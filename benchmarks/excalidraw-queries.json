@@ -1,0 +1,82 @@
+[
+  {
+    "query": "newElement newTextElement constructor create element",
+    "expected": ["packages/element/src/newElement.ts"]
+  },
+  {
+    "query": "ExcalidrawElement type definitions Rectangle Diamond Ellipse",
+    "expected": ["packages/element/src/types.ts"]
+  },
+  {
+    "query": "renderInteractiveScene canvas transform handles selection",
+    "expected": ["packages/excalidraw/renderer/interactiveScene.ts"]
+  },
+  {
+    "query": "renderStaticSvgScene SVG element conversion",
+    "expected": ["packages/excalidraw/renderer/staticSvgScene.ts"]
+  },
+  {
+    "query": "generateShape roughjs geometric element to shape",
+    "expected": ["packages/element/src/shape.ts"]
+  },
+  {
+    "query": "HistoryDelta undo redo apply inverse",
+    "expected": ["packages/excalidraw/history.ts"]
+  },
+  {
+    "query": "Store CaptureUpdateAction state delta changes",
+    "expected": ["packages/element/src/store.ts"]
+  },
+  {
+    "query": "bindLinearElement arrow binding endpoint",
+    "expected": ["packages/element/src/binding.ts"]
+  },
+  {
+    "query": "ElbowArrow routing A* pathfinding grid obstacles",
+    "expected": ["packages/element/src/elbowArrow.ts"]
+  },
+  {
+    "query": "getElementAbsoluteCoords bounding box bounds calculation",
+    "expected": ["packages/element/src/bounds.ts"]
+  },
+  {
+    "query": "hitTest isPointInElement collision detection",
+    "expected": ["packages/element/src/collision.ts"]
+  },
+  {
+    "query": "wrapText line breaks container width word wrap",
+    "expected": ["packages/element/src/textWrapping.ts"]
+  },
+  {
+    "query": "transformElements resize scale rotate aspect ratio",
+    "expected": ["packages/element/src/resizeElements.ts"]
+  },
+  {
+    "query": "frame element containment getElementsInFrame boundaries",
+    "expected": ["packages/element/src/frame.ts"]
+  },
+  {
+    "query": "restoreElements restoreAppState migrate saved data",
+    "expected": ["packages/excalidraw/data/restore.ts"]
+  },
+  {
+    "query": "Scene class element map storage getNonDeletedElements",
+    "expected": ["packages/element/src/Scene.ts"]
+  },
+  {
+    "query": "collaboration portal websocket syncElements",
+    "expected": ["excalidraw-app/collab/Collab.tsx"]
+  },
+  {
+    "query": "renderAction selectedElementActions toolbar ShapesSwitcher",
+    "expected": ["packages/excalidraw/components/Actions.tsx"]
+  },
+  {
+    "query": "actionChangeStrokeColor actionChangeBackgroundColor properties panel",
+    "expected": ["packages/excalidraw/actions/actionProperties.tsx"]
+  },
+  {
+    "query": "actionDeleteSelected fixBindingsAfterDeletion",
+    "expected": ["packages/excalidraw/actions/actionDeleteSelected.tsx"]
+  }
+]

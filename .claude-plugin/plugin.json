@@ -1,0 +1,28 @@
+{
+  "name": "local-rag",
+  "version": "0.4.0",
+  "description": "Semantic search for your codebase and conversation history — zero config, local-first, with gap analysis",
+  "author": {
+    "name": "TheWinci",
+    "url": "https://github.com/TheWinci"
+  },
+  "homepage": "https://github.com/TheWinci/local-rag",
+  "repository": "https://github.com/TheWinci/local-rag",
+  "license": "MIT",
+  "keywords": [
+    "rag",
+    "semantic-search",
+    "vector-search",
+    "codebase",
+    "local-first",
+    "embeddings",
+    "code-intelligence"
+  ],
+  "skills": "./skills/",
+  "mcpServers": {
+    "local-rag": {
+      "command": "bunx",
+      "args": ["@winci/local-rag@latest", "serve"]
+    }
+  }
+}

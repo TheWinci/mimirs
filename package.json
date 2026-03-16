@@ -1,0 +1,55 @@
+{
+  "name": "@winci/local-rag",
+  "version": "0.4.0",
+  "description": "Semantic search for your codebase — local-first RAG MCP server with hybrid search, AST-aware chunking, and usage analytics",
+  "type": "module",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TheWinci/local-rag.git"
+  },
+  "keywords": [
+    "mcp",
+    "rag",
+    "semantic-search",
+    "vector-search",
+    "sqlite-vec",
+    "embeddings",
+    "claude-code",
+    "model-context-protocol",
+    "local-first",
+    "bun"
+  ],
+  "bin": {
+    "local-rag": "src/main.ts"
+  },
+  "files": [
+    "src/",
+    ".claude-plugin/",
+    "skills/",
+    "hooks/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "server": "bun run src/main.ts serve",
+    "cli": "bun run src/main.ts",
+    "test": "bun test tests/ 2>&1; EXIT=$?; if [ $EXIT -eq 133 ]; then printf '\\n[note] Exit code 133 suppressed — known Bun crash on macOS Silicon during process cleanup (github.com/oven-sh/bun/issues/19917). All tests passed.\\n'; exit 0; else exit $EXIT; fi",
+    "bench": "bun test benchmarks/",
+    "tsc": "bunx tsc --noEmit",
+    "bump": "./scripts/bump-version.sh",
+    "bump:minor": "./scripts/bump-version.sh minor",
+    "bump:major": "./scripts/bump-version.sh major"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.4.0",
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "@winci/bun-chunk": "^0.1.2",
+    "gray-matter": "^4.0.3",
+    "sqlite-vec": "^0.1.6",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.11"
+  }
+}

@@ -1,0 +1,62 @@
+[
+  {
+    "query": "how to install and set up the project",
+    "expected": ["README.md"]
+  },
+  {
+    "query": "configure MCP server for Claude Code",
+    "expected": ["README.md"]
+  },
+  {
+    "query": "what embedding model is used",
+    "expected": ["src/embed.ts", "README.md"]
+  },
+  {
+    "query": "SQLite database schema and vector storage",
+    "expected": ["src/db.ts"]
+  },
+  {
+    "query": "how does semantic search work",
+    "expected": ["src/search.ts"]
+  },
+  {
+    "query": "file chunking strategy for code files",
+    "expected": ["src/chunker.ts"]
+  },
+  {
+    "query": "markdown frontmatter parsing",
+    "expected": ["src/parse.ts"]
+  },
+  {
+    "query": "file indexing and hash-based skip logic",
+    "expected": ["src/indexer.ts"]
+  },
+  {
+    "query": "search usage analytics and query logging",
+    "expected": ["src/db.ts"]
+  },
+  {
+    "query": "hybrid search BM25 and vector blending",
+    "expected": ["src/search.ts"]
+  },
+  {
+    "query": "file watching and auto re-index on change",
+    "expected": ["src/watcher.ts"]
+  },
+  {
+    "query": "CLI commands and argument parsing",
+    "expected": ["src/cli.ts"]
+  },
+  {
+    "query": "project configuration include exclude patterns",
+    "expected": ["src/config.ts"]
+  },
+  {
+    "query": "MCP tool registration and server setup",
+    "expected": ["src/server.ts"]
+  },
+  {
+    "query": "benchmark search quality recall MRR",
+    "expected": ["src/benchmark.ts"]
+  }
+]

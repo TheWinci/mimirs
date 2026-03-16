@@ -1,0 +1,2 @@
+This is a plain text file with no special formatting.
+It contains simple notes about the project setup and configuration.
