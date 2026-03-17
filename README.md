@@ -1,8 +1,8 @@
 # local-rag-mcp
 
-Semantic search for your codebase, zero config, with built-in gap analysis.
+Semantic search for your codebase and conversation history, zero config, with built-in gap analysis.
 
-Indexes any files — markdown, code, configs, docs — into a per-project vector store. Your AI assistant finds what it needs by meaning, not filename. Usage analytics show you where your docs are falling short.
+Indexes any files — markdown, code, configs, docs — into a per-project vector store. Also indexes AI conversation transcripts in real time, so agents can recall past decisions and discussions. Usage analytics show you where your docs are falling short.
 
 No API keys. No cloud. No Docker. Just `bun install`.
 
@@ -60,12 +60,14 @@ Omit `RAG_PROJECT_DIR` for per-project configs — the server uses cwd.
 
 ### Auto-indexing
 
-The MCP server automatically indexes your project on startup and watches for file changes during the session. You don't need to manually run `index` — just connect and search.
+The MCP server automatically indexes your project on startup and watches for file changes during the session. It also tails the active conversation transcript in real time and indexes past sessions on startup. You don't need to manually run `index` — just connect and search.
 
 Progress is logged to stderr:
 ```
 [local-rag] Startup index: 12 indexed, 0 skipped, 0 pruned
 [local-rag] Watching /path/to/project for changes
+[local-rag] Indexing conversation: a1b2c3d4...
+[local-rag] Conversation: 3 new turns indexed (total: 15)
 [local-rag] Re-indexed: docs/setup.md
 ```
 
@@ -84,6 +86,14 @@ This project has a local RAG index (local-rag-mcp). Use these MCP tools:
 - **`project_map`**: When you need to understand how files relate to each other,
   generate a dependency graph. Use `focus` to zoom into a specific file's
   neighborhood. This is faster than reading import statements across many files.
+- **`search_conversation`**: Search past conversation history to recall previous
+  decisions, discussions, and tool outputs. Use this before re-investigating
+  something that may have been discussed in an earlier session.
+- **`create_checkpoint`**: Mark important moments — decisions, milestones,
+  blockers, direction changes. Do this after completing a phase, making a key
+  technical decision, or before context gets compacted.
+- **`list_checkpoints`** / **`search_checkpoints`**: Review or search past
+  checkpoints to understand project history and prior decisions.
 - **`index_files`**: If you've created or modified files and want them searchable,
   re-index the project directory.
 - **`search_analytics`**: Check what queries return no results or low-relevance
@@ -119,6 +129,10 @@ These tools are available to any MCP client (Claude Code, etc.) once the server 
 | `remove_file` | Remove a specific file from the index |
 | `search_analytics` | Usage analytics — query counts, zero-result queries, low-relevance queries, top terms |
 | `project_map` | Generate a Mermaid dependency graph of the project — file-level or directory-level, with optional focus |
+| `search_conversation` | Search conversation history — finds past decisions, discussions, and tool outputs across sessions |
+| `create_checkpoint` | Mark an important moment — decisions, milestones, blockers, direction changes, or handoffs |
+| `list_checkpoints` | List checkpoints, most recent first. Filter by session or type |
+| `search_checkpoints` | Semantic search over checkpoint titles and summaries |
 
 ## CLI commands
 
@@ -134,6 +148,17 @@ bunx local-rag eval <file> [--dir D]         # Run A/B eval (with/without RAG)
 bunx local-rag map [dir] [--focus F]         # Generate project dependency graph
                    [--zoom file|directory]    # (Mermaid format)
                    [--max N]
+bunx local-rag conversation search <query>   # Search conversation history
+                   [--dir D] [--top N]
+bunx local-rag conversation sessions [--dir D]  # List indexed sessions
+bunx local-rag conversation index [--dir D]  # Index all sessions for a project
+bunx local-rag checkpoint create <type>      # Create a checkpoint
+                   <title> <summary>
+                   [--dir D] [--files f1,f2] [--tags t1,t2]
+bunx local-rag checkpoint list [--dir D]     # List checkpoints
+                   [--type T] [--top N]
+bunx local-rag checkpoint search <query>     # Search checkpoints
+                   [--dir D] [--type T] [--top N]
 ```
 
 ## Measuring search quality
@@ -299,12 +324,17 @@ graph TD
   watcher_ts["watcher.ts\n+ matchesAny\n+ startWatcher"]
   benchmark_ts["benchmark.ts\n+ BenchmarkQuery\n+ BenchmarkResult\n+ BenchmarkSummary"]
   eval_ts["eval.ts\n+ EvalTask\n+ EvalTrace\n+ EvalSummary"]
+  conversation_ts["conversation.ts\n+ readJSONL\n+ parseTurns\n+ discoverSessions"]
+  conversation_index_ts["conversation-index.ts\n+ indexConversation\n+ startConversationTail"]
   server_ts --> db_ts
   server_ts --> config_ts
   server_ts --> indexer_ts
   server_ts --> search_ts
   server_ts --> watcher_ts
   server_ts --> graph_ts
+  server_ts --> embed_ts
+  server_ts --> conversation_ts
+  server_ts --> conversation_index_ts
   cli_ts --> db_ts
   cli_ts --> config_ts
   cli_ts --> indexer_ts
@@ -312,6 +342,13 @@ graph TD
   cli_ts --> benchmark_ts
   cli_ts --> eval_ts
   cli_ts --> graph_ts
+  cli_ts --> embed_ts
+  cli_ts --> conversation_ts
+  cli_ts --> conversation_index_ts
+  conversation_index_ts --> conversation_ts
+  conversation_index_ts --> chunker_ts
+  conversation_index_ts --> embed_ts
+  conversation_index_ts --> db_ts
   indexer_ts --> parse_ts
   indexer_ts --> embed_ts
   indexer_ts --> chunker_ts
@@ -389,10 +426,23 @@ flowchart TD
   K --> M["Query log"]
   M --> N["Analytics\ngaps & trends"]
 
+  O["💬 JSONL transcripts"] --> P["Tail & parse turns"]
+  P --> Q["Chunk + embed turns"]
+  Q --> F
+  G -->|"past discussion"| R["Conversation search\nvector + BM25"]
+  R --> S["Relevant turns\nwith tool context"]
+  G -->|"mark moment"| T["Create checkpoint"]
+  T --> F
+  G -->|"recall history"| U["Search checkpoints"]
+  U --> V["Decisions, milestones,\nblockers, handoffs"]
+
   style A fill:#f9f9f9,stroke:#333
+  style O fill:#f9f9f9,stroke:#333
   style F fill:#e8f5e9,stroke:#388e3c
   style K fill:#e1f5fe,stroke:#0288d1
   style L fill:#e1f5fe,stroke:#0288d1
+  style S fill:#e1f5fe,stroke:#0288d1
+  style V fill:#e1f5fe,stroke:#0288d1
   style N fill:#fff3e0,stroke:#f57c00
 ```
 
@@ -413,6 +463,10 @@ flowchart TD
 7. **Watcher** — The MCP server watches for file changes with a 2-second debounce. Changed files are re-indexed and their import relationships re-resolved. Deleted files are pruned automatically.
 
 8. **Analytics** — Every search query is logged with result count, top score, and latency. Analytics surface zero-result queries (missing docs), low-relevance queries (weak docs), top search terms, and period-over-period trends.
+
+9. **Conversation index** — The MCP server tails the active JSONL transcript in real time via `fs.watch`. Each user/assistant turn is chunked, embedded, and stored — searchable within seconds. Past sessions are discovered and indexed incrementally on startup. Tool results from Bash/Grep are indexed (Read/Write/Edit are skipped since file content is already in the code index).
+
+10. **Checkpoints** — Agents create named snapshots at important moments: decisions, milestones, blockers, direction changes, and handoffs. Each checkpoint has a title, summary, and embedding for semantic search. This gives future sessions a high-signal trail of what happened and why.
 
 ## Stack
 

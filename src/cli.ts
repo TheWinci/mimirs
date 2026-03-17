@@ -8,6 +8,9 @@ import { search } from "./search";
 import { loadBenchmarkQueries, runBenchmark, formatBenchmarkReport } from "./benchmark";
 import { loadEvalTasks, runEval, formatEvalReport, saveEvalTraces } from "./eval";
 import { generateMermaid } from "./graph";
+import { embed } from "./embed";
+import { discoverSessions } from "./conversation";
+import { indexConversation } from "./conversation-index";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -29,6 +32,18 @@ Usage:
   local-rag map [dir] [--focus F]       Generate project dependency graph
                 [--zoom file|directory]  (Mermaid format)
                 [--max N]
+  local-rag conversation search <query> Search conversation history
+                [--dir D] [--top N]
+  local-rag conversation sessions       List indexed sessions
+                [--dir D]
+  local-rag conversation index [--dir D] Index all sessions for a project
+  local-rag checkpoint create <type>    Create a checkpoint
+                <title> <summary>
+                [--dir D] [--files f1,f2] [--tags t1,t2]
+  local-rag checkpoint list [--dir D]   List checkpoints
+                [--type T] [--top N]
+  local-rag checkpoint search <query>   Search checkpoints
+                [--dir D] [--type T] [--top N]
 
 Options:
   dir       Project directory (default: current directory)
@@ -264,6 +279,185 @@ async function main() {
       if (summary.recallAtK < config.benchmarkMinRecall || summary.mrr < config.benchmarkMinMrr) {
         process.exit(1);
       }
+      break;
+    }
+
+    case "conversation": {
+      const subCommand = args[1];
+      const dir = resolve(getFlag("--dir") || ".");
+      const db = new RagDB(dir);
+
+      if (subCommand === "search") {
+        const query = args[2];
+        if (!query) {
+          console.error("Usage: local-rag conversation search <query> [--dir D] [--top N]");
+          process.exit(1);
+        }
+
+        const config = await loadConfig(dir);
+        const top = parseInt(getFlag("--top") || String(config.searchTopK), 10);
+
+        // Ensure conversations are indexed
+        const sessions = discoverSessions(dir);
+        for (const session of sessions) {
+          const existing = db.getSession(session.sessionId);
+          if (!existing || existing.mtime < session.mtime) {
+            await indexConversation(session.jsonlPath, session.sessionId, db);
+          }
+        }
+
+        // Hybrid search
+        const queryEmb = await embed(query);
+        const vecResults = db.searchConversation(queryEmb, top);
+        let bm25Results: typeof vecResults = [];
+        try {
+          bm25Results = db.textSearchConversation(query, top);
+        } catch { /* FTS can fail on special chars */ }
+
+        const merged = new Map<number, (typeof vecResults)[0]>();
+        for (const r of vecResults) {
+          merged.set(r.turnId, { ...r, score: r.score * config.hybridWeight });
+        }
+        for (const r of bm25Results) {
+          const existing = merged.get(r.turnId);
+          if (existing) {
+            existing.score += r.score * (1 - config.hybridWeight);
+          } else {
+            merged.set(r.turnId, { ...r, score: r.score * (1 - config.hybridWeight) });
+          }
+        }
+
+        const results = [...merged.values()].sort((a, b) => b.score - a.score).slice(0, top);
+
+        if (results.length === 0) {
+          console.log("No conversation results found.");
+        } else {
+          for (const r of results) {
+            const tools = r.toolsUsed.length > 0 ? ` [${r.toolsUsed.join(", ")}]` : "";
+            console.log(`Turn ${r.turnIndex} (${r.timestamp})${tools}`);
+            console.log(`  ${r.snippet.slice(0, 200)}`);
+            if (r.filesReferenced.length > 0) {
+              console.log(`  Files: ${r.filesReferenced.slice(0, 5).join(", ")}`);
+            }
+            console.log();
+          }
+        }
+      } else if (subCommand === "sessions") {
+        const sessions = discoverSessions(dir);
+        if (sessions.length === 0) {
+          console.log("No conversation sessions found for this project.");
+        } else {
+          for (const s of sessions) {
+            const indexed = db.getSession(s.sessionId);
+            const status = indexed ? `${indexed.turnCount} turns indexed` : "not indexed";
+            const date = new Date(s.mtime).toISOString().slice(0, 19);
+            console.log(`  ${s.sessionId.slice(0, 8)}...  ${date}  ${status}  (${(s.size / 1024).toFixed(0)}KB)`);
+          }
+        }
+      } else if (subCommand === "index") {
+        const sessions = discoverSessions(dir);
+        if (sessions.length === 0) {
+          console.log("No conversation sessions found for this project.");
+        } else {
+          console.log(`Found ${sessions.length} sessions, indexing...`);
+          let totalTurns = 0;
+          for (const session of sessions) {
+            const result = await indexConversation(session.jsonlPath, session.sessionId, db);
+            totalTurns += result.turnsIndexed;
+            if (result.turnsIndexed > 0) {
+              console.log(`  ${session.sessionId.slice(0, 8)}...: ${result.turnsIndexed} turns`);
+            }
+          }
+          console.log(`Done: ${totalTurns} turns indexed across ${sessions.length} sessions`);
+        }
+      } else {
+        console.error("Usage: local-rag conversation <search|sessions|index>");
+        process.exit(1);
+      }
+
+      db.close();
+      break;
+    }
+
+    case "checkpoint": {
+      const subCommand = args[1];
+      const dir = resolve(getFlag("--dir") || ".");
+      const db = new RagDB(dir);
+
+      if (subCommand === "create") {
+        const type = args[2];
+        const title = args[3];
+        const summary = args[4];
+        if (!type || !title || !summary) {
+          console.error("Usage: local-rag checkpoint create <type> <title> <summary> [--dir D] [--files f1,f2] [--tags t1,t2]");
+          process.exit(1);
+        }
+
+        const filesStr = getFlag("--files");
+        const tagsStr = getFlag("--tags");
+        const filesInvolved = filesStr ? filesStr.split(",").map((f) => f.trim()) : [];
+        const tags = tagsStr ? tagsStr.split(",").map((t) => t.trim()) : [];
+
+        const sessions = discoverSessions(dir);
+        const sessionId = sessions.length > 0 ? sessions[0].sessionId : "unknown";
+        const turnCount = db.getTurnCount(sessionId);
+        const turnIndex = Math.max(0, turnCount - 1);
+
+        const embedding = await embed(`${title}. ${summary}`);
+        const id = db.createCheckpoint(
+          sessionId, turnIndex, new Date().toISOString(),
+          type, title, summary, filesInvolved, tags, embedding
+        );
+        console.log(`Checkpoint #${id} created: [${type}] ${title}`);
+      } else if (subCommand === "list") {
+        const type = getFlag("--type");
+        const top = parseInt(getFlag("--top") || "20", 10);
+        const checkpoints = db.listCheckpoints(undefined, type, top);
+
+        if (checkpoints.length === 0) {
+          console.log("No checkpoints found.");
+        } else {
+          for (const cp of checkpoints) {
+            const tagStr = cp.tags.length > 0 ? ` [${cp.tags.join(", ")}]` : "";
+            console.log(`#${cp.id} [${cp.type}] ${cp.title}${tagStr}`);
+            console.log(`  ${cp.timestamp} (turn ${cp.turnIndex})`);
+            console.log(`  ${cp.summary}`);
+            if (cp.filesInvolved.length > 0) {
+              console.log(`  Files: ${cp.filesInvolved.join(", ")}`);
+            }
+            console.log();
+          }
+        }
+      } else if (subCommand === "search") {
+        const query = args[2];
+        if (!query) {
+          console.error("Usage: local-rag checkpoint search <query> [--dir D] [--type T] [--top N]");
+          process.exit(1);
+        }
+
+        const type = getFlag("--type");
+        const top = parseInt(getFlag("--top") || "5", 10);
+        const queryEmb = await embed(query);
+        const results = db.searchCheckpoints(queryEmb, top, type);
+
+        if (results.length === 0) {
+          console.log("No matching checkpoints found.");
+        } else {
+          for (const cp of results) {
+            console.log(`${cp.score.toFixed(4)}  #${cp.id} [${cp.type}] ${cp.title}`);
+            console.log(`  ${cp.summary}`);
+            if (cp.filesInvolved.length > 0) {
+              console.log(`  Files: ${cp.filesInvolved.join(", ")}`);
+            }
+            console.log();
+          }
+        }
+      } else {
+        console.error("Usage: local-rag checkpoint <create|list|search>");
+        process.exit(1);
+      }
+
+      db.close();
       break;
     }
 

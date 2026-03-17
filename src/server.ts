@@ -9,6 +9,9 @@ import { indexDirectory } from "./indexer";
 import { search } from "./search";
 import { startWatcher } from "./watcher";
 import { generateMermaid } from "./graph";
+import { embed } from "./embed";
+import { discoverSessions } from "./conversation";
+import { indexConversation, startConversationTail } from "./conversation-index";
 import { resolve } from "path";
 
 const server = new McpServer({
@@ -260,12 +263,236 @@ server.tool(
   }
 );
 
+server.tool(
+  "search_conversation",
+  "Search through conversation history. Finds past decisions, discussions, and tool outputs from current or previous sessions.",
+  {
+    query: z.string().describe("What to search for in conversation history"),
+    directory: z
+      .string()
+      .optional()
+      .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
+    sessionId: z
+      .string()
+      .optional()
+      .describe("Limit search to a specific session ID. Omit to search all sessions."),
+    top: z
+      .number()
+      .optional()
+      .default(5)
+      .describe("Number of results to return (default: 5)"),
+  },
+  async ({ query, directory, sessionId, top }) => {
+    const projectDir = directory || process.env.RAG_PROJECT_DIR || process.cwd();
+    const ragDb = getDB(projectDir);
+    const config = await loadConfig(projectDir);
+
+    // Hybrid search: vector + BM25
+    const queryEmb = await embed(query);
+    const vecResults = ragDb.searchConversation(queryEmb, top, sessionId);
+
+    let bm25Results: typeof vecResults = [];
+    try {
+      bm25Results = ragDb.textSearchConversation(query, top, sessionId);
+    } catch {
+      // FTS can fail on special characters
+    }
+
+    // Merge and deduplicate by turnId
+    const merged = new Map<number, (typeof vecResults)[0]>();
+    const hybridWeight = config.hybridWeight;
+
+    for (const r of vecResults) {
+      merged.set(r.turnId, { ...r, score: r.score * hybridWeight });
+    }
+    for (const r of bm25Results) {
+      const existing = merged.get(r.turnId);
+      if (existing) {
+        existing.score += r.score * (1 - hybridWeight);
+      } else {
+        merged.set(r.turnId, { ...r, score: r.score * (1 - hybridWeight) });
+      }
+    }
+
+    const results = [...merged.values()]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, top);
+
+    if (results.length === 0) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: "No conversation results found. The conversation may not be indexed yet.",
+        }],
+      };
+    }
+
+    const text = results
+      .map((r) => {
+        const tools = r.toolsUsed.length > 0 ? ` [${r.toolsUsed.join(", ")}]` : "";
+        const files = r.filesReferenced.length > 0
+          ? `\n  Files: ${r.filesReferenced.slice(0, 5).join(", ")}`
+          : "";
+        return `Turn ${r.turnIndex} (${r.timestamp})${tools}\n  ${r.snippet.slice(0, 200)}...${files}`;
+      })
+      .join("\n\n");
+
+    return {
+      content: [{ type: "text" as const, text }],
+    };
+  }
+);
+
+server.tool(
+  "create_checkpoint",
+  "Create a named checkpoint marking an important moment in the conversation — a decision, milestone, blocker, direction change, or handoff.",
+  {
+    type: z
+      .enum(["decision", "milestone", "blocker", "direction_change", "handoff"])
+      .describe("Type of checkpoint"),
+    title: z.string().describe("Short label, e.g. 'Chose JWT over session cookies'"),
+    summary: z
+      .string()
+      .describe("2-3 sentence description of what happened and why"),
+    filesInvolved: z
+      .array(z.string())
+      .optional()
+      .describe("Files relevant to this checkpoint"),
+    tags: z
+      .array(z.string())
+      .optional()
+      .describe("Freeform tags for filtering"),
+    directory: z
+      .string()
+      .optional()
+      .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
+  },
+  async ({ type, title, summary, filesInvolved, tags, directory }) => {
+    const projectDir = directory || process.env.RAG_PROJECT_DIR || process.cwd();
+    const ragDb = getDB(projectDir);
+
+    // Get current session's latest turn index
+    const sessions = discoverSessions(projectDir);
+    const sessionId = sessions.length > 0 ? sessions[0].sessionId : "unknown";
+
+    // Determine turn index from DB
+    const turnCount = ragDb.getTurnCount(sessionId);
+    const turnIndex = Math.max(0, turnCount - 1);
+
+    // Embed title + summary for semantic search
+    const embText = `${title}. ${summary}`;
+    const embedding = await embed(embText);
+
+    const id = ragDb.createCheckpoint(
+      sessionId,
+      turnIndex,
+      new Date().toISOString(),
+      type,
+      title,
+      summary,
+      filesInvolved ?? [],
+      tags ?? [],
+      embedding
+    );
+
+    return {
+      content: [{
+        type: "text" as const,
+        text: `Checkpoint #${id} created: [${type}] ${title}`,
+      }],
+    };
+  }
+);
+
+server.tool(
+  "list_checkpoints",
+  "List conversation checkpoints, most recent first. Cross-session by default.",
+  {
+    sessionId: z.string().optional().describe("Limit to a specific session ID"),
+    type: z
+      .enum(["decision", "milestone", "blocker", "direction_change", "handoff"])
+      .optional()
+      .describe("Filter by checkpoint type"),
+    limit: z.number().optional().default(20).describe("Max results (default: 20)"),
+    directory: z
+      .string()
+      .optional()
+      .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
+  },
+  async ({ sessionId, type, limit, directory }) => {
+    const projectDir = directory || process.env.RAG_PROJECT_DIR || process.cwd();
+    const ragDb = getDB(projectDir);
+
+    const checkpoints = ragDb.listCheckpoints(sessionId, type, limit);
+
+    if (checkpoints.length === 0) {
+      return {
+        content: [{ type: "text" as const, text: "No checkpoints found." }],
+      };
+    }
+
+    const text = checkpoints
+      .map((cp) => {
+        const files = cp.filesInvolved.length > 0
+          ? `\n  Files: ${cp.filesInvolved.join(", ")}`
+          : "";
+        const tagStr = cp.tags.length > 0 ? ` [${cp.tags.join(", ")}]` : "";
+        return `#${cp.id} [${cp.type}] ${cp.title}${tagStr}\n  ${cp.timestamp} (turn ${cp.turnIndex})\n  ${cp.summary}${files}`;
+      })
+      .join("\n\n");
+
+    return { content: [{ type: "text" as const, text }] };
+  }
+);
+
+server.tool(
+  "search_checkpoints",
+  "Semantic search over checkpoint titles and summaries.",
+  {
+    query: z.string().describe("What to search for in checkpoints"),
+    type: z
+      .enum(["decision", "milestone", "blocker", "direction_change", "handoff"])
+      .optional()
+      .describe("Filter by checkpoint type"),
+    limit: z.number().optional().default(5).describe("Max results (default: 5)"),
+    directory: z
+      .string()
+      .optional()
+      .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
+  },
+  async ({ query, type, limit, directory }) => {
+    const projectDir = directory || process.env.RAG_PROJECT_DIR || process.cwd();
+    const ragDb = getDB(projectDir);
+
+    const queryEmb = await embed(query);
+    const results = ragDb.searchCheckpoints(queryEmb, limit, type);
+
+    if (results.length === 0) {
+      return {
+        content: [{ type: "text" as const, text: "No matching checkpoints found." }],
+      };
+    }
+
+    const text = results
+      .map((cp) => {
+        const files = cp.filesInvolved.length > 0
+          ? `\n  Files: ${cp.filesInvolved.join(", ")}`
+          : "";
+        return `${cp.score.toFixed(4)}  #${cp.id} [${cp.type}] ${cp.title}\n  ${cp.summary}${files}`;
+      })
+      .join("\n\n");
+
+    return { content: [{ type: "text" as const, text }] };
+  }
+);
+
 // Auto-index on startup + start file watcher
 const startupDir = process.env.RAG_PROJECT_DIR || process.cwd();
 const startupDb = getDB(startupDir);
 const startupConfig = await loadConfig(startupDir);
 
 let watcher: import("fs").FSWatcher | null = null;
+let convWatcher: import("fs").FSWatcher | null = null;
 
 // Index in background — don't block server startup
 indexDirectory(startupDir, startupDb, startupConfig, (msg) => {
@@ -281,10 +508,46 @@ indexDirectory(startupDir, startupDb, startupConfig, (msg) => {
   });
 });
 
+// Start conversation tailing — find and tail the current session's JSONL
+const sessions = discoverSessions(startupDir);
+if (sessions.length > 0) {
+  // Tail the most recent session (likely the current one)
+  const currentSession = sessions[0];
+  process.stderr.write(`[local-rag] Indexing conversation: ${currentSession.sessionId.slice(0, 8)}...\n`);
+
+  convWatcher = startConversationTail(
+    currentSession.jsonlPath,
+    currentSession.sessionId,
+    startupDb,
+    (msg) => process.stderr.write(`[local-rag] ${msg}\n`)
+  );
+
+  // Also index any older sessions that haven't been indexed yet
+  for (const session of sessions.slice(1)) {
+    const existing = startupDb.getSession(session.sessionId);
+    if (!existing || existing.mtime < session.mtime) {
+      indexConversation(
+        session.jsonlPath,
+        session.sessionId,
+        startupDb
+      ).then((result) => {
+        if (result.turnsIndexed > 0) {
+          process.stderr.write(
+            `[local-rag] Indexed past session ${session.sessionId.slice(0, 8)}...: ${result.turnsIndexed} turns\n`
+          );
+        }
+      }).catch(() => {
+        // Non-critical — skip broken transcripts
+      });
+    }
+  }
+}
+
 // Graceful shutdown
 function cleanup() {
   process.stderr.write("[local-rag] Shutting down...\n");
   if (watcher) watcher.close();
+  if (convWatcher) convWatcher.close();
   if (db) db.close();
   process.exit(0);
 }

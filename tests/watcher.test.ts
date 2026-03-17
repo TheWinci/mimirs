@@ -112,10 +112,17 @@ describe("startWatcher", () => {
     // Delete the file
     await unlink(join(tempDir, "to-delete.md"));
 
-    // Wait for debounce + processing
-    await new Promise((r) => setTimeout(r, 4000));
+    // Wait for fs.watch + debounce + processing (poll to avoid flakiness)
+    let removed = false;
+    for (let i = 0; i < 10; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      if (db.getStatus().totalFiles === 0) {
+        removed = true;
+        break;
+      }
+    }
 
-    expect(db.getStatus().totalFiles).toBe(0);
+    expect(removed).toBe(true);
 
     watcher.close();
   });
