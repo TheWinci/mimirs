@@ -5,6 +5,8 @@ import { RagDB } from "./db";
 import { loadConfig, writeDefaultConfig } from "./config";
 import { indexDirectory } from "./indexer";
 import { search } from "./search";
+import { loadBenchmarkQueries, runBenchmark, formatBenchmarkReport } from "./benchmark";
+import { loadEvalTasks, runEval, formatEvalReport, saveEvalTraces } from "./eval";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -19,6 +21,10 @@ Usage:
   local-rag status [dir]                  Show index stats
   local-rag remove <file> [dir]           Remove file from index
   local-rag analytics [dir] [--days N]    Show search usage analytics
+  local-rag benchmark <file> [--dir D]   Run search quality benchmark
+                       [--top N]
+  local-rag eval <file> [--dir D]       Run A/B eval (with/without RAG)
+                  [--top N] [--out F]
 
 Options:
   dir       Project directory (default: current directory)
@@ -164,7 +170,75 @@ async function main() {
         }
       }
 
+      // Trend comparison vs prior period
+      const trend = db.getAnalyticsTrend(days);
+      if (trend.previous.totalQueries > 0 || trend.current.totalQueries > 0) {
+        const arrow = (delta: number) => delta > 0 ? `+${delta}` : `${delta}`;
+        const pctArrow = (delta: number) =>
+          delta > 0 ? `+${(delta * 100).toFixed(1)}%` : `${(delta * 100).toFixed(1)}%`;
+
+        console.log(`\nTrend (current ${days}d vs prior ${days}d):`);
+        console.log(`  Queries:          ${trend.current.totalQueries} (${arrow(trend.delta.queries)})`);
+        if (trend.delta.avgTopScore !== null) {
+          console.log(`  Avg top score:    ${trend.current.avgTopScore?.toFixed(2)} (${trend.delta.avgTopScore >= 0 ? "+" : ""}${trend.delta.avgTopScore.toFixed(2)})`);
+        }
+        console.log(`  Zero-result rate: ${(trend.current.zeroResultRate * 100).toFixed(0)}% (${pctArrow(trend.delta.zeroResultRate)})`);
+      }
+
       db.close();
+      break;
+    }
+
+    case "eval": {
+      const file = args[1];
+      if (!file) {
+        console.error("Usage: local-rag eval <file> [--dir D] [--top N] [--out F]");
+        process.exit(1);
+      }
+
+      const dir = resolve(getFlag("--dir") || ".");
+      const top = parseInt(getFlag("--top") || "5", 10);
+      const outPath = getFlag("--out");
+      const db = new RagDB(dir);
+
+      const tasks = await loadEvalTasks(resolve(file));
+      console.log(`Running A/B eval with ${tasks.length} tasks against ${dir}...\n`);
+
+      const summary = await runEval(tasks, db, dir, top);
+      console.log(formatEvalReport(summary));
+
+      if (outPath) {
+        await saveEvalTraces(summary.traces, resolve(outPath));
+        console.log(`\nTraces saved to ${outPath}`);
+      }
+
+      db.close();
+      break;
+    }
+
+    case "benchmark": {
+      const file = args[1];
+      if (!file) {
+        console.error("Usage: local-rag benchmark <file> [--dir D] [--top N]");
+        process.exit(1);
+      }
+
+      const dir = resolve(getFlag("--dir") || ".");
+      const top = parseInt(getFlag("--top") || "5", 10);
+      const db = new RagDB(dir);
+
+      const queries = await loadBenchmarkQueries(resolve(file));
+      console.log(`Running ${queries.length} benchmark queries against ${dir}...\n`);
+
+      const summary = await runBenchmark(queries, db, dir, top);
+      console.log(formatBenchmarkReport(summary, top));
+
+      db.close();
+
+      // Exit with non-zero if below thresholds
+      if (summary.recallAtK < 0.8 || summary.mrr < 0.6) {
+        process.exit(1);
+      }
       break;
     }
 

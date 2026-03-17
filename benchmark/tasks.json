@@ -1,0 +1,27 @@
+[
+  {
+    "task": "Explain how authentication or access control works in this project",
+    "grading": "Should correctly state there is no auth — this is a local-only tool with no access control",
+    "expectedFiles": ["src/server.ts", "README.md"]
+  },
+  {
+    "task": "How does the project handle files that haven't changed since last indexing?",
+    "grading": "Must reference SHA-256 hash comparison and skip logic in the indexer",
+    "expectedFiles": ["src/indexer.ts"]
+  },
+  {
+    "task": "What happens when a search query returns no results?",
+    "grading": "Must reference query logging for analytics (zero-result tracking) and the CLI output message",
+    "expectedFiles": ["src/search.ts", "src/cli.ts"]
+  },
+  {
+    "task": "How are large files split before embedding?",
+    "grading": "Must reference chunking strategies: markdown heading-based, AST-aware for code, paragraph-based for text, with configurable overlap",
+    "expectedFiles": ["src/chunker.ts"]
+  },
+  {
+    "task": "What database does this project use and why?",
+    "grading": "Must reference sqlite-vec, Bun's built-in SQLite, single .db file per project, and vector search capability",
+    "expectedFiles": ["src/db.ts", "README.md"]
+  }
+]

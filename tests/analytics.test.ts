@@ -88,6 +88,32 @@ describe("query logging", () => {
     expect(analytics.queriesPerDay).toEqual([]);
   });
 
+  test("getAnalyticsTrend compares current vs prior period", () => {
+    // All queries logged now → they fall in the "current" period
+    db.logQuery("q1", 2, 0.6, "/a.md", 30);
+    db.logQuery("q2", 0, null, null, 25);
+    db.logQuery("q3", 3, 0.8, "/b.md", 40);
+
+    const trend = db.getAnalyticsTrend(7);
+
+    // Current period has 3 queries, prior has 0
+    expect(trend.current.totalQueries).toBe(3);
+    expect(trend.previous.totalQueries).toBe(0);
+    expect(trend.delta.queries).toBe(3);
+
+    // Zero-result rate: 1 out of 3
+    expect(trend.current.zeroResultRate).toBeCloseTo(1 / 3, 2);
+    expect(trend.previous.zeroResultRate).toBe(0);
+  });
+
+  test("getAnalyticsTrend handles empty data", () => {
+    const trend = db.getAnalyticsTrend(7);
+    expect(trend.current.totalQueries).toBe(0);
+    expect(trend.previous.totalQueries).toBe(0);
+    expect(trend.delta.queries).toBe(0);
+    expect(trend.delta.avgTopScore).toBeNull();
+  });
+
   test("top searched terms are ranked by count", () => {
     db.logQuery("popular", 2, 0.5, "/a.md", 20);
     db.logQuery("popular", 3, 0.6, "/b.md", 25);

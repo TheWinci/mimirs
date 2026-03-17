@@ -343,6 +343,56 @@ export class RagDB {
     };
   }
 
+  getAnalyticsTrend(days: number = 7): {
+    current: { totalQueries: number; avgTopScore: number | null; zeroResultRate: number };
+    previous: { totalQueries: number; avgTopScore: number | null; zeroResultRate: number };
+    delta: { queries: number; avgTopScore: number | null; zeroResultRate: number };
+  } {
+    const now = Date.now();
+    const currentStart = new Date(now - days * 86400000).toISOString();
+    const previousStart = new Date(now - days * 2 * 86400000).toISOString();
+
+    const getCounts = (since: string, until: string) => {
+      const total = this.db
+        .query<{ count: number }, [string, string]>(
+          "SELECT COUNT(*) as count FROM query_log WHERE created_at >= ? AND created_at < ?"
+        )
+        .get(since, until)!;
+
+      const avgScore = this.db
+        .query<{ avg: number | null }, [string, string]>(
+          "SELECT AVG(top_score) as avg FROM query_log WHERE top_score IS NOT NULL AND created_at >= ? AND created_at < ?"
+        )
+        .get(since, until)!;
+
+      const zeroCount = this.db
+        .query<{ count: number }, [string, string]>(
+          "SELECT COUNT(*) as count FROM query_log WHERE result_count = 0 AND created_at >= ? AND created_at < ?"
+        )
+        .get(since, until)!;
+
+      const zeroResultRate = total.count > 0 ? zeroCount.count / total.count : 0;
+
+      return { totalQueries: total.count, avgTopScore: avgScore.avg, zeroResultRate };
+    };
+
+    // Use a far-future upper bound for current period to include all recent entries
+    const farFuture = "9999-12-31T23:59:59.999Z";
+    const current = getCounts(currentStart, farFuture);
+    const previous = getCounts(previousStart, currentStart);
+
+    const delta = {
+      queries: current.totalQueries - previous.totalQueries,
+      avgTopScore:
+        current.avgTopScore !== null && previous.avgTopScore !== null
+          ? current.avgTopScore - previous.avgTopScore
+          : null,
+      zeroResultRate: current.zeroResultRate - previous.zeroResultRate,
+    };
+
+    return { current, previous, delta };
+  }
+
   getStatus(): { totalFiles: number; totalChunks: number; lastIndexed: string | null } {
     const files = this.db
       .query<{ count: number }, []>("SELECT COUNT(*) as count FROM files")

@@ -108,7 +108,103 @@ bunx local-rag search <query> [--top N]       # Search by meaning
 bunx local-rag status [dir]                   # Show index stats
 bunx local-rag remove <file> [dir]            # Remove a file from the index
 bunx local-rag analytics [dir] [--days N]     # Show search usage analytics
+bunx local-rag benchmark <file> [--dir D]    # Run search quality benchmark
+bunx local-rag eval <file> [--dir D]         # Run A/B eval (with/without RAG)
 ```
+
+## Measuring search quality
+
+Two tools help you measure whether the RAG index is actually working: a **benchmark** for search precision and an **A/B eval** for comparing agent behavior with and without RAG.
+
+### Benchmark
+
+Tests whether specific queries find the right files. Create a JSON file with query/expected pairs:
+
+```json
+[
+  { "query": "how to deploy", "expected": ["docs/deploy.md"] },
+  { "query": "database schema", "expected": ["src/db.ts", "docs/database.md"] }
+]
+```
+
+Run it against an indexed project:
+
+```bash
+bunx local-rag index /path/to/project
+bunx local-rag benchmark queries.json --dir /path/to/project
+```
+
+Output:
+
+```
+Benchmark results (15 queries, top-5):
+  Recall@5:      86.7%
+  MRR:           0.743
+  Zero-miss rate: 6.7% (1 queries)
+
+Missed queries (no expected file in results):
+  "kubernetes pod config"
+    expected: docs/k8s.md
+    got:      docs/deploy.md, docs/infra.md
+```
+
+- **Recall@5** — what % of expected files appeared in the top 5 results
+- **MRR** — how high the first correct result ranks on average (1.0 = always #1)
+- **Zero-miss rate** — what % of queries found none of the expected files
+
+The command exits with code 1 if Recall@5 < 80% or MRR < 0.6, so you can use it in CI.
+
+### A/B eval
+
+Compares what files the RAG server would surface for a task versus having no RAG at all. Create a task file:
+
+```json
+[
+  {
+    "task": "Explain how authentication works",
+    "grading": "Must reference auth middleware and session handling",
+    "expectedFiles": ["src/auth.ts"]
+  }
+]
+```
+
+Run it:
+
+```bash
+bunx local-rag eval tasks.json --dir /path/to/project
+```
+
+Output:
+
+```
+A/B Eval results (5 tasks):
+
+                     With RAG    Without RAG
+  Avg results:            3.2            0.0
+  Avg files found:        3.2            0.0
+  File hit rate:         100%             0%
+  Avg latency:           48ms            0ms
+
+Per-task breakdown:
+  "Explain how authentication works"
+    files found: auth.ts, session.ts
+    grading: Must reference auth middleware and session handling
+```
+
+Save full traces with `--out traces.json` for manual review or LLM-as-judge scoring.
+
+### Writing your own benchmark set
+
+A good benchmark set has 15-50 queries that cover:
+
+1. **Core concepts** — queries about the main things your project does
+2. **Specific files** — queries that should land on a known file
+3. **Cross-cutting concerns** — queries that touch multiple files
+4. **Edge cases** — queries using different phrasing for the same concept
+
+See `benchmark/queries.json` and `benchmark/tasks.json` in this repo for examples.
+
+Re-run the benchmark after changing chunking settings, include patterns, or `hybridWeight` to see if search quality improves.
 
 ## Analytics
 
@@ -134,6 +230,15 @@ Low-relevance queries (top score < 0.3):
 ```
 
 **Zero-result queries** tell you what topics your docs are missing. **Low-relevance queries** tell you where docs exist but don't answer the actual question. Both are actionable.
+
+The analytics output also includes a **trend comparison** showing how metrics changed versus the prior period:
+
+```
+Trend (current 30d vs prior 30d):
+  Queries:          142 (+38)
+  Avg top score:    0.58 (+0.05)
+  Zero-result rate: 12% (-3.0%)
+```
 
 ## Configuration
 
