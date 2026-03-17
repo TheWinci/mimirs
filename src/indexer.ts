@@ -105,10 +105,16 @@ export async function indexFile(
       filePath
     );
 
-    const embeddedChunks: { snippet: string; embedding: Float32Array }[] = [];
+    const embeddedChunks: { snippet: string; embedding: Float32Array; entityName?: string | null; chunkType?: string | null }[] = [];
     for (const chunk of chunks) {
       const embedding = await embed(chunk.text);
-      embeddedChunks.push({ snippet: chunk.text, embedding });
+      const primaryExport = chunk.exports?.[0];
+      embeddedChunks.push({
+        snippet: chunk.text,
+        embedding,
+        entityName: primaryExport?.name ?? null,
+        chunkType: primaryExport?.type ?? null,
+      });
     }
 
     db.upsertFile(filePath, hash, embeddedChunks);
@@ -164,10 +170,16 @@ export async function indexDirectory(
         filePath
       );
 
-      const embeddedChunks: { snippet: string; embedding: Float32Array }[] = [];
+      const embeddedChunks: { snippet: string; embedding: Float32Array; entityName?: string | null; chunkType?: string | null }[] = [];
       for (const chunk of chunks) {
         const embedding = await embed(chunk.text);
-        embeddedChunks.push({ snippet: chunk.text, embedding });
+        const primaryExport = chunk.exports?.[0];
+        embeddedChunks.push({
+          snippet: chunk.text,
+          embedding,
+          entityName: primaryExport?.name ?? null,
+          chunkType: primaryExport?.type ?? null,
+        });
       }
 
       db.upsertFile(filePath, hash, embeddedChunks);

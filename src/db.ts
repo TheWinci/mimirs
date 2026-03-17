@@ -34,6 +34,8 @@ export interface StoredChunk {
   fileId: number;
   chunkIndex: number;
   snippet: string;
+  entityName: string | null;
+  chunkType: string | null;
 }
 
 export interface StoredFile {
@@ -48,6 +50,17 @@ export interface SearchResult {
   score: number;
   snippet: string;
   chunkIndex: number;
+  entityName: string | null;
+  chunkType: string | null;
+}
+
+export interface ChunkSearchResult {
+  path: string;
+  score: number;
+  content: string;
+  chunkIndex: number;
+  entityName: string | null;
+  chunkType: string | null;
 }
 
 export interface CheckpointRow {
@@ -100,7 +113,9 @@ export class RagDB {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
         chunk_index INTEGER NOT NULL,
-        snippet TEXT NOT NULL
+        snippet TEXT NOT NULL,
+        entity_name TEXT,
+        chunk_type TEXT
       );
 
       CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
@@ -227,6 +242,24 @@ export class RagDB {
         created_at TEXT NOT NULL
       );
     `);
+
+    // Migrations for existing databases
+    this.migrateChunksEntityColumns();
+  }
+
+  private migrateChunksEntityColumns() {
+    // Add entity_name and chunk_type columns if they don't exist yet
+    const cols = this.db
+      .query<{ name: string }, []>("PRAGMA table_info(chunks)")
+      .all()
+      .map((c) => c.name);
+
+    if (!cols.includes("entity_name")) {
+      this.db.exec("ALTER TABLE chunks ADD COLUMN entity_name TEXT");
+    }
+    if (!cols.includes("chunk_type")) {
+      this.db.exec("ALTER TABLE chunks ADD COLUMN chunk_type TEXT");
+    }
   }
 
   getFileByPath(path: string): StoredFile | null {
@@ -238,7 +271,7 @@ export class RagDB {
   upsertFile(
     path: string,
     hash: string,
-    chunks: { snippet: string; embedding: Float32Array }[]
+    chunks: { snippet: string; embedding: Float32Array; entityName?: string | null; chunkType?: string | null }[]
   ) {
     const tx = this.db.transaction(() => {
       // Remove old data if exists
@@ -268,10 +301,10 @@ export class RagDB {
 
       // Insert chunks + vectors
       for (let i = 0; i < chunks.length; i++) {
-        const { snippet, embedding } = chunks[i];
+        const { snippet, embedding, entityName, chunkType } = chunks[i];
         this.db.run(
-          "INSERT INTO chunks (file_id, chunk_index, snippet) VALUES (?, ?, ?)",
-          [fileId, i, snippet]
+          "INSERT INTO chunks (file_id, chunk_index, snippet, entity_name, chunk_type) VALUES (?, ?, ?, ?, ?)",
+          [fileId, i, snippet, entityName ?? null, chunkType ?? null]
         );
         const chunkId = Number(
           this.db.query<{ id: number }, []>("SELECT last_insert_rowid() as id").get()!.id
@@ -324,9 +357,9 @@ export class RagDB {
     return rows.map((row) => {
       const chunk = this.db
         .query<
-          { snippet: string; chunk_index: number; file_id: number },
+          { snippet: string; chunk_index: number; file_id: number; entity_name: string | null; chunk_type: string | null },
           [number]
-        >("SELECT snippet, chunk_index, file_id FROM chunks WHERE id = ?")
+        >("SELECT snippet, chunk_index, file_id, entity_name, chunk_type FROM chunks WHERE id = ?")
         .get(row.chunk_id)!;
       const file = this.db
         .query<{ path: string }, [number]>(
@@ -342,6 +375,8 @@ export class RagDB {
         score,
         snippet: chunk.snippet,
         chunkIndex: chunk.chunk_index,
+        entityName: chunk.entity_name,
+        chunkType: chunk.chunk_type,
       };
     });
   }
@@ -350,10 +385,10 @@ export class RagDB {
     // FTS5 bm25() returns negative scores (lower = better match)
     const rows = this.db
       .query<
-        { id: number; snippet: string; chunk_index: number; file_id: number; rank: number },
+        { id: number; snippet: string; chunk_index: number; file_id: number; entity_name: string | null; chunk_type: string | null; rank: number },
         [string, number]
       >(
-        `SELECT c.id, c.snippet, c.chunk_index, c.file_id, rank
+        `SELECT c.id, c.snippet, c.chunk_index, c.file_id, c.entity_name, c.chunk_type, rank
          FROM fts_chunks f
          JOIN chunks c ON c.id = f.rowid
          WHERE fts_chunks MATCH ?
@@ -377,6 +412,83 @@ export class RagDB {
         score,
         snippet: row.snippet,
         chunkIndex: row.chunk_index,
+        entityName: row.entity_name,
+        chunkType: row.chunk_type,
+      };
+    });
+  }
+
+  searchChunks(queryEmbedding: Float32Array, topK: number = 8): ChunkSearchResult[] {
+    const rows = this.db
+      .query<
+        { chunk_id: number; distance: number },
+        [Uint8Array, number]
+      >(
+        `SELECT chunk_id, distance
+         FROM vec_chunks
+         WHERE embedding MATCH ?
+         ORDER BY distance
+         LIMIT ?`
+      )
+      .all(new Uint8Array(queryEmbedding.buffer), topK);
+
+    return rows.map((row) => {
+      const chunk = this.db
+        .query<
+          { snippet: string; chunk_index: number; file_id: number; entity_name: string | null; chunk_type: string | null },
+          [number]
+        >("SELECT snippet, chunk_index, file_id, entity_name, chunk_type FROM chunks WHERE id = ?")
+        .get(row.chunk_id)!;
+      const file = this.db
+        .query<{ path: string }, [number]>(
+          "SELECT path FROM files WHERE id = ?"
+        )
+        .get(chunk.file_id)!;
+
+      const score = 1 / (1 + row.distance);
+
+      return {
+        path: file.path,
+        score,
+        content: chunk.snippet,
+        chunkIndex: chunk.chunk_index,
+        entityName: chunk.entity_name,
+        chunkType: chunk.chunk_type,
+      };
+    });
+  }
+
+  textSearchChunks(query: string, topK: number = 8): ChunkSearchResult[] {
+    const rows = this.db
+      .query<
+        { id: number; snippet: string; chunk_index: number; file_id: number; entity_name: string | null; chunk_type: string | null; rank: number },
+        [string, number]
+      >(
+        `SELECT c.id, c.snippet, c.chunk_index, c.file_id, c.entity_name, c.chunk_type, rank
+         FROM fts_chunks f
+         JOIN chunks c ON c.id = f.rowid
+         WHERE fts_chunks MATCH ?
+         ORDER BY rank
+         LIMIT ?`
+      )
+      .all(query, topK);
+
+    return rows.map((row) => {
+      const file = this.db
+        .query<{ path: string }, [number]>(
+          "SELECT path FROM files WHERE id = ?"
+        )
+        .get(row.file_id)!;
+
+      const score = 1 / (1 + Math.abs(row.rank));
+
+      return {
+        path: file.path,
+        score,
+        content: row.snippet,
+        chunkIndex: row.chunk_index,
+        entityName: row.entity_name,
+        chunkType: row.chunk_type,
       };
     });
   }

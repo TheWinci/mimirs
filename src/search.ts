@@ -1,10 +1,19 @@
 import { embed } from "./embed";
-import { RagDB, type SearchResult } from "./db";
+import { RagDB, type SearchResult, type ChunkSearchResult } from "./db";
 
 export interface DedupedResult {
   path: string;
   score: number;
   snippets: string[];
+}
+
+export interface ChunkResult {
+  path: string;
+  score: number;
+  content: string;
+  chunkIndex: number;
+  entityName: string | null;
+  chunkType: string | null;
 }
 
 // Default: 70% vector, 30% BM25
@@ -80,6 +89,97 @@ export async function search(
 
   // Sort by score descending, take topK files
   const results = Array.from(byFile.values())
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topK);
+
+  // Log query for analytics
+  const durationMs = Math.round(performance.now() - start);
+  db.logQuery(
+    query,
+    results.length,
+    results[0]?.score ?? null,
+    results[0]?.path ?? null,
+    durationMs
+  );
+
+  return results;
+}
+
+/**
+ * Chunk-level search: returns individual semantic chunks ranked by relevance.
+ * No file deduplication — two chunks from the same file can both appear.
+ */
+export async function searchChunks(
+  query: string,
+  db: RagDB,
+  topK: number = 8,
+  threshold: number = 0.3,
+  hybridWeight: number = DEFAULT_HYBRID_WEIGHT
+): Promise<ChunkResult[]> {
+  const start = performance.now();
+  const queryEmbedding = await embed(query);
+
+  const vectorResults = db.searchChunks(queryEmbedding, topK * 3);
+
+  let textResults: ChunkSearchResult[] = [];
+  try {
+    textResults = db.textSearchChunks(query, topK * 3);
+  } catch {
+    // FTS query may fail on special characters
+  }
+
+  // Merge scores per chunk (keyed by path:chunkIndex)
+  const scoreMap = new Map<string, {
+    vectorScore: number;
+    textScore: number;
+    path: string;
+    content: string;
+    chunkIndex: number;
+    entityName: string | null;
+    chunkType: string | null;
+  }>();
+
+  for (const r of vectorResults) {
+    const key = `${r.path}:${r.chunkIndex}`;
+    scoreMap.set(key, {
+      vectorScore: r.score,
+      textScore: 0,
+      path: r.path,
+      content: r.content,
+      chunkIndex: r.chunkIndex,
+      entityName: r.entityName,
+      chunkType: r.chunkType,
+    });
+  }
+
+  for (const r of textResults) {
+    const key = `${r.path}:${r.chunkIndex}`;
+    const existing = scoreMap.get(key);
+    if (existing) {
+      existing.textScore = r.score;
+    } else {
+      scoreMap.set(key, {
+        vectorScore: 0,
+        textScore: r.score,
+        path: r.path,
+        content: r.content,
+        chunkIndex: r.chunkIndex,
+        entityName: r.entityName,
+        chunkType: r.chunkType,
+      });
+    }
+  }
+
+  const results = Array.from(scoreMap.values())
+    .map((r) => ({
+      path: r.path,
+      score: hybridWeight * r.vectorScore + (1 - hybridWeight) * r.textScore,
+      content: r.content,
+      chunkIndex: r.chunkIndex,
+      entityName: r.entityName,
+      chunkType: r.chunkType,
+    }))
+    .filter((r) => r.score >= threshold)
     .sort((a, b) => b.score - a.score)
     .slice(0, topK);
 

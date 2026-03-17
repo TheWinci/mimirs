@@ -4,7 +4,7 @@ import { resolve } from "path";
 import { RagDB } from "./db";
 import { loadConfig, writeDefaultConfig } from "./config";
 import { indexDirectory } from "./indexer";
-import { search } from "./search";
+import { search, searchChunks } from "./search";
 import { loadBenchmarkQueries, runBenchmark, formatBenchmarkReport } from "./benchmark";
 import { loadEvalTasks, runEval, formatEvalReport, saveEvalTraces } from "./eval";
 import { generateMermaid } from "./graph";
@@ -22,6 +22,8 @@ Usage:
   local-rag init [dir]                    Create default .rag/config.json
   local-rag index [dir] [--patterns ...]  Index files in directory
   local-rag search <query> [--top N]      Search indexed files
+  local-rag read <query> [--top N]       Read relevant chunks (full content)
+              [--threshold T] [--dir D]
   local-rag status [dir]                  Show index stats
   local-rag remove <file> [dir]           Remove file from index
   local-rag analytics [dir] [--days N]    Show search usage analytics
@@ -119,6 +121,35 @@ async function main() {
           const preview = r.snippets[0]?.slice(0, 120).replace(/\n/g, " ");
           console.log(`         ${preview}...`);
           console.log();
+        }
+      }
+      db.close();
+      break;
+    }
+
+    case "read": {
+      const query = args[1];
+      if (!query) {
+        console.error("Usage: local-rag read <query> [--top N] [--threshold T] [--dir D]");
+        process.exit(1);
+      }
+
+      const dir = resolve(getFlag("--dir") || ".");
+      const db = new RagDB(dir);
+      const config = await loadConfig(dir);
+      const top = parseInt(getFlag("--top") || "8", 10);
+      const threshold = parseFloat(getFlag("--threshold") || "0.3");
+
+      const results = await searchChunks(query, db, top, threshold, config.hybridWeight);
+
+      if (results.length === 0) {
+        console.log("No relevant chunks found. Has the directory been indexed?");
+      } else {
+        for (const r of results) {
+          const entity = r.entityName ? `  •  ${r.entityName}` : "";
+          console.log(`[${r.score.toFixed(2)}] ${r.path}${entity}`);
+          console.log(r.content);
+          console.log("\n---\n");
         }
       }
       db.close();

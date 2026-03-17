@@ -6,7 +6,7 @@ import { z } from "zod";
 import { RagDB } from "./db";
 import { loadConfig } from "./config";
 import { indexDirectory } from "./indexer";
-import { search } from "./search";
+import { search, searchChunks } from "./search";
 import { startWatcher } from "./watcher";
 import { generateMermaid } from "./graph";
 import { embed } from "./embed";
@@ -69,9 +69,66 @@ server.tool(
     const text = results
       .map(
         (r) =>
-          `${r.score.toFixed(4)}  ${r.path}\n  ${r.snippets[0]?.slice(0, 150)}...`
+          `${r.score.toFixed(4)}  ${r.path}\n  ${r.snippets[0]?.slice(0, 400)}...`
       )
       .join("\n\n");
+
+    return {
+      content: [{ type: "text" as const, text }],
+    };
+  }
+);
+
+server.tool(
+  "read_relevant",
+  "Retrieve the most relevant semantic chunks for a query. Returns full chunk content — individual functions, classes, or sections — ranked by relevance. No file deduplication: multiple chunks from the same file can appear. Use this instead of search + Read when you need the actual content.",
+  {
+    query: z.string().describe("The search query (natural language)"),
+    directory: z
+      .string()
+      .optional()
+      .describe(
+        "Project directory to search. Defaults to RAG_PROJECT_DIR env or cwd"
+      ),
+    top: z
+      .number()
+      .optional()
+      .describe("Max chunks to return (default: 8)"),
+    threshold: z
+      .number()
+      .optional()
+      .describe("Min relevance score to include (default: 0.3)"),
+  },
+  async ({ query, directory, top, threshold }) => {
+    const projectDir = directory || process.env.RAG_PROJECT_DIR || process.cwd();
+    const ragDb = getDB(projectDir);
+    const config = await loadConfig(projectDir);
+
+    const results = await searchChunks(
+      query,
+      ragDb,
+      top ?? 8,
+      threshold ?? 0.3,
+      config.hybridWeight
+    );
+
+    if (results.length === 0) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: "No relevant chunks found. Has the directory been indexed? Try calling index_files first.",
+          },
+        ],
+      };
+    }
+
+    const text = results
+      .map((r) => {
+        const entity = r.entityName ? `  •  ${r.entityName}` : "";
+        return `[${r.score.toFixed(2)}] ${r.path}${entity}\n${r.content}`;
+      })
+      .join("\n\n---\n\n");
 
     return {
       content: [{ type: "text" as const, text }],
