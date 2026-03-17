@@ -362,11 +362,48 @@ All options can be overridden by CLI flags (e.g. `--top 10`).
 
 ## How it works
 
-1. **Index** — walks your project, matches files against include/exclude globs, parses content (frontmatter-aware for markdown), splits into chunks (AST-aware for code via tree-sitter, heading-based for markdown), generates embeddings with all-MiniLM-L6-v2, stores vectors in sqlite-vec
-2. **Search** — hybrid search combining vector similarity (semantic) with BM25 (keyword matching). Deduplicates by file, returns ranked results. Configurable blend via `hybridWeight`.
-3. **Watch** — auto-indexes on MCP server startup, then watches for file changes with debounced re-indexing. Deletions are detected and pruned automatically.
-4. **Re-index** — compares SHA-256 hashes — skips unchanged files, prunes deleted ones
-5. **Log** — records every query with result count, top score, and duration for analytics
+```mermaid
+flowchart TD
+  A["📁 Project files"] --> B["Parse & filter"]
+  B --> C["Chunk"]
+  C --> D["Embed"]
+  C --> E["Extract imports/exports"]
+  D --> F[("SQLite DB\nvectors + FTS + graph")]
+  E --> F
+  F --> G{"Agent query"}
+  G -->|"semantic question"| H["Hybrid search\nvector + BM25"]
+  G -->|"navigation"| I["Project map\nMermaid graph"]
+  G -->|"file changed"| J["Watcher\nre-index + re-resolve"]
+  H --> K["Ranked results\nwith snippets"]
+  I --> L["Dependency graph\nfile or directory level"]
+  J --> F
+  K --> M["Query log"]
+  M --> N["Analytics\ngaps & trends"]
+
+  style A fill:#f9f9f9,stroke:#333
+  style F fill:#e8f5e9,stroke:#388e3c
+  style K fill:#e1f5fe,stroke:#0288d1
+  style L fill:#e1f5fe,stroke:#0288d1
+  style N fill:#fff3e0,stroke:#f57c00
+```
+
+### Step by step
+
+1. **Parse & filter** — Walks your project, matches files against include/exclude globs. Markdown files get frontmatter extracted and weighted. Code files are detected by extension.
+
+2. **Chunk** — Splits content into searchable pieces. Code files (`.ts`, `.py`, `.go`, `.rs`, `.java`, etc.) use tree-sitter AST parsing via `code-chunk` — this respects function/class boundaries instead of cutting mid-statement. Markdown splits on headings. Other files split on paragraphs.
+
+3. **Embed** — Each chunk is embedded into a 384-dimensional vector using all-MiniLM-L6-v2 (runs in-process via Transformers.js + ONNX, no API calls). Vectors are stored in sqlite-vec for fast similarity search.
+
+4. **Extract imports/exports** — During AST chunking, import specifiers and exported symbols are captured. After all files are indexed, relative imports are resolved to actual files in the index (with extension probing for `.ts`/`.tsx`/`.js`/`.jsx`). This builds the dependency graph.
+
+5. **Hybrid search** — Queries run both vector similarity (semantic) and BM25 (keyword) searches in parallel, then blend results using `hybridWeight` (default 0.7 = 70% semantic, 30% keyword). Results are deduplicated by file and ranked by combined score.
+
+6. **Project map** — Generates a Mermaid dependency graph from the stored import/export relationships. Supports file-level and directory-level zoom, and focused subgraphs (BFS from a specific file). Entry points are auto-detected and highlighted.
+
+7. **Watcher** — The MCP server watches for file changes with a 2-second debounce. Changed files are re-indexed and their import relationships re-resolved. Deleted files are pruned automatically.
+
+8. **Analytics** — Every search query is logged with result count, top score, and latency. Analytics surface zero-result queries (missing docs), low-relevance queries (weak docs), top search terms, and period-over-period trends.
 
 ## Stack
 
