@@ -6,7 +6,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/TheWinci/local-rag-mcp"
+    "url": "git+https://github.com/TheWinci/local-rag-mcp.git"
   },
   "keywords": [
     "mcp",
@@ -21,8 +21,8 @@
     "bun"
   ],
   "bin": {
-    "local-rag": "./src/cli.ts",
-    "local-rag-mcp": "./src/server.ts"
+    "local-rag": "src/cli.ts",
+    "local-rag-mcp": "src/server.ts"
   },
   "files": [
     "src/",

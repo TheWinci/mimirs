@@ -7,6 +7,7 @@ import { indexDirectory } from "./indexer";
 import { search } from "./search";
 import { loadBenchmarkQueries, runBenchmark, formatBenchmarkReport } from "./benchmark";
 import { loadEvalTasks, runEval, formatEvalReport, saveEvalTraces } from "./eval";
+import { generateMermaid } from "./graph";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -25,6 +26,9 @@ Usage:
                        [--top N]
   local-rag eval <file> [--dir D]       Run A/B eval (with/without RAG)
                   [--top N] [--out F]
+  local-rag map [dir] [--focus F]       Generate project dependency graph
+                [--zoom file|directory]  (Mermaid format)
+                [--max N]
 
 Options:
   dir       Project directory (default: current directory)
@@ -185,6 +189,25 @@ async function main() {
         console.log(`  Zero-result rate: ${(trend.current.zeroResultRate * 100).toFixed(0)}% (${pctArrow(trend.delta.zeroResultRate)})`);
       }
 
+      db.close();
+      break;
+    }
+
+    case "map": {
+      const dir = getDir(1);
+      const db = new RagDB(dir);
+      const focus = getFlag("--focus");
+      const zoom = (getFlag("--zoom") || "file") as "file" | "directory";
+      const max = parseInt(getFlag("--max") || "50", 10);
+
+      const mermaid = generateMermaid(db, {
+        projectDir: dir,
+        focus: focus ?? undefined,
+        zoom,
+        maxNodes: max,
+      });
+
+      console.log(mermaid);
       db.close();
       break;
     }

@@ -1,8 +1,20 @@
 import { chunk as astChunk } from "code-chunk";
 
+export interface ChunkImport {
+  name: string;
+  source: string;
+}
+
+export interface ChunkExport {
+  name: string;
+  type: string;
+}
+
 export interface Chunk {
   text: string;
   index: number;
+  imports?: ChunkImport[];
+  exports?: ChunkExport[];
 }
 
 const DEFAULT_CHUNK_SIZE = 512; // in characters
@@ -27,22 +39,29 @@ export async function chunkText(
   chunkOverlap = DEFAULT_CHUNK_OVERLAP,
   filePath?: string
 ): Promise<Chunk[]> {
-  if (text.length <= chunkSize) {
-    return [{ text, index: 0 }];
-  }
-
-  // Try AST-aware chunking for supported code files
+  // Try AST-aware chunking for supported code files (even small ones, for import/export extraction)
   if (AST_SUPPORTED.has(extension)) {
     try {
       const astChunks = await astChunk(filePath || `file${extension}`, text, {
         maxChunkSize: chunkSize,
       });
       if (astChunks.length > 0) {
-        return astChunks.map((c, i) => ({ text: c.text, index: i }));
+        return astChunks.map((c, i) => ({
+          text: c.text,
+          index: i,
+          imports: c.context.imports.map((im) => ({ name: im.name, source: im.source })),
+          exports: c.context.entities
+            .filter((e) => e.type === "export" || e.type === "function" || e.type === "class" || e.type === "interface" || e.type === "type" || e.type === "enum")
+            .map((e) => ({ name: e.name, type: e.type })),
+        }));
       }
     } catch {
       // Fall through to heuristic chunking
     }
+  }
+
+  if (text.length <= chunkSize) {
+    return [{ text, index: 0 }];
   }
 
   const isMarkdown = [".md", ".mdx", ".markdown"].includes(extension);

@@ -8,6 +8,7 @@ import { loadConfig } from "./config";
 import { indexDirectory } from "./indexer";
 import { search } from "./search";
 import { startWatcher } from "./watcher";
+import { generateMermaid } from "./graph";
 import { resolve } from "path";
 
 const server = new McpServer({
@@ -217,6 +218,44 @@ server.tool(
 
     return {
       content: [{ type: "text" as const, text: lines.join("\n") }],
+    };
+  }
+);
+
+server.tool(
+  "project_map",
+  "Generate a Mermaid dependency graph of the project. Shows file relationships, exports, and entry points.",
+  {
+    directory: z
+      .string()
+      .optional()
+      .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
+    focus: z
+      .string()
+      .optional()
+      .describe("File path (relative to project) to focus on — shows only nearby files"),
+    zoom: z
+      .enum(["file", "directory"])
+      .optional()
+      .describe("Zoom level: 'file' (default) or 'directory' for large projects"),
+    maxNodes: z
+      .number()
+      .optional()
+      .describe("Max nodes in graph (default: 50, auto-switches to directory view if exceeded)"),
+  },
+  async ({ directory, focus, zoom, maxNodes }) => {
+    const projectDir = directory || process.env.RAG_PROJECT_DIR || process.cwd();
+    const ragDb = getDB(projectDir);
+
+    const mermaid = generateMermaid(ragDb, {
+      projectDir,
+      focus,
+      zoom: zoom ?? "file",
+      maxNodes: maxNodes ?? 50,
+    });
+
+    return {
+      content: [{ type: "text" as const, text: mermaid }],
     };
   }
 );

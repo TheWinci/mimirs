@@ -98,6 +98,25 @@ export class RagDB {
         INSERT INTO fts_chunks(fts_chunks, rowid, snippet) VALUES ('delete', old.id, old.snippet);
       END;
 
+      CREATE TABLE IF NOT EXISTS file_imports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+        source TEXT NOT NULL,
+        names TEXT NOT NULL,
+        resolved_file_id INTEGER REFERENCES files(id) ON DELETE SET NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS file_exports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_file_imports_file ON file_imports(file_id);
+      CREATE INDEX IF NOT EXISTS idx_file_imports_resolved ON file_imports(resolved_file_id);
+      CREATE INDEX IF NOT EXISTS idx_file_exports_file ON file_exports(file_id);
+
       CREATE TABLE IF NOT EXISTS query_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         query TEXT NOT NULL,
@@ -341,6 +360,143 @@ export class RagDB {
       topSearchedTerms: topTerms,
       queriesPerDay: perDay,
     };
+  }
+
+  upsertFileGraph(
+    fileId: number,
+    imports: { name: string; source: string }[],
+    exports: { name: string; type: string }[]
+  ) {
+    // Clear old graph data for this file
+    this.db.run("DELETE FROM file_imports WHERE file_id = ?", [fileId]);
+    this.db.run("DELETE FROM file_exports WHERE file_id = ?", [fileId]);
+
+    for (const imp of imports) {
+      this.db.run(
+        "INSERT INTO file_imports (file_id, source, names) VALUES (?, ?, ?)",
+        [fileId, imp.source, imp.name]
+      );
+    }
+
+    for (const exp of exports) {
+      this.db.run(
+        "INSERT INTO file_exports (file_id, name, type) VALUES (?, ?, ?)",
+        [fileId, exp.name, exp.type]
+      );
+    }
+  }
+
+  resolveImport(importId: number, resolvedFileId: number) {
+    this.db.run(
+      "UPDATE file_imports SET resolved_file_id = ? WHERE id = ?",
+      [resolvedFileId, importId]
+    );
+  }
+
+  getUnresolvedImports(): { id: number; fileId: number; filePath: string; source: string }[] {
+    return this.db
+      .query<{ id: number; file_id: number; path: string; source: string }, []>(
+        `SELECT fi.id, fi.file_id, f.path, fi.source
+         FROM file_imports fi
+         JOIN files f ON f.id = fi.file_id
+         WHERE fi.resolved_file_id IS NULL`
+      )
+      .all()
+      .map((r) => ({ id: r.id, fileId: r.file_id, filePath: r.path, source: r.source }));
+  }
+
+  getAllFilePaths(): { id: number; path: string }[] {
+    return this.db
+      .query<{ id: number; path: string }, []>("SELECT id, path FROM files")
+      .all();
+  }
+
+  getGraph(): {
+    nodes: { id: number; path: string; exports: { name: string; type: string }[] }[];
+    edges: { fromId: number; fromPath: string; toId: number; toPath: string; source: string }[];
+  } {
+    const files = this.db
+      .query<{ id: number; path: string }, []>("SELECT id, path FROM files")
+      .all();
+
+    const nodes = files.map((f) => {
+      const exports = this.db
+        .query<{ name: string; type: string }, [number]>(
+          "SELECT name, type FROM file_exports WHERE file_id = ?"
+        )
+        .all(f.id);
+      return { id: f.id, path: f.path, exports };
+    });
+
+    const edges = this.db
+      .query<
+        { file_id: number; from_path: string; resolved_file_id: number; to_path: string; source: string },
+        []
+      >(
+        `SELECT fi.file_id, f1.path as from_path, fi.resolved_file_id, f2.path as to_path, fi.source
+         FROM file_imports fi
+         JOIN files f1 ON f1.id = fi.file_id
+         JOIN files f2 ON f2.id = fi.resolved_file_id
+         WHERE fi.resolved_file_id IS NOT NULL`
+      )
+      .all()
+      .map((r) => ({
+        fromId: r.file_id,
+        fromPath: r.from_path,
+        toId: r.resolved_file_id,
+        toPath: r.to_path,
+        source: r.source,
+      }));
+
+    return { nodes, edges };
+  }
+
+  getSubgraph(fileIds: number[], maxHops: number = 2): {
+    nodes: { id: number; path: string; exports: { name: string; type: string }[] }[];
+    edges: { fromId: number; fromPath: string; toId: number; toPath: string; source: string }[];
+  } {
+    const fullGraph = this.getGraph();
+    const visited = new Set<number>(fileIds);
+    let frontier = new Set<number>(fileIds);
+
+    for (let hop = 0; hop < maxHops; hop++) {
+      const nextFrontier = new Set<number>();
+      for (const edge of fullGraph.edges) {
+        if (frontier.has(edge.fromId) && !visited.has(edge.toId)) {
+          nextFrontier.add(edge.toId);
+          visited.add(edge.toId);
+        }
+        if (frontier.has(edge.toId) && !visited.has(edge.fromId)) {
+          nextFrontier.add(edge.fromId);
+          visited.add(edge.fromId);
+        }
+      }
+      frontier = nextFrontier;
+      if (frontier.size === 0) break;
+    }
+
+    const nodes = fullGraph.nodes.filter((n) => visited.has(n.id));
+    const edges = fullGraph.edges.filter((e) => visited.has(e.fromId) && visited.has(e.toId));
+
+    return { nodes, edges };
+  }
+
+  getImportsForFile(fileId: number): { id: number; source: string; resolvedFileId: number | null }[] {
+    return this.db
+      .query<{ id: number; source: string; resolved_file_id: number | null }, [number]>(
+        "SELECT id, source, resolved_file_id FROM file_imports WHERE file_id = ?"
+      )
+      .all(fileId)
+      .map((r) => ({ id: r.id, source: r.source, resolvedFileId: r.resolved_file_id }));
+  }
+
+  getImportersOf(fileId: number): number[] {
+    return this.db
+      .query<{ file_id: number }, [number]>(
+        "SELECT file_id FROM file_imports WHERE resolved_file_id = ?"
+      )
+      .all(fileId)
+      .map((r) => r.file_id);
   }
 
   getAnalyticsTrend(days: number = 7): {

@@ -5,6 +5,7 @@ import { Glob } from "bun";
 import { indexFile } from "./indexer";
 import { type RagConfig } from "./config";
 import { type RagDB } from "./db";
+import { resolveImportsForFile } from "./graph";
 
 const DEBOUNCE_MS = 2000;
 
@@ -53,6 +54,15 @@ export function startWatcher(
 
         const result = await indexFile(absPath, db, config);
         if (result === "indexed") {
+          // Re-resolve imports for this file and its importers
+          const file = db.getFileByPath(absPath);
+          if (file) {
+            resolveImportsForFile(db, file.id, directory);
+            // Re-resolve files that import this one (exports may have changed)
+            for (const importerId of db.getImportersOf(file.id)) {
+              resolveImportsForFile(db, importerId, directory);
+            }
+          }
           onEvent?.(`Re-indexed: ${rel}`);
         }
       }, DEBOUNCE_MS)
