@@ -145,14 +145,19 @@ This project has a local RAG index (local-rag-mcp). Use these MCP tools:
   decisions, discussions, and tool outputs. Use this before re-investigating
   something that may have been discussed in an earlier session.
 - **`create_checkpoint`**: Mark important moments — decisions, milestones,
-  blockers, direction changes. Do this after completing a phase, making a key
-  technical decision, or before context gets compacted.
+  blockers, direction changes. Do this liberally: after completing any feature
+  or task, after adding/modifying tools, after key technical decisions, before
+  and after large refactors, or when changing direction. If in doubt, create one.
 - **`list_checkpoints`** / **`search_checkpoints`**: Review or search past
   checkpoints to understand project history and prior decisions.
 - **`index_files`**: If you've created or modified files and want them searchable,
   re-index the project directory.
 - **`search_analytics`**: Check what queries return no results or low-relevance
   results — this reveals documentation gaps.
+- **`search_symbols`**: When you know a symbol name (function, class, type, etc.),
+  find it directly by name instead of using semantic search.
+- **`write_relevant`**: Before adding new code or docs, find the best insertion
+  point — returns the most semantically appropriate file and anchor.
 ```
 
 Without this, the agent only uses the tools when you explicitly ask. With it, the agent proactively searches the index and uses the project map for navigation.
@@ -174,6 +179,8 @@ These tools are available to any MCP client (Claude Code, etc.) once the server 
 | `create_checkpoint` | Mark an important moment — decisions, milestones, blockers, direction changes, or handoffs |
 | `list_checkpoints` | List checkpoints, most recent first. Filter by session or type |
 | `search_checkpoints` | Semantic search over checkpoint titles and summaries |
+| `search_symbols` | Find exported symbols by name — functions, classes, types, interfaces, enums. Faster than semantic search when you know the symbol name |
+| `write_relevant` | Find the best insertion point for new content — returns semantically appropriate files and anchors |
 
 ## Analytics
 

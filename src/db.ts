@@ -63,6 +63,14 @@ export interface ChunkSearchResult {
   chunkType: string | null;
 }
 
+export interface SymbolResult {
+  path: string;
+  symbolName: string;
+  symbolType: string;
+  snippet: string | null;
+  chunkIndex: number | null;
+}
+
 export interface CheckpointRow {
   id: number;
   sessionId: string;
@@ -174,6 +182,7 @@ export class RagDB {
       CREATE INDEX IF NOT EXISTS idx_file_imports_file ON file_imports(file_id);
       CREATE INDEX IF NOT EXISTS idx_file_imports_resolved ON file_imports(resolved_file_id);
       CREATE INDEX IF NOT EXISTS idx_file_exports_file ON file_exports(file_id);
+      CREATE INDEX IF NOT EXISTS idx_file_exports_name ON file_exports(name);
 
       -- Conversation indexing tables
       CREATE TABLE IF NOT EXISTS conversation_sessions (
@@ -510,6 +519,48 @@ export class RagDB {
         chunkType: row.chunk_type,
       };
     });
+  }
+
+  searchSymbols(
+    query: string,
+    exact: boolean = false,
+    type?: string,
+    topK: number = 20
+  ): SymbolResult[] {
+    const pattern = exact ? query : `%${query}%`;
+
+    let sql = `
+      SELECT fe.name AS symbol_name, fe.type AS symbol_type, f.path,
+        (SELECT snippet FROM chunks
+         WHERE file_id = fe.file_id AND LOWER(entity_name) = LOWER(fe.name)
+         ORDER BY chunk_index LIMIT 1) AS snippet,
+        (SELECT chunk_index FROM chunks
+         WHERE file_id = fe.file_id AND LOWER(entity_name) = LOWER(fe.name)
+         ORDER BY chunk_index LIMIT 1) AS chunk_index
+      FROM file_exports fe
+      JOIN files f ON f.id = fe.file_id
+      WHERE LOWER(fe.name) LIKE LOWER(?)
+    `;
+    const params: (string | number)[] = [pattern];
+
+    if (type) {
+      sql += " AND fe.type = ?";
+      params.push(type);
+    }
+
+    sql += " ORDER BY fe.name LIMIT ?";
+    params.push(topK);
+
+    return this.db
+      .query<{ symbol_name: string; symbol_type: string; path: string; snippet: string | null; chunk_index: number | null }, any[]>(sql)
+      .all(...params)
+      .map((r) => ({
+        path: r.path,
+        symbolName: r.symbol_name,
+        symbolType: r.symbol_type,
+        snippet: r.snippet,
+        chunkIndex: r.chunk_index,
+      }));
   }
 
   pruneDeleted(existingPaths: Set<string>): number {
