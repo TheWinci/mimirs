@@ -416,7 +416,8 @@ Create `.rag/config.json` in your project (or run `local-rag init`):
     "**/Vagrantfile", "**/Gemfile", "**/Rakefile", "**/Brewfile", "**/Procfile",
     "**/*.yaml", "**/*.yml", "**/*.json", "**/*.toml", "**/*.xml",
     "**/*.sh", "**/*.bash", "**/*.zsh",
-    "**/*.tf", "**/*.proto", "**/*.graphql", "**/*.gql", "**/*.sql"
+    "**/*.tf", "**/*.proto", "**/*.graphql", "**/*.gql", "**/*.sql",
+    "**/*.bru"
   ],
   "exclude": ["node_modules/**", ".git/**", "dist/**", ".rag/**"],
   "chunkSize": 512,
@@ -494,6 +495,10 @@ Detected by basename — exact match or prefix match (e.g. `Dockerfile.dev` and 
 | `.proto` | Split on blank-line blocks (message, service, enum definitions). |
 | `.graphql` `.gql` | Split on blank-line blocks (type, query, mutation, fragment definitions). |
 | `.sql` | Split on `;`-terminated statement boundaries. |
+
+| Extensions | Chunking strategy |
+|---|---|
+| `.bru` | Split on top-level blocks (`meta {}`, `post {}`, `headers {}`, `body:json {}`, `tests {}`, etc.). Each block is a chunk — lets you search across requests by endpoint, auth type, headers, or test assertions. |
 
 ### Markdown & plain text
 

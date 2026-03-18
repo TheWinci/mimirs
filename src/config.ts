@@ -36,6 +36,7 @@ const DEFAULT_CONFIG: RagConfig = {
     "**/*.proto",
     "**/*.graphql", "**/*.gql",
     "**/*.sql",
+    "**/*.bru",
   ],
   exclude: ["node_modules/**", ".git/**", "dist/**", ".rag/**"],
   chunkSize: 512,

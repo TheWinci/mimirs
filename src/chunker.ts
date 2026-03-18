@@ -26,6 +26,34 @@ const AST_SUPPORTED = new Set([
 ]);
 
 /**
+ * Every extension (real or virtual) that chunkText knows how to handle.
+ * Files with extensions outside this set are skipped by the indexer so
+ * binaries and other unrecognised formats never enter the DB.
+ */
+export const KNOWN_EXTENSIONS = new Set([
+  // Markdown
+  ".md", ".mdx", ".markdown",
+  // Plain text
+  ".txt",
+  // AST-aware code
+  ".ts", ".tsx", ".js", ".jsx", ".py", ".go", ".rs", ".java",
+  // Heuristic code (blank-line blocks)
+  ".c", ".cpp", ".h", ".hpp", ".rb", ".swift",
+  ".sh", ".bash", ".zsh", ".fish",
+  ".tf", ".proto", ".graphql", ".gql",
+  ".xml",
+  // Virtual extensions for basename-detected files
+  ".makefile", ".dockerfile", ".jenkinsfile",
+  ".vagrantfile", ".gemfile", ".rakefile", ".brewfile", ".procfile",
+  // Structured data
+  ".yaml", ".yml", ".json", ".toml",
+  // Query / schema languages
+  ".sql",
+  // API collections
+  ".bru",
+]);
+
+/**
  * Split text into chunks. Strategy depends on content type:
  * - Code (supported languages): AST-aware chunking via tree-sitter
  * - Markdown: split on headings first, then by size
@@ -90,6 +118,8 @@ export async function chunkText(
     sections = splitJSON(text);
   } else if (extension === ".toml") {
     sections = splitTOML(text);
+  } else if (extension === ".bru") {
+    sections = splitBru(text);
   } else if (extension === ".sql") {
     sections = splitSQL(text);
   } else if (isCode) {
@@ -146,6 +176,31 @@ function splitDockerfile(text: string): string[] {
   }
 
   return mergeTinyParts(sections.length > 0 ? sections : [text], 100);
+}
+
+function splitBru(text: string): string[] {
+  // Each top-level block in the Bru Markup Language starts at column 0 with
+  // `keyword {` (keyword may contain colons/hyphens, e.g. `body:json`, `vars:pre-request`).
+  const lines = text.split("\n");
+  const sections: string[] = [];
+  let current: string[] = [];
+
+  for (const line of lines) {
+    if (/^[a-zA-Z][a-zA-Z0-9:_-]*\s*\{/.test(line) && current.length > 0) {
+      const section = current.join("\n").trim();
+      if (section) sections.push(section);
+      current = [line];
+    } else {
+      current.push(line);
+    }
+  }
+
+  if (current.length > 0) {
+    const section = current.join("\n").trim();
+    if (section) sections.push(section);
+  }
+
+  return mergeTinyParts(sections, 100);
 }
 
 function splitTOML(text: string): string[] {

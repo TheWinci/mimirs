@@ -4,7 +4,7 @@ import { readFile } from "fs/promises";
 import { Glob } from "bun";
 import { parseFile } from "./parse";
 import { embed } from "./embed";
-import { chunkText, type ChunkImport, type ChunkExport } from "./chunker";
+import { chunkText, KNOWN_EXTENSIONS, type ChunkImport, type ChunkExport } from "./chunker";
 import { RagDB } from "./db";
 import { type RagConfig } from "./config";
 import { resolveImports, resolveImportsForFile } from "./graph";
@@ -102,6 +102,10 @@ export async function indexFile(
 
     const parsed = await parseFile(filePath);
 
+    if (!KNOWN_EXTENSIONS.has(parsed.extension)) {
+      return "skipped";
+    }
+
     if (!parsed.content.trim()) {
       return "skipped";
     }
@@ -165,6 +169,12 @@ export async function indexDirectory(
       }
 
       const parsed = await parseFile(filePath);
+
+      if (!KNOWN_EXTENSIONS.has(parsed.extension)) {
+        onProgress?.(`Skipped (unsupported extension "${parsed.extension}"): ${relative(directory, filePath)}`);
+        result.skipped++;
+        continue;
+      }
 
       if (!parsed.content.trim()) {
         result.skipped++;
