@@ -13,6 +13,7 @@ import { embed } from "./embed";
 import { discoverSessions } from "./conversation";
 import { indexConversation, startConversationTail } from "./conversation-index";
 import { resolve } from "path";
+import { homedir } from "os";
 
 const server = new McpServer({
   name: "local-rag",
@@ -545,6 +546,13 @@ server.tool(
 
 // Auto-index on startup + start file watcher
 const startupDir = process.env.RAG_PROJECT_DIR || process.cwd();
+
+if (resolve(startupDir) === homedir()) {
+  process.stderr.write(
+    `[local-rag] WARNING: project directory is your home folder (${startupDir}).\n` +
+    `[local-rag] This will index your entire home directory. Set RAG_PROJECT_DIR to your project path.\n`
+  );
+}
 const startupDb = getDB(startupDir);
 const startupConfig = await loadConfig(startupDir);
 

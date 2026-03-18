@@ -33,12 +33,14 @@ bun add local-rag-mcp
 
 Works with any [MCP](https://modelcontextprotocol.io/)-compatible client. Add this server config to your editor's MCP config file:
 
-| Editor | Config file |
-|---|---|
-| Claude Code | `~/.claude/settings.json` or `<project>/.claude/settings.json` |
-| Cursor | `<project>/.cursor/mcp.json` |
-| Windsurf | `~/.codeium/windsurf/mcp_config.json` |
-| VS Code (Copilot) | `<project>/.vscode/mcp.json` |
+| Editor | Config file | Sets cwd to project? |
+|---|---|---|
+| Claude Code | `~/.claude/settings.json` or `<project>/.claude/settings.json` | Yes |
+| Cursor | `<project>/.cursor/mcp.json` | **No** — uses home dir |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json` | **No** — uses home dir |
+| VS Code (Copilot) | `<project>/.vscode/mcp.json` | Yes |
+
+Editors that set cwd to the project automatically (Claude Code, VS Code) work with no extra config:
 
 ```json
 {
@@ -51,12 +53,29 @@ Works with any [MCP](https://modelcontextprotocol.io/)-compatible client. Add th
 }
 ```
 
+**Cursor and Windsurf** spawn MCP servers from the user's home directory, so you must set `RAG_PROJECT_DIR` explicitly — otherwise the server indexes `~` instead of your project:
+
+```json
+{
+  "mcpServers": {
+    "local-rag": {
+      "command": "bunx",
+      "args": ["local-rag-mcp"],
+      "env": {
+        "RAG_PROJECT_DIR": "/path/to/your/project"
+      }
+    }
+  }
+}
+```
+
 > **VS Code note:** Uses `"servers"` instead of `"mcpServers"` and requires `"type": "stdio"` on the server object.
 
 **Read-only project directory?** Set `RAG_DB_DIR` to redirect the index to a writable path:
 
 ```json
 "env": {
+  "RAG_PROJECT_DIR": "/path/to/your/project",
   "RAG_DB_DIR": "/tmp/my-project-rag"
 }
 ```
