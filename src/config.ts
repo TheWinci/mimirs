@@ -38,6 +38,7 @@ const DEFAULT_CONFIG: RagConfig = {
     "**/*.sql",
     "**/*.mod",
     "**/*.bru",
+    "**/*.css", "**/*.scss", "**/*.less",
   ],
   exclude: ["node_modules/**", ".git/**", "dist/**", ".rag/**"],
   chunkSize: 512,

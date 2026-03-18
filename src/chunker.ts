@@ -52,6 +52,8 @@ export const KNOWN_EXTENSIONS = new Set([
   ".sql",
   // API collections
   ".bru",
+  // Stylesheets
+  ".css", ".scss", ".less",
 ]);
 
 /**
@@ -124,6 +126,8 @@ export async function chunkText(
     sections = splitBru(text);
   } else if (extension === ".sql") {
     sections = splitSQL(text);
+  } else if (extension === ".css" || extension === ".scss" || extension === ".less") {
+    sections = splitCSS(text);
   } else if (isCode) {
     sections = splitCode(text);
   } else {
@@ -384,6 +388,34 @@ function splitCode(text: string): string[] {
 function splitParagraphs(text: string): string[] {
   const parts = text.split(/\n\n+/);
   return mergeTinyParts(parts, 100);
+}
+
+function splitCSS(text: string): string[] {
+  // Split on top-level brace blocks. Each rule (.foo {}), @media block,
+  // @keyframes, etc. ends when brace depth returns to 0.
+  const chunks: string[] = [];
+  let current: string[] = [];
+  let depth = 0;
+
+  for (const line of text.split("\n")) {
+    current.push(line);
+    for (const ch of line) {
+      if (ch === "{") depth++;
+      else if (ch === "}") depth--;
+    }
+    if (depth === 0 && current.some((l) => l.trim())) {
+      const block = current.join("\n").trim();
+      if (block) chunks.push(block);
+      current = [];
+    }
+  }
+
+  if (current.length > 0) {
+    const remaining = current.join("\n").trim();
+    if (remaining) chunks.push(remaining);
+  }
+
+  return mergeTinyParts(chunks, 100);
 }
 
 /**
