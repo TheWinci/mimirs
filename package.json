@@ -1,6 +1,6 @@
 {
   "name": "local-rag-mcp",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "description": "Semantic search for your codebase — local-first RAG MCP server with hybrid search, AST-aware chunking, and usage analytics",
   "type": "module",
   "license": "MIT",
