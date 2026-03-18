@@ -430,6 +430,31 @@ Create `.rag/config.json` in your project (or run `local-rag init`):
 }
 ```
 
+or an example of exluding files that are definetly not supported and i thought of them - might have missed some
+
+```json
+{
+  "include": ["**/*"],
+  "exclude": [
+    "node_modules/**",
+    ".git/**",
+    "dist/**",
+    "build/**",
+    "out/**",
+    ".rag/**",
+    "**/*.lock",
+    "**/package-lock.json",
+    "**/*.min.js",
+    "**/*.map",
+    "**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.gif", "**/*.webp", "**/*.ico", "**/*.svg",
+    "**/*.pdf", "**/*.zip", "**/*.tar", "**/*.gz",
+    "**/*.wasm", "**/*.bin", "**/*.exe", "**/*.dylib", "**/*.so",
+    "**/*.db", "**/*.sqlite",
+    "**/*.ttf", "**/*.woff", "**/*.woff2", "**/*.eot"
+  ]
+}
+```
+
 | Option | Default | Description |
 |---|---|---|
 | `include` | see [Supported file types](#supported-file-types) | Glob patterns for files to index |
