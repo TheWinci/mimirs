@@ -27,6 +27,7 @@ No API keys. No cloud. No Docker. Just `bunx`.
 - **No one reads the docs.** Docs exist but never get surfaced at the right moment. This makes them findable by meaning, automatically.
 - **Analytics expose documentation gaps.** After a week of usage, you'll know which topics people search for but can't find — that's a free gap analysis.
 - **Refactoring is blind.** Agents change a function signature and have no way to find all callers. `find_usages` enumerates every call site across the codebase with file and line number, so you know what breaks before you change anything.
+- **Agents work on stale mental models.** They search for code without knowing what's already been modified in the working tree. `git_context` surfaces uncommitted changes, recent commits, and changed files in one call — annotated with whether each file is in the index or not.
 
 ## Quick start
 
@@ -162,6 +163,10 @@ This project has a local RAG index (local-rag-mcp). Use these MCP tools:
 - **`find_usages`**: Before changing a function or type, find all its call sites.
   Use this to understand the blast radius of a rename or API change. Faster and
   more reliable than semantic search for finding usages.
+- **`git_context`**: At the start of a session (or any time you need orientation),
+  call this to see what files have already been modified, recent commits, and
+  which changed files are in the index. Avoids redundant searches and conflicting
+  edits on already-modified files.
 - **`write_relevant`**: Before adding new code or docs, find the best insertion
   point — returns the most semantically appropriate file and anchor.
 ```
@@ -187,6 +192,7 @@ These tools are available to any MCP client (Claude Code, etc.) once the server 
 | `search_checkpoints` | Semantic search over checkpoint titles and summaries |
 | `search_symbols` | Find exported symbols by name — functions, classes, types, interfaces, enums. Faster than semantic search when you know the symbol name |
 | `find_usages` | Find every call site of a symbol across the codebase — returns file paths, line numbers (`path:line`), and the matching line. Excludes the defining file |
+| `git_context` | Show uncommitted changes (annotated `[indexed]`/`[not indexed]`), recent commits, and changed files. Optional unified diff (`include_diff`). Non-git directories return a graceful message |
 | `write_relevant` | Find the best insertion point for new content — returns semantically appropriate files and anchors |
 
 ## Analytics
@@ -434,6 +440,25 @@ flowchart TD
 9. **Conversation index** — The MCP server tails the active JSONL transcript in real time via `fs.watch`. Each user/assistant turn is chunked, embedded, and stored — searchable within seconds. Past sessions are discovered and indexed incrementally on startup. Tool results from Bash/Grep are indexed (Read/Write/Edit are skipped since file content is already in the code index).
 
 10. **Checkpoints** — Agents create named snapshots at important moments: decisions, milestones, blockers, direction changes, and handoffs. Each checkpoint has a title, summary, and embedding for semantic search. This gives future sessions a high-signal trail of what happened and why.
+
+11. **Git context** — `git_context` shells out to `git` (searching upward for the repo root) and returns up to four sections: uncommitted changes from `git status --short`, recent commits from `git log --oneline`, changed files since a ref, and an optional `git diff HEAD` (truncated to 200 lines). Each file in the status section is annotated with `[indexed]` or `[not indexed]` by checking the RAG file table. Returns `"Not a git repository."` gracefully in non-git directories.
+
+Example output:
+
+```
+## Uncommitted changes
+ M src/server.ts  [indexed]
+ M README.md  [not indexed]
+
+## Recent commits (since HEAD~5)
+a1b2c3d feat: add git_context tool
+9810edf feat: added search symbol and write relevant
+
+## Changed files (since HEAD~5)
+src/server.ts
+README.md
+PLAN.md
+```
 
 ## Stack
 
