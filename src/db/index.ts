@@ -358,16 +358,15 @@ export class RagDB {
       .get(path);
   }
 
-  upsertFile(
-    path: string,
-    hash: string,
-    chunks: { snippet: string; embedding: Float32Array; entityName?: string | null; chunkType?: string | null; startLine?: number | null; endLine?: number | null }[]
-  ) {
-    const tx = this.db.transaction(() => {
-      // Remove old data if exists
-      const existing = this.getFileByPath(path);
-      if (existing) {
-        // Get chunk IDs to remove from vec table
+  /**
+   * Creates the file record and removes old data. Returns the new file ID.
+   * Call `insertChunkBatch` in a loop to insert chunks after this.
+   */
+  upsertFileStart(path: string, hash: string): number {
+    // Remove old data if exists
+    const existing = this.getFileByPath(path);
+    if (existing) {
+      const deleteTx = this.db.transaction(() => {
         const oldChunks = this.db
           .query<{ id: number }, [number]>(
             "SELECT id FROM chunks WHERE file_id = ?"
@@ -378,23 +377,33 @@ export class RagDB {
         }
         this.db.run("DELETE FROM chunks WHERE file_id = ?", [existing.id]);
         this.db.run("DELETE FROM files WHERE id = ?", [existing.id]);
-      }
+      });
+      deleteTx();
+    }
 
-      // Insert file record
-      this.db.run(
-        "INSERT INTO files (path, hash, indexed_at) VALUES (?, ?, ?)",
-        [path, hash, new Date().toISOString()]
-      );
-      const fileId = Number(
-        this.db.query<{ id: number }, []>("SELECT last_insert_rowid() as id").get()!.id
-      );
+    this.db.run(
+      "INSERT INTO files (path, hash, indexed_at) VALUES (?, ?, ?)",
+      [path, hash, new Date().toISOString()]
+    );
+    return Number(
+      this.db.query<{ id: number }, []>("SELECT last_insert_rowid() as id").get()!.id
+    );
+  }
 
-      // Insert chunks + vectors
+  /**
+   * Insert a batch of chunks for a file in a single transaction.
+   */
+  insertChunkBatch(
+    fileId: number,
+    chunks: { snippet: string; embedding: Float32Array; entityName?: string | null; chunkType?: string | null; startLine?: number | null; endLine?: number | null }[],
+    startIndex: number
+  ) {
+    const tx = this.db.transaction(() => {
       for (let i = 0; i < chunks.length; i++) {
         const { snippet, embedding, entityName, chunkType, startLine, endLine } = chunks[i];
         this.db.run(
           "INSERT INTO chunks (file_id, chunk_index, snippet, entity_name, chunk_type, start_line, end_line) VALUES (?, ?, ?, ?, ?, ?, ?)",
-          [fileId, i, snippet, entityName ?? null, chunkType ?? null, startLine ?? null, endLine ?? null]
+          [fileId, startIndex + i, snippet, entityName ?? null, chunkType ?? null, startLine ?? null, endLine ?? null]
         );
         const chunkId = Number(
           this.db.query<{ id: number }, []>("SELECT last_insert_rowid() as id").get()!.id
@@ -405,8 +414,19 @@ export class RagDB {
         );
       }
     });
-
     tx();
+  }
+
+  /**
+   * Convenience wrapper: upserts file + all chunks in one go (blocks until done).
+   */
+  upsertFile(
+    path: string,
+    hash: string,
+    chunks: { snippet: string; embedding: Float32Array; entityName?: string | null; chunkType?: string | null; startLine?: number | null; endLine?: number | null }[]
+  ) {
+    const fileId = this.upsertFileStart(path, hash);
+    this.insertChunkBatch(fileId, chunks, 0);
   }
 
   removeFile(path: string): boolean {

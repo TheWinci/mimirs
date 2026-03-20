@@ -160,9 +160,12 @@ export async function indexDirectory(
   directory: string,
   db: RagDB,
   config: RagConfig,
-  onProgress?: (msg: string) => void
+  onProgress?: (msg: string, opts?: { transient?: boolean }) => void,
+  signal?: AbortSignal
 ): Promise<IndexResult> {
   const result: IndexResult = { indexed: 0, skipped: 0, pruned: 0, errors: [] };
+
+  if (signal?.aborted) return result;
 
   const matchedFiles = await collectFiles(directory, config, onProgress);
 
@@ -170,6 +173,8 @@ export async function indexDirectory(
 
   // Index each file
   for (const filePath of matchedFiles) {
+    if (signal?.aborted) break;
+
     try {
       const hash = await fileHash(filePath);
       const existing = db.getFileByPath(filePath);
@@ -203,6 +208,7 @@ export async function indexDirectory(
 
       const embeddedChunks: { snippet: string; embedding: Float32Array; entityName?: string | null; chunkType?: string | null; startLine?: number | null; endLine?: number | null }[] = [];
       for (let i = 0; i < chunks.length; i += config.indexBatchSize ?? 50) {
+        if (signal?.aborted) break;
         const batch = chunks.slice(i, i + (config.indexBatchSize ?? 50));
         const embeddings = await embedBatch(batch.map(c => c.text), config.indexThreads);
         for (let j = 0; j < batch.length; j++) {
@@ -217,17 +223,28 @@ export async function indexDirectory(
             endLine: chunk.endLine ?? null,
           });
         }
+        onProgress?.(`Embedded batch ${Math.min(i + (config.indexBatchSize ?? 50), chunks.length)}/${chunks.length} chunks for ${relative(directory, filePath)}`, { transient: true });
         await Bun.sleep(0);
       }
 
-      db.upsertFile(filePath, hash, embeddedChunks);
+      if (signal?.aborted) break;
+
+      // Insert into DB in batches, yielding between each to keep the event loop responsive
+      const DB_BATCH = 500;
+      const fileId = db.upsertFileStart(filePath, hash);
+      for (let i = 0; i < embeddedChunks.length; i += DB_BATCH) {
+        if (signal?.aborted) break;
+        const batch = embeddedChunks.slice(i, i + DB_BATCH);
+        db.insertChunkBatch(fileId, batch, i);
+        onProgress?.(`Writing batch ${Math.min(i + DB_BATCH, embeddedChunks.length)}/${embeddedChunks.length} chunks to DB for ${relative(directory, filePath)}`, { transient: true });
+        await Bun.sleep(0);
+      }
+
+      if (signal?.aborted) break;
 
       // Store graph metadata (imports/exports)
       const graphData = aggregateGraphData(chunks);
-      const file = db.getFileByPath(filePath);
-      if (file) {
-        db.upsertFileGraph(file.id, graphData.imports, graphData.exports);
-      }
+      db.upsertFileGraph(fileId, graphData.imports, graphData.exports);
 
       result.indexed++;
       onProgress?.(`Indexed: ${relative(directory, filePath)} (${chunks.length} chunks)`);
@@ -238,6 +255,8 @@ export async function indexDirectory(
       onProgress?.(msg);
     }
   }
+
+  if (signal?.aborted) return result;
 
   // Prune files that no longer exist
   const existingPaths = new Set(matchedFiles);

@@ -73,7 +73,7 @@ export async function chunkText(
   filePath?: string
 ): Promise<Chunk[]> {
   const chunks = await _chunkText(text, extension, chunkSize, chunkOverlap, filePath);
-  assignLineNumbers(chunks, text);
+  await assignLineNumbers(chunks, text);
   return chunks;
 }
 
@@ -172,15 +172,35 @@ async function _chunkText(
  * repeated text still resolves in order. Chunks whose text is not a verbatim
  * substring (e.g. JSON-reformatted chunks) are left without line numbers.
  */
-function assignLineNumbers(chunks: Chunk[], fullText: string): void {
+async function assignLineNumbers(chunks: Chunk[], fullText: string): Promise<void> {
+  // Pre-compute a line offset index so we can binary-search instead of
+  // re-splitting the full text for every chunk (O(n) build, O(log n) per lookup).
+  const lineOffsets = [0];
+  for (let i = 0; i < fullText.length; i++) {
+    if (fullText[i] === "\n") lineOffsets.push(i + 1);
+  }
+
+  function offsetToLine(offset: number): number {
+    let lo = 0, hi = lineOffsets.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (lineOffsets[mid] <= offset) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo + 1; // 1-based
+  }
+
   let cursor = 0;
-  for (const chunk of chunks) {
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
     const idx = fullText.indexOf(chunk.text, cursor);
     if (idx >= 0) {
-      chunk.startLine = fullText.slice(0, idx).split("\n").length;
-      chunk.endLine = fullText.slice(0, idx + chunk.text.length).split("\n").length;
+      chunk.startLine = offsetToLine(idx);
+      chunk.endLine = offsetToLine(idx + chunk.text.length);
       cursor = idx + chunk.text.length;
     }
+    // Yield every 200 chunks to keep the event loop responsive
+    if (i % 200 === 0 && i > 0) await Promise.resolve();
   }
 }
 

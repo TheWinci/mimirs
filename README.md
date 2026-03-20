@@ -14,6 +14,7 @@ No API keys. No cloud. No Docker. Just `bunx`.
 - [Why](#why)
 - [Quick start](#quick-start)
 - [MCP tools](#mcp-tools)
+- [CLI](#cli)
 - [Analytics](#analytics)
 - [Project map](#project-map)
 - [Configuration](#configuration)
@@ -45,7 +46,7 @@ brew install sqlite
 Run the server directly to confirm it works and watch the indexing output:
 
 ```bash
-bunx local-rag-mcp
+bunx local-rag-mcp serve
 ```
 
 You should see something like:
@@ -89,7 +90,7 @@ Editors that set cwd to the project automatically (Claude Code, VS Code) work wi
   "mcpServers": {
     "local-rag": {
       "command": "bunx",
-      "args": ["local-rag-mcp"]
+      "args": ["local-rag-mcp", "serve"]
     }
   }
 }
@@ -102,7 +103,7 @@ Editors that set cwd to the project automatically (Claude Code, VS Code) work wi
   "mcpServers": {
     "local-rag": {
       "command": "bunx",
-      "args": ["local-rag-mcp"],
+      "args": ["local-rag-mcp", "serve"],
       "env": {
         "RAG_PROJECT_DIR": "/path/to/your/project"
       }
@@ -124,7 +125,7 @@ Editors that set cwd to the project automatically (Claude Code, VS Code) work wi
 
 ### Auto-indexing
 
-The MCP server automatically indexes your project on startup and watches for file changes during the session. It also tails the active conversation transcript in real time and indexes past sessions on startup. You don't need to manually run `index` — just connect and search. Progress is logged to stderr.
+The MCP server (`local-rag-mcp serve`) automatically indexes your project on startup and watches for file changes during the session. It also tails the active conversation transcript in real time and indexes past sessions on startup. You don't need to manually run `index` — just connect and search. Progress is logged to stderr.
 
 ### Make the agent use it automatically
 
@@ -139,7 +140,7 @@ This project has a local RAG index (local-rag-mcp). Use these MCP tools:
   with snippet previews — use this when you need to know *where* something is.
 - **`read_relevant`**: Get the actual content of relevant semantic chunks —
   individual functions, classes, or markdown sections — ranked by relevance.
-  Results include exact line ranges (`src/db.ts:42-67`) so you can navigate
+  Results include exact line ranges (`src/db/index.ts:42-67`) so you can navigate
   directly to the edit location. Use this instead of `search` + `Read` when
   you need the content itself. Two chunks from the same file can both appear
   (no file deduplication).
@@ -203,6 +204,26 @@ These tools are available to any MCP client (Claude Code, etc.) once the server 
 | `get_annotations` | Retrieve notes by file path, or search semantically across all annotations |
 | `write_relevant` | Find the best insertion point for new content — returns semantically appropriate files and anchors |
 
+## CLI
+
+`local-rag-mcp` is a CLI-first tool. The MCP server runs as the `serve` subcommand.
+
+```bash
+local-rag-mcp serve              # Start MCP server (stdio transport)
+local-rag-mcp init [dir]         # Set up .rag/config.json, CLAUDE.md, .gitignore
+local-rag-mcp index [dir]        # Index files in a directory
+local-rag-mcp search <query>     # Semantic search
+local-rag-mcp read <query>       # Chunk-level retrieval (like read_relevant)
+local-rag-mcp status [dir]       # Show index stats
+local-rag-mcp remove <path>      # Remove a file from the index
+local-rag-mcp analytics [dir]    # Usage analytics with trend comparison
+local-rag-mcp map [dir]          # Dependency graph (Mermaid output)
+local-rag-mcp benchmark [dir]    # Run search quality benchmark
+local-rag-mcp eval [dir]         # A/B eval harness
+local-rag-mcp conversation       # Conversation subcommands (search, sessions, index)
+local-rag-mcp checkpoint         # Checkpoint subcommands (create, list, search)
+```
+
 ## Analytics
 
 Every search is logged automatically. Use the `search_analytics` MCP tool to see what's working and what's not:
@@ -241,52 +262,47 @@ Trend (current 30d vs prior 30d):
 
 The `project_map` MCP tool generates a Mermaid dependency graph from import/export relationships extracted during indexing. This gives AI agents (and humans) a bird's-eye view of how files relate to each other.
 
-Here's the dependency graph for this project's source files:
+Here's the dependency graph for this project's source domains:
 
 ```mermaid
 graph TD
-  server_ts["server.ts\n+ getDB\n+ cleanup"]
-  db_ts["db.ts\n+ loadCustomSQLite\n+ StoredChunk\n+ StoredFile"]
-  search_ts["search.ts\n+ DedupedResult\n+ search"]
-  indexer_ts["indexer.ts\n+ aggregateGraphData\n+ IndexResult\n+ fileHash"]
-  chunker_ts["chunker.ts\n+ ChunkImport\n+ ChunkExport\n+ Chunk"]
-  embed_ts["embed.ts\n+ getEmbedder\n+ embed"]
-  config_ts["config.ts\n+ RagConfig\n+ loadConfig\n+ writeDefaultConfig"]
-  graph_ts["graph.ts\n+ resolveImports\n+ resolveImportsForFile\n+ tryResolvePath"]
-  parse_ts["parse.ts\n+ ParsedFile\n+ parseFile\n+ buildWeightedText"]
-  watcher_ts["watcher.ts\n+ matchesAny\n+ startWatcher"]
-  conversation_ts["conversation.ts\n+ readJSONL\n+ parseTurns\n+ discoverSessions"]
-  conversation_index_ts["conversation-index.ts\n+ indexConversation\n+ startConversationTail"]
-  server_ts --> db_ts
-  server_ts --> config_ts
-  server_ts --> indexer_ts
-  server_ts --> search_ts
-  server_ts --> watcher_ts
-  server_ts --> graph_ts
-  server_ts --> embed_ts
-  server_ts --> conversation_ts
-  server_ts --> conversation_index_ts
-  conversation_index_ts --> conversation_ts
-  conversation_index_ts --> chunker_ts
-  conversation_index_ts --> embed_ts
-  conversation_index_ts --> db_ts
-  indexer_ts --> parse_ts
-  indexer_ts --> embed_ts
-  indexer_ts --> chunker_ts
-  indexer_ts --> db_ts
-  indexer_ts --> config_ts
-  indexer_ts --> graph_ts
-  search_ts --> embed_ts
-  search_ts --> db_ts
-  watcher_ts --> indexer_ts
-  watcher_ts --> config_ts
-  watcher_ts --> db_ts
-  watcher_ts --> graph_ts
-  db_ts --> embed_ts
-  style server_ts fill:#e1f5fe,stroke:#0288d1
+  main["src/main.ts"]
+  cli["src/cli/\n+ main, usage, getFlag\n+ 12 command handlers"]
+  server["src/server/\n+ startServer, getDB"]
+  tools["src/tools/\n+ registerAllTools\n+ 8 tool modules"]
+  db["src/db/\n+ RagDB (facade)"]
+  indexing["src/indexing/\n+ indexer, chunker,\n  parse, watcher"]
+  search["src/search/\n+ hybrid, usages,\n  benchmark, eval"]
+  embeddings["src/embeddings/\n+ embed, embedBatch"]
+  graph["src/graph/\n+ resolver"]
+  conversation["src/conversation/\n+ parser, indexer"]
+  config["src/config/\n+ loadConfig"]
+
+  main --> cli
+  cli --> server
+  cli --> search
+  cli --> graph
+  cli --> conversation
+  server --> tools
+  server --> db
+  server --> indexing
+  server --> conversation
+  tools --> search
+  tools --> graph
+  tools --> conversation
+  search --> db
+  search --> embeddings
+  indexing --> db
+  indexing --> embeddings
+  indexing --> graph
+  conversation --> indexing
+  graph --> db
+
+  style main fill:#e1f5fe,stroke:#0288d1
+  style server fill:#e1f5fe,stroke:#0288d1
 ```
 
-`server.ts` is the entry point (highlighted in blue). The graph is extracted from tree-sitter AST parsing, not regex, so it handles re-exports, barrel files, and aliased imports correctly.
+`src/main.ts` is the single entry point. The CLI dispatches to command handlers; `serve` starts the MCP server. The graph is extracted from tree-sitter AST parsing, not regex, so it handles re-exports, barrel files, and aliased imports correctly.
 
 ## Configuration
 
@@ -451,10 +467,10 @@ flowchart TD
 
 11. **Code annotations** — `annotate` stores notes in a dedicated `annotations` table, embedded at write time for semantic search. Notes are keyed by `(path, symbol_name)` so calling again updates rather than duplicates. `get_annotations` retrieves by file path or searches semantically. `read_relevant` automatically surfaces relevant notes as `[NOTE]` blocks above matching chunks — file-level notes for any chunk from that file, symbol-level notes only when the entity name matches.
 
-Example: after annotating `src/db.ts` on symbol `RagDB` with "not thread-safe — don't share across requests", a `read_relevant("database constructor")` result looks like:
+Example: after annotating `src/db/index.ts` on symbol `RagDB` with "not thread-safe — don't share across requests", a `read_relevant("database constructor")` result looks like:
 
 ```
-[0.91] src/db.ts:108-138  •  RagDB
+[0.91] src/db/index.ts:108-138  •  RagDB
 [NOTE (RagDB)] not thread-safe — don't share across requests
 export class RagDB {
   private db: Database;
@@ -467,17 +483,16 @@ Example output:
 
 ```
 ## Uncommitted changes
- M src/server.ts  [indexed]
+ M src/server/index.ts  [indexed]
  M README.md  [not indexed]
 
 ## Recent commits (since HEAD~5)
-a1b2c3d feat: add git_context tool
-9810edf feat: added search symbol and write relevant
+a1b2c3d feat: restructure to domain-based folders
+9810edf feat: add git_context tool
 
 ## Changed files (since HEAD~5)
-src/server.ts
+src/server/index.ts
 README.md
-PLAN.md
 ```
 
 ## Stack

@@ -3,6 +3,7 @@ import { RagDB } from "../../db";
 import { loadConfig } from "../../config";
 import { indexDirectory } from "../../indexing/indexer";
 import { runSetup, mcpConfigSnippet, detectAgentHints, confirm } from "../setup";
+import { cliProgress } from "../progress";
 
 export async function initCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const dir = resolve(args[1] && !args[1].startsWith("--") ? args[1] : ".");
@@ -25,7 +26,7 @@ export async function initCommand(args: string[], getFlag: (flag: string) => str
     const db = new RagDB(dir);
     const config = await loadConfig(dir);
     console.log(`Indexing ${dir}...`);
-    const result = await indexDirectory(dir, db, config, console.log);
+    const result = await indexDirectory(dir, db, config, cliProgress);
     console.log(
       `\nDone: ${result.indexed} indexed, ${result.skipped} skipped, ${result.pruned} pruned`
     );

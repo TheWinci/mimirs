@@ -57,7 +57,8 @@ export async function startServer() {
       const db = new RagDB(dir);
       const config = await loadConfig(dir);
       console.log(`Indexing ${dir}...`);
-      const result = await indexDirectory(dir, db, config, console.log);
+      const { cliProgress } = await import("../cli/progress");
+      const result = await indexDirectory(dir, db, config, cliProgress);
       console.log(
         `\nDone: ${result.indexed} indexed, ${result.skipped} skipped, ${result.pruned} pruned`
       );
