@@ -21,8 +21,7 @@
     "bun"
   ],
   "bin": {
-    "local-rag": "src/cli.ts",
-    "local-rag-mcp": "src/server.ts"
+    "local-rag-mcp": "src/main.ts"
   },
   "files": [
     "src/",
@@ -30,8 +29,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "server": "bun run src/server.ts",
-    "cli": "bun run src/cli.ts",
+    "server": "bun run src/main.ts serve",
+    "cli": "bun run src/main.ts",
     "test": "bun test tests/ 2>&1; EXIT=$?; if [ $EXIT -eq 133 ]; then printf '\\n[note] Exit code 133 suppressed — known Bun crash on macOS Silicon during process cleanup (github.com/oven-sh/bun/issues/19917). All tests passed.\\n'; exit 0; else exit $EXIT; fi"
   },
   "dependencies": {
