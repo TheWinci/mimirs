@@ -8,6 +8,7 @@ import { indexDirectory } from "../indexing/indexer";
 import { startWatcher, type Watcher } from "../indexing/watcher";
 import { discoverSessions } from "../conversation/parser";
 import { indexConversation, startConversationTail } from "../conversation/indexer";
+import { ensureGitignore } from "../cli/setup";
 import { registerAllTools } from "../tools";
 import { log } from "../utils/log";
 
@@ -54,6 +55,11 @@ export async function startServer() {
   let convWatcher: Watcher | null = null;
 
   if (!isHomeDirTrap) {
+    // Ensure .rag/ is gitignored
+    ensureGitignore(startupDir).catch((err) => {
+      log.warn(`Failed to update .gitignore: ${err instanceof Error ? err.message : err}`, "server");
+    });
+
     // Index in background — don't block server startup
     indexDirectory(startupDir, startupDb, startupConfig, (msg) => {
       process.stderr.write(`[local-rag] ${msg}\n`);
