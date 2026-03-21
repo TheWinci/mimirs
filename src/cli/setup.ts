@@ -2,7 +2,7 @@ import { existsSync } from "fs";
 import { readFile, writeFile, mkdir } from "fs/promises";
 import { join, resolve } from "path";
 import { createInterface } from "readline";
-import { writeDefaultConfig } from "../config";
+import { loadConfig } from "../config";
 
 const MARKER = "<!-- local-rag -->";
 
@@ -69,7 +69,8 @@ export interface SetupResult {
 export async function ensureConfig(projectDir: string): Promise<string | null> {
   const configPath = join(projectDir, ".rag", "config.json");
   if (existsSync(configPath)) return null;
-  await writeDefaultConfig(projectDir);
+  // loadConfig auto-creates the file with defaults if missing
+  await loadConfig(projectDir);
   return "Created .rag/config.json";
 }
 

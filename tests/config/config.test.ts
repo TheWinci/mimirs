@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { loadConfig, writeDefaultConfig } from "../../src/config";
+import { loadConfig } from "../../src/config";
 import { createTempDir, cleanupTempDir } from "../helpers";
-import { writeFile, mkdir } from "fs/promises";
+import { writeFile, mkdir, readFile } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
 
@@ -16,9 +16,11 @@ afterEach(async () => {
 });
 
 describe("loadConfig", () => {
-  test("returns defaults when no config.json exists", async () => {
+  test("creates config.json with defaults when none exists", async () => {
     const config = await loadConfig(tempDir);
     expect(config.include).toContain("**/*.md");
+    expect(config.include).toContain("**/*.ts");
+    expect(config.include).toContain("**/*.py");
     expect(config.include).toContain("**/*.yaml");
     expect(config.include).toContain("**/Makefile");
     expect(config.include).toContain("**/Dockerfile");
@@ -29,9 +31,16 @@ describe("loadConfig", () => {
     expect(config.exclude).toContain("node_modules/**");
     expect(config.chunkSize).toBe(512);
     expect(config.chunkOverlap).toBe(50);
+
+    // Verify it was written to disk
+    const configPath = join(tempDir, ".rag", "config.json");
+    expect(existsSync(configPath)).toBe(true);
+    const onDisk = JSON.parse(await readFile(configPath, "utf-8"));
+    expect(onDisk.include).toEqual(config.include);
+    expect(onDisk.exclude).toEqual(config.exclude);
   });
 
-  test("merges user config with defaults", async () => {
+  test("loads user config from disk without merging defaults", async () => {
     await mkdir(join(tempDir, ".rag"), { recursive: true });
     await writeFile(
       join(tempDir, ".rag", "config.json"),
@@ -44,22 +53,7 @@ describe("loadConfig", () => {
     const config = await loadConfig(tempDir);
     expect(config.include).toEqual(["**/*.md", "**/*.ts", "**/*.py"]);
     expect(config.chunkSize).toBe(1024);
-    // Defaults preserved for unset fields
+    // Zod defaults for unset fields
     expect(config.chunkOverlap).toBe(50);
-  });
-});
-
-describe("writeDefaultConfig", () => {
-  test("creates valid JSON config file", async () => {
-    await mkdir(join(tempDir, ".rag"), { recursive: true });
-    const path = await writeDefaultConfig(tempDir);
-
-    expect(existsSync(path)).toBe(true);
-
-    const content = JSON.parse(await Bun.file(path).text());
-    expect(content.include).toBeArray();
-    expect(content.exclude).toBeArray();
-    expect(content.chunkSize).toBeNumber();
-    expect(content.chunkOverlap).toBeNumber();
   });
 });
