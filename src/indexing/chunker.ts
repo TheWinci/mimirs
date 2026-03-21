@@ -1,4 +1,4 @@
-import { chunk as astChunk } from "code-chunk";
+import { chunk as astChunk } from "@winci/bun-chunk";
 import { log } from "../utils/log";
 
 export interface ChunkImport {
@@ -97,18 +97,23 @@ async function _chunkText(
   // Try AST-aware chunking for supported code files (even small ones, for import/export extraction)
   if (AST_SUPPORTED.has(extension)) {
     try {
-      const astChunks = await astChunk(filePath || `file${extension}`, text, {
-        maxChunkSize: chunkSize,
-      });
+      const astChunks = await astChunk(filePath || `file${extension}`, text);
       if (astChunks.length > 0) {
-        return astChunks.map((c, i) => ({
-          text: c.text,
-          index: i,
-          imports: c.context.imports.map((im) => ({ name: im.name, source: im.source })),
-          exports: c.context.entities
-            .filter((e) => e.type === "export" || e.type === "function" || e.type === "class" || e.type === "interface" || e.type === "type" || e.type === "enum")
-            .map((e) => ({ name: e.name, type: e.type })),
-        }));
+        return astChunks.map((c, i) => {
+          const chunk: Chunk = {
+            text: c.text,
+            index: i,
+            startLine: c.startLine + 1, // bun-chunk is 0-indexed, local-rag is 1-indexed
+            endLine: c.endLine + 1,
+          };
+          if (c.type === "import") {
+            chunk.imports = parseImportText(c.text);
+          }
+          if (c.name && c.type !== "import" && c.type !== "block") {
+            chunk.exports = [{ name: c.name, type: c.type }];
+          }
+          return chunk;
+        });
       }
     } catch (err) {
       log.debug(`AST chunking failed for ${filePath || extension}, using heuristic: ${err instanceof Error ? err.message : err}`, "chunker");
@@ -199,6 +204,29 @@ function assignLineNumbers(chunks: Chunk[], fullText: string): void {
       cursor = idx + chunk.text.length;
     }
   }
+}
+
+/** Extract import name and source from an import statement text */
+function parseImportText(text: string): ChunkImport[] {
+  // Match: import { foo } from "bar" / import foo from "bar" / import * as foo from "bar"
+  const match = text.match(/from\s+["']([^"']+)["']/);
+  if (!match) {
+    // import "side-effect" or Python: import foo / from foo import bar
+    const pyImport = text.match(/^import\s+(\S+)/);
+    if (pyImport) return [{ name: pyImport[1], source: pyImport[1] }];
+    const pyFrom = text.match(/^from\s+(\S+)\s+import\s+(.+)/);
+    if (pyFrom) return [{ name: pyFrom[2].trim(), source: pyFrom[1] }];
+    // Go/Rust: use/import with path
+    const quotedPath = text.match(/["']([^"']+)["']/);
+    if (quotedPath) return [{ name: quotedPath[1].split("/").pop()!, source: quotedPath[1] }];
+    return [];
+  }
+  const source = match[1];
+  const nameMatch = text.match(/import\s+(?:\{([^}]+)\}|(\w+)|\*\s+as\s+(\w+))/);
+  const name = nameMatch
+    ? (nameMatch[1]?.trim() || nameMatch[2] || nameMatch[3] || source)
+    : source;
+  return [{ name, source }];
 }
 
 function splitMarkdown(text: string): string[] {
