@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "local-rag": {
+      "command": "bunx",
+      "args": ["@winci/local-rag@latest", "serve"]
+    }
+  }
+}

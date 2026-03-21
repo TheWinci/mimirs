@@ -154,6 +154,79 @@ export function mcpConfigSnippet(projectDir: string): string {
   }, null, 2);
 }
 
+function mcpServerEntry(projectDir: string) {
+  return {
+    command: "bunx",
+    args: ["@winci/local-rag@latest"],
+    env: { RAG_PROJECT_DIR: resolve(projectDir) },
+  };
+}
+
+export async function ensureMcpJson(projectDir: string): Promise<string[]> {
+  const actions: string[] = [];
+  const entry = mcpServerEntry(projectDir);
+
+  // Claude Code — .mcp.json
+  const claudeMcpPath = join(projectDir, ".mcp.json");
+  if (existsSync(claudeMcpPath)) {
+    const raw = JSON.parse(await readFile(claudeMcpPath, "utf-8"));
+    if (!raw.mcpServers?.["local-rag"]) {
+      raw.mcpServers = raw.mcpServers || {};
+      raw.mcpServers["local-rag"] = entry;
+      await writeFile(claudeMcpPath, JSON.stringify(raw, null, 2) + "\n");
+      actions.push("Added local-rag to .mcp.json");
+    }
+  } else {
+    await writeFile(
+      claudeMcpPath,
+      JSON.stringify({ mcpServers: { "local-rag": entry } }, null, 2) + "\n"
+    );
+    actions.push("Created .mcp.json with local-rag");
+  }
+
+  // Cursor — .cursor/mcp.json
+  if (existsSync(join(projectDir, ".cursor"))) {
+    const cursorMcpPath = join(projectDir, ".cursor", "mcp.json");
+    if (existsSync(cursorMcpPath)) {
+      const raw = JSON.parse(await readFile(cursorMcpPath, "utf-8"));
+      if (!raw.mcpServers?.["local-rag"]) {
+        raw.mcpServers = raw.mcpServers || {};
+        raw.mcpServers["local-rag"] = entry;
+        await writeFile(cursorMcpPath, JSON.stringify(raw, null, 2) + "\n");
+        actions.push("Added local-rag to .cursor/mcp.json");
+      }
+    } else {
+      await writeFile(
+        cursorMcpPath,
+        JSON.stringify({ mcpServers: { "local-rag": entry } }, null, 2) + "\n"
+      );
+      actions.push("Created .cursor/mcp.json with local-rag");
+    }
+  }
+
+  // Windsurf — .windsurf/mcp.json
+  if (existsSync(join(projectDir, ".windsurf"))) {
+    const windsurfMcpPath = join(projectDir, ".windsurf", "mcp.json");
+    if (existsSync(windsurfMcpPath)) {
+      const raw = JSON.parse(await readFile(windsurfMcpPath, "utf-8"));
+      if (!raw.mcpServers?.["local-rag"]) {
+        raw.mcpServers = raw.mcpServers || {};
+        raw.mcpServers["local-rag"] = entry;
+        await writeFile(windsurfMcpPath, JSON.stringify(raw, null, 2) + "\n");
+        actions.push("Added local-rag to .windsurf/mcp.json");
+      }
+    } else {
+      await writeFile(
+        windsurfMcpPath,
+        JSON.stringify({ mcpServers: { "local-rag": entry } }, null, 2) + "\n"
+      );
+      actions.push("Created .windsurf/mcp.json with local-rag");
+    }
+  }
+
+  return actions;
+}
+
 export function detectAgentHints(projectDir: string): string[] {
   const hints: string[] = [];
   if (existsSync(join(projectDir, ".mcp.json")))
@@ -185,6 +258,9 @@ export async function runSetup(projectDir: string): Promise<SetupResult> {
 
   const instructionActions = await ensureAgentInstructions(projectDir);
   actions.push(...instructionActions);
+
+  const mcpActions = await ensureMcpJson(projectDir);
+  actions.push(...mcpActions);
 
   const gitignoreAction = await ensureGitignore(projectDir);
   if (gitignoreAction) actions.push(gitignoreAction);
