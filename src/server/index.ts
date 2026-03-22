@@ -161,6 +161,14 @@ export async function startServer() {
   process.on("SIGINT", cleanup);
   process.on("SIGTERM", cleanup);
   process.on("SIGHUP", cleanup);
+  process.on("uncaughtException", (err) => {
+    process.stderr.write(`[local-rag] Uncaught exception: ${err.message}\n`);
+    cleanup();
+  });
+  process.on("unhandledRejection", (err) => {
+    process.stderr.write(`[local-rag] Unhandled rejection: ${err instanceof Error ? err.message : err}\n`);
+    cleanup();
+  });
 
   // Start server
   const transport = new StdioServerTransport();
