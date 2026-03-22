@@ -1,33 +1,58 @@
-import { dirname, resolve, relative, basename } from "path";
+import { dirname, resolve, relative, basename, extname } from "path";
+import { resolveImport as bcResolveImport, loadTsConfig, EXTENSION_MAP } from "@winci/bun-chunk";
 import { RagDB } from "../db";
 
-// Extensions to try when resolving relative imports
+// Extensions to try when resolving relative imports (DB-based fallback)
 const RESOLVE_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx"];
 const INDEX_FILES = RESOLVE_EXTENSIONS.map((ext) => `/index${ext}`);
 
 /**
+ * Detect language from file extension using bun-chunk's EXTENSION_MAP.
+ */
+function detectLanguage(filePath: string) {
+  const ext = extname(filePath).toLowerCase();
+  return (EXTENSION_MAP as Record<string, string>)[ext] ?? null;
+}
+
+/**
  * Resolve all unresolved imports in the database by matching import specifiers
- * to indexed file paths.
+ * to indexed file paths. Uses a two-pass approach:
+ *   1. bun-chunk's filesystem resolver (handles tsconfig paths, Python, Rust)
+ *   2. DB-based resolution as fallback
  */
 export function resolveImports(db: RagDB, projectDir: string): number {
   const unresolved = db.getUnresolvedImports();
   const pathToId = buildPathToIdMap(db);
+  const tsConfig = loadTsConfig(projectDir);
 
   let resolvedCount = 0;
 
   for (const imp of unresolved) {
-    // Skip bare/external specifiers (no ./ or ../ prefix)
+    const lang = detectLanguage(imp.filePath);
+
+    // Skip bare/external specifiers — but let Python/Rust through since
+    // their relative imports don't always start with ./ (e.g. crate::, from .x)
     if (!imp.source.startsWith(".") && !imp.source.startsWith("/")) {
+      if (lang !== "rust" && lang !== "python") continue;
+    }
+
+    // Pass 1: bun-chunk filesystem resolution
+    const resolvedPath = bcResolveImport(imp.source, imp.filePath, projectDir, lang, tsConfig);
+    if (resolvedPath && pathToId.has(resolvedPath)) {
+      db.resolveImport(imp.id, pathToId.get(resolvedPath)!);
+      resolvedCount++;
       continue;
     }
 
-    const importerDir = dirname(imp.filePath);
-    const basePath = resolve(importerDir, imp.source);
-
-    const resolved = tryResolvePath(basePath, pathToId);
-    if (resolved !== null) {
-      db.resolveImport(imp.id, resolved);
-      resolvedCount++;
+    // Pass 2: DB-based resolution (extension probing against indexed paths)
+    if (imp.source.startsWith(".") || imp.source.startsWith("/")) {
+      const importerDir = dirname(imp.filePath);
+      const basePath = resolve(importerDir, imp.source);
+      const dbResolved = tryResolvePath(basePath, pathToId);
+      if (dbResolved !== null) {
+        db.resolveImport(imp.id, dbResolved);
+        resolvedCount++;
+      }
     }
   }
 
@@ -57,16 +82,32 @@ export function resolveImportsForFile(
   const filePath = idToPath.get(fileId);
   if (!filePath) return;
 
-  const importerDir = dirname(filePath);
+  const lang = detectLanguage(filePath);
+  const tsConfig = loadTsConfig(projectDir);
 
   for (const imp of imports) {
     if (imp.resolvedFileId !== null) continue;
-    if (!imp.source.startsWith(".") && !imp.source.startsWith("/")) continue;
 
-    const basePath = resolve(importerDir, imp.source);
-    const resolved = tryResolvePath(basePath, pathToId);
-    if (resolved !== null) {
-      db.resolveImport(imp.id, resolved);
+    // Skip bare/external specifiers — but let Python/Rust through
+    if (!imp.source.startsWith(".") && !imp.source.startsWith("/")) {
+      if (lang !== "rust" && lang !== "python") continue;
+    }
+
+    // Pass 1: bun-chunk filesystem resolution
+    const resolvedPath = bcResolveImport(imp.source, filePath, projectDir, lang, tsConfig);
+    if (resolvedPath && pathToId.has(resolvedPath)) {
+      db.resolveImport(imp.id, pathToId.get(resolvedPath)!);
+      continue;
+    }
+
+    // Pass 2: DB-based resolution
+    if (imp.source.startsWith(".") || imp.source.startsWith("/")) {
+      const importerDir = dirname(filePath);
+      const basePath = resolve(importerDir, imp.source);
+      const resolved = tryResolvePath(basePath, pathToId);
+      if (resolved !== null) {
+        db.resolveImport(imp.id, resolved);
+      }
     }
   }
 }

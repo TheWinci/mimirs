@@ -18,6 +18,8 @@ const defaultConfig: RagConfig = {
   chunkOverlap: 50,
   hybridWeight: 0.7,
   searchTopK: 10,
+  incrementalChunks: false,
+  enableReranking: true,
   benchmarkTopK: 10,
   benchmarkMinRecall: 0.5,
   benchmarkMinMrr: 0.5,
@@ -72,7 +74,7 @@ function generateLargeJson(targetLines: number): string {
   return lines.join("\n");
 }
 
-const indexThreads = Math.max(2, Math.floor(cpus().length / 2));
+const indexThreads = Math.max(2, Math.floor(cpus().length / 3));
 
 beforeAll(async () => {
   // Initialize embedder with limited threads to avoid CPU saturation

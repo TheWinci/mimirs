@@ -41,6 +41,17 @@ export function upsertFileStart(db: Database, path: string, hash: string): numbe
   );
 }
 
+/**
+ * Update only the file hash and indexed_at timestamp, without deleting chunks.
+ * Used by incremental chunk updates where we selectively delete/add chunks.
+ */
+export function updateFileHash(db: Database, fileId: number, hash: string): void {
+  db.run(
+    "UPDATE files SET hash = ?, indexed_at = ? WHERE id = ?",
+    [hash, new Date().toISOString(), fileId]
+  );
+}
+
 export function insertChunkBatch(
   db: Database,
   fileId: number,
@@ -49,10 +60,10 @@ export function insertChunkBatch(
 ) {
   const tx = db.transaction(() => {
     for (let i = 0; i < chunks.length; i++) {
-      const { snippet, embedding, entityName, chunkType, startLine, endLine } = chunks[i];
+      const { snippet, embedding, entityName, chunkType, startLine, endLine, contentHash } = chunks[i];
       db.run(
-        "INSERT INTO chunks (file_id, chunk_index, snippet, entity_name, chunk_type, start_line, end_line) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        [fileId, startIndex + i, snippet, entityName ?? null, chunkType ?? null, startLine ?? null, endLine ?? null]
+        "INSERT INTO chunks (file_id, chunk_index, snippet, entity_name, chunk_type, start_line, end_line, content_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        [fileId, startIndex + i, snippet, entityName ?? null, chunkType ?? null, startLine ?? null, endLine ?? null, contentHash ?? null]
       );
       const chunkId = Number(
         db.query<{ id: number }, []>("SELECT last_insert_rowid() as id").get()!.id
@@ -117,6 +128,62 @@ export function pruneDeleted(db: Database, existingPaths: Set<string>): number {
   });
   tx();
   return toRemove.length;
+}
+
+/**
+ * Get all content hashes for chunks belonging to a file.
+ * Returns empty array if no chunks have hashes (e.g. heuristic-chunked files).
+ */
+export function getChunkHashes(db: Database, fileId: number): Set<string> {
+  const rows = db
+    .query<{ content_hash: string }, [number]>(
+      "SELECT content_hash FROM chunks WHERE file_id = ? AND content_hash IS NOT NULL"
+    )
+    .all(fileId);
+  return new Set(rows.map(r => r.content_hash));
+}
+
+/**
+ * Delete chunks (and their vec embeddings) whose content_hash is NOT in the keep set.
+ * Returns the number of chunks deleted.
+ */
+export function deleteStaleChunks(db: Database, fileId: number, keepHashes: Set<string>): number {
+  const allChunks = db
+    .query<{ id: number; content_hash: string | null }, [number]>(
+      "SELECT id, content_hash FROM chunks WHERE file_id = ?"
+    )
+    .all(fileId);
+
+  const toDelete = allChunks.filter(c => !c.content_hash || !keepHashes.has(c.content_hash));
+  if (toDelete.length === 0) return 0;
+
+  const tx = db.transaction(() => {
+    for (const c of toDelete) {
+      db.run("DELETE FROM vec_chunks WHERE chunk_id = ?", [c.id]);
+      db.run("DELETE FROM chunks WHERE id = ?", [c.id]);
+    }
+  });
+  tx();
+  return toDelete.length;
+}
+
+/**
+ * Re-index existing chunks: update chunk_index, start_line, end_line for kept chunks.
+ */
+export function updateChunkPositions(
+  db: Database,
+  fileId: number,
+  updates: { contentHash: string; chunkIndex: number; startLine: number | null; endLine: number | null }[]
+) {
+  const tx = db.transaction(() => {
+    for (const u of updates) {
+      db.run(
+        "UPDATE chunks SET chunk_index = ?, start_line = ?, end_line = ? WHERE file_id = ? AND content_hash = ?",
+        [u.chunkIndex, u.startLine, u.endLine, fileId, u.contentHash]
+      );
+    }
+  });
+  tx();
 }
 
 export function getAllFilePaths(db: Database): { id: number; path: string }[] {

@@ -104,7 +104,8 @@ export class RagDB {
         entity_name TEXT,
         chunk_type TEXT,
         start_line INTEGER,
-        end_line INTEGER
+        end_line INTEGER,
+        content_hash TEXT
       );
 
       CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
@@ -134,14 +135,19 @@ export class RagDB {
         file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
         source TEXT NOT NULL,
         names TEXT NOT NULL,
-        resolved_file_id INTEGER REFERENCES files(id) ON DELETE SET NULL
+        resolved_file_id INTEGER REFERENCES files(id) ON DELETE SET NULL,
+        is_default INTEGER DEFAULT 0,
+        is_namespace INTEGER DEFAULT 0
       );
 
       CREATE TABLE IF NOT EXISTS file_exports (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
-        type TEXT NOT NULL
+        type TEXT NOT NULL,
+        is_default INTEGER DEFAULT 0,
+        is_reexport INTEGER DEFAULT 0,
+        reexport_source TEXT
       );
 
       CREATE INDEX IF NOT EXISTS idx_file_imports_file ON file_imports(file_id);
@@ -264,6 +270,7 @@ export class RagDB {
     `);
 
     this.migrateChunksEntityColumns();
+    this.migrateGraphColumns();
   }
 
   private migrateChunksEntityColumns() {
@@ -284,6 +291,38 @@ export class RagDB {
     if (!cols.includes("end_line")) {
       this.db.exec("ALTER TABLE chunks ADD COLUMN end_line INTEGER");
     }
+    if (!cols.includes("content_hash")) {
+      this.db.exec("ALTER TABLE chunks ADD COLUMN content_hash TEXT");
+    }
+  }
+
+  private migrateGraphColumns() {
+    const importCols = this.db
+      .query<{ name: string }, []>("PRAGMA table_info(file_imports)")
+      .all()
+      .map((c) => c.name);
+
+    if (!importCols.includes("is_default")) {
+      this.db.exec("ALTER TABLE file_imports ADD COLUMN is_default INTEGER DEFAULT 0");
+    }
+    if (!importCols.includes("is_namespace")) {
+      this.db.exec("ALTER TABLE file_imports ADD COLUMN is_namespace INTEGER DEFAULT 0");
+    }
+
+    const exportCols = this.db
+      .query<{ name: string }, []>("PRAGMA table_info(file_exports)")
+      .all()
+      .map((c) => c.name);
+
+    if (!exportCols.includes("is_default")) {
+      this.db.exec("ALTER TABLE file_exports ADD COLUMN is_default INTEGER DEFAULT 0");
+    }
+    if (!exportCols.includes("is_reexport")) {
+      this.db.exec("ALTER TABLE file_exports ADD COLUMN is_reexport INTEGER DEFAULT 0");
+    }
+    if (!exportCols.includes("reexport_source")) {
+      this.db.exec("ALTER TABLE file_exports ADD COLUMN reexport_source TEXT");
+    }
   }
 
   // ── File operations ───────────────────────────────────────────
@@ -293,6 +332,9 @@ export class RagDB {
   }
   upsertFileStart(path: string, hash: string) {
     return fileOps.upsertFileStart(this.db, path, hash);
+  }
+  updateFileHash(fileId: number, hash: string) {
+    fileOps.updateFileHash(this.db, fileId, hash);
   }
   insertChunkBatch(fileId: number, chunks: EmbeddedChunk[], startIndex: number) {
     fileOps.insertChunkBatch(this.db, fileId, chunks, startIndex);
@@ -308,6 +350,18 @@ export class RagDB {
   }
   getAllFilePaths() {
     return fileOps.getAllFilePaths(this.db);
+  }
+  getChunkHashes(fileId: number) {
+    return fileOps.getChunkHashes(this.db, fileId);
+  }
+  deleteStaleChunks(fileId: number, keepHashes: Set<string>) {
+    return fileOps.deleteStaleChunks(this.db, fileId, keepHashes);
+  }
+  updateChunkPositions(
+    fileId: number,
+    updates: { contentHash: string; chunkIndex: number; startLine: number | null; endLine: number | null }[]
+  ) {
+    fileOps.updateChunkPositions(this.db, fileId, updates);
   }
   getStatus() {
     return fileOps.getStatus(this.db);
@@ -338,8 +392,8 @@ export class RagDB {
 
   upsertFileGraph(
     fileId: number,
-    imports: { name: string; source: string }[],
-    exports: { name: string; type: string }[]
+    imports: { name: string; source: string; isDefault?: boolean; isNamespace?: boolean }[],
+    exports: { name: string; type: string; isDefault?: boolean; isReExport?: boolean; reExportSource?: string }[]
   ) {
     graphOps.upsertFileGraph(this.db, fileId, imports, exports);
   }

@@ -3,8 +3,8 @@ import { Database } from "bun:sqlite";
 export function upsertFileGraph(
   db: Database,
   fileId: number,
-  imports: { name: string; source: string }[],
-  exports: { name: string; type: string }[]
+  imports: { name: string; source: string; isDefault?: boolean; isNamespace?: boolean }[],
+  exports: { name: string; type: string; isDefault?: boolean; isReExport?: boolean; reExportSource?: string }[]
 ) {
   const tx = db.transaction(() => {
     db.run("DELETE FROM file_imports WHERE file_id = ?", [fileId]);
@@ -12,15 +12,15 @@ export function upsertFileGraph(
 
     for (const imp of imports) {
       db.run(
-        "INSERT INTO file_imports (file_id, source, names) VALUES (?, ?, ?)",
-        [fileId, imp.source, imp.name]
+        "INSERT INTO file_imports (file_id, source, names, is_default, is_namespace) VALUES (?, ?, ?, ?, ?)",
+        [fileId, imp.source, imp.name, imp.isDefault ? 1 : 0, imp.isNamespace ? 1 : 0]
       );
     }
 
     for (const exp of exports) {
       db.run(
-        "INSERT INTO file_exports (file_id, name, type) VALUES (?, ?, ?)",
-        [fileId, exp.name, exp.type]
+        "INSERT INTO file_exports (file_id, name, type, is_default, is_reexport, reexport_source) VALUES (?, ?, ?, ?, ?, ?)",
+        [fileId, exp.name, exp.type, exp.isDefault ? 1 : 0, exp.isReExport ? 1 : 0, exp.reExportSource ?? null]
       );
     }
   });

@@ -58,7 +58,7 @@ async function indexTurn(turn: ParsedTurn, db: RagDB): Promise<boolean> {
   if (!text.trim()) return false;
 
   // Chunk the turn text (use .md extension for paragraph-style splitting)
-  const textChunks = await chunkText(text, ".md", 512, 50);
+  const { chunks: textChunks } = await chunkText(text, ".md", 512, 50);
 
   // Embed all chunks in one batch
   const embeddings = await embedBatch(textChunks.map(c => c.text));

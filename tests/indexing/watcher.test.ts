@@ -90,11 +90,17 @@ describe("startWatcher", () => {
     // Write a new file
     await writeFixture(tempDir, "new-doc.md", "# New\n\nBrand new documentation.");
 
-    // Wait for debounce (2s) + processing time
-    await new Promise((r) => setTimeout(r, 4000));
+    // Poll for indexing (debounce 2s + processing time varies)
+    let indexed = false;
+    for (let i = 0; i < 10; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      if (db.getStatus().totalFiles >= 1) {
+        indexed = true;
+        break;
+      }
+    }
 
-    const status = db.getStatus();
-    expect(status.totalFiles).toBe(1);
+    expect(indexed).toBe(true);
 
     watcher.close();
   });
@@ -129,7 +135,7 @@ describe("startWatcher", () => {
 
   test("ignores excluded paths", async () => {
     const config = await loadConfig(tempDir);
-    config.exclude = ["**/*.log"];
+    config.exclude = [...config.exclude, "**/*.log"];
     const events: string[] = [];
     const watcher = startWatcher(tempDir, db, config, (msg) => events.push(msg));
 

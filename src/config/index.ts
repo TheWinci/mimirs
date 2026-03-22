@@ -13,6 +13,7 @@ const RagConfigSchema = z.object({
   searchTopK: z.number().int().min(1).default(5),
   indexBatchSize: z.number().int().min(1).optional(),
   indexThreads: z.number().int().min(1).optional(),
+  incrementalChunks: z.boolean().default(false),
   enableReranking: z.boolean().default(true),
   benchmarkTopK: z.number().int().min(1).default(5),
   benchmarkMinRecall: z.number().min(0).max(1).default(0.8),
@@ -29,9 +30,13 @@ const DEFAULT_CONFIG: RagConfig = {
     "**/*.go",
     "**/*.rs",
     "**/*.java",
-    // Source code — heuristic chunking
-    "**/*.c", "**/*.cpp", "**/*.h", "**/*.hpp",
+    "**/*.c", "**/*.h",
+    "**/*.cpp", "**/*.cc", "**/*.cxx", "**/*.hpp", "**/*.hh", "**/*.hxx",
+    "**/*.cs",
     "**/*.rb",
+    "**/*.php",
+    "**/*.scala", "**/*.sc",
+    // Source code — heuristic chunking
     "**/*.swift",
     // Markdown & plain text
     "**/*.md", "**/*.mdx", "**/*.markdown", "**/*.txt",
@@ -64,6 +69,7 @@ const DEFAULT_CONFIG: RagConfig = {
   chunkOverlap: 50,
   hybridWeight: 0.7,
   searchTopK: 5,
+  incrementalChunks: false,
   enableReranking: true,
   indexBatchSize: 50,
   benchmarkTopK: 5,

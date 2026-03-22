@@ -1,15 +1,8 @@
-import { chunk as astChunk } from "@winci/bun-chunk";
+import { chunk as astChunk, chunkFile as astChunkFile } from "@winci/bun-chunk";
+import type { ChunkImport, ChunkExport } from "@winci/bun-chunk";
 import { log } from "../utils/log";
 
-export interface ChunkImport {
-  name: string;
-  source: string;
-}
-
-export interface ChunkExport {
-  name: string;
-  type: string;
-}
+export type { ChunkImport, ChunkExport };
 
 export interface Chunk {
   text: string;
@@ -18,19 +11,31 @@ export interface Chunk {
   endLine?: number;
   imports?: ChunkImport[];
   exports?: ChunkExport[];
+  parentName?: string;
+  hash?: string;
 }
 
 const DEFAULT_CHUNK_SIZE = 512; // in characters
 const DEFAULT_CHUNK_OVERLAP = 50;
 
-// Extensions that code-chunk supports via tree-sitter
+// Extensions that bun-chunk supports via tree-sitter
 const AST_SUPPORTED = new Set([
+  // Original
   ".ts", ".tsx", ".js", ".jsx", ".py", ".go", ".rs", ".java",
+  // bun-chunk Phase 2 additions
+  ".c", ".h",
+  ".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx",
+  ".cs",
+  ".rb",
+  ".php",
+  ".scala", ".sc",
+  ".html", ".htm",
+  ".css", ".scss", ".less",
 ]);
 
 // Code-like extensions handled by blank-line heuristic splitting
 const HEURISTIC_CODE = new Set([
-  ".c", ".cpp", ".h", ".hpp", ".rb", ".swift",
+  ".swift",
   ".sh", ".bash", ".zsh", ".fish",
   ".tf", ".proto", ".graphql", ".gql",
   ".mod", ".xml",
@@ -49,8 +54,11 @@ export const KNOWN_EXTENSIONS = new Set([
   ".txt",
   // AST-aware code
   ".ts", ".tsx", ".js", ".jsx", ".py", ".go", ".rs", ".java",
+  ".c", ".h", ".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx",
+  ".cs", ".rb", ".php", ".scala", ".sc",
+  ".html", ".htm", ".css", ".scss", ".less",
   // Heuristic code (blank-line blocks)
-  ".c", ".cpp", ".h", ".hpp", ".rb", ".swift",
+  ".swift",
   ".sh", ".bash", ".zsh", ".fish",
   ".tf", ".proto", ".graphql", ".gql",
   ".mod",
@@ -64,9 +72,13 @@ export const KNOWN_EXTENSIONS = new Set([
   ".sql",
   // API collections
   ".bru",
-  // Stylesheets
-  ".css", ".scss", ".less",
 ]);
+
+export interface ChunkTextResult {
+  chunks: Chunk[];
+  fileImports?: ChunkImport[];
+  fileExports?: ChunkExport[];
+}
 
 /**
  * Split text into chunks. Strategy depends on content type:
@@ -81,10 +93,10 @@ export async function chunkText(
   chunkSize = DEFAULT_CHUNK_SIZE,
   chunkOverlap = DEFAULT_CHUNK_OVERLAP,
   filePath?: string
-): Promise<Chunk[]> {
-  const chunks = await _chunkText(text, extension, chunkSize, chunkOverlap, filePath);
-  assignLineNumbers(chunks, text);
-  return chunks;
+): Promise<ChunkTextResult> {
+  const result = await _chunkText(text, extension, chunkSize, chunkOverlap, filePath);
+  assignLineNumbers(result.chunks, text);
+  return result;
 }
 
 async function _chunkText(
@@ -93,27 +105,42 @@ async function _chunkText(
   chunkSize = DEFAULT_CHUNK_SIZE,
   chunkOverlap = DEFAULT_CHUNK_OVERLAP,
   filePath?: string
-): Promise<Chunk[]> {
+): Promise<ChunkTextResult> {
   // Try AST-aware chunking for supported code files (even small ones, for import/export extraction)
   if (AST_SUPPORTED.has(extension)) {
     try {
-      const astChunks = await astChunk(filePath || `file${extension}`, text);
-      if (astChunks.length > 0) {
-        return astChunks.map((c, i) => {
+      const astOpts = { includeContext: true, includeMetadata: true };
+      let result;
+      if (filePath) {
+        try {
+          result = await astChunkFile(filePath, astOpts);
+        } catch {
+          // File may not exist on disk (e.g. tests with inline code) — fall back to text-based AST
+          result = await astChunk(`file${extension}`, text, astOpts);
+        }
+      } else {
+        result = await astChunk(`file${extension}`, text, astOpts);
+      }
+
+      if (result.chunks.length > 0) {
+        const chunks = result.chunks.map((c, i) => {
           const chunk: Chunk = {
             text: c.text,
             index: i,
             startLine: c.startLine + 1, // bun-chunk is 0-indexed, local-rag is 1-indexed
             endLine: c.endLine + 1,
           };
-          if (c.type === "import") {
-            chunk.imports = parseImportText(c.text);
-          }
-          if (c.name && c.type !== "import" && c.type !== "block") {
-            chunk.exports = [{ name: c.name, type: c.type }];
-          }
+          if (c.imports?.length) chunk.imports = c.imports;
+          if (c.exports?.length) chunk.exports = c.exports;
+          if (c.parentName) chunk.parentName = c.parentName;
+          if (c.hash) chunk.hash = c.hash;
           return chunk;
         });
+        return {
+          chunks,
+          fileImports: result.fileImports,
+          fileExports: result.fileExports,
+        };
       }
     } catch (err) {
       log.debug(`AST chunking failed for ${filePath || extension}, using heuristic: ${err instanceof Error ? err.message : err}`, "chunker");
@@ -121,7 +148,7 @@ async function _chunkText(
   }
 
   if (text.length <= chunkSize) {
-    return [{ text, index: 0 }];
+    return { chunks: [{ text, index: 0 }] };
   }
 
   const isMarkdown = [".md", ".mdx", ".markdown"].includes(extension);
@@ -147,8 +174,6 @@ async function _chunkText(
     sections = splitBru(text);
   } else if (extension === ".sql") {
     sections = splitSQL(text);
-  } else if (extension === ".css" || extension === ".scss" || extension === ".less") {
-    sections = splitCSS(text);
   } else if (isCode) {
     sections = splitCode(text);
   } else {
@@ -170,7 +195,7 @@ async function _chunkText(
     }
   }
 
-  return chunks;
+  return { chunks };
 }
 
 /**
@@ -204,29 +229,6 @@ function assignLineNumbers(chunks: Chunk[], fullText: string): void {
       cursor = idx + chunk.text.length;
     }
   }
-}
-
-/** Extract import name and source from an import statement text */
-function parseImportText(text: string): ChunkImport[] {
-  // Match: import { foo } from "bar" / import foo from "bar" / import * as foo from "bar"
-  const match = text.match(/from\s+["']([^"']+)["']/);
-  if (!match) {
-    // import "side-effect" or Python: import foo / from foo import bar
-    const pyImport = text.match(/^import\s+(\S+)/);
-    if (pyImport) return [{ name: pyImport[1], source: pyImport[1] }];
-    const pyFrom = text.match(/^from\s+(\S+)\s+import\s+(.+)/);
-    if (pyFrom) return [{ name: pyFrom[2].trim(), source: pyFrom[1] }];
-    // Go/Rust: use/import with path
-    const quotedPath = text.match(/["']([^"']+)["']/);
-    if (quotedPath) return [{ name: quotedPath[1].split("/").pop()!, source: quotedPath[1] }];
-    return [];
-  }
-  const source = match[1];
-  const nameMatch = text.match(/import\s+(?:\{([^}]+)\}|(\w+)|\*\s+as\s+(\w+))/);
-  const name = nameMatch
-    ? (nameMatch[1]?.trim() || nameMatch[2] || nameMatch[3] || source)
-    : source;
-  return [{ name, source }];
 }
 
 function splitMarkdown(text: string): string[] {
@@ -477,34 +479,6 @@ function splitCode(text: string): string[] {
 function splitParagraphs(text: string): string[] {
   const parts = text.split(/\n\n+/);
   return mergeTinyParts(parts, 100);
-}
-
-function splitCSS(text: string): string[] {
-  // Split on top-level brace blocks. Each rule (.foo {}), @media block,
-  // @keyframes, etc. ends when brace depth returns to 0.
-  const chunks: string[] = [];
-  let current: string[] = [];
-  let depth = 0;
-
-  for (const line of text.split("\n")) {
-    current.push(line);
-    for (const ch of line) {
-      if (ch === "{") depth++;
-      else if (ch === "}") depth--;
-    }
-    if (depth === 0 && current.some((l) => l.trim())) {
-      const block = current.join("\n").trim();
-      if (block) chunks.push(block);
-      current = [];
-    }
-  }
-
-  if (current.length > 0) {
-    const remaining = current.join("\n").trim();
-    if (remaining) chunks.push(remaining);
-  }
-
-  return mergeTinyParts(chunks, 100);
 }
 
 /**

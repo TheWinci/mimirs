@@ -6,4 +6,5 @@ export interface EmbeddedChunk {
   chunkType?: string | null;
   startLine?: number | null;
   endLine?: number | null;
+  contentHash?: string | null;
 }

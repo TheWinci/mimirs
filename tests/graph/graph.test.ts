@@ -29,40 +29,43 @@ async function indexFileWithGraph(
   content: string,
   extension: string
 ) {
-  const chunks = await chunkText(content, extension, 512, 50, path);
+  const { chunks, fileImports, fileExports } = await chunkText(content, extension, 512, 50, path);
   const emb = await embed(content.slice(0, 200));
   db.upsertFile(path, `hash-${path}`, [{ snippet: content, embedding: emb }]);
 
   const file = db.getFileByPath(path);
   if (!file) return;
 
-  // Aggregate imports/exports from chunks
-  const importMap = new Map<string, string>();
-  const exportMap = new Map<string, string>();
-  for (const chunk of chunks) {
-    if (chunk.imports) {
-      for (const imp of chunk.imports) {
-        if (!importMap.has(imp.source)) importMap.set(imp.source, imp.name);
+  // Use file-level graph data when available, otherwise aggregate from chunks
+  if (fileImports && fileExports) {
+    db.upsertFileGraph(file.id, fileImports, fileExports);
+  } else {
+    const importMap = new Map<string, string>();
+    const exportMap = new Map<string, string>();
+    for (const chunk of chunks) {
+      if (chunk.imports) {
+        for (const imp of chunk.imports) {
+          if (!importMap.has(imp.source)) importMap.set(imp.source, imp.name);
+        }
+      }
+      if (chunk.exports) {
+        for (const exp of chunk.exports) {
+          if (!exportMap.has(exp.name)) exportMap.set(exp.name, exp.type);
+        }
       }
     }
-    if (chunk.exports) {
-      for (const exp of chunk.exports) {
-        if (!exportMap.has(exp.name)) exportMap.set(exp.name, exp.type);
-      }
-    }
+    db.upsertFileGraph(
+      file.id,
+      Array.from(importMap, ([source, name]) => ({ name, source })),
+      Array.from(exportMap, ([name, type]) => ({ name, type }))
+    );
   }
-
-  db.upsertFileGraph(
-    file.id,
-    Array.from(importMap, ([source, name]) => ({ name, source })),
-    Array.from(exportMap, ([name, type]) => ({ name, type }))
-  );
 }
 
 describe("chunker import/export extraction", () => {
   test("captures imports from TypeScript code", async () => {
     const code = `import { RagDB } from "./db";\nimport { search } from "./search";\n\nexport function main() { console.log("hello"); }`;
-    const chunks = await chunkText(code, ".ts", 2000, 50, "test.ts");
+    const { chunks } = await chunkText(code, ".ts", 2000, 50, "test.ts");
 
     // At least one chunk should have imports
     const allImports = chunks.flatMap((c) => c.imports || []);
@@ -75,7 +78,7 @@ describe("chunker import/export extraction", () => {
 
   test("captures exports from TypeScript code", async () => {
     const code = `export class MyService {\n  run() { return true; }\n}\n\nexport function helper() { return 1; }`;
-    const chunks = await chunkText(code, ".ts", 2000, 50, "service.ts");
+    const { chunks } = await chunkText(code, ".ts", 2000, 50, "service.ts");
 
     const allExports = chunks.flatMap((c) => c.exports || []);
     const names = allExports.map((e) => e.name);
@@ -85,7 +88,7 @@ describe("chunker import/export extraction", () => {
 
   test("non-AST files have no imports/exports", async () => {
     const md = "# Hello\n\nThis is markdown content";
-    const chunks = await chunkText(md, ".md", 2000, 50);
+    const { chunks } = await chunkText(md, ".md", 2000, 50);
 
     for (const chunk of chunks) {
       expect(chunk.imports).toBeUndefined();
