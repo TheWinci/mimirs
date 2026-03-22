@@ -1,6 +1,6 @@
 {
   "name": "@winci/local-rag",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Semantic search for your codebase — local-first RAG MCP server with hybrid search, AST-aware chunking, and usage analytics",
   "type": "module",
   "license": "MIT",
@@ -26,7 +26,6 @@
   "files": [
     "src/",
     ".claude-plugin/",
-
     "skills/",
     "hooks/",
     "README.md",
