@@ -18,7 +18,6 @@ No API keys. No cloud. No Docker. Just `bunx`.
 - [MCP tools](#mcp-tools)
 - [CLI](#cli)
 - [Analytics](#analytics)
-- [Project map](#project-map)
 - [Configuration](#configuration)
 - [Supported file types](#supported-file-types)
 - [How it works](#how-it-works)
@@ -294,52 +293,6 @@ Trend (current 30d vs prior 30d):
   Avg top score:    0.58 (+0.05)
   Zero-result rate: 12% (-3.0%)
 ```
-
-## Project map
-
-The `project_map` MCP tool generates a dependency graph from import/export relationships extracted during indexing. This gives AI agents (and humans) a bird's-eye view of how files relate to each other.
-
-Here's the dependency graph for this project's source domains:
-
-```mermaid
-graph TD
-  main["src/main.ts"]
-  cli["src/cli/\n+ main, usage, getFlag\n+ 12 command handlers"]
-  server["src/server/\n+ startServer, getDB"]
-  tools["src/tools/\n+ registerAllTools\n+ 8 tool modules"]
-  db["src/db/\n+ RagDB (facade)"]
-  indexing["src/indexing/\n+ indexer, chunker,\n  parse, watcher"]
-  search["src/search/\n+ hybrid, usages,\n  benchmark, eval"]
-  embeddings["src/embeddings/\n+ embed, embedBatch"]
-  graph["src/graph/\n+ resolver"]
-  conversation["src/conversation/\n+ parser, indexer"]
-  config["src/config/\n+ loadConfig"]
-
-  main --> cli
-  cli --> server
-  cli --> search
-  cli --> graph
-  cli --> conversation
-  server --> tools
-  server --> db
-  server --> indexing
-  server --> conversation
-  tools --> search
-  tools --> graph
-  tools --> conversation
-  search --> db
-  search --> embeddings
-  indexing --> db
-  indexing --> embeddings
-  indexing --> graph
-  conversation --> indexing
-  graph --> db
-
-  style main fill:#e1f5fe,stroke:#0288d1
-  style server fill:#e1f5fe,stroke:#0288d1
-```
-
-`src/main.ts` is the single entry point. The CLI dispatches to command handlers; `serve` starts the MCP server. The graph is extracted from tree-sitter AST parsing, not regex, so it handles re-exports, barrel files, and aliased imports correctly.
 
 ## Configuration
 
