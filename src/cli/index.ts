@@ -10,6 +10,8 @@ import { benchmarkModelsCommand } from "./commands/benchmark-models";
 import { evalCommand } from "./commands/eval";
 import { conversationCommand } from "./commands/conversation";
 import { checkpointCommand } from "./commands/checkpoint";
+import { annotationsCommand } from "./commands/annotations";
+import { sessionContextCommand } from "./commands/session-context";
 import { serveCommand } from "./commands/serve";
 import { demoCommand } from "./commands/demo";
 
@@ -48,6 +50,10 @@ Usage:
                 [--type T] [--top N]
   local-rag checkpoint search <query>  Search checkpoints
                 [--dir D] [--type T] [--top N]
+  local-rag annotations [dir]          List annotations
+                [--path P] [--dir D]
+  local-rag session-context [dir]      Session start context summary
+                [--dir D]
   local-rag demo [dir]                 Run interactive feature demo
 
 Options:
@@ -109,6 +115,12 @@ export async function main() {
       break;
     case "checkpoint":
       await checkpointCommand(args, getFlag);
+      break;
+    case "annotations":
+      await annotationsCommand(args, getFlag);
+      break;
+    case "session-context":
+      await sessionContextCommand(args, getFlag);
       break;
     case "demo":
       await demoCommand(args);
