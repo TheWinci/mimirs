@@ -178,7 +178,7 @@ Create `.rag/config.json` in your project root to customize which files are inde
 
 ```json
 {
-  "include": ["**/*.md", "**/*.ts", "**/*.js", "**/*.py", "**/*.go", "**/*.rs", "**/*.css", "**/*.scss", "**/*.less"],
+  "include": ["**/*.md", "**/*.ts", "**/*.js", "**/*.py", "**/*.go", "**/*.rs"],
   "exclude": ["node_modules/**", ".git/**", "dist/**", ".rag/**"]
 }
 ```
@@ -348,14 +348,14 @@ These use [bun-chunk](https://github.com/TheWinci/bun-chunk) to extract real fun
 | `.php` | PHP |
 | `.scala` `.sc` | Scala |
 | `.html` `.htm` | HTML |
-| `.css` `.scss` `.less` | CSS / SCSS / LESS |
+| `.css` `.scss` `.less` | CSS / SCSS / LESS. **Not indexed by default** — class names match code queries semantically but agents rarely act on stylesheets. Add `"**/*.css"` etc. to `include` if needed. |
 
 ### Structured data & config
 
 | Extensions / filenames | Chunking strategy |
 |---|---|
 | `.yaml` `.yml` | Split on top-level keys. OpenAPI files: `paths:` is further split per endpoint (`  /users:`, `  /orders:`) so each route is its own chunk. |
-| `.json` | Parse and split per top-level key. OpenAPI files: each path under `paths` becomes its own chunk. Falls back to paragraph split for invalid JSON. |
+| `.json` | Parse and split per top-level key. OpenAPI files: each path under `paths` becomes its own chunk. Falls back to paragraph split for invalid JSON. **Not indexed by default** — locale bundles and config files add noise to code search. Add `"**/*.json"` to `include` if needed. |
 | `.toml` | Split on `[section]` and `[[array-of-tables]]` headers (e.g. each `[[package]]` in a Cargo workspace). |
 | `.xml` | Split on blank-line-separated blocks. |
 
@@ -494,14 +494,15 @@ README.md
 
 ## Search quality
 
-Benchmarked on two codebases with known expected files per query. Full details in [BENCHMARKS.md](BENCHMARKS.md).
+Benchmarked on three codebases with known expected files per query. Full details in [BENCHMARKS.md](BENCHMARKS.md).
 
 | Codebase | Files | Queries | Recall@7 | MRR | Zero-miss |
 |---|---|---|---|---|---|
 | local-rag (this project) | 97 | 20 | 97.5% | 0.588 | 0.0% |
 | Express.js | 161 | 15 | 93.3% | 0.678 | 6.7% |
+| Excalidraw | 676 | 20 | 85.0% | 0.512 | 15.0% |
 
-Default top-K was raised from 5 to 7 based on benchmark data showing misses landing just outside the top-5 window — this recovered +5pp recall on local-rag and +6.7pp on Express with only 2 extra results per query. Using all-MiniLM-L6-v2 with hybrid search, pipeline improvements, and conditional cross-encoder reranking. Full details and model comparison in [BENCHMARKS.md](BENCHMARKS.md).
+Recall degrades gracefully with codebase size — 85% on a 676-file monorepo with no tuning. Using all-MiniLM-L6-v2 with hybrid search, pipeline improvements, and conditional cross-encoder reranking. JSON and CSS/SCSS files are excluded from default indexing — they add noise without helping code search. Full details and model comparison in [BENCHMARKS.md](BENCHMARKS.md).
 
 ## Stack
 

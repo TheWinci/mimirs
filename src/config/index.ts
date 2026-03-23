@@ -11,7 +11,7 @@ const RagConfigSchema = z.object({
   chunkSize: z.number().int().min(64).default(512),
   chunkOverlap: z.number().int().min(0).default(50),
   hybridWeight: z.number().min(0).max(1).default(0.7),
-  searchTopK: z.number().int().min(1).default(7),
+  searchTopK: z.number().int().min(1).default(10),
   indexBatchSize: z.number().int().min(1).optional(),
   indexThreads: z.number().int().min(1).optional(),
   incrementalChunks: z.boolean().default(false),
@@ -53,7 +53,6 @@ const DEFAULT_CONFIG: RagConfig = {
     "**/*.sh", "**/*.bash", "**/*.zsh", "**/*.fish",
     // Structured data & config
     "**/*.yaml", "**/*.yml",
-    "**/*.json",
     "**/*.toml",
     "**/*.xml",
     // Infrastructure / schema languages
@@ -64,14 +63,14 @@ const DEFAULT_CONFIG: RagConfig = {
     "**/*.mod",
     // API collections
     "**/*.bru",
-    // Stylesheets
-    "**/*.css", "**/*.scss", "**/*.less",
+    // Stylesheets — not indexed by default (class names add noise to code search)
+    // "**/*.css", "**/*.scss", "**/*.less",
   ],
   exclude: ["node_modules/**", ".git/**", "dist/**", ".rag/**"],
   chunkSize: 512,
   chunkOverlap: 50,
   hybridWeight: 0.7,
-  searchTopK: 7,
+  searchTopK: 10,
   incrementalChunks: false,
   enableReranking: true,
   indexBatchSize: 50,
