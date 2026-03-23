@@ -199,7 +199,9 @@ claude --plugin-dir ./local-rag
 The plugin:
 - Starts the MCP server automatically
 - Indexes your project on startup and watches for changes
-- Auto-reindexes files when you edit them (via `PostToolUse` hook)
+- **SessionStart hook** — prints project context at the start of each session: git status, recent commits, index stats, search gaps, and annotations on modified files
+- **PostToolUse hook** — auto-reindexes files when you edit them (Write/Edit/NotebookEdit)
+- **SessionEnd hook** — auto-creates a "handoff" checkpoint listing modified files, so the next session knows where you left off
 - Makes the agent use RAG tools proactively (via built-in skill)
 
 No `CLAUDE.md` instructions needed — the plugin's skill tells the agent when and how to use each tool.
@@ -210,7 +212,7 @@ The MCP server automatically indexes your project on startup and watches for fil
 
 Conversation history indexing (via `search_conversation`) tails Claude Code's JSONL transcripts in real time and indexes past sessions on startup. This feature is specific to Claude Code — other editors don't expose conversation transcripts in a format local-rag can read.
 
-> **Plugin users**: Files are also re-indexed automatically whenever you edit them, via the `PostToolUse` hook.
+> **Plugin users**: Files are also re-indexed automatically whenever you edit them, via the `PostToolUse` hook. Sessions start with a context summary (git status, search gaps, annotations) and end with an auto-checkpoint for continuity.
 
 ## MCP tools
 
@@ -254,6 +256,8 @@ local-rag benchmark [dir]    # Run search quality benchmark
 local-rag eval [dir]         # A/B eval harness
 local-rag conversation       # Conversation subcommands (search, sessions, index)
 local-rag checkpoint         # Checkpoint subcommands (create, list, search)
+local-rag annotations [dir]  # List annotations (optionally filter by --path)
+local-rag session-context    # Session start context summary (used by hook)
 local-rag demo [dir]         # Interactive feature demo
 ```
 
@@ -557,7 +561,7 @@ Using all-MiniLM-L6-v2 with hybrid search, pipeline improvements, and conditiona
 | Reranker | ms-marco-MiniLM-L-6-v2 cross-encoder (~80MB, downloaded on first query) |
 | Vector store | sqlite-vec (single `.db` file) |
 | MCP | @modelcontextprotocol/sdk (stdio transport) |
-| Plugin | Claude Code plugin with skills + `PostToolUse` hook (via `--plugin-dir`) |
+| Plugin | Claude Code plugin with skills + hooks (SessionStart, PostToolUse, SessionEnd) |
 
 ## Per-project storage
 
