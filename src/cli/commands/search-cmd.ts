@@ -1,6 +1,6 @@
 import { resolve } from "path";
 import { RagDB } from "../../db";
-import { loadConfig } from "../../config";
+import { loadConfig, applyEmbeddingConfig } from "../../config";
 import { search, searchChunks } from "../../search/hybrid";
 
 export async function searchCommand(args: string[], getFlag: (flag: string) => string | undefined) {
@@ -13,6 +13,7 @@ export async function searchCommand(args: string[], getFlag: (flag: string) => s
   const dir = resolve(getFlag("--dir") || ".");
   const db = new RagDB(dir);
   const config = await loadConfig(dir);
+  applyEmbeddingConfig(config);
   const top = parseInt(getFlag("--top") || String(config.searchTopK), 10);
 
   const results = await search(query, db, top, 0, config.hybridWeight, config.enableReranking);
@@ -40,6 +41,7 @@ export async function readCommand(args: string[], getFlag: (flag: string) => str
   const dir = resolve(getFlag("--dir") || ".");
   const db = new RagDB(dir);
   const config = await loadConfig(dir);
+  applyEmbeddingConfig(config);
   const top = parseInt(getFlag("--top") || "8", 10);
   const threshold = parseFloat(getFlag("--threshold") || "0.3");
 

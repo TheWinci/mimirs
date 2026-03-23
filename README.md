@@ -364,6 +364,8 @@ Create `.rag/config.json` in your project. The defaults index all [supported fil
 | `chunkOverlap` | `50` | Overlap tokens between chunks |
 | `hybridWeight` | `0.7` | Blend ratio: 1.0 = vector only, 0.0 = BM25 only |
 | `enableReranking` | `true` | Cross-encoder reranking for higher precision (adds ~80MB model on first query) |
+| `embeddingModel` | _(default)_ | Override the embedding model (HuggingFace model ID). Must have ONNX weights. Requires re-index |
+| `embeddingDim` | _(default)_ | Embedding dimension to match the model (e.g. 384 for bge-small-en-v1.5) |
 | `searchTopK` | `5` | Default number of search results |
 | `incrementalChunks` | `false` | When enabled, only re-embeds chunks whose content hash changed. Falls back to full re-index if >50% of chunks differ |
 
@@ -537,12 +539,12 @@ README.md
 
 Benchmarked on two codebases with known expected files per query. Full details in [BENCHMARKS.md](BENCHMARKS.md).
 
-| Codebase | Files | Queries | Recall@5 | MRR | Recall@10 |
+| Codebase | Files | Queries | Recall@5 | MRR | Zero-miss |
 |---|---|---|---|---|---|
-| local-rag (this project) | 95 | 20 | 77.5% | 0.492 | 95.0% |
-| Express.js | 161 | 15 | 73.3% | 0.580 | 93.3% |
+| local-rag (this project) | 97 | 20 | 92.5% | 0.600 | 5.0% |
+| Express.js | 161 | 15 | 86.7% | 0.678 | 13.3% |
 
-With reranking enabled (default). Reranking improves MRR by +0.11-0.17 over hybrid search alone.
+Using all-MiniLM-L6-v2 with hybrid search, pipeline improvements, and conditional cross-encoder reranking. Users who want maximum recall can switch to bge-small-en-v1.5 via [config](#configuration) for up to 97.5% recall@5 on TypeScript codebases. Full details and model comparison in [BENCHMARKS.md](BENCHMARKS.md).
 
 ## Stack
 
@@ -551,7 +553,7 @@ With reranking enabled (default). Reranking improves MRR by +0.11-0.17 over hybr
 | Runtime | Bun (built-in SQLite, fast TS) |
 | AST chunking | [bun-chunk](https://github.com/TheWinci/bun-chunk) — tree-sitter grammars for 14 languages, with `chunkFile()` for context + metadata |
 | Embeddings | Transformers.js + ONNX (in-process, no daemon) |
-| Embedding model | all-MiniLM-L6-v2 (~23MB, 384 dimensions) |
+| Embedding model | all-MiniLM-L6-v2 (~23MB, 384 dimensions) — [configurable](#configuration) |
 | Reranker | ms-marco-MiniLM-L-6-v2 cross-encoder (~80MB, downloaded on first query) |
 | Vector store | sqlite-vec (single `.db` file) |
 | MCP | @modelcontextprotocol/sdk (stdio transport) |

@@ -1,6 +1,6 @@
 import { resolve } from "path";
 import { RagDB } from "../../db";
-import { loadConfig } from "../../config";
+import { loadConfig, applyEmbeddingConfig } from "../../config";
 import { indexDirectory } from "../../indexing/indexer";
 import { cliProgress } from "../progress";
 
@@ -8,6 +8,7 @@ export async function indexCommand(args: string[], getFlag: (flag: string) => st
   const dir = resolve(args[1] && !args[1].startsWith("--") ? args[1] : ".");
   const db = new RagDB(dir);
   const config = await loadConfig(dir);
+  applyEmbeddingConfig(config);
 
   const patternsStr = getFlag("--patterns");
   if (patternsStr) {

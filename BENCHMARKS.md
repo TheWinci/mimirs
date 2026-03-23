@@ -1,79 +1,74 @@
 # Benchmarks
 
-Search quality benchmarks for local-rag, measured on two codebases.
-Last updated 2026-03-23, version 0.2.15.
+Search quality benchmarks measured on two codebases. Last updated 2026-03-23.
 
-## Method
-
-Each benchmark is a set of queries with known expected files. Metrics:
-
-- **Recall@K** — fraction of expected files found in the top-K results, averaged across queries
-- **MRR** (Mean Reciprocal Rank) — 1/(rank of first expected file), averaged across queries. Higher = expected file ranks closer to #1
-- **Zero-miss rate** — percentage of queries where none of the expected files appeared in results
-
-All benchmarks use hybrid search (70% vector / 30% BM25). Reranking uses the ms-marco-MiniLM-L-6-v2 cross-encoder.
+**Metrics:** Recall@K (fraction of expected files in top-K), MRR (1/rank of first hit), Zero-miss (queries with no expected file in results).
 
 ## Results
 
-### local-rag (self-benchmark)
+All results use hybrid search (70% vector / 30% BM25) with pipeline improvements enabled.
 
-95 files indexed (source, tests, docs, configs). 20 queries targeting specific source files by function/class names and implementation concepts.
-
-| Config | Recall@5 | MRR | Zero-miss |
-|---|---|---|---|
-| Hybrid + reranking | **77.5%** | **0.492** | **20.0%** |
-| Hybrid only | 70.0% | 0.327 | 30.0% |
-| Hybrid + reranking (top-10) | **95.0%** | **0.539** | **5.0%** |
-
-Reranking effect: **+7.5pp recall**, **+0.165 MRR**, **-10pp zero-miss rate**.
-
-### Express.js (external project)
-
-161 files indexed (source, tests, examples, docs, markdown). 15 queries targeting core `lib/` files by API methods and implementation details.
+### local-rag (97 files, 20 queries)
 
 | Config | Recall@5 | MRR | Zero-miss |
 |---|---|---|---|
-| Hybrid + reranking | 73.3% | **0.580** | 26.7% |
-| Hybrid only | **80.0%** | 0.466 | **20.0%** |
-| Hybrid + reranking (top-10) | **93.3%** | **0.589** | **6.7%** |
+| **all-MiniLM-L6-v2 (default)** | **92.5%** | **0.600** | **5.0%** |
+| bge-small-en-v1.5 (opt-in) | 97.5% | 0.540 | 0.0% |
 
-On Express, reranking improves ranking precision (MRR +0.114) but slightly reduces recall at top-5 (-6.7pp). This is expected: the cross-encoder promotes the most precisely relevant result to rank 1, but may push borderline-relevant files out of the top-5 cutoff.
+### Express.js (161 files, 15 queries)
 
-## Analysis
+| Config | Recall@5 | MRR | Zero-miss |
+|---|---|---|---|
+| **all-MiniLM-L6-v2 (default)** | **86.7%** | **0.678** | **13.3%** |
+| bge-small-en-v1.5 (opt-in) | 80.0% | 0.541 | 20.0% |
 
-**What works well:**
-- At top-10, both codebases achieve 93-95% recall — the expected file is almost always in the result set
-- MRR with reranking is 0.49-0.58, meaning the expected file typically appears in the top 2-3 results
-- Hybrid search (vector + BM25) consistently outperforms either alone
+### Model tradeoff
 
-**Where search struggles:**
-- Small, highly-referenced files (e.g. `db/index.ts`, `config/index.ts`) — these are mentioned in many files, so test files and docs that reference them can outrank the source
-- Files whose content is mostly re-exports or delegation (e.g. `db/index.ts` is a facade that delegates to store modules)
-- Queries that match documentation descriptions better than actual code (descriptive queries favor README/markdown over implementation)
+| | all-MiniLM-L6-v2 | bge-small-en-v1.5 |
+|---|---|---|
+| Download size | 23MB | 127MB |
+| Index time (97 files) | ~40s | ~80s |
+| Best for | General use, JS codebases | TypeScript with deep import graphs |
 
-**Reranking tradeoffs:**
-- Consistently improves MRR (ranking quality) across both codebases
-- On small, focused codebases (local-rag): improves both recall and MRR
-- On larger codebases with many test files (Express): improves MRR but can slightly reduce top-5 recall
-- Recommendation: keep reranking on (default). The MRR improvement means agents find the right file faster
+## Decision
+
+**Default: all-MiniLM-L6-v2.** Faster indexing, smaller download, higher MRR, and better recall on Express. bge-small edges ahead on TypeScript codebases where the dependency graph boost has more data.
+
+Users who want maximum recall on TypeScript projects can opt in:
+
+```json
+{
+  "embeddingModel": "Xenova/bge-small-en-v1.5",
+  "embeddingDim": 384
+}
+```
+
+## Pipeline improvements
+
+The search pipeline applies five post-retrieval optimizations (no re-indexing needed):
+
+1. **Source file boost** — source paths 1.1x, test paths 0.85x
+2. **Symbol expansion** — exact symbol name matches injected into candidates at 0.75 base score
+3. **Dependency graph boost** — files with more importers get a logarithmic score boost
+4. **Doc expansion** — doc files in top-K expand the result set instead of displacing code
+5. **Conditional reranking** — skip the cross-encoder for code-heavy queries (≥50% identifiers)
+
+Impact of pipeline on all-MiniLM-L6-v2:
+
+| Codebase | Without pipeline | With pipeline | Delta |
+|---|---|---|---|
+| local-rag | 77.5% | 92.5% | +15.0pp |
+| Express.js | 73.3% | 86.7% | +13.4pp |
 
 ## Reproducing
 
 ```bash
-# Index and benchmark local-rag
 bunx @winci/local-rag index .
 bunx @winci/local-rag benchmark benchmarks/local-rag-queries.json --dir . --top 5
 
-# Without reranking
-bunx @winci/local-rag benchmark benchmarks/local-rag-queries.json --dir . --top 5 --no-rerank
-
-# Index and benchmark Express.js
-git clone --depth 1 https://github.com/expressjs/express.git /tmp/express-bench
-bunx @winci/local-rag index /tmp/express-bench
-bunx @winci/local-rag benchmark benchmarks/express-queries.json --dir /tmp/express-bench --top 5
+# Compare models
+bunx @winci/local-rag benchmark-models benchmarks/local-rag-queries.json \
+  --models "Xenova/all-MiniLM-L6-v2,Xenova/bge-small-en-v1.5" --dir . --top 5
 ```
 
-## Query files
-
-- [benchmarks/local-rag-queries.json](benchmarks/local-rag-queries.json) — 20 queries for local-rag
-- [benchmarks/express-queries.json](benchmarks/express-queries.json) — 15 queries for Express.js
+Query files: [local-rag](benchmarks/local-rag-queries.json) (20 queries), [Express.js](benchmarks/express-queries.json) (15 queries).

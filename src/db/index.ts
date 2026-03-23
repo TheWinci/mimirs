@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 import * as sqliteVec from "sqlite-vec";
-import { EMBEDDING_DIM } from "../embeddings/embed";
+import { getEmbeddingDim } from "../embeddings/embed";
 import { join, resolve } from "path";
 import { mkdirSync, existsSync } from "fs";
 import { platform } from "os";
@@ -57,12 +57,14 @@ function loadCustomSQLite() {
 export class RagDB {
   private db: Database;
 
-  constructor(projectDir: string) {
+  constructor(projectDir: string, customRagDir?: string) {
     loadCustomSQLite();
 
-    const ragDir = process.env.RAG_DB_DIR
-      ? resolve(process.env.RAG_DB_DIR)
-      : join(projectDir, ".rag");
+    const ragDir = customRagDir
+      ? resolve(customRagDir)
+      : process.env.RAG_DB_DIR
+        ? resolve(process.env.RAG_DB_DIR)
+        : join(projectDir, ".rag");
 
     try {
       mkdirSync(ragDir, { recursive: true });
@@ -110,7 +112,7 @@ export class RagDB {
 
       CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
         chunk_id INTEGER PRIMARY KEY,
-        embedding FLOAT[${EMBEDDING_DIM}]
+        embedding FLOAT[${getEmbeddingDim()}]
       );
 
       CREATE VIRTUAL TABLE IF NOT EXISTS fts_chunks USING fts5(
@@ -191,7 +193,7 @@ export class RagDB {
 
       CREATE VIRTUAL TABLE IF NOT EXISTS vec_conversation USING vec0(
         chunk_id INTEGER PRIMARY KEY,
-        embedding FLOAT[${EMBEDDING_DIM}]
+        embedding FLOAT[${getEmbeddingDim()}]
       );
 
       CREATE VIRTUAL TABLE IF NOT EXISTS fts_conversation USING fts5(
@@ -231,7 +233,7 @@ export class RagDB {
 
       CREATE VIRTUAL TABLE IF NOT EXISTS vec_checkpoints USING vec0(
         checkpoint_id INTEGER PRIMARY KEY,
-        embedding FLOAT[${EMBEDDING_DIM}]
+        embedding FLOAT[${getEmbeddingDim()}]
       );
 
       CREATE TABLE IF NOT EXISTS query_log (
@@ -265,7 +267,7 @@ export class RagDB {
 
       CREATE VIRTUAL TABLE IF NOT EXISTS vec_annotations USING vec0(
         annotation_id INTEGER PRIMARY KEY,
-        embedding FLOAT[${EMBEDDING_DIM}]
+        embedding FLOAT[${getEmbeddingDim()}]
       );
     `);
 

@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { RagDB } from "../db";
-import { loadConfig, type RagConfig } from "../config";
+import { loadConfig, applyEmbeddingConfig, type RagConfig } from "../config";
 import { registerSearchTools } from "./search";
 import { registerIndexTools } from "./index-tools";
 import { registerGraphTools } from "./graph-tools";
@@ -18,7 +18,9 @@ export async function resolveProject(
   getDB: GetDB
 ): Promise<{ projectDir: string; db: RagDB; config: RagConfig }> {
   const projectDir = directory || process.env.RAG_PROJECT_DIR || process.cwd();
-  return { projectDir, db: getDB(projectDir), config: await loadConfig(projectDir) };
+  const config = await loadConfig(projectDir);
+  applyEmbeddingConfig(config);
+  return { projectDir, db: getDB(projectDir), config };
 }
 
 export function registerAllTools(server: McpServer, getDB: (dir: string) => RagDB) {

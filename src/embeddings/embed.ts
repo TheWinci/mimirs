@@ -11,13 +11,27 @@ import { rmSync } from "node:fs";
 const CACHE_DIR = join(homedir(), ".cache", "local-rag", "models");
 env.cacheDir = CACHE_DIR;
 
-const MODEL_ID = "Xenova/all-MiniLM-L6-v2";
-const EMBEDDING_DIM = 384;
+const DEFAULT_MODEL_ID = "Xenova/all-MiniLM-L6-v2";
+const DEFAULT_EMBEDDING_DIM = 384;
 
+let currentModelId = DEFAULT_MODEL_ID;
+let currentDim = DEFAULT_EMBEDDING_DIM;
 let extractor: FeatureExtractionPipeline | null = null;
 
 function defaultThreadCount(): number {
   return Math.max(2, Math.floor(cpus().length / 3));
+}
+
+/**
+ * Configure a different embedding model. Must be called before getEmbedder().
+ * Resets the singleton if the model changes.
+ */
+export function configureEmbedder(modelId: string, dim: number): void {
+  if (modelId !== currentModelId || dim !== currentDim) {
+    extractor = null;
+    currentModelId = modelId;
+    currentDim = dim;
+  }
 }
 
 export async function getEmbedder(threads?: number): Promise<FeatureExtractionPipeline> {
@@ -31,14 +45,14 @@ export async function getEmbedder(threads?: number): Promise<FeatureExtractionPi
       },
     };
     try {
-      extractor = await pipeline("feature-extraction", MODEL_ID, pipelineOptions);
+      extractor = await pipeline("feature-extraction", currentModelId, pipelineOptions);
     } catch (err) {
       // If the cached model is corrupted, delete it and retry once
       const msg = (err as Error).message || "";
       if (msg.includes("Protobuf parsing failed") || msg.includes("Load model")) {
-        const modelDir = join(CACHE_DIR, ...MODEL_ID.split("/"));
+        const modelDir = join(CACHE_DIR, ...currentModelId.split("/"));
         rmSync(modelDir, { recursive: true, force: true });
-        extractor = await pipeline("feature-extraction", MODEL_ID, pipelineOptions);
+        extractor = await pipeline("feature-extraction", currentModelId, pipelineOptions);
       } else {
         throw err;
       }
@@ -60,7 +74,7 @@ export async function embedBatch(texts: string[], threads?: number): Promise<Flo
   const flat = new Float32Array(output.data as Float64Array);
   const result: Float32Array[] = [];
   for (let i = 0; i < texts.length; i++) {
-    result.push(flat.slice(i * EMBEDDING_DIM, (i + 1) * EMBEDDING_DIM));
+    result.push(flat.slice(i * currentDim, (i + 1) * currentDim));
   }
   return result;
 }
@@ -70,4 +84,16 @@ export function resetEmbedder(): void {
   extractor = null;
 }
 
-export { EMBEDDING_DIM };
+/** Current embedding dimension — changes if configureEmbedder() is called */
+export function getEmbeddingDim(): number {
+  return currentDim;
+}
+
+/** Current model ID */
+export function getModelId(): string {
+  return currentModelId;
+}
+
+// Backwards-compatible constant export (default dimension)
+const EMBEDDING_DIM = DEFAULT_EMBEDDING_DIM;
+export { EMBEDDING_DIM, DEFAULT_MODEL_ID, DEFAULT_EMBEDDING_DIM };

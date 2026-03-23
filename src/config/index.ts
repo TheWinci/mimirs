@@ -3,6 +3,7 @@ import { join } from "path";
 import { existsSync } from "fs";
 import { z } from "zod";
 import { log } from "../utils/log";
+import { configureEmbedder, DEFAULT_MODEL_ID, DEFAULT_EMBEDDING_DIM } from "../embeddings/embed";
 
 const RagConfigSchema = z.object({
   include: z.array(z.string()).default([]),
@@ -15,6 +16,8 @@ const RagConfigSchema = z.object({
   indexThreads: z.number().int().min(1).optional(),
   incrementalChunks: z.boolean().default(false),
   enableReranking: z.boolean().default(true),
+  embeddingModel: z.string().optional(),
+  embeddingDim: z.number().int().min(1).optional(),
   benchmarkTopK: z.number().int().min(1).default(5),
   benchmarkMinRecall: z.number().min(0).max(1).default(0.8),
   benchmarkMinMrr: z.number().min(0).max(1).default(0.6),
@@ -110,4 +113,14 @@ export async function loadConfig(projectDir: string): Promise<RagConfig> {
   }
 
   return result.data;
+}
+
+/**
+ * Apply embedding model settings from config.
+ * Call this after loadConfig() when embeddings will be used.
+ */
+export function applyEmbeddingConfig(config: RagConfig): void {
+  const model = config.embeddingModel ?? DEFAULT_MODEL_ID;
+  const dim = config.embeddingDim ?? DEFAULT_EMBEDDING_DIM;
+  configureEmbedder(model, dim);
 }

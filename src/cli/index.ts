@@ -6,6 +6,7 @@ import { removeCommand } from "./commands/remove";
 import { analyticsCommand } from "./commands/analytics";
 import { mapCommand } from "./commands/map";
 import { benchmarkCommand } from "./commands/benchmark";
+import { benchmarkModelsCommand } from "./commands/benchmark-models";
 import { evalCommand } from "./commands/eval";
 import { conversationCommand } from "./commands/conversation";
 import { checkpointCommand } from "./commands/checkpoint";
@@ -96,6 +97,9 @@ export async function main() {
       break;
     case "benchmark":
       await benchmarkCommand(args, getFlag);
+      break;
+    case "benchmark-models":
+      await benchmarkModelsCommand(args, getFlag);
       break;
     case "eval":
       await evalCommand(args, getFlag);
