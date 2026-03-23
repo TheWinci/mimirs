@@ -22,6 +22,7 @@ No API keys. No cloud. No Docker. Just `bunx`.
 - [Configuration](#configuration)
 - [Supported file types](#supported-file-types)
 - [How it works](#how-it-works)
+- [Search quality](#search-quality)
 - [Stack](#stack)
 
 ## Why
@@ -531,6 +532,17 @@ a1b2c3d feat: restructure to domain-based folders
 src/server/index.ts
 README.md
 ```
+
+## Search quality
+
+Benchmarked on two codebases with known expected files per query. Full details in [BENCHMARKS.md](BENCHMARKS.md).
+
+| Codebase | Files | Queries | Recall@5 | MRR | Recall@10 |
+|---|---|---|---|---|---|
+| local-rag (this project) | 95 | 20 | 77.5% | 0.492 | 95.0% |
+| Express.js | 161 | 15 | 73.3% | 0.580 | 93.3% |
+
+With reranking enabled (default). Reranking improves MRR by +0.11-0.17 over hybrid search alone.
 
 ## Stack
 

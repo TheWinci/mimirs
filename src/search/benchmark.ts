@@ -54,15 +54,17 @@ export async function runBenchmark(
   db: RagDB,
   projectDir: string,
   topK: number = 5,
-  hybridWeight?: number
+  hybridWeight?: number,
+  enableReranking?: boolean
 ): Promise<BenchmarkSummary> {
   const config = await loadConfig(projectDir);
   const weight = hybridWeight ?? config.hybridWeight;
+  const reranking = enableReranking ?? config.enableReranking;
 
   const results: BenchmarkResult[] = [];
 
   for (const q of queries) {
-    const searchResults = await search(q.query, db, topK, 0, weight);
+    const searchResults = await search(q.query, db, topK, 0, weight, reranking);
 
     const resultPaths = searchResults.map((r) => r.path);
     const expectedNormalized = q.expected.map((p) => normalizePath(p, projectDir));

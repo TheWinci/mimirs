@@ -1,0 +1,82 @@
+[
+  {
+    "query": "hybridSearch vector BM25 blend results",
+    "expected": ["src/search/hybrid.ts"]
+  },
+  {
+    "query": "embedBatch transformers.js ONNX model loading",
+    "expected": ["src/embeddings/embed.ts"]
+  },
+  {
+    "query": "rerank cross-encoder ms-marco score candidates",
+    "expected": ["src/search/reranker.ts"]
+  },
+  {
+    "query": "chunkText AST tree-sitter splitMarkdown splitCode",
+    "expected": ["src/indexing/chunker.ts"]
+  },
+  {
+    "query": "processFile fileHash embedBatch incremental chunks",
+    "expected": ["src/indexing/indexer.ts"]
+  },
+  {
+    "query": "RagDB initSchema CREATE TABLE chunks vec_chunks",
+    "expected": ["src/db/index.ts"]
+  },
+  {
+    "query": "resolveImport loadTsConfig two-pass resolution",
+    "expected": ["src/graph/resolver.ts"]
+  },
+  {
+    "query": "generateProjectMap getSubgraph dependency graph",
+    "expected": ["src/graph/resolver.ts"]
+  },
+  {
+    "query": "parseJSONL readTurns conversation transcript turns",
+    "expected": ["src/conversation/parser.ts"]
+  },
+  {
+    "query": "watchProject debounce fs.watch reindex changed files",
+    "expected": ["src/indexing/watcher.ts"]
+  },
+  {
+    "query": "startServer registerAllTools MCP stdio transport",
+    "expected": ["src/server/index.ts", "src/cli/commands/serve.ts"]
+  },
+  {
+    "query": "loadConfig RagConfig chunkSize exclude include glob",
+    "expected": ["src/config/index.ts"]
+  },
+  {
+    "query": "findUsages escapeRegex symbol callsites line match",
+    "expected": ["src/search/usages.ts"]
+  },
+  {
+    "query": "createCheckpoint insertCheckpoint embedding blob",
+    "expected": ["src/db/checkpoints.ts"]
+  },
+  {
+    "query": "upsertAnnotation getAnnotations fts_annotations",
+    "expected": ["src/db/annotations.ts"]
+  },
+  {
+    "query": "logQuery getAnalytics query_log zero-result rate",
+    "expected": ["src/db/analytics.ts"]
+  },
+  {
+    "query": "vectorSearch textSearch fts_chunks BM25 ranking",
+    "expected": ["src/db/search.ts"]
+  },
+  {
+    "query": "parseFile detectExtension frontmatter basename",
+    "expected": ["src/indexing/parse.ts"]
+  },
+  {
+    "query": "runBenchmark recall MRR reciprocalRank metric",
+    "expected": ["src/search/benchmark.ts"]
+  },
+  {
+    "query": "runEval withRag withoutRag trace comparison",
+    "expected": ["src/search/eval.ts"]
+  }
+]

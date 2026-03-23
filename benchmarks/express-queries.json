@@ -1,0 +1,62 @@
+[
+  {
+    "query": "app.set app.get settings locals trust proxy",
+    "expected": ["lib/application.js"]
+  },
+  {
+    "query": "res.send res.json res.status response body",
+    "expected": ["lib/response.js"]
+  },
+  {
+    "query": "req.params req.query req.ip request hostname",
+    "expected": ["lib/request.js"]
+  },
+  {
+    "query": "template engine render view lookup resolve",
+    "expected": ["lib/view.js"]
+  },
+  {
+    "query": "createApplication exports module express factory",
+    "expected": ["lib/express.js"]
+  },
+  {
+    "query": "etag normalize mime content-type utility helpers",
+    "expected": ["lib/utils.js"]
+  },
+  {
+    "query": "app.render response template engine callback",
+    "expected": ["lib/application.js"]
+  },
+  {
+    "query": "res.redirect location status 301 302 url",
+    "expected": ["lib/response.js"]
+  },
+  {
+    "query": "req.accepts content negotiation type format",
+    "expected": ["lib/request.js"]
+  },
+  {
+    "query": "app.use middleware mount path route handler",
+    "expected": ["lib/application.js"]
+  },
+  {
+    "query": "res.cookie res.clearCookie set-cookie options",
+    "expected": ["lib/response.js"]
+  },
+  {
+    "query": "req.range content-range bytes header parsing",
+    "expected": ["lib/request.js"]
+  },
+  {
+    "query": "app.listen http server port bind createServer",
+    "expected": ["lib/application.js"]
+  },
+  {
+    "query": "res.sendFile transfer stream download attachment",
+    "expected": ["lib/response.js"]
+  },
+  {
+    "query": "view resolve root path extension template file lookup",
+    "expected": ["lib/view.js"]
+  }
+]
