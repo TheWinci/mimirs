@@ -147,7 +147,10 @@ function expandForDocs<T extends { path: string }>(
 ): T[] {
   const initial = pool.slice(0, topK);
   const docCount = initial.filter((r) => DOC_EXTENSIONS.test(r.path)).length;
-  if (docCount === 0) return initial;
+  // Only expand when docs are displacing code files — if all results are docs,
+  // there's nothing to protect and expansion would exceed topK for no reason.
+  const codeCount = initial.length - docCount;
+  if (docCount === 0 || codeCount === 0) return initial;
   return pool.slice(0, topK + docCount);
 }
 

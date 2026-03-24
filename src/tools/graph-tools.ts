@@ -7,7 +7,7 @@ import { type GetDB, resolveProject } from "./index";
 export function registerGraphTools(server: McpServer, getDB: GetDB) {
   server.tool(
     "project_map",
-    "Generate a structured dependency map of the project. Shows files, their exports, depends_on (imports), and depended_on_by (importers). Entry points are listed separately.",
+    "Visualize how files relate to each other — imports, exports, and entry points. Faster than reading import statements across many files. Use 'focus' to zoom into a specific file's neighborhood. Use search or read_relevant next to explore specific areas of the map.",
     {
       directory: z
         .string()
@@ -36,15 +36,17 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
         maxNodes: maxNodes ?? 50,
       });
 
+      const footer = `\n── Tip: call search("<topic>") to find files related to a specific area, or depends_on/depended_on_by for a single file's connections. ──`;
+
       return {
-        content: [{ type: "text" as const, text: map }],
+        content: [{ type: "text" as const, text: `${map}${footer}` }],
       };
     }
   );
 
   server.tool(
     "find_usages",
-    "Find every usage (call site or reference) of a symbol across the codebase. Returns file paths, line numbers, and the matching line. Excludes the file that defines the symbol. Use this before renaming or changing a function signature to understand the blast radius.",
+    "Find every call site or reference to a symbol across all indexed files — with file paths, line numbers, and matching lines. More reliable than grep for usage analysis: searches the chunk index so it won't miss aliased imports or re-exports. Use this before renaming or changing a function signature.",
     {
       symbol: z.string().describe("Symbol name to search for"),
       exact: z
@@ -89,6 +91,9 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
         lines.push("");
       }
 
+      const footer = `── Tip: call depended_on_by("<file>") on any file above to see its full importer tree. ──`;
+      lines.push(footer);
+
       return {
         content: [{ type: "text" as const, text: lines.join("\n") }],
       };
@@ -97,7 +102,7 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
 
   server.tool(
     "depends_on",
-    "List all files that a given file imports (its dependencies). Returns resolved file paths only — unresolved or external imports are excluded.",
+    "List all files that a given file imports (its dependencies). Shows the resolved import graph — what this file actually depends on. Use depended_on_by for the reverse direction.",
     {
       file: z.string().describe("File path (relative to project) to query"),
       directory: z
@@ -130,7 +135,7 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
 
   server.tool(
     "depended_on_by",
-    "List all files that import a given file (its reverse dependencies / importers). Use this to understand the blast radius before modifying a file.",
+    "List all files that import a given file (reverse dependencies). Shows the blast radius before modifying a file — every file that would be affected by a change. Use find_usages for symbol-level granularity.",
     {
       file: z.string().describe("File path (relative to project) to query"),
       directory: z

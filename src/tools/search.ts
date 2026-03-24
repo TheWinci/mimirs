@@ -8,7 +8,7 @@ import { type GetDB, resolveProject } from "./index";
 export function registerSearchTools(server: McpServer, getDB: GetDB) {
   server.tool(
     "search",
-    "Semantic search over indexed files. Returns ranked file paths with relevance scores and snippets.",
+    "Search the full codebase by meaning — finds files that grep misses. Use natural language ('how does auth work') or symbol names. Searches all indexed files semantically + by keyword in <100ms. Returns ranked file paths with snippets. Use read_relevant next to get full content with line ranges.",
     {
       query: z.string().describe("The search query (natural language)"),
       directory: z
@@ -25,35 +25,42 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
     async ({ query, directory, top }) => {
       const { db: ragDb, config } = await resolveProject(directory, getDB);
 
+      const start = performance.now();
       const results = await search(query, ragDb, top ?? config.searchTopK, 0, config.hybridWeight, config.enableReranking);
+      const durationMs = Math.round(performance.now() - start);
+      const { totalFiles } = ragDb.getStatus();
 
       if (results.length === 0) {
         return {
           content: [
             {
               type: "text" as const,
-              text: "No results found. Has the directory been indexed? Try calling index_files first.",
+              text: `No results found across ${totalFiles} indexed files. Has the directory been indexed? Try calling index_files first.`,
             },
           ],
         };
       }
 
-      const text = results
+      const header = `── ${results.length} results across ${totalFiles} indexed files (${durationMs}ms) ──`;
+
+      const body = results
         .map(
           (r) =>
             `${r.score.toFixed(4)}  ${r.path}\n  ${r.snippets[0]?.slice(0, 400)}...`
         )
         .join("\n\n");
 
+      const footer = `\n── Tip: call read_relevant with the same query to get full function/class content with exact line ranges. ──`;
+
       return {
-        content: [{ type: "text" as const, text }],
+        content: [{ type: "text" as const, text: `${header}\n\n${body}${footer}` }],
       };
     }
   );
 
   server.tool(
     "read_relevant",
-    "Retrieve the most relevant semantic chunks for a query. Returns full chunk content — individual functions, classes, or sections — ranked by relevance. No file deduplication: multiple chunks from the same file can appear. Use this instead of search + Read when you need the actual content.",
+    "Get the actual content of the most relevant code chunks — individual functions, classes, or sections — with exact line ranges for navigation. Smarter than grep: finds code by meaning, not just string matching. Multiple chunks from the same file can appear. Use this instead of search + Read when you need the content itself.",
     {
       query: z.string().describe("The search query (natural language)"),
       directory: z
@@ -74,6 +81,7 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
     async ({ query, directory, top, threshold }) => {
       const { projectDir, db: ragDb, config } = await resolveProject(directory, getDB);
 
+      const start = performance.now();
       const results = await searchChunks(
         query,
         ragDb,
@@ -82,17 +90,22 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
         config.hybridWeight,
         config.enableReranking
       );
+      const durationMs = Math.round(performance.now() - start);
+      const { totalFiles } = ragDb.getStatus();
 
       if (results.length === 0) {
         return {
           content: [
             {
               type: "text" as const,
-              text: "No relevant chunks found. Has the directory been indexed? Try calling index_files first.",
+              text: `No relevant chunks found across ${totalFiles} indexed files. Has the directory been indexed? Try calling index_files first.`,
             },
           ],
         };
       }
+
+      const uniqueFiles = new Set(results.map((r) => r.path));
+      const header = `── ${results.length} chunks from ${uniqueFiles.size} files (searched ${totalFiles} files in ${durationMs}ms) ──`;
 
       // Batch-fetch annotations for all unique paths (avoids N+1 queries)
       const uniqueRelPaths = [...new Set(results.map((r) => relative(projectDir, r.path)))];
@@ -102,11 +115,17 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
         if (anns.length > 0) annotationsByPath.set(relPath, anns);
       }
 
-      const text = results
+      // Collect entity names for the follow-up suggestion
+      const entityNames = results
+        .map((r) => r.entityName)
+        .filter((name): name is string => name != null && name.length > 0);
+      const topEntity = entityNames[0];
+
+      const body = results
         .map((r) => {
           const lineRange = r.startLine != null && r.endLine != null ? `:${r.startLine}-${r.endLine}` : "";
           const entity = r.entityName ? `  •  ${r.entityName}` : "";
-          const header = `[${r.score.toFixed(2)}] ${r.path}${lineRange}${entity}`;
+          const resultHeader = `[${r.score.toFixed(2)}] ${r.path}${lineRange}${entity}`;
 
           // Surface annotations for this file (and matching entity if applicable)
           const relPath = relative(projectDir, r.path);
@@ -121,19 +140,24 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
               }).join("\n") + "\n"
             : "";
 
-          return `${header}\n${noteBlock}${r.content}`;
+          return `${resultHeader}\n${noteBlock}${r.content}`;
         })
         .join("\n\n---\n\n");
 
+      const footerHint = topEntity
+        ? `call find_usages("${topEntity}") to see all call sites before modifying.`
+        : `call find_usages("<symbol>") to see all call sites before modifying.`;
+      const footer = `\n── Tip: ${footerHint} ──`;
+
       return {
-        content: [{ type: "text" as const, text }],
+        content: [{ type: "text" as const, text: `${header}\n\n${body}${footer}` }],
       };
     }
   );
 
   server.tool(
     "search_symbols",
-    "Search for exported symbols by name — functions, classes, types, interfaces, enums. Returns the files that export matching symbols with the defining code snippet. Faster than semantic search when you know the symbol name.",
+    "Find where a function, class, type, or interface is defined — by name, not semantics. Faster than grep for symbol lookup: searches the pre-built symbol index across all indexed files. Use find_usages next to see where the symbol is called.",
     {
       symbol: z.string().describe("Symbol name to search for"),
       exact: z
@@ -161,20 +185,23 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
         };
       }
 
-      const text = results
+      const body = results
         .map((r) => {
           const snippet = r.snippet ? `\n${r.snippet.slice(0, 300)}` : "";
           return `${r.path}  •  ${r.symbolName} (${r.symbolType})${snippet}`;
         })
         .join("\n\n---\n\n");
 
-      return { content: [{ type: "text" as const, text }] };
+      const topSymbol = results[0].symbolName;
+      const footer = `\n── Tip: call find_usages("${topSymbol}") to see all call sites, or read_relevant("${topSymbol}") for full context. ──`;
+
+      return { content: [{ type: "text" as const, text: `${body}${footer}` }] };
     }
   );
 
   server.tool(
     "write_relevant",
-    "Find the best location to insert new content. Given code or documentation you want to add, returns the most semantically appropriate files and insertion points — the chunk after which your content belongs, with an anchor for precise placement.",
+    "Find the best file and location to insert new code or docs. Returns semantically appropriate insertion points with anchors for precise placement. Use this before adding a new function to find which file and position it belongs in.",
     {
       content: z.string().describe("The content you want to add — a function, class, doc section, etc."),
       directory: z
@@ -222,7 +249,7 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
         .sort((a, b) => b.score - a.score)
         .slice(0, topN);
 
-      const text = candidates
+      const body = candidates
         .map((r) => {
           const insertAfter = r.entityName
             ? `after \`${r.entityName}\` (chunk ${r.chunkIndex})`
@@ -232,7 +259,10 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
         })
         .join("\n\n---\n\n");
 
-      return { content: [{ type: "text" as const, text }] };
+      const topFile = candidates[0].path;
+      const footer = `\n── Tip: call read_relevant with your content query to see the surrounding code at the insertion point. ──`;
+
+      return { content: [{ type: "text" as const, text: `${body}${footer}` }] };
     }
   );
 }
