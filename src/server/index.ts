@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { resolve, join } from "path";
 import { homedir } from "os";
-import { mkdirSync, writeFileSync, unlinkSync } from "fs";
+import { mkdirSync, writeFileSync } from "fs";
 import { RagDB } from "../db";
 import { loadConfig } from "../config";
 import { indexDirectory } from "../indexing/indexer";
@@ -70,10 +70,6 @@ export async function startServer() {
     const writeStatus = (status: string) => {
       try { mkdirSync(ragDir, { recursive: true }); writeFileSync(statusPath, status); } catch {}
     };
-    const clearStatus = () => {
-      try { unlinkSync(statusPath); } catch {}
-    };
-
     writeStatus("starting");
     indexDirectory(startupDir, startupDb, startupConfig, (msg) => {
       if (msg === "file:done") {
@@ -93,7 +89,15 @@ export async function startServer() {
         writeStatus(`0/${totalFiles} files`);
       }
     }).then((result) => {
-      clearStatus();
+      const dbStatus = startupDb.getStatus();
+      const doneStatus = [
+        `done`,
+        `version: ${version}`,
+        `finished: ${new Date().toISOString()}`,
+        `indexed: ${result.indexed}, skipped: ${result.skipped}, pruned: ${result.pruned}`,
+        `total files: ${dbStatus.totalFiles}, total chunks: ${dbStatus.totalChunks}`,
+      ].join("\n");
+      writeStatus(doneStatus);
       process.stderr.write(
         `[local-rag] Startup index: ${result.indexed} indexed, ${result.skipped} skipped, ${result.pruned} pruned\n`
       );
@@ -103,7 +107,7 @@ export async function startServer() {
         process.stderr.write(`[local-rag] ${msg}\n`);
       });
     }).catch((err) => {
-      clearStatus();
+      writeStatus(`error\nversion: ${version}\nfailed: ${new Date().toISOString()}\n${err instanceof Error ? err.message : err}`);
       log.warn(`Startup indexing failed: ${err instanceof Error ? err.message : err}`, "server");
     });
   }
@@ -148,11 +152,6 @@ export async function startServer() {
     process.stderr.write("[local-rag] Shutting down...\n");
     if (watcher) watcher.close();
     if (convWatcher) convWatcher.close();
-    // Clean up indexing-status file if it exists
-    if (!isHomeDirTrap) {
-      const statusPath = join(startupDir, ".rag", "indexing-status");
-      try { unlinkSync(statusPath); } catch {}
-    }
     for (const d of dbMap.values()) d.close();
     dbMap.clear();
     process.exit(0);
