@@ -75,8 +75,14 @@ async function collectFiles(
   const seen = new Set<string>();
   let lastReport = 0;
 
-  for (const pattern of config.include) {
+  const totalPatterns = config.include.length;
+  for (let pi = 0; pi < totalPatterns; pi++) {
+    const pattern = config.include[pi];
     const glob = new Glob(pattern);
+    // Heartbeat timer so long-running scans that find few files still report progress
+    const heartbeat = setInterval(() => {
+      onProgress?.(`scanning files… ${seen.size} found (pattern ${pi + 1}/${totalPatterns})`);
+    }, 1000);
     try {
       for await (const file of glob.scan({ cwd: directory, absolute: true })) {
         const rel = relative(directory, file);
@@ -84,7 +90,7 @@ async function collectFiles(
           seen.add(file);
           const now = Date.now();
           if (now - lastReport >= 500) {
-            onProgress?.(`scanning files… ${seen.size} found`);
+            onProgress?.(`scanning files… ${seen.size} found (pattern ${pi + 1}/${totalPatterns})`);
             lastReport = now;
           }
           if (seen.size > MAX_COLLECT_FILES) {
@@ -100,9 +106,13 @@ async function collectFiles(
       if (err.code === "EPERM" || err.code === "EACCES") {
         onWarning?.(`Skipping inaccessible path (${err.code}): ${err.path ?? pattern}`);
       } else {
+        clearInterval(heartbeat);
         throw err;
       }
     }
+    clearInterval(heartbeat);
+    // Report after each pattern so progress is visible even when patterns match nothing
+    onProgress?.(`scanning files… ${seen.size} found (pattern ${pi + 1}/${totalPatterns})`);
   }
 
   return [...seen];
