@@ -41,7 +41,7 @@ export async function getEmbedder(
   if (!extractor) {
     const numThreads = threads ?? defaultThreadCount();
     const pipelineOptions = {
-      dtype: "fp32" as const,
+      dtype: "q8" as const,
       session_options: {
         intraOpNumThreads: numThreads,
         interOpNumThreads: numThreads,
