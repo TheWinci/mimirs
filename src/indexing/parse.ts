@@ -1,5 +1,4 @@
 import matter from "gray-matter";
-import { readFile } from "fs/promises";
 import { extname } from "path";
 
 export interface ParsedFile {
@@ -49,8 +48,7 @@ function resolveExtension(rawExt: string, basename: string): string {
   return rawExt;
 }
 
-export async function parseFile(filePath: string): Promise<ParsedFile> {
-  const raw = await readFile(filePath, "utf-8");
+export function parseFile(filePath: string, raw: string): ParsedFile {
   const rawExt = extname(filePath).toLowerCase();
   const basename = filePath.split("/").pop()?.toLowerCase() ?? "";
   const ext = resolveExtension(rawExt, basename);

@@ -49,9 +49,8 @@ export interface IndexResult {
   errors: string[];
 }
 
-async function fileHash(filePath: string): Promise<string> {
-  const content = await readFile(filePath);
-  return createHash("sha256").update(content).digest("hex");
+function hashString(content: string): string {
+  return createHash("sha256").update(content, "utf-8").digest("hex");
 }
 
 function matchesAny(filePath: string, globs: Glob[]): boolean {
@@ -158,7 +157,9 @@ async function processFile(
     return "skipped";
   }
 
-  const hash = await fileHash(filePath);
+  // Single read: hash and parse from the same string
+  let raw: string | null = await readFile(filePath, "utf-8");
+  const hash = hashString(raw);
   const existing = db.getFileByPath(filePath);
 
   if (existing && existing.hash === hash) {
@@ -169,7 +170,8 @@ async function processFile(
   const relPath = baseDir ? relative(baseDir, filePath) : filePath;
   onProgress?.(`Indexing ${relPath}`);
 
-  const parsed = await parseFile(filePath);
+  const parsed = parseFile(filePath, raw);
+  raw = null; // free before the expensive embed loop
 
   if (!KNOWN_EXTENSIONS.has(parsed.extension)) {
     onProgress?.(`Skipped (unsupported extension "${parsed.extension}"): ${relPath}`);
