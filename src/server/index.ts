@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { resolve, join } from "path";
 import { checkIndexDir } from "../utils/dir-guard";
-import { mkdirSync, writeFileSync } from "fs";
+import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { RagDB } from "../db";
 import { loadConfig } from "../config";
 import { indexDirectory } from "../indexing/indexer";
@@ -62,13 +62,12 @@ export async function startServer() {
     });
 
     // Index in background — don't block server startup
-    const statusPath = join(startupDir, ".rag", "indexing-status");
     let totalFiles = 0;
     let processedFiles = 0;
 
     const ragDir = join(startupDir, ".rag");
     const writeStatus = (status: string) => {
-      try { mkdirSync(ragDir, { recursive: true }); writeFileSync(statusPath, status); } catch {}
+      try { mkdirSync(ragDir, { recursive: true }); writeFileSync(statusPath!, status); } catch {}
     };
     writeStatus("starting");
     indexDirectory(startupDir, startupDb, startupConfig, (msg) => {
@@ -147,8 +146,26 @@ export async function startServer() {
     }
   }
 
+  // Write to indexing-status on abnormal exit so the file doesn't stay stuck on "starting"
+  const statusPath = !isHomeDirTrap ? join(startupDir, ".rag", "indexing-status") : null;
+  function writeExitStatus(reason: string) {
+    if (!statusPath) return;
+    try {
+      // Only overwrite if indexing hadn't finished (file still exists and doesn't start with "done")
+      const current = readFileSync(statusPath, "utf8");
+      if (current.startsWith("done") || current.startsWith("error")) return;
+      writeFileSync(statusPath, [
+        `interrupted`,
+        `version: ${version}`,
+        `stopped: ${new Date().toISOString()}`,
+        `reason: ${reason}`,
+      ].join("\n"));
+    } catch {}
+  }
+
   // Graceful shutdown
-  function cleanup() {
+  function cleanup(reason: string = "shutdown") {
+    writeExitStatus(reason);
     process.stderr.write("[local-rag] Shutting down...\n");
     if (watcher) watcher.close();
     if (convWatcher) convWatcher.close();
@@ -157,16 +174,16 @@ export async function startServer() {
     process.exit(0);
   }
 
-  process.on("SIGINT", cleanup);
-  process.on("SIGTERM", cleanup);
-  process.on("SIGHUP", cleanup);
+  process.on("SIGINT", () => cleanup("SIGINT"));
+  process.on("SIGTERM", () => cleanup("SIGTERM"));
+  process.on("SIGHUP", () => cleanup("SIGHUP"));
   process.on("uncaughtException", (err) => {
     process.stderr.write(`[local-rag] Uncaught exception: ${err.message}\n`);
-    cleanup();
+    cleanup(`uncaught exception: ${err.message}`);
   });
   process.on("unhandledRejection", (err) => {
     process.stderr.write(`[local-rag] Unhandled rejection: ${err instanceof Error ? err.message : err}\n`);
-    cleanup();
+    cleanup(`unhandled rejection: ${err instanceof Error ? err.message : err}`);
   });
 
   // Start server
