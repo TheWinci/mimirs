@@ -66,7 +66,32 @@ const DEFAULT_CONFIG: RagConfig = {
     // Stylesheets — not indexed by default (class names add noise to code search)
     // "**/*.css", "**/*.scss", "**/*.less",
   ],
-  exclude: ["node_modules/**", ".git/**", "dist/**", ".rag/**"],
+  exclude: [
+    // Package managers & dependencies
+    "node_modules/**", ".yarn/**", ".pnp.*",
+    // Version control
+    ".git/**",
+    // Build output
+    "dist/**", "build/**", "out/**", ".output/**",
+    // Framework caches & generated
+    ".next/**", ".nuxt/**", ".svelte-kit/**", ".turbo/**",
+    // Tool caches
+    ".cache/**", ".parcel-cache/**", ".webpack/**",
+    // Test & coverage output
+    "coverage/**", ".nyc_output/**",
+    // Environment & secrets
+    ".env", ".env.*",
+    // IDE settings (config, not code)
+    ".idea/**", ".vscode/**",
+    // Python
+    "__pycache__/**", ".venv/**", "venv/**", ".tox/**", "*.egg-info/**",
+    // Rust
+    "target/**",
+    // Go
+    "vendor/**",
+    // Local RAG index
+    ".rag/**",
+  ],
   chunkSize: 512,
   chunkOverlap: 50,
   hybridWeight: 0.7,

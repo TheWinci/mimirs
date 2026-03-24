@@ -1,7 +1,6 @@
-import { relative } from "path";
+import { relative, resolve, extname, basename } from "path";
 import { createHash } from "crypto";
-import { readFile, stat } from "fs/promises";
-import { Glob } from "bun";
+import { readFile, stat, readdir } from "fs/promises";
 import { parseFile } from "./parse";
 import { embedBatch } from "../embeddings/embed";
 import { chunkText, KNOWN_EXTENSIONS, type ChunkImport, type ChunkExport } from "./chunker";
@@ -53,10 +52,6 @@ function hashString(content: string): string {
   return createHash("sha256").update(content, "utf-8").digest("hex");
 }
 
-function matchesAny(filePath: string, globs: Glob[]): boolean {
-  return globs.some((g) => g.match(filePath));
-}
-
 /**
  * Hard cap on files to collect. Prevents OOM when the project directory
  * accidentally resolves to ~ or / and glob starts walking the entire FS.
@@ -65,57 +60,134 @@ function matchesAny(filePath: string, globs: Glob[]): boolean {
  */
 const MAX_COLLECT_FILES = 100_000;
 
+/**
+ * Build a fast filter from include patterns. Most patterns are either
+ * "**‍/*.ext" (extension match) or "**‍/Basename" / "**‍/Basename.*" (basename match).
+ * Pre-parsing these avoids creating Glob objects entirely.
+ */
+function buildIncludeFilter(patterns: string[]): (rel: string) => boolean {
+  const extensions = new Set<string>();
+  const basenames = new Set<string>();
+  const basenamePrefixes: string[] = [];
+
+  for (const p of patterns) {
+    const extMatch = p.match(/^\*\*\/\*(\.\w+)$/);
+    if (extMatch) { extensions.add(extMatch[1]); continue; }
+
+    const baseMatch = p.match(/^\*\*\/([A-Za-z]\w*)$/);
+    if (baseMatch) { basenames.add(baseMatch[1]); continue; }
+
+    const prefixMatch = p.match(/^\*\*\/([A-Za-z]\w*)\.\*$/);
+    if (prefixMatch) { basenamePrefixes.push(prefixMatch[1] + "."); continue; }
+  }
+
+  return (rel: string) => {
+    const ext = extname(rel);
+    const base = basename(rel);
+    return extensions.has(ext)
+      || basenames.has(base)
+      || basenamePrefixes.some((p) => base.startsWith(p));
+  };
+}
+
+/**
+ * Build a fast exclude checker from exclude patterns. Categorises patterns
+ * into directory prefixes ("dir/**"), exact basenames (".env"), and
+ * basename prefix globs (".env.*", "*.egg-info/**") for fast matching
+ * without Glob objects.
+ */
+function buildExcludeFilter(patterns: string[]): (rel: string) => boolean {
+  const dirPrefixes: string[] = [];
+  const exactBasenames = new Set<string>();
+  const basenamePrefixes: string[] = [];
+  const basenameSuffixes: string[] = [];
+
+  for (const p of patterns) {
+    // "dir/**" or "dir" → directory prefix
+    const dirMatch = p.match(/^([^*?]+?)\/?\*\*$/);
+    if (dirMatch) { dirPrefixes.push(dirMatch[1]); continue; }
+
+    // Exact file like ".env"
+    if (!p.includes("*") && !p.includes("?") && !p.includes("/")) {
+      exactBasenames.add(p); continue;
+    }
+
+    // ".env.*" or ".pnp.*" → basename starts with prefix
+    const prefixMatch = p.match(/^([^*?/]+)\.\*$/);
+    if (prefixMatch) { basenamePrefixes.push(prefixMatch[1] + "."); continue; }
+
+    // "*.egg-info/**" → path segment ends with suffix
+    const suffixDirMatch = p.match(/^\*([^*?/]+)\/\*\*$/);
+    if (suffixDirMatch) { basenameSuffixes.push(suffixDirMatch[1]); continue; }
+  }
+
+  return (rel: string) => {
+    // Check directory prefixes (most common case)
+    for (const prefix of dirPrefixes) {
+      if (rel.startsWith(prefix + "/") || rel === prefix) return true;
+    }
+
+    const base = basename(rel);
+
+    if (exactBasenames.has(base)) return true;
+
+    for (const p of basenamePrefixes) {
+      if (base.startsWith(p)) return true;
+    }
+
+    // Check if any path segment matches a suffix pattern (e.g. "foo.egg-info/bar.py")
+    if (basenameSuffixes.length > 0) {
+      const segments = rel.split("/");
+      for (const seg of segments) {
+        for (const suffix of basenameSuffixes) {
+          if (seg.endsWith(suffix)) return true;
+        }
+      }
+    }
+
+    return false;
+  };
+}
+
 async function collectFiles(
   directory: string,
   config: RagConfig,
-  onWarning?: (msg: string) => void,
+  _onWarning?: (msg: string) => void,
   onProgress?: (msg: string) => void
 ): Promise<string[]> {
-  const excludeGlobs = config.exclude.map((pat) => new Glob(pat));
-  const seen = new Set<string>();
-  let lastReport = 0;
+  const isIncluded = buildIncludeFilter(config.include);
+  const isExcluded = buildExcludeFilter(config.exclude);
 
-  const totalPatterns = config.include.length;
-  for (let pi = 0; pi < totalPatterns; pi++) {
-    const pattern = config.include[pi];
-    const glob = new Glob(pattern);
-    // Heartbeat timer so long-running scans that find few files still report progress
-    const heartbeat = setInterval(() => {
-      onProgress?.(`scanning files… ${seen.size} found (pattern ${pi + 1}/${totalPatterns})`);
-    }, 1000);
-    try {
-      for await (const file of glob.scan({ cwd: directory, absolute: true })) {
-        const rel = relative(directory, file);
-        if (!matchesAny(rel, excludeGlobs) && !seen.has(file)) {
-          seen.add(file);
-          const now = Date.now();
-          if (now - lastReport >= 500) {
-            onProgress?.(`scanning files… ${seen.size} found (pattern ${pi + 1}/${totalPatterns})`);
-            lastReport = now;
-          }
-          if (seen.size > MAX_COLLECT_FILES) {
-            throw new Error(
-              `Aborting: found more than ${MAX_COLLECT_FILES.toLocaleString()} files in "${directory}". ` +
-              `This usually means RAG_PROJECT_DIR is not set and the server defaulted to your home folder or another broad directory. ` +
-              `Set RAG_PROJECT_DIR to your actual project path in your MCP server config.`
-            );
-          }
-        }
-      }
-    } catch (err: any) {
-      if (err.code === "EPERM" || err.code === "EACCES") {
-        onWarning?.(`Skipping inaccessible path (${err.code}): ${err.path ?? pattern}`);
-      } else {
-        clearInterval(heartbeat);
-        throw err;
-      }
-    }
-    clearInterval(heartbeat);
-    // Report after each pattern so progress is visible even when patterns match nothing
-    onProgress?.(`scanning files… ${seen.size} found (pattern ${pi + 1}/${totalPatterns})`);
+  onProgress?.("scanning files…");
+
+  const allEntries = await readdir(directory, { recursive: true });
+
+  if (allEntries.length > MAX_COLLECT_FILES) {
+    throw new Error(
+      `Aborting: found more than ${MAX_COLLECT_FILES.toLocaleString()} filesystem entries in "${directory}". ` +
+      `This usually means RAG_PROJECT_DIR is not set and the server defaulted to your home folder or another broad directory. ` +
+      `Set RAG_PROJECT_DIR to your actual project path in your MCP server config.`
+    );
   }
 
-  return [...seen];
+  const results: string[] = [];
+  let lastReport = 0;
+
+  for (const rel of allEntries) {
+    if (isExcluded(rel)) continue;
+    if (!isIncluded(rel)) continue;
+
+    results.push(resolve(directory, rel));
+
+    const now = Date.now();
+    if (now - lastReport >= 500) {
+      onProgress?.(`scanning files… ${results.length} found`);
+      lastReport = now;
+    }
+  }
+
+  onProgress?.(`scanning files… ${results.length} found`);
+  return results;
 }
 
 interface ProcessFileOptions {
