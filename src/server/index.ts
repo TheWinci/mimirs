@@ -258,11 +258,13 @@ export async function startServer() {
   process.on("SIGHUP", () => cleanup("SIGHUP"));
   process.on("uncaughtException", (err) => {
     process.stderr.write(`[local-rag] Uncaught exception: ${err.message}\n`);
-    cleanup(`uncaught exception: ${err.message}`);
+    cleanup(`uncaught exception: ${err.message}\n${err.stack ?? "(no stack)"}`);
   });
   process.on("unhandledRejection", (err) => {
-    process.stderr.write(`[local-rag] Unhandled rejection: ${err instanceof Error ? err.message : err}\n`);
-    cleanup(`unhandled rejection: ${err instanceof Error ? err.message : err}`);
+    const msg = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : "(no stack)";
+    process.stderr.write(`[local-rag] Unhandled rejection: ${msg}\n`);
+    cleanup(`unhandled rejection: ${msg}\n${stack}`);
   });
 
 }
