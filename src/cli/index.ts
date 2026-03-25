@@ -14,6 +14,7 @@ import { annotationsCommand } from "./commands/annotations";
 import { sessionContextCommand } from "./commands/session-context";
 import { serveCommand } from "./commands/serve";
 import { demoCommand } from "./commands/demo";
+import { doctorCommand } from "./commands/doctor";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -55,6 +56,7 @@ Usage:
                 [--path P] [--dir D]
   local-rag session-context [dir]      Session start context summary
                 [--dir D]
+  local-rag doctor [dir]               Diagnose MCP server startup issues
   local-rag demo [dir]                 Run interactive feature demo
 
 Options:
@@ -122,6 +124,9 @@ export async function main() {
       break;
     case "session-context":
       await sessionContextCommand(args, getFlag);
+      break;
+    case "doctor":
+      await doctorCommand(args);
       break;
     case "demo":
       await demoCommand(args);

@@ -33,21 +33,60 @@ function getDB(projectDir: string): RagDB {
   return db;
 }
 
-export async function startServer() {
-  const server = new McpServer({
-    name: "local-rag",
-    version,
-  });
+/** Write crash details to .rag/server-error.log so they're visible outside stderr */
+function writeStartupError(err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  const stack = err instanceof Error ? err.stack : "(no stack)";
+  const projectDir = process.env.RAG_PROJECT_DIR || process.cwd();
+  try {
+    const ragDir = join(projectDir, ".rag");
+    mkdirSync(ragDir, { recursive: true });
+    writeFileSync(
+      join(ragDir, "server-error.log"),
+      [
+        `local-rag server failed at ${new Date().toISOString()}`,
+        ``,
+        `Error: ${msg}`,
+        ``,
+        stack,
+        ``,
+        `To diagnose: bunx @winci/local-rag doctor`,
+      ].join("\n")
+    );
+  } catch {
+    // Best-effort
+  }
+  log.error(`Startup failed: ${msg}`, "server");
+}
 
-  // Register all MCP tools
-  registerAllTools(server, getDB);
+export async function startServer() {
+  let server: McpServer;
+  try {
+    server = new McpServer({
+      name: "local-rag",
+      version,
+    });
+
+    // Register all MCP tools
+    registerAllTools(server, getDB);
+  } catch (err) {
+    // If we crash before connecting transport, the MCP client just sees
+    // "Connection closed" with no details. Write diagnostics to a file.
+    writeStartupError(err);
+    throw err;
+  }
 
   // Connect transport IMMEDIATELY so the MCP client's `initialize` handshake
   // is answered before any slow startup work (config I/O, session discovery,
   // indexing).  Without this, the client may time out, close the pipes, and
   // the server's subsequent stderr writes hit EPIPE.
   const transport = new StdioServerTransport();
-  await server.connect(transport);
+  try {
+    await server.connect(transport);
+  } catch (err) {
+    writeStartupError(err);
+    throw err;
+  }
 
   // Auto-index on startup + start file watcher
   const startupDir = process.env.RAG_PROJECT_DIR || process.cwd();
