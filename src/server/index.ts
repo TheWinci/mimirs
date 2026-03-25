@@ -55,10 +55,7 @@ export async function startServer() {
   const dirCheck = checkIndexDir(startupDir);
   const isHomeDirTrap = !dirCheck.safe;
   if (isHomeDirTrap) {
-    process.stderr.write(
-      `[local-rag] WARNING: ${dirCheck.reason}\n` +
-      `[local-rag] Skipping auto-index and file watcher.\n`
-    );
+    log.warn(`${dirCheck.reason} — skipping auto-index and file watcher`, "dir-guard");
   }
 
   // Preflight: verify DB can be created (catches missing Homebrew SQLite on macOS)
@@ -74,7 +71,7 @@ export async function startServer() {
         : `Check the local-rag README for setup instructions.`;
 
     initError = `${msg}\n\n${fix}`;
-    process.stderr.write(`[local-rag] FATAL: ${msg}\n[local-rag] ${fix}\n`);
+    log.error(`FATAL: ${msg} — ${fix}`, "db");
 
     // Write the error to indexing-status so it's visible to the user/IDE
     const ragDir = join(startupDir, ".rag");
@@ -89,7 +86,7 @@ export async function startServer() {
         fix,
       ].join("\n"));
     } catch (statusErr) {
-      log.warn(`Could not write indexing-status: ${statusErr instanceof Error ? statusErr.message : statusErr}`, "server");
+      log.warn(`Could not write indexing-status: ${statusErr instanceof Error ? statusErr.message : statusErr}`, "status");
     }
 
     // Server is already connected — just return and let tool calls
@@ -111,7 +108,7 @@ export async function startServer() {
       mkdirSync(ragDir, { recursive: true });
       writeFileSync(statusPath, status);
     } catch (statusErr) {
-      log.warn(`Could not write indexing-status: ${statusErr instanceof Error ? statusErr.message : statusErr}`, "server");
+      log.warn(`Could not write indexing-status: ${statusErr instanceof Error ? statusErr.message : statusErr}`, "status");
     }
   };
 
@@ -121,7 +118,7 @@ export async function startServer() {
   if (!isHomeDirTrap) {
     // Ensure .rag/ is gitignored
     ensureGitignore(startupDir).catch((err) => {
-      log.warn(`Failed to update .gitignore: ${err instanceof Error ? err.message : err}`, "server");
+      log.warn(`Failed to update .gitignore: ${err instanceof Error ? err.message : err}`, "gitignore");
     });
 
     // Index in background — don't block server startup
@@ -138,7 +135,7 @@ export async function startServer() {
         return;
       }
 
-      process.stderr.write(`[local-rag] ${msg}\n`);
+      log.debug(msg, "indexer");
 
       // File scanning progress
       if (msg.startsWith("scanning files")) {
@@ -175,17 +172,15 @@ export async function startServer() {
         `total files: ${dbStatus.totalFiles}, total chunks: ${dbStatus.totalChunks}`,
       ].join("\n");
       writeStatus(doneStatus);
-      process.stderr.write(
-        `[local-rag] Startup index: ${result.indexed} indexed, ${result.skipped} skipped, ${result.pruned} pruned\n`
-      );
+      log.debug(`Startup index: ${result.indexed} indexed, ${result.skipped} skipped, ${result.pruned} pruned`, "indexer");
 
       // Start watching after initial index completes
       watcher = startWatcher(startupDir, startupDb, startupConfig, (msg) => {
-        process.stderr.write(`[local-rag] ${msg}\n`);
+        log.debug(msg, "watcher");
       });
     }).catch((err) => {
       writeStatus(`error\nversion: ${version}\nfailed: ${new Date().toISOString()}\n${err instanceof Error ? err.message : err}`);
-      log.warn(`Startup indexing failed: ${err instanceof Error ? err.message : err}`, "server");
+      log.warn(`Startup indexing failed: ${err instanceof Error ? err.message : err}`, "indexer");
     });
   }
 
@@ -194,13 +189,13 @@ export async function startServer() {
   if (sessions.length > 0) {
     // Tail the most recent session (likely the current one)
     const currentSession = sessions[0];
-    process.stderr.write(`[local-rag] Indexing conversation: ${currentSession.sessionId.slice(0, 8)}...\n`);
+    log.debug(`Indexing conversation: ${currentSession.sessionId.slice(0, 8)}...`, "conversation");
 
     convWatcher = startConversationTail(
       currentSession.jsonlPath,
       currentSession.sessionId,
       startupDb,
-      (msg) => process.stderr.write(`[local-rag] ${msg}\n`)
+      (msg) => log.debug(msg, "conversation")
     );
 
     // Also index any older sessions that haven't been indexed yet
@@ -213,9 +208,7 @@ export async function startServer() {
           startupDb
         ).then((result) => {
           if (result.turnsIndexed > 0) {
-            process.stderr.write(
-              `[local-rag] Indexed past session ${session.sessionId.slice(0, 8)}...: ${result.turnsIndexed} turns\n`
-            );
+            log.debug(`Indexed past session ${session.sessionId.slice(0, 8)}...: ${result.turnsIndexed} turns`, "conversation");
           }
         }).catch((err) => {
           log.warn(`Failed to index session ${session.sessionId.slice(0, 8)}: ${err instanceof Error ? err.message : err}`, "conversation");
@@ -238,14 +231,14 @@ export async function startServer() {
         `reason: ${reason}`,
       ].join("\n"));
     } catch (statusErr) {
-      log.warn(`Could not write exit status: ${statusErr instanceof Error ? statusErr.message : statusErr}`, "server");
+      log.warn(`Could not write exit status: ${statusErr instanceof Error ? statusErr.message : statusErr}`, "status");
     }
   }
 
   // Graceful shutdown
   function cleanup(reason: string = "shutdown") {
     writeExitStatus(reason);
-    process.stderr.write("[local-rag] Shutting down...\n");
+    log.debug("Shutting down...", "shutdown");
     if (watcher) watcher.close();
     if (convWatcher) convWatcher.close();
     for (const d of dbMap.values()) d.close();
@@ -257,13 +250,13 @@ export async function startServer() {
   process.on("SIGTERM", () => cleanup("SIGTERM"));
   process.on("SIGHUP", () => cleanup("SIGHUP"));
   process.on("uncaughtException", (err) => {
-    process.stderr.write(`[local-rag] Uncaught exception: ${err.message}\n`);
+    log.error(`Uncaught exception: ${err.message}`, "uncaught");
     cleanup(`uncaught exception: ${err.message}\n${err.stack ?? "(no stack)"}`);
   });
   process.on("unhandledRejection", (err) => {
     const msg = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack : "(no stack)";
-    process.stderr.write(`[local-rag] Unhandled rejection: ${msg}\n`);
+    log.error(`Unhandled rejection: ${msg}`, "uncaught");
     cleanup(`unhandled rejection: ${msg}\n${stack}`);
   });
 
