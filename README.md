@@ -524,23 +524,23 @@ your-project/
   .rag/
     index.db          ← vectors, chunks, query logs
     config.json       ← include/exclude patterns, settings
-    indexing-status   ← only exists while indexing is in progress
+    status   ← only exists while indexing is in progress
 ```
 
 Add `.rag/` to your `.gitignore`.
 
 ### Indexing progress
 
-When the MCP server indexes your project (on first run or after changes), it writes progress to `.rag/indexing-status`. The file contains a line like `42/150 files (28%)` and is deleted automatically when indexing completes.
+When the MCP server indexes your project (on first run or after changes), it writes progress to `.rag/status`. The file contains a line like `42/150 files (28%)` and is deleted automatically when indexing completes.
 
 To monitor progress in another terminal:
 
 ```bash
 # One-shot check
-cat .rag/indexing-status
+cat .rag/status
 
 # Live updates (refreshes every second)
-watch -n1 cat .rag/indexing-status
+watch -n1 cat .rag/status
 ```
 
 If the file doesn't exist, indexing is either complete or hasn't started yet.

@@ -112,11 +112,11 @@ export async function startServer() {
     initError = `${msg}\n\n${fix}`;
     log.error(`FATAL: ${msg} — ${fix}`, "db");
 
-    // Write the error to indexing-status so it's visible to the user/IDE
+    // Write the error to status so it's visible to the user/IDE
     const ragDir = join(startupDir, ".rag");
     try {
       mkdirSync(ragDir, { recursive: true });
-      writeFileSync(join(ragDir, "indexing-status"), [
+      writeFileSync(join(ragDir, "status"), [
         `error`,
         `version: ${version}`,
         `failed: ${new Date().toISOString()}`,
@@ -125,7 +125,7 @@ export async function startServer() {
         fix,
       ].join("\n"));
     } catch (statusErr) {
-      log.warn(`Could not write indexing-status: ${statusErr instanceof Error ? statusErr.message : statusErr}`, "status");
+      log.warn(`Could not write status: ${statusErr instanceof Error ? statusErr.message : statusErr}`, "status");
     }
 
     // Server is already connected — just return and let tool calls
@@ -140,14 +140,14 @@ export async function startServer() {
 
   // Define statusPath early so writeStatus can use it immediately
   const ragDir = join(startupDir, ".rag");
-  const statusPath = !isHomeDirTrap ? join(ragDir, "indexing-status") : null;
+  const statusPath = !isHomeDirTrap ? join(ragDir, "status") : null;
   const writeStatus = (status: string) => {
     if (!statusPath) return;
     try {
       mkdirSync(ragDir, { recursive: true });
       writeFileSync(statusPath, status);
     } catch (statusErr) {
-      log.warn(`Could not write indexing-status: ${statusErr instanceof Error ? statusErr.message : statusErr}`, "status");
+      log.warn(`Could not write status: ${statusErr instanceof Error ? statusErr.message : statusErr}`, "status");
     }
   };
 
@@ -256,7 +256,7 @@ export async function startServer() {
     }
   }
 
-  // Write to indexing-status on abnormal exit so the file doesn't stay stuck on "starting"
+  // Write to status on abnormal exit so the file doesn't stay stuck on "starting"
   function writeExitStatus(reason: string) {
     if (!statusPath) return;
     try {

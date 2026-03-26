@@ -95,7 +95,10 @@ function buildIncludeFilter(patterns: string[]): (rel: string) => boolean {
  * without Glob objects.
  */
 function buildExcludeFilter(patterns: string[]): (rel: string) => boolean {
-  const dirPrefixes: string[] = [];
+  /** Prefixes anchored to root (e.g. "src/generated") */
+  const anchoredDirPrefixes: string[] = [];
+  /** Simple directory names matched anywhere in the path (e.g. "node_modules") */
+  const anyDepthDirNames: string[] = [];
   const exactBasenames = new Set<string>();
   const basenamePrefixes: string[] = [];
   const basenameSuffixes: string[] = [];
@@ -103,7 +106,17 @@ function buildExcludeFilter(patterns: string[]): (rel: string) => boolean {
   for (const p of patterns) {
     // "dir/**" or "dir" → directory prefix
     const dirMatch = p.match(/^([^*?]+?)\/?\*\*$/);
-    if (dirMatch) { dirPrefixes.push(dirMatch[1]); continue; }
+    if (dirMatch) {
+      const dir = dirMatch[1];
+      // If the pattern has no slashes it's a bare directory name like
+      // "node_modules" — match it at any depth in the tree.
+      if (!dir.includes("/")) {
+        anyDepthDirNames.push(dir);
+      } else {
+        anchoredDirPrefixes.push(dir);
+      }
+      continue;
+    }
 
     // Exact file like ".env"
     if (!p.includes("*") && !p.includes("?") && !p.includes("/")) {
@@ -120,9 +133,18 @@ function buildExcludeFilter(patterns: string[]): (rel: string) => boolean {
   }
 
   return (rel: string) => {
-    // Check directory prefixes (most common case)
-    for (const prefix of dirPrefixes) {
+    // Check anchored directory prefixes
+    for (const prefix of anchoredDirPrefixes) {
       if (rel.startsWith(prefix + "/") || rel === prefix) return true;
+    }
+
+    // Check bare directory names at any depth (e.g. "node_modules", ".git")
+    for (const dir of anyDepthDirNames) {
+      if (
+        rel.startsWith(dir + "/") ||       // root: node_modules/...
+        rel.includes("/" + dir + "/") ||    // nested: packages/app/node_modules/...
+        rel === dir                          // exact match
+      ) return true;
     }
 
     const base = basename(rel);

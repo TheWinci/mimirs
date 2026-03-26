@@ -131,7 +131,7 @@ export async function doctorCommand(args: string[]) {
   }
 
   // Check indexing status
-  const statusPath = join(projectDir, ".rag", "indexing-status");
+  const statusPath = join(projectDir, ".rag", "status");
   if (existsSync(statusPath)) {
     const status = readFileSync(statusPath, "utf8");
     const firstLine = status.split("\n")[0];
