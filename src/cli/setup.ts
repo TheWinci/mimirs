@@ -104,7 +104,7 @@ async function injectMdc(filePath: string, dir: string): Promise<string | null> 
     const content = await readFile(filePath, "utf-8");
     if (content.includes(MARKER)) return null;
   }
-  await mkdir(dir, { recursive: true });
+  await mkdir(join(filePath, ".."), { recursive: true });
   await writeFile(filePath, MDC_BLOCK + "\n");
   return `Created ${filePath}`;
 }
