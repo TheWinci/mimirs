@@ -85,6 +85,91 @@ function writeStartupError(err: unknown) {
 }
 
 export async function startServer() {
+  // Write "starting" status as the very first thing — overwrites any stale
+  // "interrupted" from a previous instance before we do anything else.
+  const startupDir = process.env.RAG_PROJECT_DIR || process.cwd();
+  const dirCheck = checkIndexDir(startupDir);
+  const isHomeDirTrap = !dirCheck.safe;
+  const ragDir = join(startupDir, ".rag");
+  const statusPath = !isHomeDirTrap ? join(ragDir, "status") : null;
+  const instanceId = `pid:${process.pid}`;
+
+  const writeStatus = (status: string) => {
+    if (!statusPath) return;
+    try {
+      mkdirSync(ragDir, { recursive: true });
+      writeFileSync(statusPath, `${status}\n${instanceId}`);
+    } catch (statusErr) {
+      log.warn(`Could not write status: ${statusErr instanceof Error ? statusErr.message : statusErr}`, "status");
+    }
+  };
+
+  writeStatus(`starting\nversion: ${version}\nstarted: ${new Date().toISOString()}`);
+
+  // Register shutdown handlers early so any crash during startup is recorded.
+  // The cleanup targets (watcher, convWatcher) start as null and get assigned
+  // later — this is safe because cleanup just skips null values.
+  let watcher: Watcher | null = null;
+  let convWatcher: Watcher | null = null;
+
+  function writeExitStatus(reason: string) {
+    if (!statusPath) return;
+    try {
+      const current = readFileSync(statusPath, "utf8");
+      // Only overwrite if this instance owns the status file.
+      // Another instance may have started and written its own status —
+      // clobbering it with "interrupted" would be incorrect.
+      if (!current.includes(instanceId)) return;
+      if (current.startsWith("done") || current.startsWith("error")) return;
+      writeFileSync(statusPath, [
+        `interrupted`,
+        `version: ${version}`,
+        `stopped: ${new Date().toISOString()}`,
+        `reason: ${reason}`,
+        instanceId,
+      ].join("\n"));
+    } catch (statusErr) {
+      log.warn(`Could not write exit status: ${statusErr instanceof Error ? statusErr.message : statusErr}`, "status");
+    }
+  }
+
+  function cleanup(reason: string = "shutdown") {
+    writeExitStatus(reason);
+    log.debug("Shutting down...", "shutdown");
+    if (watcher) watcher.close();
+    if (convWatcher) convWatcher.close();
+    for (const entry of dbMap.values()) entry.db.close();
+    dbMap.clear();
+    process.exit(0);
+  }
+
+  // Register signal/stdin handlers immediately so crashes during startup
+  // still write "interrupted" instead of leaving stale status.
+  process.stdin.on("end", () => {
+    log.debug("stdin closed (IDE window likely closed)", "shutdown");
+    cleanup("stdin closed");
+  });
+  process.stdin.on("error", () => {
+    cleanup("stdin error");
+  });
+  process.on("SIGINT", () => cleanup("SIGINT"));
+  process.on("SIGTERM", () => cleanup("SIGTERM"));
+  process.on("SIGHUP", () => cleanup("SIGHUP"));
+  process.on("uncaughtException", (err) => {
+    log.error(`Uncaught exception: ${err.message}`, "uncaught");
+    cleanup(`uncaught exception: ${err.message}\n${err.stack ?? "(no stack)"}`);
+  });
+  process.on("unhandledRejection", (err) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : "(no stack)";
+    log.error(`Unhandled rejection: ${msg}`, "uncaught");
+    cleanup(`unhandled rejection: ${msg}\n${stack}`);
+  });
+
+  if (isHomeDirTrap) {
+    log.warn(`${dirCheck.reason} — skipping auto-index and file watcher`, "dir-guard");
+  }
+
   let server: McpServer;
   try {
     server = new McpServer({
@@ -113,15 +198,6 @@ export async function startServer() {
     throw err;
   }
 
-  // Auto-index on startup + start file watcher
-  const startupDir = process.env.RAG_PROJECT_DIR || process.cwd();
-
-  const dirCheck = checkIndexDir(startupDir);
-  const isHomeDirTrap = !dirCheck.safe;
-  if (isHomeDirTrap) {
-    log.warn(`${dirCheck.reason} — skipping auto-index and file watcher`, "dir-guard");
-  }
-
   // Preflight: verify DB can be created (catches missing Homebrew SQLite on macOS)
   let startupDb: ReturnType<typeof getDB>;
   try {
@@ -146,7 +222,6 @@ export async function startServer() {
     }
 
     // Write the error to status so it's visible to the user/IDE
-    const ragDir = join(startupDir, ".rag");
     try {
       mkdirSync(ragDir, { recursive: true });
       writeFileSync(join(ragDir, "status"), [
@@ -168,26 +243,6 @@ export async function startServer() {
   }
 
   const startupConfig = await loadConfig(startupDir);
-
-  let watcher: Watcher | null = null;
-  let convWatcher: Watcher | null = null;
-
-  // Define statusPath early so writeStatus can use it immediately
-  const ragDir = join(startupDir, ".rag");
-  const statusPath = !isHomeDirTrap ? join(ragDir, "status") : null;
-  const instanceId = `pid:${process.pid}`;
-  const writeStatus = (status: string) => {
-    if (!statusPath) return;
-    try {
-      mkdirSync(ragDir, { recursive: true });
-      writeFileSync(statusPath, `${status}\n${instanceId}`);
-    } catch (statusErr) {
-      log.warn(`Could not write status: ${statusErr instanceof Error ? statusErr.message : statusErr}`, "status");
-    }
-  };
-
-  // Write status immediately so the file exists as soon as the MCP starts
-  writeStatus(`starting\nversion: ${version}\nstarted: ${new Date().toISOString()}`);
 
   if (!isHomeDirTrap) {
     // Ensure .rag/ is gitignored
@@ -290,64 +345,5 @@ export async function startServer() {
       }
     }
   }
-
-  // Write to status on abnormal exit so the file doesn't stay stuck on "starting"
-  function writeExitStatus(reason: string) {
-    if (!statusPath) return;
-    try {
-      const current = readFileSync(statusPath, "utf8");
-      // Only overwrite if this instance owns the status file.
-      // Another instance may have started and written its own status —
-      // clobbering it with "interrupted" would be incorrect.
-      if (!current.includes(instanceId)) return;
-      if (current.startsWith("done") || current.startsWith("error")) return;
-      writeFileSync(statusPath, [
-        `interrupted`,
-        `version: ${version}`,
-        `stopped: ${new Date().toISOString()}`,
-        `reason: ${reason}`,
-        instanceId,
-      ].join("\n"));
-    } catch (statusErr) {
-      log.warn(`Could not write exit status: ${statusErr instanceof Error ? statusErr.message : statusErr}`, "status");
-    }
-  }
-
-  // Graceful shutdown
-  function cleanup(reason: string = "shutdown") {
-    writeExitStatus(reason);
-    log.debug("Shutting down...", "shutdown");
-    if (watcher) watcher.close();
-    if (convWatcher) convWatcher.close();
-    for (const entry of dbMap.values()) entry.db.close();
-    dbMap.clear();
-    process.exit(0);
-  }
-
-  // Detect stdin close — happens when the IDE (Cursor, VS Code) closes
-  // the window without sending a signal. Without this, the process and
-  // its database connections stay alive indefinitely.
-  process.stdin.on("end", () => {
-    log.debug("stdin closed (IDE window likely closed)", "shutdown");
-    cleanup("stdin closed");
-  });
-  process.stdin.on("error", () => {
-    // EPIPE / EIO — same situation, pipe is gone
-    cleanup("stdin error");
-  });
-
-  process.on("SIGINT", () => cleanup("SIGINT"));
-  process.on("SIGTERM", () => cleanup("SIGTERM"));
-  process.on("SIGHUP", () => cleanup("SIGHUP"));
-  process.on("uncaughtException", (err) => {
-    log.error(`Uncaught exception: ${err.message}`, "uncaught");
-    cleanup(`uncaught exception: ${err.message}\n${err.stack ?? "(no stack)"}`);
-  });
-  process.on("unhandledRejection", (err) => {
-    const msg = err instanceof Error ? err.message : String(err);
-    const stack = err instanceof Error ? err.stack : "(no stack)";
-    log.error(`Unhandled rejection: ${msg}`, "uncaught");
-    cleanup(`unhandled rejection: ${msg}\n${stack}`);
-  });
 
 }
