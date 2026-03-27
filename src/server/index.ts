@@ -163,11 +163,12 @@ export async function startServer() {
   // Define statusPath early so writeStatus can use it immediately
   const ragDir = join(startupDir, ".rag");
   const statusPath = !isHomeDirTrap ? join(ragDir, "status") : null;
+  const instanceId = `pid:${process.pid}`;
   const writeStatus = (status: string) => {
     if (!statusPath) return;
     try {
       mkdirSync(ragDir, { recursive: true });
-      writeFileSync(statusPath, status);
+      writeFileSync(statusPath, `${status}\n${instanceId}`);
     } catch (statusErr) {
       log.warn(`Could not write status: ${statusErr instanceof Error ? statusErr.message : statusErr}`, "status");
     }
@@ -282,14 +283,18 @@ export async function startServer() {
   function writeExitStatus(reason: string) {
     if (!statusPath) return;
     try {
-      // Only overwrite if indexing hadn't finished (file still exists and doesn't start with "done")
       const current = readFileSync(statusPath, "utf8");
+      // Only overwrite if this instance owns the status file.
+      // Another instance may have started and written its own status —
+      // clobbering it with "interrupted" would be incorrect.
+      if (!current.includes(instanceId)) return;
       if (current.startsWith("done") || current.startsWith("error")) return;
       writeFileSync(statusPath, [
         `interrupted`,
         `version: ${version}`,
         `stopped: ${new Date().toISOString()}`,
         `reason: ${reason}`,
+        instanceId,
       ].join("\n"));
     } catch (statusErr) {
       log.warn(`Could not write exit status: ${statusErr instanceof Error ? statusErr.message : statusErr}`, "status");
