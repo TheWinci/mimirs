@@ -16,6 +16,7 @@ const RagConfigSchema = z.object({
   indexThreads: z.number().int().min(1).optional(),
   incrementalChunks: z.boolean().default(false),
   enableReranking: z.boolean().default(true),
+  embeddingMerge: z.boolean().default(true),
   embeddingModel: z.string().optional(),
   embeddingDim: z.number().int().min(1).optional(),
   benchmarkTopK: z.number().int().min(1).default(5),

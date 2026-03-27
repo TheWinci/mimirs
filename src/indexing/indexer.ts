@@ -2,7 +2,7 @@ import { relative, resolve, extname, basename } from "path";
 import { createHash } from "crypto";
 import { readFile, stat, readdir } from "fs/promises";
 import { parseFile } from "./parse";
-import { embedBatch } from "../embeddings/embed";
+import { embedBatch, embedBatchMerged } from "../embeddings/embed";
 import { chunkText, KNOWN_EXTENSIONS, type ChunkImport, type ChunkExport } from "./chunker";
 import { RagDB } from "../db";
 import { type RagConfig } from "../config";
@@ -323,7 +323,8 @@ async function processFile(
     if (signal?.aborted) break;
 
     const batch = chunks.slice(i, i + batchSize);
-    const embeddings = await embedBatch(
+    const embedFn = config.embeddingMerge !== false ? embedBatchMerged : embedBatch;
+    const embeddings = await embedFn(
       batch.map(c => c.text),
       config.indexThreads,
       onProgress ? (msg: string) => onProgress(msg) : undefined,
@@ -422,7 +423,8 @@ async function processFileIncremental(
     if (signal?.aborted) return null;
 
     const batch = newChunks.slice(i, i + batchSize);
-    const embeddings = await embedBatch(
+    const embedFn = config.embeddingMerge !== false ? embedBatchMerged : embedBatch;
+    const embeddings = await embedFn(
       batch.map(c => c.text),
       config.indexThreads,
       onProgress ? (msg: string) => onProgress(msg) : undefined,

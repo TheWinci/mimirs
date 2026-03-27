@@ -9,6 +9,8 @@ No API keys. No cloud. No Docker. Just `bunx`.
 [![npm](https://img.shields.io/npm/v/@winci/local-rag)](https://www.npmjs.com/package/@winci/local-rag)
 [![license](https://img.shields.io/npm/l/@winci/local-rag)](LICENSE)
 
+**97.5% recall** on its own codebase, **90%+ on a 676-file monorepo** — out of the box, no tuning. Hybrid vector + BM25 search with cross-encoder reranking, AST-aware chunking across 14 languages, dependency graph, and [embedding merge](#embedding-merge) that recovers 45% of content other tools silently lose. Full benchmarks in [BENCHMARKS.md](BENCHMARKS.md).
+
 ## Contents
 
 - [Why](#why)
@@ -21,6 +23,7 @@ No API keys. No cloud. No Docker. Just `bunx`.
 - [Configuration](#configuration)
 - [Supported file types](#supported-file-types)
 - [How it works](#how-it-works)
+  - [Embedding merge](#embedding-merge)
 - [Search quality](#search-quality)
 - [Stack](#stack)
 
@@ -321,6 +324,7 @@ Create `.rag/config.json` in your project. The defaults index all [supported fil
 | `chunkOverlap` | `50` | Overlap tokens between chunks |
 | `hybridWeight` | `0.7` | Blend ratio: 1.0 = vector only, 0.0 = BM25 only |
 | `enableReranking` | `true` | Cross-encoder reranking for higher precision (adds ~80MB model on first query) |
+| `embeddingMerge` | `true` | Merge windowed embeddings for oversized chunks — see [Embedding merge](#embedding-merge) |
 | `embeddingModel` | _(default)_ | Override the embedding model (HuggingFace model ID). Must have ONNX weights. Requires re-index |
 | `embeddingDim` | _(default)_ | Embedding dimension to match the model (e.g. 384 for bge-small-en-v1.5) |
 | `searchTopK` | `10` | Default number of search results |
@@ -491,6 +495,21 @@ a1b2c3d feat: restructure to domain-based folders
 src/server/index.ts
 README.md
 ```
+
+### Embedding merge
+
+The default embedding model (all-MiniLM-L6-v2) has a hard 256-token sequence limit. Input beyond that is silently truncated — the vector only represents the first ~256 tokens. For small chunks this doesn't matter, but AST-aware chunking preserves whole functions, and **23.4% of those exceed 256 tokens, losing an average of 45.8% of their content** from the embedding.
+
+When `embeddingMerge` is enabled (default), oversized chunks are split into overlapping 256-token windows at index time. Each window is embedded separately, then the vectors are averaged and L2-normalized into a single embedding. The chunk text stays intact for FTS and display — only the vector changes.
+
+| Metric | Truncated (old) | Merged (new) |
+|---|---|---|
+| Tail-content similarity | 0.31-0.52 | 0.43-0.62 |
+| Improvement | — | **+0.065 to +0.159** |
+| Query-time overhead | — | **zero** (merge happens at index time) |
+| Chunks affected | — | ~23% of AST chunks |
+
+This means searching for something that appears in the second half of a large function now actually finds it. Disable with `"embeddingMerge": false` in `.rag/config.json` if needed.
 
 ## Search quality
 

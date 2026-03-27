@@ -122,6 +122,51 @@ Users who want maximum recall can opt into gte-small:
 
 This trades ~60% slower indexing for +5pp recall on large codebases (676 files: 95% vs 90%) and consistently higher MRR.
 
+## Embedding merge
+
+all-MiniLM-L6-v2 has a hard 256-token max sequence length. Anything beyond that is silently truncated — the embedding vector only represents the beginning of the chunk. AST-aware chunking preserves whole functions (no size limit), so large functions lose significant content from their embedding.
+
+### Truncation analysis (local-rag, 883 AST chunks)
+
+| Metric | Value |
+|---|---|
+| Chunks exceeding 256 tokens | 207 / 883 (23.4%) |
+| Average content lost to truncation | 45.8% |
+| Worst case (largest function) | 75%+ content invisible to vector search |
+
+### Merge strategy
+
+For chunks exceeding 256 tokens: split into overlapping 256-token windows (32-token overlap), embed each window, average the vectors, L2-normalize. The chunk text stays intact for FTS and display — only the embedding changes.
+
+### Tail-content retrieval test
+
+To measure impact, we extracted phrases from past the 256-token cutoff (invisible to the truncated embedding) and measured cosine similarity of the query against both strategies:
+
+| Entity | Sim (truncated) | Sim (merged) | Delta |
+|---|---|---|---|
+| processFile | 0.358 | 0.468 | +0.110 |
+| processFileIncremental | 0.313 | 0.472 | +0.159 |
+| indexDirectory | 0.421 | 0.486 | +0.065 |
+| hybridSearch | 0.387 | 0.453 | +0.066 |
+| chunkText | 0.519 | 0.618 | +0.099 |
+| Avg across 15 largest | — | — | **+0.101** |
+
+Merged embeddings consistently improve retrieval for content past the truncation point. The improvement is largest for functions where the distinctive logic (error handling, return paths, edge cases) appears in the second half.
+
+### Cost
+
+- **Index time**: ~5-15% slower (extra tokenization + window embedding for 23% of chunks)
+- **Query time**: zero overhead — merge happens entirely at index time
+- **Storage**: identical — one 384d vector per chunk regardless of strategy
+
+Enabled by default (`embeddingMerge: true`). Disable with `"embeddingMerge": false` in `.rag/config.json`.
+
+### Reproducing
+
+```bash
+bun benchmarks/ast-truncation-analysis.ts
+```
+
 ## Pipeline improvements
 
 The search pipeline applies five post-retrieval optimizations (no re-indexing needed):
