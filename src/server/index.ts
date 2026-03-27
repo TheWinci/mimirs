@@ -94,8 +94,10 @@ export async function startServer() {
   const statusPath = !isHomeDirTrap ? join(ragDir, "status") : null;
   const instanceId = `pid:${process.pid}`;
 
+  let shuttingDown = false;
+
   const writeStatus = (status: string) => {
-    if (!statusPath) return;
+    if (!statusPath || shuttingDown) return;
     try {
       mkdirSync(ragDir, { recursive: true });
       writeFileSync(statusPath, `${status}\n${instanceId}`);
@@ -134,6 +136,7 @@ export async function startServer() {
   }
 
   function cleanup(reason: string = "shutdown") {
+    shuttingDown = true;
     writeExitStatus(reason);
     log.debug("Shutting down...", "shutdown");
     if (watcher) watcher.close();
