@@ -9,7 +9,7 @@ No API keys. No cloud. No Docker. Just `bunx`.
 [![npm](https://img.shields.io/npm/v/@winci/local-rag)](https://www.npmjs.com/package/@winci/local-rag)
 [![license](https://img.shields.io/npm/l/@winci/local-rag)](LICENSE)
 
-**100% recall** on codebases up to 700 files, **100% recall at 8.7k files** (Kubernetes, with config tuning) — no cloud, no API keys. Hybrid vector + BM25 search, AST-aware chunking across 23 languages, dependency graph boost, and [embedding merge](#embedding-merge) that recovers 45% of content other tools silently lose. Full benchmarks in [BENCHMARKS.md](BENCHMARKS.md).
+**100% recall** on codebases, even at **8.7k files** (Kubernetes, with config tuning) — no cloud, no API keys. Hybrid vector + BM25 search, AST-aware chunking across 23 languages, dependency graph boost, and [embedding merge](#embedding-merge) that recovers 45% of content other tools silently lose. Full benchmarks in [BENCHMARKS.md](BENCHMARKS.md).
 
 ## Contents
 
