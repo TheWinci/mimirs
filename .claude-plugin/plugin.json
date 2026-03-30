@@ -1,6 +1,6 @@
 {
   "name": "local-rag",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Semantic search for your codebase and conversation history — zero config, local-first, with gap analysis",
   "author": {
     "name": "TheWinci",
