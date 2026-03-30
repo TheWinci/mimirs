@@ -16,7 +16,7 @@ export async function searchCommand(args: string[], getFlag: (flag: string) => s
   applyEmbeddingConfig(config);
   const top = parseInt(getFlag("--top") || String(config.searchTopK), 10);
 
-  const results = await search(query, db, top, 0, config.hybridWeight);
+  const results = await search(query, db, top, 0, config.hybridWeight, config.generated);
 
   if (results.length === 0) {
     console.log("No results found. Has the directory been indexed?");
@@ -45,7 +45,7 @@ export async function readCommand(args: string[], getFlag: (flag: string) => str
   const top = parseInt(getFlag("--top") || "8", 10);
   const threshold = parseFloat(getFlag("--threshold") || "0.3");
 
-  const results = await searchChunks(query, db, top, threshold, config.hybridWeight);
+  const results = await searchChunks(query, db, top, threshold, config.hybridWeight, config.generated);
 
   if (results.length === 0) {
     console.log("No relevant chunks found. Has the directory been indexed?");

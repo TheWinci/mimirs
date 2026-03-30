@@ -43,7 +43,7 @@ export async function demoCommand(args: string[]) {
   const demoQuery = "how does search work";
   console.log(`${DIM}> search "${demoQuery}"${RESET}\n`);
 
-  const searchResults = await search(demoQuery, db, 3, 0, config.hybridWeight);
+  const searchResults = await search(demoQuery, db, 3, 0, config.hybridWeight, config.generated);
   if (searchResults.length > 0) {
     for (const r of searchResults) {
       console.log(`  ${YELLOW}${r.score.toFixed(4)}${RESET}  ${r.path}`);
@@ -59,7 +59,7 @@ export async function demoCommand(args: string[]) {
   header("3. Chunk-level retrieval (read_relevant)");
   console.log(`${DIM}> read_relevant "${demoQuery}"${RESET}\n`);
 
-  const chunks = await searchChunks(demoQuery, db, 2, 0.3, config.hybridWeight);
+  const chunks = await searchChunks(demoQuery, db, 2, 0.3, config.hybridWeight, config.generated);
   if (chunks.length > 0) {
     for (const r of chunks) {
       const lineRange = r.startLine != null && r.endLine != null ? `:${r.startLine}-${r.endLine}` : "";

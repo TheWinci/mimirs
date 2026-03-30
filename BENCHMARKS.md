@@ -1,18 +1,18 @@
 # Benchmarks
 
-Search quality benchmarks measured on three codebases. Last updated 2026-03-28.
+Search quality benchmarks measured on four codebases. Last updated 2026-03-30.
 
 **Metrics:** Recall@K (fraction of expected files in top-K), MRR (1/rank of first hit), Zero-miss (queries with no expected file in results).
 
 ## Results
 
-All results use hybrid search (70% vector / 30% BM25) with pipeline improvements (source/test path boost, symbol expansion, dependency graph boost, doc expansion). Default top-K is 10.
+All results use hybrid search (70% vector / 30% BM25) with pipeline improvements (source/test path boost, symbol expansion, dependency graph boost, doc expansion, filename affinity boost, boilerplate demotion). Default top-K is 10.
 
 ### local-rag (97 files, 20 queries)
 
 | Config | Recall@10 | MRR | Zero-miss |
 |---|---|---|---|
-| **all-MiniLM-L6-v2 (default)** | **100.0%** | **0.677** | **0.0%** |
+| **all-MiniLM-L6-v2 (default)** | **100.0%** | **0.715** | **0.0%** |
 
 ### Express.js (161 files, 15 queries)
 
@@ -26,17 +26,54 @@ All results use hybrid search (70% vector / 30% BM25) with pipeline improvements
 |---|---|---|---|
 | **all-MiniLM-L6-v2 (default)** | **100.0%** | **0.366** | **0.0%** |
 
-Excalidraw is the stress test — a large monorepo with 676 indexed files across `packages/`, `excalidraw-app/`, `dev-docs/`, and `examples/`. MRR is lower than the smaller codebases because highly-imported utility files have many consumers that score competitively, pushing the source definition lower in rank — but it always lands in the top 10.
+Excalidraw is a stress test — a large monorepo with 676 indexed files across `packages/`, `excalidraw-app/`, `dev-docs/`, and `examples/`. MRR is lower than the smaller codebases because heavily-imported utility files have many consumers that score competitively, pushing the source definition lower in rank — but it always lands in the top 10.
+
+### Kubernetes (8,691 files, 20 queries)
+
+The scale test — the full Kubernetes codebase (Go), excluding test files and vendor/. 8,691 source files (including generated), 351 MB index.
+
+| Config | Recall@10 | Recall@15 | MRR | Zero-miss@10 |
+|---|---|---|---|---|
+| **Excl. tests + generated demotion + top-15** | **100.0%** | **100.0%** | **0.496** | **0.0%** |
+| Excl. tests + generated demotion (default top-10) | 80.0% | 100.0% | 0.471 | 20.0% |
+| Excl. tests only (before pipeline v2) | 65.0% | — | 0.320 | 35.0% |
+| Including test files (11,193 files) | 65.0% | — | 0.272 | 35.0% |
+
+At 8.7k files, Kubernetes is 12× larger than Excalidraw and represents an extreme test of semantic search. With proper configuration — excluding test files, demoting generated files via the `generated` config, and `"searchTopK": 15` — recall reaches **100%**. The 4 files that miss at top-10 all rank 11th–15th, pushed down by structurally similar siblings (e.g. `chain.go` among dozens of `admission.go` plugins, `csi_plugin.go` among other volume plugins).
+
+**Recommended Kubernetes config:**
+
+```json
+{
+  "include": ["**/*.go"],
+  "exclude": ["vendor/**", "**/*_test.go", "test/**", "third_party/**", "hack/**"],
+  "generated": ["applyconfigurations/**", "**/zz_generated*", "**/fake_*", "**/*_generated.go"],
+  "searchTopK": 15
+}
+```
+
+**Impact of excluding test files:** Removing 2,640 test files eliminated 57,753 chunks (28%), shrunk the DB by 34% (521→344 MB), cut index time by 37% (62→39 min), and improved MRR by 18% (0.272→0.320). Recall@20 gained 5pp (85→90%). Test files contain the same domain vocabulary as source files, creating ranking noise without adding navigational value.
+
+**Indexing performance:**
+
+| Metric | With tests | Without tests |
+|---|---|---|
+| Files indexed | 11,193 | 8,553 |
+| Chunks | 207,598 | 149,845 |
+| DB size | 521 MB | 344 MB |
+| Index time | 62 min | 39 min |
+| Search latency (per query) | ~337 ms | ~230 ms |
 
 ### Scaling behavior
 
 | Codebase | Files | Recall@10 | MRR | Zero-miss |
 |---|---|---|---|---|
-| local-rag | 97 | 100.0% | 0.677 | 0.0% |
+| local-rag | 97 | 100.0% | 0.651 | 0.0% |
 | Express.js | 161 | 100.0% | 0.922 | 0.0% |
 | Excalidraw | 676 | 100.0% | 0.366 | 0.0% |
+| Kubernetes | 8,691 | 80.0% (100% @15) | 0.496 | 20.0% (0% @15) |
 
-100% recall across all three codebases. The dependency graph boost and symbol expansion ensure source definitions are found even in large monorepos where consumer files outnumber definitions.
+100% recall on codebases up to ~700 files at default top-10. At Kubernetes scale (8.7k files), recall reaches 80% at top-10 and **100% at top-15** with proper configuration (test exclusion, generated file demotion, `searchTopK: 15`). The 5 extra results add ~750 tokens per query — negligible for agents that routinely consume thousands of tokens per tool call.
 
 ### Why top-10?
 
@@ -164,12 +201,14 @@ bun benchmarks/ast-truncation-analysis.ts
 
 ## Pipeline improvements
 
-The search pipeline applies four post-retrieval optimizations (no re-indexing needed):
+The search pipeline applies six post-retrieval optimizations (no re-indexing needed):
 
 1. **Source file boost** — source paths 1.1x, test paths 0.85x
 2. **Symbol expansion** — exact symbol name matches injected into candidates at 0.75 base score
 3. **Dependency graph boost** — files with more importers get a logarithmic score boost
 4. **Doc expansion** — doc files in top-K expand the result set instead of displacing code
+5. **Filename affinity boost** — if query words match the filename stem, boost 1.0 + 0.1 × match count
+6. **Boilerplate demotion** — type definitions (`types.go`), generated files (`zz_generated*`), and boilerplate paths (`applyconfigurations/`, `testing/`) are demoted 0.75–0.85×
 
 Cross-encoder reranking was removed in v0.3.27 — it loaded a ~80MB model, added latency to every query, and benchmarked at +0pp recall at top-10 across all three codebases. Worse, the ms-marco cross-encoder (trained on web Q&A) actively hurt code search by preferring test files over source definitions. Removing it improved recall from 90-97.5% to 100% across the board.
 
@@ -188,4 +227,26 @@ bunx @winci/local-rag benchmark-models benchmarks/local-rag-queries.json \
   --models "Xenova/all-MiniLM-L6-v2,Xenova/bge-small-en-v1.5" --dir . --top 10
 ```
 
-Query files: [local-rag](benchmarks/local-rag-queries.json) (20 queries), [Express.js](benchmarks/express-queries.json) (15 queries), [Excalidraw](benchmarks/excalidraw-queries.json) (20 queries).
+Query files: [local-rag](benchmarks/local-rag-queries.json) (20 queries), [Express.js](benchmarks/express-queries.json) (15 queries), [Excalidraw](benchmarks/excalidraw-queries.json) (20 queries), [Kubernetes](benchmarks/kubernetes-queries.json) (20 queries).
+
+### Kubernetes
+
+```bash
+# Clone (shallow — full history not needed for indexing)
+git clone --depth 1 https://github.com/kubernetes/kubernetes.git /tmp/k8s-bench
+
+# Configure: Go files only, exclude test files
+mkdir -p /tmp/k8s-bench/.rag
+cat > /tmp/k8s-bench/.rag/config.json << 'EOF'
+{
+  "include": ["**/*.go"],
+  "exclude": ["vendor/**", ".git/**", "**/*_test.go", "test/**", "third_party/**", "hack/**", ".rag/**"]
+}
+EOF
+
+# Index (~39 min on M-series Mac)
+bunx @winci/local-rag index /tmp/k8s-bench
+
+# Benchmark
+bunx @winci/local-rag benchmark benchmarks/kubernetes-queries.json --dir /tmp/k8s-bench --top 10
+```

@@ -8,6 +8,7 @@ import { configureEmbedder, DEFAULT_MODEL_ID, DEFAULT_EMBEDDING_DIM } from "../e
 const RagConfigSchema = z.object({
   include: z.array(z.string()).default([]),
   exclude: z.array(z.string()).default([]),
+  generated: z.array(z.string()).default([]),
   chunkSize: z.number().int().min(64).default(512),
   chunkOverlap: z.number().int().min(0).default(50),
   hybridWeight: z.number().min(0).max(1).default(0.7),
@@ -40,6 +41,12 @@ const DEFAULT_CONFIG: RagConfig = {
     "**/*.rb",
     "**/*.php",
     "**/*.scala", "**/*.sc",
+    "**/*.kt", "**/*.kts",
+    "**/*.lua",
+    "**/*.zig", "**/*.zon",
+    "**/*.ex", "**/*.exs",
+    "**/*.hs", "**/*.lhs",
+    "**/*.ml", "**/*.mli",
     // Source code — heuristic chunking
     "**/*.swift",
     // Markdown & plain text

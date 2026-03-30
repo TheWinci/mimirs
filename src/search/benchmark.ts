@@ -62,7 +62,7 @@ export async function runBenchmark(
   const results: BenchmarkResult[] = [];
 
   for (const q of queries) {
-    const searchResults = await search(q.query, db, topK, 0, weight);
+    const searchResults = await search(q.query, db, topK, 0, weight, config.generated);
 
     const resultPaths = searchResults.map((r) => r.path);
     const expectedNormalized = q.expected.map((p) => normalizePath(p, projectDir));

@@ -102,6 +102,8 @@ function buildExcludeFilter(patterns: string[]): (rel: string) => boolean {
   const exactBasenames = new Set<string>();
   const basenamePrefixes: string[] = [];
   const basenameSuffixes: string[] = [];
+  // Filename suffixes like "_test.go" matched at any depth
+  const filenameSuffixes: string[] = [];
 
   for (const p of patterns) {
     // "dir/**" or "dir" → directory prefix
@@ -126,6 +128,10 @@ function buildExcludeFilter(patterns: string[]): (rel: string) => boolean {
     // ".env.*" or ".pnp.*" → basename starts with prefix
     const prefixMatch = p.match(/^([^*?/]+)\.\*$/);
     if (prefixMatch) { basenamePrefixes.push(prefixMatch[1] + "."); continue; }
+
+    // "**/*_test.go" or "**/*_generated.go" → filename ends with suffix
+    const filenameSuffixMatch = p.match(/^\*\*\/\*([^*?/]+)$/);
+    if (filenameSuffixMatch) { filenameSuffixes.push(filenameSuffixMatch[1]); continue; }
 
     // "*.egg-info/**" → path segment ends with suffix
     const suffixDirMatch = p.match(/^\*([^*?/]+)\/\*\*$/);
@@ -153,6 +159,10 @@ function buildExcludeFilter(patterns: string[]): (rel: string) => boolean {
 
     for (const p of basenamePrefixes) {
       if (base.startsWith(p)) return true;
+    }
+
+    for (const s of filenameSuffixes) {
+      if (base.endsWith(s)) return true;
     }
 
     // Check if any path segment matches a suffix pattern (e.g. "foo.egg-info/bar.py")

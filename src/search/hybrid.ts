@@ -1,7 +1,7 @@
 import { embed } from "../embeddings/embed";
 import { RagDB, type SearchResult, type ChunkSearchResult } from "../db";
 import { log } from "../utils/log";
-import { basename } from "path";
+import { basename, extname } from "path";
 
 export interface DedupedResult {
   path: string;
@@ -78,6 +78,126 @@ function applyPathBoost(results: DedupedResult[]): DedupedResult[] {
     if (isTest) multiplier = 0.85;
     else if (isSource) multiplier = 1.1;
     return { ...r, score: r.score * multiplier };
+  });
+}
+
+// ── Filename-query affinity boost ─────────────────────────────────
+// If query words appear in the filename (minus extension), boost the result.
+// "scheduler" in query + file named "scheduler.go" → strong signal.
+const BOILERPLATE_BASENAMES = new Set([
+  "types.go", "doc.go", "types.ts", "types.d.ts", "index.d.ts",
+  "constants.go", "defaults.go", "conversion.go",
+]);
+
+// ── Generated file demotion ──────────────────────────────────────
+// Configurable via "generated" in .rag/config.json. Patterns use the same
+// glob syntax as "exclude": "**/*.generated.ts", "generated/**",
+// "**/zz_generated*", etc.
+const GENERATED_DEMOTION = 0.75;
+
+function buildGeneratedMatcher(patterns: string[]): (path: string) => boolean {
+  if (patterns.length === 0) return () => false;
+
+  const dirPrefixes: string[] = [];      // "generated/**" → starts with "generated/"
+  const anyDepthDirs: string[] = [];     // "applyconfigurations/**" → /applyconfigurations/ anywhere
+  const filenameSuffixes: string[] = []; // "**/*_generated.go" → basename ends with "_generated.go"
+  const filenamePatterns: RegExp[] = [];  // "**/zz_generated*" → basename starts with "zz_generated"
+
+  for (const p of patterns) {
+    // "dir/**" → directory prefix
+    const dirMatch = p.match(/^([^*?]+?)\/?\*\*$/);
+    if (dirMatch) {
+      const dir = dirMatch[1];
+      if (!dir.includes("/")) {
+        anyDepthDirs.push(dir);
+      } else {
+        dirPrefixes.push(dir);
+      }
+      continue;
+    }
+
+    // "**/*_generated.go" → filename ends with suffix
+    const suffixMatch = p.match(/^\*\*\/\*([^*?/]+)$/);
+    if (suffixMatch) { filenameSuffixes.push(suffixMatch[1]); continue; }
+
+    // "**/zz_generated*" → filename starts with prefix
+    const prefixMatch = p.match(/^\*\*\/([^*?/]+)\*$/);
+    if (prefixMatch) { filenamePatterns.push(new RegExp(`^${escapeForRegex(prefixMatch[1])}`)); continue; }
+
+    // "**/fake_*" same as above
+    // Fallback: treat as regex-safe substring match on full path
+    filenamePatterns.push(new RegExp(escapeForRegex(p).replace(/\\\*/g, ".*")));
+  }
+
+  return (filePath: string) => {
+    for (const prefix of dirPrefixes) {
+      if (filePath.startsWith(prefix + "/") || filePath.includes("/" + prefix + "/")) return true;
+    }
+    for (const dir of anyDepthDirs) {
+      if (filePath.startsWith(dir + "/") || filePath.includes("/" + dir + "/")) return true;
+    }
+    const base = basename(filePath);
+    for (const s of filenameSuffixes) {
+      if (base.endsWith(s)) return true;
+    }
+    for (const re of filenamePatterns) {
+      if (re.test(base)) return true;
+    }
+    return false;
+  };
+}
+
+function escapeForRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function applyFilenameBoost(
+  results: DedupedResult[],
+  query: string,
+  isGenerated: (path: string) => boolean,
+): DedupedResult[] {
+  // Extract meaningful words from query (lowercase, 3+ chars, no stop words)
+  const queryWords = query.toLowerCase().split(/[\s_/.-]+/)
+    .filter((w) => w.length >= 3 && !STOP_WORDS.has(w));
+  if (queryWords.length === 0) return results;
+
+  return results.map((r) => {
+    const base = basename(r.path);
+    const stem = base.replace(extname(base), "").toLowerCase();
+
+    // Demote boilerplate files — they contain vocabulary but no implementation
+    if (BOILERPLATE_BASENAMES.has(base)) {
+      return { ...r, score: r.score * 0.8 };
+    }
+    // Demote generated files (configured via "generated" in config.json)
+    if (isGenerated(r.path)) {
+      return { ...r, score: r.score * GENERATED_DEMOTION };
+    }
+
+    // Boost if query words appear in filename stem
+    const stemWords = stem.split(/[_-]+/);
+    const stemMatchCount = queryWords.filter((qw) =>
+      stemWords.some((sw) => sw === qw || sw.includes(qw) || qw.includes(sw))
+    ).length;
+
+    // Boost if query words appear in directory path segments
+    // Stricter than filename matching: segment must contain the query word, not vice versa
+    // e.g. "podautoscaler" contains "autoscaler" ✓, but "ragdb" contains "db" ✗
+    const pathSegments = r.path.toLowerCase().split("/").slice(0, -1); // exclude filename
+    const segmentWords = pathSegments.flatMap((seg) => seg.split(/[_.-]+/));
+    const pathMatchCount = queryWords.filter((qw) =>
+      qw.length >= 3 && segmentWords.some((sw) => sw.length >= 3 && (sw === qw || sw.includes(qw)))
+    ).length;
+
+    let boost = 1.0;
+    if (stemMatchCount > 0) boost += 0.1 * stemMatchCount;
+    if (pathMatchCount > 0) boost += 0.05 * pathMatchCount;
+
+    if (boost > 1.0) {
+      return { ...r, score: r.score * boost };
+    }
+
+    return r;
   });
 }
 
@@ -163,17 +283,18 @@ export async function search(
   topK: number = 5,
   threshold: number = 0,
   hybridWeight: number = DEFAULT_HYBRID_WEIGHT,
+  generatedPatterns: string[] = [],
 ): Promise<DedupedResult[]> {
   const start = performance.now();
   const queryEmbedding = await embed(query);
 
   // Fetch more than topK to allow deduplication
-  const vectorResults = db.search(queryEmbedding, topK * 3);
+  const vectorResults = db.search(queryEmbedding, topK * 4);
 
   // BM25 text search for keyword matching
   let textResults: typeof vectorResults = [];
   try {
-    textResults = db.textSearch(query, topK * 3);
+    textResults = db.textSearch(query, topK * 4);
   } catch (err) {
     log.debug(`FTS query failed, falling back to vector-only: ${err instanceof Error ? err.message : err}`, "search");
   }
@@ -216,9 +337,12 @@ export async function search(
     mergeSymbolResults(byFile, symbolHits);
   }
 
-  // Source file boost (source up, test down) + dependency graph boost
-  const allSorted = applyGraphBoost(applyPathBoost(Array.from(byFile.values())), db)
-    .sort((a, b) => b.score - a.score);
+  // Source file boost (source up, test down) + filename affinity + generated demotion + dependency graph boost
+  const isGenerated = buildGeneratedMatcher(generatedPatterns);
+  const allSorted = applyGraphBoost(
+    applyFilenameBoost(applyPathBoost(Array.from(byFile.values())), query, isGenerated),
+    db
+  ).sort((a, b) => b.score - a.score);
 
   // Doc expansion — docs are bonus results, don't displace code
   const results = expandForDocs(allSorted, topK);
@@ -313,19 +437,21 @@ export async function searchChunks(
   topK: number = 8,
   threshold: number = 0.3,
   hybridWeight: number = DEFAULT_HYBRID_WEIGHT,
+  generatedPatterns: string[] = [],
 ): Promise<ChunkResult[]> {
   const start = performance.now();
   const queryEmbedding = await embed(query);
 
-  const vectorResults = db.searchChunks(queryEmbedding, topK * 3);
+  const vectorResults = db.searchChunks(queryEmbedding, topK * 4);
 
   let textResults: ChunkSearchResult[] = [];
   try {
-    textResults = db.textSearchChunks(query, topK * 3);
+    textResults = db.textSearchChunks(query, topK * 4);
   } catch (err) {
     log.debug(`FTS chunk query failed, falling back to vector-only: ${err instanceof Error ? err.message : err}`, "search");
   }
 
+  const isGenerated = buildGeneratedMatcher(generatedPatterns);
   let results = mergeHybridScores(vectorResults, textResults, hybridWeight)
     .filter((r) => r.score >= threshold)
     .map((r) => {
@@ -335,6 +461,29 @@ export async function searchChunks(
       let multiplier = 1.0;
       if (isTest) multiplier = 0.85;
       else if (isSource) multiplier = 1.1;
+
+      // Filename affinity + boilerplate/generated demotion for chunks
+      const base = basename(r.path);
+      const stem = base.replace(extname(base), "").toLowerCase();
+      if (BOILERPLATE_BASENAMES.has(base)) {
+        multiplier *= 0.8;
+      } else if (isGenerated(r.path)) {
+        multiplier *= GENERATED_DEMOTION;
+      } else {
+        const queryWords = query.toLowerCase().split(/[\s_/.-]+/)
+          .filter((w) => w.length >= 3 && !STOP_WORDS.has(w));
+        const stemWords = stem.split(/[_-]+/);
+        const stemMatchCount = queryWords.filter((qw) =>
+          stemWords.some((sw) => sw === qw || sw.includes(qw) || qw.includes(sw))
+        ).length;
+        const pathSegments = r.path.toLowerCase().split("/").slice(0, -1);
+        const segmentWords = pathSegments.flatMap((seg) => seg.split(/[_.-]+/));
+        const pathMatchCount = queryWords.filter((qw) =>
+          qw.length >= 3 && segmentWords.some((sw) => sw.length >= 3 && (sw === qw || sw.includes(qw)))
+        ).length;
+        if (stemMatchCount > 0) multiplier *= 1.0 + 0.1 * stemMatchCount;
+        if (pathMatchCount > 0) multiplier *= 1.0 + 0.05 * pathMatchCount;
+      }
 
       // Dependency graph boost for chunks
       const file = db.getFileByPath(r.path);

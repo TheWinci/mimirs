@@ -50,5 +50,8 @@ This project has a local RAG index (local-rag). Use these MCP tools:
   `[NOTE]` blocks inline in `read_relevant` results automatically.
 - **`get_annotations`**: Retrieve all notes for a file, or search semantically
   across all annotations to find relevant caveats before editing.
+- **`depends_on`**: List all files that a given file imports — its dependencies.
+- **`depended_on_by`**: List all files that import a given file — reverse
+  dependencies. Use before modifying a shared module to see who depends on it.
 - **`write_relevant`**: Before adding new code or docs, find the best insertion
   point — returns the most semantically appropriate file and anchor.

@@ -9,7 +9,7 @@ No API keys. No cloud. No Docker. Just `bunx`.
 [![npm](https://img.shields.io/npm/v/@winci/local-rag)](https://www.npmjs.com/package/@winci/local-rag)
 [![license](https://img.shields.io/npm/l/@winci/local-rag)](LICENSE)
 
-**100% recall** across all three benchmark codebases — out of the box, no tuning. Hybrid vector + BM25 search, AST-aware chunking across 14 languages, dependency graph boost, and [embedding merge](#embedding-merge) that recovers 45% of content other tools silently lose. Full benchmarks in [BENCHMARKS.md](BENCHMARKS.md).
+**100% recall** on codebases up to 700 files, **100% recall at 8.7k files** (Kubernetes, with config tuning) — no cloud, no API keys. Hybrid vector + BM25 search, AST-aware chunking across 23 languages, dependency graph boost, and [embedding merge](#embedding-merge) that recovers 45% of content other tools silently lose. Full benchmarks in [BENCHMARKS.md](BENCHMARKS.md).
 
 ## Contents
 
@@ -163,6 +163,9 @@ This project has a local RAG index (local-rag). Use these MCP tools:
   `[NOTE]` blocks inline in `read_relevant` results automatically.
 - **`get_annotations`**: Retrieve all notes for a file, or search semantically
   across all annotations to find relevant caveats before editing.
+- **`depends_on`**: List all files that a given file imports — its dependencies.
+- **`depended_on_by`**: List all files that import a given file — reverse
+  dependencies. Use before modifying a shared module to see who depends on it.
 - **`write_relevant`**: Before adding new code or docs, find the best insertion
   point — returns the most semantically appropriate file and anchor.
 ```
@@ -238,6 +241,8 @@ These tools are available to any MCP client (Claude Code, etc.) once the server 
 | `git_context` | Show uncommitted changes (annotated `[indexed]`/`[not indexed]`), recent commits, and changed files. Optional unified diff (`include_diff`). Non-git directories return a graceful message |
 | `annotate` | Attach a persistent note to a file or symbol. Notes survive sessions and surface inline in `read_relevant` results. Upserts by `(path, symbol)` key |
 | `get_annotations` | Retrieve notes by file path, or search semantically across all annotations |
+| `depends_on` | List all files that a given file imports (its dependencies) |
+| `depended_on_by` | List all files that import a given file (reverse dependencies) |
 | `write_relevant` | Find the best insertion point for new content — returns semantically appropriate files and anchors |
 
 ## CLI
@@ -340,7 +345,7 @@ These use [bun-chunk](https://github.com/TheWinci/bun-chunk) to extract real fun
 | Extensions | Notes |
 |---|---|
 | `.ts` `.tsx` `.js` `.jsx` | TypeScript & JavaScript |
-| `.py` | Python |
+| `.py` `.pyi` | Python |
 | `.go` | Go |
 | `.rs` | Rust |
 | `.java` | Java |
@@ -350,6 +355,15 @@ These use [bun-chunk](https://github.com/TheWinci/bun-chunk) to extract real fun
 | `.rb` | Ruby |
 | `.php` | PHP |
 | `.scala` `.sc` | Scala |
+| `.kt` `.kts` | Kotlin |
+| `.lua` | Lua |
+| `.zig` `.zon` | Zig |
+| `.ex` `.exs` | Elixir |
+| `.hs` `.lhs` | Haskell |
+| `.ml` `.mli` | OCaml |
+| `.sh` `.bash` `.zsh` | Bash / Zsh (falls back to blank-line heuristic if AST fails) |
+| `.toml` | TOML (falls back to section-header heuristic if AST fails) |
+| `.yaml` `.yml` | YAML (falls back to top-level-key heuristic if AST fails) |
 | `.html` `.htm` | HTML |
 | `.css` `.scss` `.less` | CSS / SCSS / LESS. **Not indexed by default** — class names match code queries semantically but agents rarely act on stylesheets. Add `"**/*.css"` etc. to `include` if needed. |
 
@@ -513,20 +527,21 @@ This means searching for something that appears in the second half of a large fu
 
 Benchmarked on three codebases with known expected files per query. Full details in [BENCHMARKS.md](BENCHMARKS.md).
 
-| Codebase | Files | Queries | Recall@10 | MRR | Zero-miss |
-|---|---|---|---|---|---|
-| local-rag (this project) | 97 | 20 | 100.0% | 0.677 | 0.0% |
-| Express.js | 161 | 15 | 100.0% | 0.922 | 0.0% |
-| Excalidraw | 676 | 20 | 100.0% | 0.366 | 0.0% |
+| Codebase | Language | Files | Queries | Recall@10 | MRR | Zero-miss |
+|---|---|---|---|---|---|---|
+| local-rag (this project) | TypeScript | 97 | 20 | 100.0% | 0.651 | 0.0% |
+| Express.js | JavaScript | 161 | 15 | 100.0% | 0.922 | 0.0% |
+| Excalidraw | TypeScript | 676 | 20 | 100.0% | 0.366 | 0.0% |
+| Kubernetes | Go | 8,691 | 20 | 100.0%* | 0.496 | 0.0%* |
 
-100% recall across all three codebases with zero missed queries — out of the box, no tuning. Default top-K is 10, chosen by benchmarking the recall curve at K=5 through K=20 across all three codebases (see [BENCHMARKS.md](BENCHMARKS.md#why-top-10)). JSON and CSS/SCSS files are excluded from default indexing — they add noise without helping code search.
+\*With config tuning: test exclusion, generated file demotion, `searchTopK: 15`. At default top-10, Recall is 80%. Full analysis including config recommendations in [BENCHMARKS.md](BENCHMARKS.md). JSON and CSS/SCSS files are excluded from default indexing — they add noise without helping code search.
 
 ## Stack
 
 | Layer | Choice |
 |---|---|
 | Runtime | Bun (built-in SQLite, fast TS) |
-| AST chunking | [bun-chunk](https://github.com/TheWinci/bun-chunk) — tree-sitter grammars for 14 languages, with `chunkFile()` for context + metadata |
+| AST chunking | [bun-chunk](https://github.com/TheWinci/bun-chunk) — tree-sitter grammars for 23 languages, with `chunkFile()` for context + metadata |
 | Embeddings | Transformers.js + ONNX (in-process, no daemon) |
 | Embedding model | all-MiniLM-L6-v2 (~23MB, 384 dimensions) — [configurable](#configuration) |
 | Vector store | sqlite-vec (single `.db` file) |

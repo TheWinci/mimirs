@@ -1,0 +1,82 @@
+[
+  {
+    "query": "scheduler scheduleOne scheduling cycle pod to node binding",
+    "expected": ["pkg/scheduler/scheduler.go"]
+  },
+  {
+    "query": "kubelet syncPod syncLoop run pod workers PLEG container runtime",
+    "expected": ["pkg/kubelet/kubelet.go"]
+  },
+  {
+    "query": "kubectl apply RunApply applyOptions server-side apply patcher",
+    "expected": ["staging/src/k8s.io/kubectl/pkg/cmd/apply/apply.go"]
+  },
+  {
+    "query": "director handler chain API server HTTP request dispatch full handler",
+    "expected": ["staging/src/k8s.io/apiserver/pkg/server/handler.go"]
+  },
+  {
+    "query": "etcd3 store Create Get GuaranteedUpdate Watch implementation",
+    "expected": ["staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go"]
+  },
+  {
+    "query": "admission chain Admit Validate handler plugins ordered interface",
+    "expected": ["staging/src/k8s.io/apiserver/pkg/admission/chain.go"]
+  },
+  {
+    "query": "kubelet status manager SetPodStatus syncPod patch pod status apiserver",
+    "expected": ["pkg/kubelet/status/status_manager.go"]
+  },
+  {
+    "query": "iptables proxier syncProxyRules service endpoint chains nat rules",
+    "expected": ["pkg/proxy/iptables/proxier.go"]
+  },
+  {
+    "query": "kube-controller-manager NewControllerManagerCommand startControllers run",
+    "expected": ["cmd/kube-controller-manager/app/controllermanager.go"]
+  },
+  {
+    "query": "deployment controller syncDeployment rolloutRolling rolloutRecreate reconcile",
+    "expected": ["pkg/controller/deployment/deployment_controller.go"]
+  },
+  {
+    "query": "replica set controller syncReplicaSet manageReplicas pod count reconcile",
+    "expected": ["pkg/controller/replicaset/replica_set.go"]
+  },
+  {
+    "query": "node lifecycle controller monitorNodeHealth taint eviction zone not-ready",
+    "expected": ["pkg/controller/nodelifecycle/node_lifecycle_controller.go"]
+  },
+  {
+    "query": "horizontal pod autoscaler reconcileAutoscaler computeReplicasForMetrics scale",
+    "expected": ["pkg/controller/podautoscaler/horizontal.go"]
+  },
+  {
+    "query": "garbage collector GarbageCollector attemptToDeleteItem ownerReferences graph",
+    "expected": ["pkg/controller/garbagecollector/garbagecollector.go"]
+  },
+  {
+    "query": "resource quota admission controller evaluator usage limit enforce namespace",
+    "expected": ["staging/src/k8s.io/apiserver/pkg/admission/plugin/resourcequota/controller.go"]
+  },
+  {
+    "query": "RBAC authorizer RBACAuthorizer Authorize role binding clusterrole policy rules",
+    "expected": ["plugin/pkg/auth/authorizer/rbac/rbac.go"]
+  },
+  {
+    "query": "pod security admission Validate enforce baseline restricted level policy",
+    "expected": ["plugin/pkg/admission/security/podsecurity/admission.go"]
+  },
+  {
+    "query": "CRI RuntimeService ImageService interface container runtime gRPC API definition",
+    "expected": ["staging/src/k8s.io/cri-api/pkg/apis/services.go"]
+  },
+  {
+    "query": "CSI csiPlugin Init CanAttach CanSupport volume plugin registration persistent",
+    "expected": ["pkg/volume/csi/csi_plugin.go"]
+  },
+  {
+    "query": "API discovery rootAPIsHandler goRestfulContainer /apis group version list",
+    "expected": ["staging/src/k8s.io/apiserver/pkg/endpoints/discovery/root.go"]
+  }
+]

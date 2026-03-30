@@ -72,7 +72,7 @@ export async function runEvalTask(
 
   if (condition === "with-rag") {
     const config = await loadConfig(projectDir);
-    searchResults = await search(task.task, db, topK, 0, config.hybridWeight);
+    searchResults = await search(task.task, db, topK, 0, config.hybridWeight, config.generated);
     searchCount = 1;
   }
 

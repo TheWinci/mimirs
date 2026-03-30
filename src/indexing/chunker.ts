@@ -26,7 +26,7 @@ const DEFAULT_CHUNK_OVERLAP = 50;
 const AST_SUPPORTED = new Set([
   // Original
   ".ts", ".tsx", ".js", ".jsx", ".py", ".go", ".rs", ".java",
-  // bun-chunk Phase 2 additions
+  // bun-chunk 0.1.2
   ".c", ".h",
   ".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx",
   ".cs",
@@ -35,12 +35,22 @@ const AST_SUPPORTED = new Set([
   ".scala", ".sc",
   ".html", ".htm",
   ".css", ".scss", ".less",
+  // bun-chunk 0.1.4
+  ".kt", ".kts",       // Kotlin
+  ".lua",              // Lua
+  ".zig", ".zon",      // Zig
+  ".ex", ".exs",       // Elixir
+  ".sh", ".bash", ".zsh", // Bash (was heuristic-only)
+  ".toml",             // TOML (was heuristic-only)
+  ".yaml", ".yml",     // YAML (was heuristic-only)
+  ".hs", ".lhs",       // Haskell
+  ".ml", ".mli",       // OCaml
 ]);
 
 // Code-like extensions handled by blank-line heuristic splitting
 const HEURISTIC_CODE = new Set([
   ".swift",
-  ".sh", ".bash", ".zsh", ".fish",
+  ".fish",  // .sh/.bash/.zsh now handled by AST
   ".tf", ".proto", ".graphql", ".gql",
   ".mod", ".xml",
   ".jenkinsfile", ".vagrantfile", ".gemfile", ".rakefile", ".brewfile", ".procfile",
@@ -60,18 +70,28 @@ export const KNOWN_EXTENSIONS = new Set([
   ".ts", ".tsx", ".js", ".jsx", ".py", ".go", ".rs", ".java",
   ".c", ".h", ".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx",
   ".cs", ".rb", ".php", ".scala", ".sc",
+  ".kt", ".kts",       // Kotlin
+  ".lua",              // Lua
+  ".zig", ".zon",      // Zig
+  ".ex", ".exs",       // Elixir
+  ".hs", ".lhs",       // Haskell
+  ".ml", ".mli",       // OCaml
   ".html", ".htm", ".css", ".scss", ".less",
+  // AST-aware config/scripting
+  ".sh", ".bash", ".zsh",
+  ".toml",
+  ".yaml", ".yml",
   // Heuristic code (blank-line blocks)
   ".swift",
-  ".sh", ".bash", ".zsh", ".fish",
+  ".fish",
   ".tf", ".proto", ".graphql", ".gql",
   ".mod",
   ".xml",
   // Virtual extensions for basename-detected files
   ".makefile", ".dockerfile", ".jenkinsfile",
   ".vagrantfile", ".gemfile", ".rakefile", ".brewfile", ".procfile",
-  // Structured data
-  ".yaml", ".yml", ".json", ".toml",
+  // Structured data (heuristic fallback for non-AST parsing)
+  ".json",
   // Query / schema languages
   ".sql",
   // API collections
