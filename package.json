@@ -1,6 +1,6 @@
 {
   "name": "@winci/local-rag",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "Semantic search for your codebase — local-first RAG MCP server with hybrid search, AST-aware chunking, and usage analytics",
   "type": "module",
   "license": "Apache-2.0",
