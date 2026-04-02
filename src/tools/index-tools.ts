@@ -1,9 +1,9 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { indexDirectory } from "../indexing/indexer";
-import { type GetDB, resolveProject } from "./index";
+import { type GetDB, type WriteStatus, resolveProject } from "./index";
 
-export function registerIndexTools(server: McpServer, getDB: GetDB) {
+export function registerIndexTools(server: McpServer, getDB: GetDB, writeStatus?: WriteStatus) {
   server.tool(
     "index_files",
     "Index files in a directory for semantic search. Skips unchanged files and prunes deleted ones.",
@@ -25,7 +25,41 @@ export function registerIndexTools(server: McpServer, getDB: GetDB) {
       const { projectDir, db: ragDb, config: baseConfig } = await resolveProject(directory, getDB);
       const config = patterns ? { ...baseConfig, include: patterns } : baseConfig;
 
-      const result = await indexDirectory(projectDir, ragDb, config);
+      let totalFiles = 0;
+      let processedFiles = 0;
+
+      const result = await indexDirectory(projectDir, ragDb, config, (msg) => {
+        if (!writeStatus) return;
+
+        if (msg === "file:done") {
+          processedFiles++;
+          if (totalFiles > 0) {
+            const pct = Math.round((processedFiles / totalFiles) * 100);
+            writeStatus(`${processedFiles}/${totalFiles} files (${pct}%)`);
+          }
+          return;
+        }
+
+        const foundMatch = msg.match(/^Found (\d+) files to index$/);
+        if (foundMatch) {
+          totalFiles = parseInt(foundMatch[1], 10);
+          writeStatus(`0/${totalFiles} files`);
+          return;
+        }
+
+        if (msg.startsWith("scanning files")) {
+          writeStatus(msg);
+        }
+      });
+
+      if (writeStatus) {
+        const dbStatus = ragDb.getStatus();
+        writeStatus([
+          `done`,
+          `indexed: ${result.indexed}, skipped: ${result.skipped}, pruned: ${result.pruned}`,
+          `total files: ${dbStatus.totalFiles}, total chunks: ${dbStatus.totalChunks}`,
+        ].join("\n"));
+      }
 
       return {
         content: [

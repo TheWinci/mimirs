@@ -12,6 +12,7 @@ import { registerGitTools } from "./git-tools";
 import { registerServerInfoTools, type ConnectedDBInfo } from "./server-info-tools";
 
 export type GetDB = (dir: string) => RagDB;
+export type WriteStatus = (status: string) => void;
 
 /** Resolve the project directory, database, and config from an optional directory param. */
 export async function resolveProject(
@@ -28,9 +29,10 @@ export function registerAllTools(
   server: McpServer,
   getDB: (dir: string) => RagDB,
   getConnectedDBs?: () => ConnectedDBInfo[],
+  writeStatus?: WriteStatus,
 ) {
   registerSearchTools(server, getDB);
-  registerIndexTools(server, getDB);
+  registerIndexTools(server, getDB, writeStatus);
   registerGraphTools(server, getDB);
   registerConversationTools(server, getDB);
   registerCheckpointTools(server, getDB);
