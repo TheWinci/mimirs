@@ -3,19 +3,24 @@ import { mkdirSync, writeFileSync, unlinkSync } from "fs";
 import { RagDB } from "../../db";
 import { loadConfig } from "../../config";
 import { indexDirectory } from "../../indexing/indexer";
-import { runSetup, confirm, parseIdeFlag, type IDE } from "../setup";
+import { runSetup, confirm, parseIdeFlag, mcpConfigSnippet } from "../setup";
 import { cliProgress } from "../progress";
 
 export async function initCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const dir = resolve(args[1] && !args[1].startsWith("--") ? args[1] : ".");
   const autoYes = args.includes("--yes") || args.includes("-y");
   const ideFlag = getFlag("--ide");
-  const ides: IDE[] | undefined = ideFlag ? parseIdeFlag(ideFlag) : undefined;
-  const { actions } = await runSetup(dir, ides);
-  if (actions.length === 0) {
+  const ides = ideFlag ? parseIdeFlag(ideFlag) : undefined;
+  const { actions, unknownIdes } = await runSetup(dir, ides);
+  if (actions.length === 0 && unknownIdes.length === 0) {
     console.log("Already set up — nothing to do.");
   } else {
     for (const action of actions) console.log(action);
+  }
+
+  if (unknownIdes.length > 0) {
+    console.log(`\nAdd this to your agent's MCP config (${unknownIdes.join(", ")}):\n`);
+    console.log(mcpConfigSnippet(dir));
   }
 
   console.log();

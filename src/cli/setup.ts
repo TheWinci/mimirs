@@ -1,6 +1,7 @@
 import { existsSync } from "fs";
 import { readFile, writeFile, mkdir } from "fs/promises";
 import { join, resolve } from "path";
+import { homedir } from "os";
 import { createInterface } from "readline";
 import { loadConfig } from "../config";
 
@@ -62,10 +63,19 @@ alwaysApply: true
 
 ${INSTRUCTIONS_BLOCK}`;
 
+const WINDSURF_BLOCK = `${MARKER}
+---
+trigger: always_on
+description: local-rag tool usage instructions
+---
+
+${INSTRUCTIONS_BLOCK}`;
+
 const MARKDOWN_BLOCK = INSTRUCTIONS_BLOCK;
 
 export interface SetupResult {
   actions: string[];
+  unknownIdes: string[];
 }
 
 export async function ensureConfig(projectDir: string): Promise<string | null> {
@@ -112,23 +122,32 @@ async function injectMdc(filePath: string, dir: string): Promise<string | null> 
   return `Created ${filePath}`;
 }
 
-export type IDE = "claude" | "cursor" | "windsurf" | "copilot";
-export const ALL_IDES: IDE[] = ["claude", "cursor", "windsurf", "copilot"];
-
-export function parseIdeFlag(value: string): IDE[] {
-  if (value === "all") return [...ALL_IDES];
-  const ides = value.split(",").map(s => s.trim().toLowerCase());
-  const valid = new Set<string>(ALL_IDES);
-  for (const ide of ides) {
-    if (!valid.has(ide)) {
-      console.error(`Unknown IDE: ${ide}. Valid options: ${ALL_IDES.join(", ")}, all`);
-      process.exit(1);
-    }
+async function injectWindsurfRule(filePath: string, dir: string): Promise<string | null> {
+  if (!existsSync(dir)) return null;
+  if (existsSync(filePath)) {
+    const content = await readFile(filePath, "utf-8");
+    if (content.includes(MARKER)) return null;
   }
-  return ides as IDE[];
+  await mkdir(join(filePath, ".."), { recursive: true });
+  await writeFile(filePath, WINDSURF_BLOCK + "\n");
+  return `Created ${filePath}`;
 }
 
-export async function ensureAgentInstructions(projectDir: string, ides?: IDE[]): Promise<string[]> {
+export type KnownIDE = "claude" | "cursor" | "windsurf" | "copilot";
+export const KNOWN_IDES: KnownIDE[] = ["claude", "cursor", "windsurf", "copilot"];
+
+export function unknownIdes(ides?: string[]): string[] {
+  if (!ides) return [];
+  const known = new Set<string>(KNOWN_IDES);
+  return ides.filter(ide => !known.has(ide));
+}
+
+export function parseIdeFlag(value: string): string[] {
+  if (value === "all") return [...KNOWN_IDES];
+  return value.split(",").map(s => s.trim().toLowerCase());
+}
+
+export async function ensureAgentInstructions(projectDir: string, ides?: string[]): Promise<string[]> {
   const actions: string[] = [];
   const forced = new Set(ides);
 
@@ -146,12 +165,12 @@ export async function ensureAgentInstructions(projectDir: string, ides?: IDE[]):
   );
   if (cursorAction) actions.push(cursorAction);
 
-  // Windsurf — if .windsurf/ exists or explicitly requested
+  // Windsurf — .windsurf/rules/local-rag.md (uses .md with trigger frontmatter, not .mdc)
   if (forced.has("windsurf") && !existsSync(join(projectDir, ".windsurf"))) {
     await mkdir(join(projectDir, ".windsurf"), { recursive: true });
   }
-  const windsurfAction = await injectMdc(
-    join(projectDir, ".windsurf", "rules", "local-rag.mdc"),
+  const windsurfAction = await injectWindsurfRule(
+    join(projectDir, ".windsurf", "rules", "local-rag.md"),
     join(projectDir, ".windsurf")
   );
   if (windsurfAction) actions.push(windsurfAction);
@@ -207,7 +226,7 @@ async function upsertMcpJson(mcpPath: string, entry: object): Promise<string | n
   return `Created ${mcpPath} with local-rag`;
 }
 
-export async function ensureMcpJson(projectDir: string, ides?: IDE[]): Promise<string[]> {
+export async function ensureMcpJson(projectDir: string, ides?: string[]): Promise<string[]> {
   const actions: string[] = [];
   const entry = mcpServerEntry(projectDir);
   const forced = new Set(ides);
@@ -222,9 +241,10 @@ export async function ensureMcpJson(projectDir: string, ides?: IDE[]): Promise<s
     if (action) actions.push(action);
   }
 
-  // Windsurf — .windsurf/mcp.json
+  // Windsurf — global ~/.codeium/windsurf/mcp_config.json
   if (forced.has("windsurf") || existsSync(join(projectDir, ".windsurf"))) {
-    const action = await upsertMcpJson(join(projectDir, ".windsurf", "mcp.json"), entry);
+    const windsurfConfig = join(homedir(), ".codeium", "windsurf", "mcp_config.json");
+    const action = await upsertMcpJson(windsurfConfig, entry);
     if (action) actions.push(action);
   }
 
@@ -238,7 +258,7 @@ export function detectAgentHints(projectDir: string): string[] {
   if (existsSync(join(projectDir, ".cursor")))
     hints.push("Cursor:       add to .cursor/mcp.json → mcpServers");
   if (existsSync(join(projectDir, ".windsurf")))
-    hints.push("Windsurf:     add to .windsurf/mcp.json → mcpServers");
+    hints.push("Windsurf:     add to ~/.codeium/windsurf/mcp_config.json → mcpServers");
   if (hints.length === 0)
     hints.push("Add to your agent's MCP config under mcpServers:");
   return hints;
@@ -254,7 +274,7 @@ export function confirm(question: string): Promise<boolean> {
   });
 }
 
-export async function runSetup(projectDir: string, ides?: IDE[]): Promise<SetupResult> {
+export async function runSetup(projectDir: string, ides?: string[]): Promise<SetupResult> {
   const actions: string[] = [];
 
   const configAction = await ensureConfig(projectDir);
@@ -269,5 +289,5 @@ export async function runSetup(projectDir: string, ides?: IDE[]): Promise<SetupR
   const gitignoreAction = await ensureGitignore(projectDir);
   if (gitignoreAction) actions.push(gitignoreAction);
 
-  return { actions };
+  return { actions, unknownIdes: unknownIdes(ides) };
 }

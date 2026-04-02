@@ -173,6 +173,8 @@ export async function startServer() {
     log.warn(`${dirCheck.reason} — skipping auto-index and file watcher`, "dir-guard");
   }
 
+  writeStatus(`starting\nversion: ${version}\nphase: creating server`);
+
   let server: McpServer;
   try {
     server = new McpServer({
@@ -181,11 +183,13 @@ export async function startServer() {
     });
 
     // Register all MCP tools
-    registerAllTools(server, getDB, getConnectedDBs);
+    registerAllTools(server, getDB, getConnectedDBs, writeStatus);
+    writeStatus(`starting\nversion: ${version}\nphase: tools registered`);
   } catch (err) {
     // If we crash before connecting transport, the MCP client just sees
     // "Connection closed" with no details. Write diagnostics to a file.
     writeStartupError(err);
+    writeStatus(`error\nversion: ${version}\nphase: tool registration failed\n${err instanceof Error ? err.message : err}`);
     throw err;
   }
 
@@ -195,9 +199,12 @@ export async function startServer() {
   // the server's subsequent stderr writes hit EPIPE.
   const transport = new StdioServerTransport();
   try {
+    writeStatus(`starting\nversion: ${version}\nphase: connecting transport`);
     await server.connect(transport);
+    writeStatus(`starting\nversion: ${version}\nphase: transport connected`);
   } catch (err) {
     writeStartupError(err);
+    writeStatus(`error\nversion: ${version}\nphase: transport failed\n${err instanceof Error ? err.message : err}`);
     throw err;
   }
 
@@ -309,6 +316,15 @@ export async function startServer() {
       // Start watching after initial index completes
       watcher = startWatcher(startupDir, startupDb, startupConfig, (msg) => {
         log.debug(msg, "watcher");
+        // Update status file so IDE/client sees watcher activity
+        const dbStatus = startupDb.getStatus();
+        writeStatus([
+          `done`,
+          `version: ${version}`,
+          `finished: ${new Date().toISOString()}`,
+          `total files: ${dbStatus.totalFiles}, total chunks: ${dbStatus.totalChunks}`,
+          `watcher: ${msg}`,
+        ].join("\n"));
       });
     }).catch((err) => {
       writeStatus(`error\nversion: ${version}\nfailed: ${new Date().toISOString()}\n${err instanceof Error ? err.message : err}`);
