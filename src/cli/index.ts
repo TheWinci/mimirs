@@ -15,6 +15,7 @@ import { sessionContextCommand } from "./commands/session-context";
 import { serveCommand } from "./commands/serve";
 import { demoCommand } from "./commands/demo";
 import { doctorCommand } from "./commands/doctor";
+import { cleanupCommand } from "./commands/cleanup";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -57,6 +58,7 @@ Usage:
   local-rag session-context [dir]      Session start context summary
                 [--dir D]
   local-rag doctor [dir]               Diagnose MCP server startup issues
+  local-rag cleanup [dir] [-y]          Remove all local-rag files
   local-rag demo [dir]                 Run interactive feature demo
 
 Options:
@@ -127,6 +129,9 @@ export async function main() {
       break;
     case "doctor":
       await doctorCommand(args);
+      break;
+    case "cleanup":
+      await cleanupCommand(args);
       break;
     case "demo":
       await demoCommand(args);
