@@ -241,11 +241,16 @@ export async function ensureMcpJson(projectDir: string, ides?: string[]): Promis
     if (action) actions.push(action);
   }
 
-  // Windsurf — global ~/.codeium/windsurf/mcp_config.json
+  // Windsurf — global configs:
+  //   Standalone Windsurf:       ~/.codeium/windsurf/mcp_config.json
+  //   Windsurf plugin (JetBrains): ~/.codeium/mcp_config.json
   if (forced.has("windsurf") || existsSync(join(projectDir, ".windsurf"))) {
-    const windsurfConfig = join(homedir(), ".codeium", "windsurf", "mcp_config.json");
-    const action = await upsertMcpJson(windsurfConfig, entry);
-    if (action) actions.push(action);
+    const windsurfStandalone = join(homedir(), ".codeium", "windsurf", "mcp_config.json");
+    const windsurfPlugin = join(homedir(), ".codeium", "mcp_config.json");
+    const standaloneAction = await upsertMcpJson(windsurfStandalone, entry);
+    if (standaloneAction) actions.push(standaloneAction);
+    const pluginAction = await upsertMcpJson(windsurfPlugin, entry);
+    if (pluginAction) actions.push(pluginAction);
   }
 
   return actions;
@@ -257,8 +262,10 @@ export function detectAgentHints(projectDir: string): string[] {
     hints.push("Claude Code:  add to .mcp.json → mcpServers");
   if (existsSync(join(projectDir, ".cursor")))
     hints.push("Cursor:       add to .cursor/mcp.json → mcpServers");
-  if (existsSync(join(projectDir, ".windsurf")))
+  if (existsSync(join(projectDir, ".windsurf"))) {
     hints.push("Windsurf:     add to ~/.codeium/windsurf/mcp_config.json → mcpServers");
+    hints.push("Windsurf (JB): add to ~/.codeium/mcp_config.json → mcpServers");
+  }
   if (hints.length === 0)
     hints.push("Add to your agent's MCP config under mcpServers:");
   return hints;

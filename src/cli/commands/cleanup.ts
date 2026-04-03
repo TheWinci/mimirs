@@ -128,8 +128,8 @@ export async function cleanupCommand(args: string[]) {
   // MCP configs
   pending.push(() => removeMcpEntry(join(dir, ".mcp.json")));
   pending.push(() => removeMcpEntry(join(dir, ".cursor", "mcp.json")));
-  const windsurfConfig = join(homedir(), ".codeium", "windsurf", "mcp_config.json");
-  pending.push(() => removeMcpEntry(windsurfConfig));
+  pending.push(() => removeMcpEntry(join(homedir(), ".codeium", "windsurf", "mcp_config.json")));
+  pending.push(() => removeMcpEntry(join(homedir(), ".codeium", "mcp_config.json")));
 
   // Agent instruction files
   pending.push(() => removeInstructionsBlock(join(dir, "CLAUDE.md")));

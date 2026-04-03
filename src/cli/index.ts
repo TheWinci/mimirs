@@ -12,7 +12,9 @@ import { conversationCommand } from "./commands/conversation";
 import { checkpointCommand } from "./commands/checkpoint";
 import { annotationsCommand } from "./commands/annotations";
 import { sessionContextCommand } from "./commands/session-context";
-import { serveCommand } from "./commands/serve";
+// serve is imported dynamically below — its transitive deps include native
+// modules (bun:sqlite, sqlite-vec) and top-level awaits that would crash the
+// entire CLI if they fail at module load time, blocking even `doctor`.
 import { demoCommand } from "./commands/demo";
 import { doctorCommand } from "./commands/doctor";
 import { cleanupCommand } from "./commands/cleanup";
@@ -79,9 +81,11 @@ export async function main() {
   }
 
   switch (command) {
-    case "serve":
+    case "serve": {
+      const { serveCommand } = await import("./commands/serve");
       await serveCommand();
       break;
+    }
     case "init":
       await initCommand(args, getFlag);
       break;
