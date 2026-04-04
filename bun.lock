@@ -7,7 +7,7 @@
       "dependencies": {
         "@huggingface/transformers": "^3.4.0",
         "@modelcontextprotocol/sdk": "^1.12.0",
-        "@winci/bun-chunk": "0.1.4",
+        "@winci/bun-chunk": "^1.0.0",
         "gray-matter": "^4.0.3",
         "sqlite-vec": "^0.1.6",
         "zod": "^4.3.6",
@@ -114,7 +114,9 @@
 
     "@types/node": ["@types/node@25.5.0", "", { "dependencies": { "undici-types": "~7.18.0" } }, "sha512-jp2P3tQMSxWugkCUKLRPVUpGaL5MVFwF8RDuSRztfwgN1wmqJeMSbKlnEtQqU8UrhTmzEmZdu2I6v2dpp7XIxw=="],
 
-    "@winci/bun-chunk": ["@winci/bun-chunk@0.1.4", "", { "dependencies": { "@tree-sitter-grammars/tree-sitter-kotlin": "^1.1.0", "@tree-sitter-grammars/tree-sitter-lua": "^0.4.1", "@tree-sitter-grammars/tree-sitter-toml": "^0.7.0", "@tree-sitter-grammars/tree-sitter-yaml": "^0.7.1", "@tree-sitter-grammars/tree-sitter-zig": "^1.1.2", "tree-sitter-bash": "^0.25.1", "tree-sitter-c": "^0.24.1", "tree-sitter-c-sharp": "^0.23.1", "tree-sitter-cpp": "^0.23.4", "tree-sitter-css": "^0.25.0", "tree-sitter-elixir": "^0.3.5", "tree-sitter-go": "^0.25.0", "tree-sitter-haskell": "^0.23.1", "tree-sitter-html": "^0.23.2", "tree-sitter-java": "^0.23.5", "tree-sitter-javascript": "^0.25.0", "tree-sitter-ocaml": "^0.24.2", "tree-sitter-php": "^0.24.2", "tree-sitter-python": "^0.25.0", "tree-sitter-ruby": "^0.23.1", "tree-sitter-rust": "^0.24.0", "tree-sitter-scala": "^0.24.0", "tree-sitter-typescript": "^0.23.2", "web-tree-sitter": "^0.26.7" }, "bin": { "bun-chunk": "src/cli.ts" } }, "sha512-NozfVbTZrALr+sPFkcKcXqWfkL/L4OmGtNm0JPYFSrWJyNcYfKtd89wORyeYfWftEADinta98M55TQvP0UO7Dw=="],
+    "@winci/bun-chunk": ["@winci/bun-chunk@1.0.0", "", { "dependencies": { "@tree-sitter-grammars/tree-sitter-kotlin": "^1.1.0", "@tree-sitter-grammars/tree-sitter-lua": "^0.4.1", "@tree-sitter-grammars/tree-sitter-toml": "^0.7.0", "@tree-sitter-grammars/tree-sitter-yaml": "^0.7.1", "@tree-sitter-grammars/tree-sitter-zig": "^1.1.2", "@winci/tree-sitter-dart": "^1.0.0", "tree-sitter-bash": "^0.25.1", "tree-sitter-c": "^0.24.1", "tree-sitter-c-sharp": "^0.23.1", "tree-sitter-cpp": "^0.23.4", "tree-sitter-css": "^0.25.0", "tree-sitter-elixir": "^0.3.5", "tree-sitter-go": "^0.25.0", "tree-sitter-haskell": "^0.23.1", "tree-sitter-html": "^0.23.2", "tree-sitter-java": "^0.23.5", "tree-sitter-javascript": "^0.25.0", "tree-sitter-ocaml": "^0.24.2", "tree-sitter-php": "^0.24.2", "tree-sitter-python": "^0.25.0", "tree-sitter-ruby": "^0.23.1", "tree-sitter-rust": "^0.24.0", "tree-sitter-scala": "^0.24.0", "tree-sitter-typescript": "^0.23.2", "web-tree-sitter": "^0.26.7" }, "bin": { "bun-chunk": "src/cli.ts" } }, "sha512-OFd4LGBR0Kn15CJQfpUaKaDGqonHZgctlR+VL6rJ32Bra0cRm8DAu8W589+Zu48hggIt1VwMRZZBsSiDID3ZSA=="],
+
+    "@winci/tree-sitter-dart": ["@winci/tree-sitter-dart@1.0.0", "", {}, "sha512-u0Cy9ak0SkI8DYaFKc/AnNdC98SCx5t2ZrBi//tguIVmmuU0epfWMnTNW4HCUqsPW5nb3baKvFWS6QohKNNN5g=="],
 
     "accepts": ["accepts@2.0.0", "", { "dependencies": { "mime-types": "^3.0.0", "negotiator": "^1.0.0" } }, "sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng=="],
 

@@ -45,6 +45,7 @@ const AST_SUPPORTED = new Set([
   ".yaml", ".yml",     // YAML (was heuristic-only)
   ".hs", ".lhs",       // Haskell
   ".ml", ".mli",       // OCaml
+  ".dart",             // Dart
 ]);
 
 // Code-like extensions handled by blank-line heuristic splitting
@@ -76,6 +77,7 @@ export const KNOWN_EXTENSIONS = new Set([
   ".ex", ".exs",       // Elixir
   ".hs", ".lhs",       // Haskell
   ".ml", ".mli",       // OCaml
+  ".dart",             // Dart
   ".html", ".htm", ".css", ".scss", ".less",
   // AST-aware config/scripting
   ".sh", ".bash", ".zsh",
