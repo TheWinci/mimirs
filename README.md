@@ -9,7 +9,7 @@ No API keys. No cloud. No Docker. Just `bunx`.
 [![npm](https://img.shields.io/npm/v/@winci/local-rag)](https://www.npmjs.com/package/@winci/local-rag)
 [![license](https://img.shields.io/npm/l/@winci/local-rag)](LICENSE)
 
-**100% recall** on codebases, even at **8.7k files** (Kubernetes, with config tuning) — no cloud, no API keys. Hybrid vector + BM25 search, AST-aware chunking across 23 languages, and dependency graph boost. Full benchmarks in [BENCHMARKS.md](BENCHMARKS.md).
+**100% recall** on codebases, even at **8.7k files** (Kubernetes, with config tuning) — no cloud, no API keys. Hybrid vector + BM25 search, AST-aware chunking across 24 languages, and dependency graph boost. Full benchmarks in [BENCHMARKS.md](BENCHMARKS.md).
 
 ## Why
 
@@ -91,6 +91,7 @@ Uses [bun-chunk](https://github.com/TheWinci/bun-chunk) to extract function/clas
 | `.ex` `.exs` | Elixir |
 | `.hs` `.lhs` | Haskell |
 | `.ml` `.mli` | OCaml |
+| `.dart` | Dart |
 | `.sh` `.bash` `.zsh` | Bash / Zsh |
 | `.toml` | TOML |
 | `.yaml` `.yml` | YAML |
@@ -145,7 +146,7 @@ Benchmarked on four codebases with known expected files per query. Full details 
 | Layer | Choice |
 |---|---|
 | Runtime | Bun (built-in SQLite, fast TS) |
-| AST chunking | [bun-chunk](https://github.com/TheWinci/bun-chunk) — tree-sitter grammars for 23 languages |
+| AST chunking | [bun-chunk](https://github.com/TheWinci/bun-chunk) — tree-sitter grammars for 24 languages |
 | Embeddings | Transformers.js + ONNX (in-process, no daemon) |
 | Embedding model | all-MiniLM-L6-v2 (~23MB, 384 dimensions) — [configurable](docs/configuration.md) |
 | Vector store | sqlite-vec (single `.db` file) |
