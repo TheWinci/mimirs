@@ -64,7 +64,7 @@ For deeper integration, local-rag is also available as a Claude Code plugin. In 
 
 ```
 /plugin marketplace add https://github.com/TheWinci/local-rag.git
-/plugin install local-rag@local-rag
+/plugin install local-rag
 ```
 
 The plugin adds **SessionStart** (context summary), **PostToolUse** (auto-reindex on edit), and **SessionEnd** (auto-checkpoint) hooks. No `CLAUDE.md` instructions needed — the plugin's built-in skill handles tool usage.
