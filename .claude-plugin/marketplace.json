@@ -1,0 +1,17 @@
+{
+  "name": "local-rag",
+  "owner": {
+    "name": "TheWinci",
+    "url": "https://github.com/TheWinci"
+  },
+  "plugins": [
+    {
+      "name": "local-rag",
+      "source": {
+        "source": "github",
+        "repo": "TheWinci/local-rag"
+      },
+      "description": "Semantic search for your codebase and conversation history — zero config, local-first, with gap analysis"
+    }
+  ]
+}
