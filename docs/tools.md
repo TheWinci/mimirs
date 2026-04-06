@@ -23,6 +23,7 @@ These tools are available to any MCP client (Claude Code, Cursor, Windsurf, VS C
 | `depends_on` | List all files that a given file imports (its dependencies) |
 | `depended_on_by` | List all files that import a given file (reverse dependencies) |
 | `write_relevant` | Find the best insertion point for new content — returns semantically appropriate files and anchors |
+| `generate_wiki` | Generate or update a structured markdown wiki for the codebase — returns step-by-step instructions that the agent follows using other local-rag tools. Supports incremental updates |
 
 ## CLI
 
