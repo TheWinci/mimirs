@@ -10,6 +10,7 @@ import { registerAnnotationTools } from "./annotation-tools";
 import { registerAnalyticsTools } from "./analytics-tools";
 import { registerGitTools } from "./git-tools";
 import { registerServerInfoTools, type ConnectedDBInfo } from "./server-info-tools";
+import { registerWikiTools } from "./wiki-tools";
 
 export type GetDB = (dir: string) => RagDB;
 export type WriteStatus = (status: string) => void;
@@ -40,4 +41,5 @@ export function registerAllTools(
   registerAnalyticsTools(server, getDB);
   registerGitTools(server, getDB);
   registerServerInfoTools(server, getDB, getConnectedDBs);
+  registerWikiTools(server, getDB);
 }
