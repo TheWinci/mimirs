@@ -7,7 +7,7 @@ import { type GetDB, resolveProject } from "./index";
 export function registerAnnotationTools(server: McpServer, getDB: GetDB) {
   server.tool(
     "annotate",
-    "Attach a persistent note to a file or specific symbol. Notes survive sessions and surface inline in read_relevant results. Use for: known issues, caveats, architectural decisions tied to specific code, or 'don't change this until X lands'. Calling again with the same path+symbol updates the existing note.",
+    "Attach a persistent note to a file or symbol that surfaces inline in future read_relevant results. Call this immediately when you encounter: a known bug or race condition, fragile code that shouldn't be changed yet, a non-obvious architectural constraint, or a workaround that needs context. Calling again with the same path+symbol updates the existing note.",
     {
       path: z.string().describe("File path (relative to project root) the note applies to"),
       note: z.string().describe("The note text"),
