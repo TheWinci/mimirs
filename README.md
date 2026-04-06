@@ -50,7 +50,7 @@ brew install sqlite
 ### 2. Set up your editor
 
 ```bash
-bunx @winci/local-rag init --ide claude   # or: cursor, windsurf, copilot, all
+bunx @winci/local-rag init --ide claude   # or: cursor, windsurf, copilot, jetbrains, all
 ```
 
 This creates the MCP server config, editor rules, `.rag/config.json`, and `.gitignore` entry. Run with `--ide all` to set up every supported editor at once.

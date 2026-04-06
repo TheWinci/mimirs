@@ -111,6 +111,7 @@ async function injectMarkdown(filePath: string, block: string): Promise<string |
     await writeFile(filePath, content.trimEnd() + "\n\n" + block + "\n");
     return `Updated ${filePath}`;
   }
+  await mkdir(join(filePath, ".."), { recursive: true });
   await writeFile(filePath, block + "\n");
   return `Created ${filePath}`;
 }
@@ -137,8 +138,8 @@ async function injectWindsurfRule(filePath: string, dir: string): Promise<string
   return `Created ${filePath}`;
 }
 
-export type KnownIDE = "claude" | "cursor" | "windsurf" | "copilot";
-export const KNOWN_IDES: KnownIDE[] = ["claude", "cursor", "windsurf", "copilot"];
+export type KnownIDE = "claude" | "cursor" | "windsurf" | "copilot" | "jetbrains";
+export const KNOWN_IDES: KnownIDE[] = ["claude", "cursor", "windsurf", "copilot", "jetbrains"];
 
 export function unknownIdes(ides?: string[]): string[] {
   if (!ides) return [];
@@ -178,6 +179,18 @@ export async function ensureAgentInstructions(projectDir: string, ides?: string[
     join(projectDir, ".windsurf")
   );
   if (windsurfAction) actions.push(windsurfAction);
+
+  // JetBrains (Junie) — .junie/guidelines/local-rag.md
+  if (forced.has("jetbrains") && !existsSync(join(projectDir, ".junie"))) {
+    await mkdir(join(projectDir, ".junie"), { recursive: true });
+  }
+  if (existsSync(join(projectDir, ".junie"))) {
+    const junieAction = await injectMarkdown(
+      join(projectDir, ".junie", "guidelines", "local-rag.md"),
+      MARKDOWN_BLOCK
+    );
+    if (junieAction) actions.push(junieAction);
+  }
 
   // GitHub Copilot — if .github/ exists or explicitly requested
   if (forced.has("copilot") && !existsSync(join(projectDir, ".github"))) {
@@ -245,6 +258,15 @@ export async function ensureMcpJson(projectDir: string, ides?: string[]): Promis
     if (action) actions.push(action);
   }
 
+  // JetBrains (Junie) — .junie/mcp.json (project-level)
+  if (forced.has("jetbrains") && !existsSync(join(projectDir, ".junie"))) {
+    await mkdir(join(projectDir, ".junie"), { recursive: true });
+  }
+  if (existsSync(join(projectDir, ".junie"))) {
+    const action = await upsertMcpJson(join(projectDir, ".junie", "mcp.json"), entry);
+    if (action) actions.push(action);
+  }
+
   // Windsurf — global configs:
   //   Standalone Windsurf:       ~/.codeium/windsurf/mcp_config.json
   //   Windsurf plugin (JetBrains): ~/.codeium/mcp_config.json
@@ -266,6 +288,8 @@ export function detectAgentHints(projectDir: string): string[] {
     hints.push("Claude Code:  add to .mcp.json → mcpServers");
   if (existsSync(join(projectDir, ".cursor")))
     hints.push("Cursor:       add to .cursor/mcp.json → mcpServers");
+  if (existsSync(join(projectDir, ".junie")))
+    hints.push("JetBrains:    add to .junie/mcp.json → mcpServers");
   if (existsSync(join(projectDir, ".windsurf"))) {
     hints.push("Windsurf:     add to ~/.codeium/windsurf/mcp_config.json → mcpServers");
     hints.push("Windsurf (JB): add to ~/.codeium/mcp_config.json → mcpServers");
