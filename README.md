@@ -29,6 +29,9 @@ Checkpoints capture milestones, direction changes, and blockers. Searchable acro
 **Understand codebase structure.**
 Dependency graphs, reverse-dependency lookups, and `find_usages` show the blast radius before any refactor.
 
+**Generate a project wiki.**
+`generate_wiki` produces a structured, cross-linked markdown wiki — architecture docs, module pages, entity pages, guides, and Mermaid diagrams — all built from the semantic index. Supports incremental updates when source files change.
+
 **Expose documentation gaps.**
 Analytics log every query locally — nothing leaves your machine. Zero-result and low-relevance queries reveal what's missing from your docs.
 
