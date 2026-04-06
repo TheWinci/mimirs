@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "generatedAt": "2026-04-06T08:30:00.000Z",
+  "lastGitRef": "459f003",
+  "pages": {
+    "index.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": []
+    },
+    "architecture.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": ["src/main.ts", "src/cli/index.ts", "src/server/index.ts", "src/config/index.ts", "src/db/index.ts"]
+    },
+    "data-flow.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": ["src/indexing/indexer.ts", "src/indexing/chunker.ts", "src/search/hybrid.ts", "src/conversation/indexer.ts", "src/embeddings/embed.ts"]
+    },
+    "api-surface.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": ["src/tools/index.ts", "src/cli/index.ts", "src/config/index.ts"]
+    },
+    "glossary.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": ["src/db/index.ts", "src/search/hybrid.ts", "src/indexing/chunker.ts", "src/config/index.ts"]
+    },
+    "modules/cli/index.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": ["src/cli/index.ts", "src/cli/setup.ts", "src/cli/progress.ts"]
+    },
+    "modules/cli/internals.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": ["src/cli/setup.ts", "src/cli/progress.ts", "src/cli/commands/init.ts", "src/cli/commands/serve.ts", "src/cli/commands/search-cmd.ts"]
+    },
+    "modules/config/index.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": ["src/config/index.ts"]
+    },
+    "modules/conversation/index.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": ["src/conversation/parser.ts", "src/conversation/indexer.ts"]
+    },
+    "modules/db/index.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": ["src/db/index.ts", "src/db/types.ts", "src/db/files.ts", "src/db/search.ts", "src/db/graph.ts", "src/db/conversation.ts", "src/db/checkpoints.ts", "src/db/annotations.ts", "src/db/analytics.ts"]
+    },
+    "modules/db/internals.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": ["src/db/index.ts", "src/db/types.ts", "src/db/files.ts", "src/db/search.ts", "src/db/graph.ts", "src/db/conversation.ts", "src/db/checkpoints.ts", "src/db/annotations.ts", "src/db/analytics.ts"]
+    },
+    "modules/embeddings/index.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": ["src/embeddings/embed.ts"]
+    },
+    "modules/graph/index.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": ["src/graph/resolver.ts"]
+    },
+    "modules/indexing/index.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": ["src/indexing/chunker.ts", "src/indexing/indexer.ts", "src/indexing/parse.ts", "src/indexing/watcher.ts"]
+    },
+    "modules/search/index.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": ["src/search/hybrid.ts", "src/search/usages.ts", "src/search/eval.ts", "src/search/benchmark.ts"]
+    },
+    "modules/server/index.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": ["src/server/index.ts"]
+    },
+    "modules/tools/index.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": ["src/tools/index.ts"]
+    },
+    "modules/tools/internals.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": ["src/tools/search.ts", "src/tools/graph-tools.ts", "src/tools/index-tools.ts", "src/tools/annotation-tools.ts", "src/tools/checkpoint-tools.ts", "src/tools/conversation-tools.ts", "src/tools/git-tools.ts", "src/tools/analytics-tools.ts", "src/tools/server-info-tools.ts", "src/tools/wiki-tools.ts"]
+    },
+    "modules/utils/index.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": ["src/utils/log.ts", "src/utils/dir-guard.ts"]
+    },
+    "entities/rag-db.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": ["src/db/index.ts"]
+    },
+    "entities/hybrid-search.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": ["src/search/hybrid.ts"]
+    },
+    "entities/chunk.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": ["src/indexing/chunker.ts"]
+    },
+    "entities/rag-config.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": ["src/config/index.ts"]
+    },
+    "guides/getting-started.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": ["src/cli/setup.ts", "src/cli/commands/init.ts"]
+    },
+    "guides/conventions.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": []
+    },
+    "guides/testing.md": {
+      "generatedAt": "2026-04-06T08:30:00.000Z",
+      "sourceFiles": ["tests/helpers.ts"]
+    }
+  }
+}
