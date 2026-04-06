@@ -35,7 +35,7 @@ The CLI is invoked via `bunx @winci/local-rag <command>`. Commands are defined i
 | Command | File | Description |
 |---------|------|-------------|
 | `serve` | serve.ts | Start MCP server (stdio transport) |
-| `init [dir]` | init.ts | Set up editor config, rules, `.rag/`, `.gitignore` (`--ide claude\|cursor\|windsurf\|copilot\|all`) |
+| `init [dir]` | init.ts | Set up editor config, rules, `.rag/`, `.gitignore` (`--ide claude\|cursor\|windsurf\|copilot\|jetbrains\|all`) |
 | `index [dir]` | index-cmd.ts | Index files in a directory |
 | `search <query>` | search-cmd.ts | Semantic search (also: `read <query>` for chunk-level) |
 | `status [dir]` | status.ts | Show index stats |

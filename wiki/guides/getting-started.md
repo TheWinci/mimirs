@@ -16,7 +16,7 @@ Run the init command for your IDE:
 bunx @winci/local-rag init --ide claude
 ```
 
-Supported `--ide` values: `claude`, `cursor`, `windsurf`, `copilot`, `all`.
+Supported `--ide` values: `claude`, `cursor`, `windsurf`, `copilot`, `jetbrains`, `all`.
 
 This creates:
 

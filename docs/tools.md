@@ -31,7 +31,7 @@ These tools are available to any MCP client (Claude Code, Cursor, Windsurf, VS C
 
 ```bash
 local-rag serve              # Start MCP server (stdio transport)
-local-rag init [dir]         # Set up editor config, rules, .rag/, .gitignore (--ide claude|cursor|windsurf|copilot|all)
+local-rag init [dir]         # Set up editor config, rules, .rag/, .gitignore (--ide claude|cursor|windsurf|copilot|jetbrains|all)
 local-rag index [dir]        # Index files in a directory
 local-rag search <query>     # Semantic search
 local-rag read <query>       # Chunk-level retrieval (like read_relevant)
