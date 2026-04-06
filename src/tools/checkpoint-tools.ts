@@ -7,7 +7,7 @@ import { type GetDB, resolveProject } from "./index";
 export function registerCheckpointTools(server: McpServer, getDB: GetDB) {
   server.tool(
     "create_checkpoint",
-    "Create a named checkpoint marking an important moment. Call this liberally: after completing any feature or task, after adding or modifying tools, after key technical decisions, before and after large refactors, when hitting a blocker, or when changing direction. Checkpoints are the only way future sessions can know what was done and why — if in doubt, create one.",
+    "Save a checkpoint so future sessions know what was done and why. REQUIRED: call this as your final step after completing any user-requested task, before responding to the user. Also call when hitting a blocker or changing direction mid-task.",
     {
       type: z
         .enum(["decision", "milestone", "blocker", "direction_change", "handoff"])
@@ -56,10 +56,20 @@ export function registerCheckpointTools(server: McpServer, getDB: GetDB) {
         embedding
       );
 
+      const hints: string[] = [];
+      if (filesInvolved && filesInvolved.length > 0) {
+        hints.push(
+          `If you noticed any caveats, known issues, or "don't touch" conditions in the files above, call annotate() now to attach them.`
+        );
+      }
+
       return {
         content: [{
           type: "text" as const,
-          text: `Checkpoint #${id} created: [${type}] ${title}`,
+          text: [
+            `Checkpoint #${id} created: [${type}] ${title}`,
+            ...hints,
+          ].join("\n\n"),
         }],
       };
     }

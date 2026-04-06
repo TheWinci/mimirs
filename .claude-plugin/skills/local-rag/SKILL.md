@@ -26,10 +26,10 @@ This project has a local RAG index (local-rag). Use these MCP tools:
 - **`search_conversation`**: Search past conversation history to recall previous
   decisions, discussions, and tool outputs. Use this before re-investigating
   something that may have been discussed in an earlier session.
-- **`create_checkpoint`**: Mark important moments — decisions, milestones,
-  blockers, direction changes. Do this liberally: after completing any feature
-  or task, after adding/modifying tools, after key technical decisions, before
-  and after large refactors, or when changing direction. If in doubt, create one.
+- **`create_checkpoint`**: **Call this as your final step after completing any
+  user-requested task**, before responding to the user. Also call when hitting
+  a blocker or changing direction mid-task. Include what was done, which files
+  changed, and why. This is the only way future sessions know what happened.
 - **`list_checkpoints`** / **`search_checkpoints`**: Review or search past
   checkpoints to understand project history and prior decisions.
 - **`index_files`**: If you've created or modified files and want them searchable,
@@ -45,9 +45,10 @@ This project has a local RAG index (local-rag). Use these MCP tools:
   call this to see what files have already been modified, recent commits, and
   which changed files are in the index. Avoids redundant searches and conflicting
   edits on already-modified files.
-- **`annotate`**: Attach a persistent note to a file or symbol — "known race
-  condition", "don't refactor until auth rewrite lands", etc. Notes appear as
-  `[NOTE]` blocks inline in `read_relevant` results automatically.
+- **`annotate`**: Call this immediately when you encounter a known bug, race
+  condition, fragile code, non-obvious constraint, or workaround while reading
+  code. Notes persist across sessions and surface as `[NOTE]` blocks inline in
+  `read_relevant` results automatically.
 - **`get_annotations`**: Retrieve all notes for a file, or search semantically
   across all annotations to find relevant caveats before editing.
 - **`depends_on`**: List all files that a given file imports — its dependencies.
