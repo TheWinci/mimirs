@@ -37,7 +37,7 @@ Analytics log every query locally — nothing leaves your machine. Zero-result a
 
 ## Quick start
 
-Works with [Claude Code](https://claude.ai/code), [Cursor](https://cursor.sh), [Windsurf](https://codeium.com/windsurf), and [VS Code Copilot](https://code.visualstudio.com/).
+Works with any MCP-compatible agent or IDE. The `init` command auto-configures Claude Code, Cursor, Windsurf, JetBrains (Junie), and Copilot — but you can point any MCP client at the server manually.
 
 ### 1. Install SQLite (macOS)
 
