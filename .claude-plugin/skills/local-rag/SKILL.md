@@ -56,5 +56,6 @@ This project has a local RAG index (local-rag). Use these MCP tools:
 - **`write_relevant`**: Before adding new code or docs, find the best insertion
   point — returns the most semantically appropriate file and anchor.
 - **`generate_wiki`**: Generate or update a structured markdown wiki for the
-  codebase. Returns step-by-step instructions — follow them using the other
-  local-rag tools to build wiki pages in `wiki/`.
+  codebase. Call with `run: true` to immediately execute all phases. Follow
+  the returned instructions step by step using the other local-rag tools to
+  build wiki pages in `wiki/`.

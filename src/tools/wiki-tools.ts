@@ -406,20 +406,30 @@ Source: <new HEAD ref>.
 export function registerWikiTools(server: McpServer, getDB: GetDB) {
   server.tool(
     "generate_wiki",
-    "Generate or update a structured markdown wiki for the codebase. Returns step-by-step instructions — follow them using local-rag tools (read_relevant, search_symbols, project_map, etc.) to build wiki pages in wiki/. Supports incremental updates when wiki/_manifest.json already exists.",
+    "Generate or update a structured markdown wiki for the codebase. Call with run: true to immediately execute all phases (recommended). Returns step-by-step instructions that use local-rag tools (read_relevant, search_symbols, project_map, etc.) to build wiki pages in wiki/. When run is true, follow every phase without waiting for user input. Supports incremental updates when wiki/_manifest.json already exists.",
     {
       directory: z
         .string()
         .optional()
         .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
+      run: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe("When true, instructs the agent to immediately execute all phases without waiting for further user input"),
     },
-    async ({ directory }) => {
+    async ({ directory, run }) => {
       const { db: ragDb } = await resolveProject(directory, getDB);
       const status = ragDb.getStatus();
 
-      const preamble = status.totalFiles === 0
-        ? "⚠ The index is empty — run `index_files()` first, then follow the instructions below.\n\n"
-        : `Index: ${status.totalFiles} files, ${status.totalChunks} chunks. Ready to generate.\n\n`;
+      let preamble: string;
+      if (status.totalFiles === 0) {
+        preamble = "⚠ The index is empty — run `index_files()` first, then follow the instructions below.\n\n";
+      } else if (run) {
+        preamble = `Index: ${status.totalFiles} files, ${status.totalChunks} chunks.\n\n**ACTION REQUIRED: Follow the phases below step by step. Start with Phase 0 now. Do not wait for further user input. Execute all tool calls described in each phase, write the wiki files, and continue until Phase 6 (or Phase 7 for incremental updates) is complete.**\n\n`;
+      } else {
+        preamble = `Index: ${status.totalFiles} files, ${status.totalChunks} chunks. Ready to generate.\n\n`;
+      }
 
       return {
         content: [{ type: "text" as const, text: preamble + WIKI_INSTRUCTIONS }],
