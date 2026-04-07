@@ -90,7 +90,7 @@ export class RagDB {
       ? resolve(customRagDir)
       : process.env.RAG_DB_DIR
         ? resolve(process.env.RAG_DB_DIR)
-        : join(projectDir, ".rag");
+        : join(projectDir, ".mimirs");
 
     try {
       mkdirSync(ragDir, { recursive: true });
@@ -101,7 +101,7 @@ export class RagDB {
           ? `RAG_DB_DIR path "${ragDir}"`
           : `project directory "${projectDir}"`;
         throw new Error(
-          `local-rag: cannot write to ${where} (${code}).\n` +
+          `mimirs: cannot write to ${where} (${code}).\n` +
           `Set RAG_DB_DIR to a writable directory in your MCP server config:\n` +
           `  "env": { "RAG_DB_DIR": "/tmp/my-project-rag", "RAG_PROJECT_DIR": "..." }`
         );

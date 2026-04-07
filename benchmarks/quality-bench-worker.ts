@@ -38,7 +38,7 @@ mkdirSync(ragDir, { recursive: true });
 // ---------------------------------------------------------------------------
 
 const { pipeline: hfPipeline, env } = await import("@huggingface/transformers");
-env.cacheDir = join(homedir(), ".cache", "local-rag", "models");
+env.cacheDir = join(homedir(), ".cache", "mimirs", "models");
 
 const numThreads = Math.max(2, Math.floor(cpus().length / 3));
 
@@ -209,7 +209,7 @@ console.error(`[${dtype}] Indexed ${indexed} files in ${indexTimeMs.toFixed(0)}m
 // by default. We need search to use OUR model. Since we can't monkey-patch
 // the module, we'll drive the search manually.
 
-const queries = await loadBenchmarkQueries(resolve("benchmarks/local-rag-queries.json"));
+const queries = await loadBenchmarkQueries(resolve("benchmarks/mimirs-queries.json"));
 const topK = config.benchmarkTopK;
 
 console.error(`[${dtype}] Running ${queries.length} queries...`);

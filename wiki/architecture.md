@@ -2,7 +2,7 @@
 
 ## Overview
 
-local-rag is a semantic search and code intelligence MCP server built with Bun and TypeScript. It indexes codebases into a local SQLite database with vector embeddings (via Hugging Face Transformers.js), then exposes search, navigation, and annotation capabilities through the Model Context Protocol. Everything runs locally — no external APIs, no cloud dependencies.
+mimirs is a semantic search and code intelligence MCP server built with Bun and TypeScript. It indexes codebases into a local SQLite database with vector embeddings (via Hugging Face Transformers.js), then exposes search, navigation, and annotation capabilities through the Model Context Protocol. Everything runs locally — no external APIs, no cloud dependencies.
 
 ## Module Map
 
@@ -56,13 +56,13 @@ graph TD
 
 There are two primary entry points:
 
-1. **CLI** (`src/main.ts` → `src/cli/index.ts`) — The command-line interface. Provides commands for indexing, searching, setup, benchmarking, and launching the MCP server. This is the main user-facing entry point invoked via `bunx @winci/local-rag`.
+1. **CLI** (`src/main.ts` → `src/cli/index.ts`) — The command-line interface. Provides commands for indexing, searching, setup, benchmarking, and launching the MCP server. This is the main user-facing entry point invoked via `bunx mimirs`.
 
 2. **MCP Server** (`src/server/index.ts`) — Started by the `serve` CLI command. Runs over stdio, registers all MCP tools, and handles requests from AI agents (Claude Code, Cursor, etc.). This is the primary machine-facing entry point.
 
 ## Configuration
 
-Configuration lives in `.rag/config.json` per project. If missing, it's auto-created with defaults on first use. The config schema is validated with Zod (`src/config/index.ts`).
+Configuration lives in `.mimirs/config.json` per project. If missing, it's auto-created with defaults on first use. The config schema is validated with Zod (`src/config/index.ts`).
 
 Key config options:
 - `include` / `exclude` — glob patterns for which files to index (53 include patterns by default covering 20+ languages)
@@ -75,7 +75,7 @@ Key config options:
 ## Design Decisions
 
 - **Local-first**: All processing happens locally using Hugging Face Transformers.js via ONNX runtime. No API keys or network calls needed.
-- **SQLite + sqlite-vec**: Single-file database with WAL mode for concurrent reads. Vector search via the `sqlite-vec` extension. FTS5 for BM25 text search. All in one DB file at `.rag/index.db`.
+- **SQLite + sqlite-vec**: Single-file database with WAL mode for concurrent reads. Vector search via the `sqlite-vec` extension. FTS5 for BM25 text search. All in one DB file at `.mimirs/index.db`.
 - **Hybrid search**: Combines semantic vector search with BM25 keyword matching (configurable weight) to handle both natural language queries and exact symbol lookups.
 - **AST-aware chunking**: Uses tree-sitter (via `@winci/bun-chunk`) to parse source files into semantically meaningful chunks (functions, classes, methods) rather than arbitrary fixed-size splits. Falls back to heuristic blank-line splitting for unsupported languages.
 - **Incremental indexing**: Files are hashed and only re-indexed when content changes. Chunk-level deduplication via content hashes avoids redundant embedding computation.

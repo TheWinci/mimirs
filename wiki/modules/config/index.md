@@ -1,8 +1,8 @@
 # Config Module
 
 The Config module (`src/config/`) manages project-level configuration for
-local-rag. It defines the schema, defaults, and loading logic for
-`.rag/config.json`.
+mimirs. It defines the schema, defaults, and loading logic for
+`.mimirs/config.json`.
 
 ## Entry Point -- `index.ts`
 
@@ -11,7 +11,7 @@ A single file module with the following exports:
 - **`RagConfigSchema`** -- Zod schema defining all config fields and their
   validation rules.
 - **`DEFAULT_CONFIG`** -- Default values used when creating a new config file.
-- **`loadConfig(projectDir)`** -- Reads `.rag/config.json`, validates it
+- **`loadConfig(projectDir)`** -- Reads `.mimirs/config.json`, validates it
   against the Zod schema, and returns the parsed config. Auto-creates the file
   with defaults if it does not exist.
 - **`applyEmbeddingConfig(config)`** -- Takes a loaded config and calls
@@ -20,7 +20,7 @@ A single file module with the following exports:
 
 ## Config Location
 
-Configuration is stored at `<projectDir>/.rag/config.json`. The file is
+Configuration is stored at `<projectDir>/.mimirs/config.json`. The file is
 auto-created with `DEFAULT_CONFIG` values on first access.
 
 ## Key Config Fields

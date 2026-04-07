@@ -1,6 +1,6 @@
 # DB Module
 
-The DB module (`src/db/`) is the persistence layer for local-rag. It wraps
+The DB module (`src/db/`) is the persistence layer for mimirs. It wraps
 SQLite via `bun:sqlite`, loading the [sqlite-vec](https://github.com/asg017/sqlite-vec)
 extension for vector similarity search and using FTS5 for BM25 full-text
 ranking.
@@ -40,7 +40,7 @@ All database access flows through the `RagDB` class exported from
 constructor(projectDir: string, customRagDir?: string)
 ```
 
-- **projectDir** -- used to derive the default `.rag/` storage directory.
+- **projectDir** -- used to derive the default `.mimirs/` storage directory.
 - **customRagDir** -- explicit override. If omitted, falls back to
   `RAG_DB_DIR` env var, then `<projectDir>/.rag`.
 
@@ -48,7 +48,7 @@ On instantiation the class:
 
 1. Calls `loadCustomSQLite()` -- on macOS, swaps Apple's bundled SQLite
    (which lacks extension support) for Homebrew's build.
-2. Creates the `.rag/` directory if absent.
+2. Creates the `.mimirs/` directory if absent.
 3. Opens `index.db` with WAL mode and a 5-second busy timeout.
 4. Loads the sqlite-vec extension.
 5. Runs `initSchema()` to create all tables, virtual tables, triggers,

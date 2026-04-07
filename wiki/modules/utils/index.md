@@ -25,11 +25,11 @@ keeps log output separate from the stdio protocol used for MCP communication.
 
 ### `dir-guard.ts` -- Directory Validation
 
-Validates that the `.rag/` index directory is safe to use.
+Validates that the `.mimirs/` index directory is safe to use.
 
 **Exports:**
 
-- **`checkIndexDir`** -- Validates that the `.rag/` directory is writable and
+- **`checkIndexDir`** -- Validates that the `.mimirs/` directory is writable and
   not located inside a temporary directory. Throws with a descriptive error
   if validation fails.
 

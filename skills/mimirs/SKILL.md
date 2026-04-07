@@ -1,9 +1,9 @@
 ---
-name: local-rag
+name: mimirs
 description: Semantic search, code navigation, and conversation memory for the current project. Use automatically when searching code, finding usages, navigating dependencies, or recalling past discussions.
 ---
 
-This project has a local RAG index (local-rag). Use these MCP tools proactively:
+This project has a local RAG index (mimirs). Use these MCP tools proactively:
 
 - **`search`**: Discover which files are relevant to a topic. Returns file paths
   with snippet previews — use this when you need to know *where* something is.
@@ -44,5 +44,5 @@ This project has a local RAG index (local-rag). Use these MCP tools proactively:
   point — returns the most semantically appropriate file and anchor.
 - **`generate_wiki`**: Generate or update a structured markdown wiki for the
   codebase. Call with `run: true` to immediately execute all phases. Follow
-  the returned instructions step by step using the other local-rag tools to
+  the returned instructions step by step using the other mimirs tools to
   build wiki pages in `wiki/`.

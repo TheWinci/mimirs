@@ -11,24 +11,24 @@ main().catch((err) => {
   try {
     const { mkdirSync, writeFileSync } = require("fs");
     const { join } = require("path");
-    const ragDir = join(projectDir, ".rag");
+    const ragDir = join(projectDir, ".mimirs");
     mkdirSync(ragDir, { recursive: true });
     writeFileSync(
       join(ragDir, "server-error.log"),
       [
-        `local-rag server crashed at ${new Date().toISOString()}`,
+        `mimirs server crashed at ${new Date().toISOString()}`,
         ``,
         `Error: ${msg}`,
         ``,
         stack,
         ``,
-        `To diagnose: bunx @winci/local-rag doctor`,
+        `To diagnose: bunx mimirs doctor`,
       ].join("\n")
     );
   } catch {
     // Best-effort — if we can't write, fall through to stderr
   }
 
-  console.error(`[local-rag] FATAL: ${msg}`);
+  console.error(`[mimirs] FATAL: ${msg}`);
   process.exit(1);
 });

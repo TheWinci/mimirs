@@ -18,7 +18,7 @@ export function registerIndexTools(server: McpServer, getDB: GetDB, writeStatus?
         .array(z.string())
         .optional()
         .describe(
-          "Override include patterns (e.g. ['**/*.md', '**/*.ts']). Uses .rag/config.json if not provided"
+          "Override include patterns (e.g. ['**/*.md', '**/*.ts']). Uses .mimirs/config.json if not provided"
         ),
     },
     async ({ directory, patterns }) => {

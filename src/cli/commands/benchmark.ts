@@ -7,7 +7,7 @@ import { cli } from "../../utils/log";
 export async function benchmarkCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const file = args[1];
   if (!file) {
-    cli.error("Usage: local-rag benchmark <file> [--dir D] [--top N]");
+    cli.error("Usage: mimirs benchmark <file> [--dir D] [--top N]");
     process.exit(1);
   }
 

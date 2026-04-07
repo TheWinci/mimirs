@@ -24,7 +24,7 @@ fi
 FILE_COUNT=$(echo "$ALL_FILES" | tr ',' '\n' | wc -l | tr -d ' ')
 SUMMARY="Session ended with ${FILE_COUNT} modified file(s): ${ALL_FILES}"
 
-bunx @winci/local-rag checkpoint create \
+bunx mimirs checkpoint create \
   "handoff" \
   "Session end (auto)" \
   "$SUMMARY" \

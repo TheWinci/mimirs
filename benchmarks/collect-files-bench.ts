@@ -48,7 +48,7 @@ const INCLUDE_PATTERNS = [
   "**/*.bru",
 ];
 
-const EXCLUDE_PATTERNS = ["node_modules/**", ".git/**", "dist/**", ".rag/**"];
+const EXCLUDE_PATTERNS = ["node_modules/**", ".git/**", "dist/**", ".mimirs/**"];
 
 const WARMUP_RUNS = 2;
 const BENCH_RUNS = 5;

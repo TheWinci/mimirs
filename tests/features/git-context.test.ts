@@ -45,7 +45,7 @@ describe("git_context tool", () => {
   });
 
   test("returns git context for a real git repository", async () => {
-    // Use the local-rag repo itself (which is a git repo)
+    // Use the mimirs repo itself (which is a git repo)
     const repoDir = join(import.meta.dir, "..", "..");
     const result = await client.callTool({
       name: "git_context",

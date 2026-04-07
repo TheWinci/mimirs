@@ -1,7 +1,7 @@
 /**
  * All project output in one place.
  *
- * - `log`  — MCP diagnostic channel (stderr, level-gated, [local-rag] prefix)
+ * - `log`  — MCP diagnostic channel (stderr, level-gated, [mimirs] prefix)
  * - `cli`  — CLI user-facing output (stdout/stderr, no prefix)
  */
 
@@ -27,8 +27,8 @@ process.stderr.on("error", () => {});
 function write(level: Level, prefix: string, msg: string, context?: string) {
   if (LEVELS[level] < currentLevel()) return;
   const line = context
-    ? `[local-rag] ${prefix} ${msg} (${context})`
-    : `[local-rag] ${prefix} ${msg}`;
+    ? `[mimirs] ${prefix} ${msg} (${context})`
+    : `[mimirs] ${prefix} ${msg}`;
   process.stderr.write(line + "\n");
 }
 

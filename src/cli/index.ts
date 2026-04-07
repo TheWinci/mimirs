@@ -24,45 +24,45 @@ const args = process.argv.slice(2);
 const command = args[0];
 
 function usage() {
-  cli.log(`local-rag — Local RAG for semantic file search
+  cli.log(`mimirs — Local RAG for semantic file search
 
 Usage:
-  local-rag serve                      Start MCP server (stdio)
-  local-rag init [dir] [--ide IDEs]    Create default .rag/config.json
+  mimirs serve                      Start MCP server (stdio)
+  mimirs init [dir] [--ide IDEs]    Create default .mimirs/config.json
               IDEs: claude,cursor,windsurf,copilot,all
-  local-rag index [dir] [--patterns ...] Index files in directory
-  local-rag search <query> [--top N]   Search indexed files
-  local-rag read <query> [--top N]     Read relevant chunks (full content)
+  mimirs index [dir] [--patterns ...] Index files in directory
+  mimirs search <query> [--top N]   Search indexed files
+  mimirs read <query> [--top N]     Read relevant chunks (full content)
               [--threshold T] [--dir D]
-  local-rag status [dir]               Show index stats
-  local-rag remove <file> [dir]        Remove file from index
-  local-rag analytics [dir] [--days N] Show search usage analytics
-  local-rag benchmark <file> [--dir D] Run search quality benchmark
+  mimirs status [dir]               Show index stats
+  mimirs remove <file> [dir]        Remove file from index
+  mimirs analytics [dir] [--days N] Show search usage analytics
+  mimirs benchmark <file> [--dir D] Run search quality benchmark
                        [--top N]
-  local-rag eval <file> [--dir D]      Run A/B eval (with/without RAG)
+  mimirs eval <file> [--dir D]      Run A/B eval (with/without RAG)
                   [--top N] [--out F]
-  local-rag map [dir] [--focus F]      Generate project dependency graph
+  mimirs map [dir] [--focus F]      Generate project dependency graph
                 [--zoom file|directory]     (Mermaid format)
                 [--max N]
-  local-rag conversation search <query> Search conversation history
+  mimirs conversation search <query> Search conversation history
                 [--dir D] [--top N]
-  local-rag conversation sessions      List indexed sessions
+  mimirs conversation sessions      List indexed sessions
                 [--dir D]
-  local-rag conversation index [--dir D] Index all sessions for a project
-  local-rag checkpoint create <type>   Create a checkpoint
+  mimirs conversation index [--dir D] Index all sessions for a project
+  mimirs checkpoint create <type>   Create a checkpoint
                 <title> <summary>
                 [--dir D] [--files f1,f2] [--tags t1,t2]
-  local-rag checkpoint list [--dir D]  List checkpoints
+  mimirs checkpoint list [--dir D]  List checkpoints
                 [--type T] [--top N]
-  local-rag checkpoint search <query>  Search checkpoints
+  mimirs checkpoint search <query>  Search checkpoints
                 [--dir D] [--type T] [--top N]
-  local-rag annotations [dir]          List annotations
+  mimirs annotations [dir]          List annotations
                 [--path P] [--dir D]
-  local-rag session-context [dir]      Session start context summary
+  mimirs session-context [dir]      Session start context summary
                 [--dir D]
-  local-rag doctor [dir]               Diagnose MCP server startup issues
-  local-rag cleanup [dir] [-y]          Remove all local-rag files
-  local-rag demo [dir]                 Run interactive feature demo
+  mimirs doctor [dir]               Diagnose MCP server startup issues
+  mimirs cleanup [dir] [-y]          Remove all mimirs files
+  mimirs demo [dir]                 Run interactive feature demo
 
 Options:
   dir       Project directory (default: current directory)

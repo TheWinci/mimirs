@@ -66,7 +66,7 @@ async function buildParentLookup(): Promise<ParentLookup> {
       const relPath = resolve(absPath); // absolute for matching with DB paths
       for (const c of result.chunks) {
         if (c.parentName && (c.type === "method" || c.type === "field")) {
-          // bun-chunk uses 0-indexed lines, local-rag uses 1-indexed
+          // bun-chunk uses 0-indexed lines, mimirs uses 1-indexed
           const key = `${relPath}:${c.startLine + 1}`;
           lookup.set(key, {
             parentName: c.parentName,

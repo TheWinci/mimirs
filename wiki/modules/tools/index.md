@@ -1,6 +1,6 @@
 # Tools Module
 
-The Tools module (`src/tools/`) defines all MCP tools that local-rag exposes
+The Tools module (`src/tools/`) defines all MCP tools that mimirs exposes
 to AI agents. Each tool file registers one or more tools with the MCP server,
 providing the agent with search, indexing, graph, annotation, and context
 capabilities.

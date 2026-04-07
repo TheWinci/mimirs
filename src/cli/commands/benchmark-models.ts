@@ -32,7 +32,7 @@ function parseModelArg(arg: string): ModelSpec {
 export async function benchmarkModelsCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const file = args[1];
   if (!file) {
-    cli.error("Usage: local-rag benchmark-models <queries.json> --models model1,model2 [--dir D] [--top N]");
+    cli.error("Usage: mimirs benchmark-models <queries.json> --models model1,model2 [--dir D] [--top N]");
     cli.error("\nKnown models:");
     for (const [name, spec] of Object.entries(KNOWN_MODELS)) {
       cli.error(`  ${name} (${spec.dim}d)`);

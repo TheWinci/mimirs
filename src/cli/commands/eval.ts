@@ -7,7 +7,7 @@ import { cli } from "../../utils/log";
 export async function evalCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const file = args[1];
   if (!file) {
-    cli.error("Usage: local-rag eval <file> [--dir D] [--top N] [--out F]");
+    cli.error("Usage: mimirs eval <file> [--dir D] [--top N] [--out F]");
     process.exit(1);
   }
 

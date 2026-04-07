@@ -1,6 +1,6 @@
 # Chunk
 
-A Chunk is the atomic unit of indexed content in local-rag. Each chunk
+A Chunk is the atomic unit of indexed content in mimirs. Each chunk
 represents a semantically meaningful fragment of a file — a function, a class,
 a markdown section, or a fixed-size text block — and carries optional metadata
 about its origin.
@@ -97,7 +97,7 @@ Supported extensions: `.ts`, `.tsx`, `.js`, `.jsx`, `.py`, `.go`, `.rs`,
 
 Produces chunks with `imports`, `exports`, `name`, `chunkType`, and
 `parentName` metadata. Line numbers are converted from 0-indexed (bun-chunk)
-to 1-indexed (local-rag convention).
+to 1-indexed (mimirs convention).
 
 ### Heuristic blank-line splitting
 

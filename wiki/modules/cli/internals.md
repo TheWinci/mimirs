@@ -53,13 +53,13 @@ flowchart TD
 
 ### Config and Instructions
 
-- `ensureConfig()` creates `.rag/config.json` with `DEFAULT_CONFIG` values if
+- `ensureConfig()` creates `.mimirs/config.json` with `DEFAULT_CONFIG` values if
   the file does not exist.
-- `ensureAgentInstructions()` appends local-rag usage guidance to the IDE's
+- `ensureAgentInstructions()` appends mimirs usage guidance to the IDE's
   instruction file (e.g., `CLAUDE.md`).
 - `ensureMcpJson()` writes the MCP server registration into the IDE's MCP
   config file. Uses `mcpConfigSnippet()` to generate the JSON payload.
-- `ensureGitignore()` appends `.rag/` to the project's `.gitignore`.
+- `ensureGitignore()` appends `.mimirs/` to the project's `.gitignore`.
 
 ### User Confirmation
 

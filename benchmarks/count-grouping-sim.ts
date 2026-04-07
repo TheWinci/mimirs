@@ -1,5 +1,5 @@
 /**
- * Simulate count-based parent grouping on both local-rag and excalidraw.
+ * Simulate count-based parent grouping on both mimirs and excalidraw.
  *
  * Rule: if ≥2 sub-chunks from the same parent appear in top-K results,
  * replace them all with one parent chunk (keeping the highest score).
@@ -24,7 +24,7 @@ interface Project {
 
 const projects: Project[] = [
   {
-    name: "local-rag",
+    name: "mimirs",
     dir: resolve(import.meta.dir, ".."),
     dbPath: resolve(import.meta.dir, ".."),
     queries: [
@@ -45,7 +45,7 @@ const projects: Project[] = [
   {
     name: "excalidraw",
     dir: "/Users/winci/repos/excalidraw",
-    dbPath: resolve(import.meta.dir, "..", ".rag", "bench-excalidraw", "index.db"),
+    dbPath: resolve(import.meta.dir, "..", ".mimirs", "bench-excalidraw", "index.db"),
     queries: [
       { query: "linear element editor selection and dragging", kind: "broad" },
       { query: "scene management elements state", kind: "broad" },

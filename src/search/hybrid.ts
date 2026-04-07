@@ -90,7 +90,7 @@ const BOILERPLATE_BASENAMES = new Set([
 ]);
 
 // ── Generated file demotion ──────────────────────────────────────
-// Configurable via "generated" in .rag/config.json. Patterns use the same
+// Configurable via "generated" in .mimirs/config.json. Patterns use the same
 // glob syntax as "exclude": "**/*.generated.ts", "generated/**",
 // "**/zz_generated*", etc.
 const GENERATED_DEMOTION = 0.75;

@@ -30,12 +30,12 @@ These tools are registered by `registerAllTools()` in `src/tools/index.ts` and a
 
 ## CLI Commands
 
-The CLI is invoked via `bunx @winci/local-rag <command>`. Commands are defined in `src/cli/commands/`:
+The CLI is invoked via `bunx mimirs <command>`. Commands are defined in `src/cli/commands/`:
 
 | Command | File | Description |
 |---------|------|-------------|
 | `serve` | serve.ts | Start MCP server (stdio transport) |
-| `init [dir]` | init.ts | Set up editor config, rules, `.rag/`, `.gitignore` (`--ide claude\|cursor\|windsurf\|copilot\|jetbrains\|all`) |
+| `init [dir]` | init.ts | Set up editor config, rules, `.mimirs/`, `.gitignore` (`--ide claude\|cursor\|windsurf\|copilot\|jetbrains\|all`) |
 | `index [dir]` | index-cmd.ts | Index files in a directory |
 | `search <query>` | search-cmd.ts | Semantic search (also: `read <query>` for chunk-level) |
 | `status [dir]` | status.ts | Show index stats |
@@ -50,11 +50,11 @@ The CLI is invoked via `bunx @winci/local-rag <command>`. Commands are defined i
 | `session-context` | session-context.ts | Session start context summary (used by hook) |
 | `doctor` | doctor.ts | Diagnose common setup issues |
 | `demo [dir]` | demo.ts | Interactive feature demo |
-| `cleanup` | cleanup.ts | Remove local-rag config and data from a project |
+| `cleanup` | cleanup.ts | Remove mimirs config and data from a project |
 
 ## Configuration Options
 
-Stored in `.rag/config.json`, validated by `RagConfigSchema` (Zod):
+Stored in `.mimirs/config.json`, validated by `RagConfigSchema` (Zod):
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|

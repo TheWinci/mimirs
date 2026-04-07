@@ -1,6 +1,6 @@
 # RagDB
 
-Central database facade for local-rag. Wraps a SQLite database (with
+Central database facade for mimirs. Wraps a SQLite database (with
 sqlite-vec and FTS5) and delegates every operation to specialised sub-modules.
 
 **Source:** `src/db/index.ts`
@@ -16,7 +16,7 @@ export class RagDB {
 ```
 
 `projectDir` is used only during construction to locate (or create)
-`.rag/index.db`. It is **not** stored as a field. An optional `customRagDir`
+`.mimirs/index.db`. It is **not** stored as a field. An optional `customRagDir`
 overrides the default path; the `RAG_DB_DIR` environment variable is also
 respected as a fallback.
 
@@ -24,7 +24,7 @@ respected as a fallback.
 
 1. Calls `loadCustomSQLite()` — on macOS, points `bun:sqlite` at Homebrew's
    vanilla SQLite build so extension loading works.
-2. Resolves the `.rag` directory (`customRagDir` > `RAG_DB_DIR` env >
+2. Resolves the `.mimirs` directory (`customRagDir` > `RAG_DB_DIR` env >
    `projectDir/.rag`), creating it if needed.
 3. Opens `index.db` in WAL mode with a 5 s busy timeout.
 4. Loads the `sqlite-vec` extension.

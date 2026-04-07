@@ -1,7 +1,7 @@
 # Server Module
 
 The Server module (`src/server/`) implements the MCP (Model Context Protocol)
-server that exposes local-rag's capabilities to AI agents over stdio transport.
+server that exposes mimirs's capabilities to AI agents over stdio transport.
 
 ## Entry Point -- `index.ts`
 
@@ -37,8 +37,8 @@ flowchart TD
 2. **Connect stdio transport** -- the server communicates with the AI agent
    over stdin/stdout (MCP standard).
 3. **Register tools** -- calls `registerAllTools()` from the Tools module to
-   make all local-rag tools available to the agent.
-4. **Load config** -- reads `.rag/config.json` via the Config module.
+   make all mimirs tools available to the agent.
+4. **Load config** -- reads `.mimirs/config.json` via the Config module.
 5. **Background indexing** -- kicks off file indexing in the background so the
    server is responsive immediately while the index builds.
 6. **Conversation indexing** -- indexes conversation history from Claude Code

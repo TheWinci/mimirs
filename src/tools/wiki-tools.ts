@@ -5,7 +5,7 @@ import { type GetDB, resolveProject } from "./index";
 const WIKI_INSTRUCTIONS = `# Wiki Generator
 
 Generate a structured, cross-linked markdown wiki from the current codebase
-using local-rag MCP tools. The wiki is built by querying the semantic index —
+using mimirs MCP tools. The wiki is built by querying the semantic index —
 not by bulk-reading source files.
 
 ## Output Structure
@@ -39,7 +39,7 @@ wiki/
 - **Diagrams**: Use Mermaid.js fenced blocks. Include all relevant nodes — completeness over brevity. Use subgraphs to group when diagrams are large. Use \`graph TD\` for hierarchies, \`graph LR\` for pipelines, \`sequenceDiagram\` for flows, \`classDiagram\` for entity relationships.
 - **Mermaid reserved words**: Never use Mermaid keywords as bare node IDs. Reserved words include: \`graph\`, \`subgraph\`, \`end\`, \`style\`, \`classDef\`, \`click\`, \`linkStyle\`, \`class\`, \`default\`, \`node\`, \`edge\`. Always suffix them (e.g., \`depGraph\`, \`graphTools\`, \`endNode\`).
 - **Over-fetch**: Use higher \`top\` values than defaults (see per-phase instructions). Missing context produces shallow pages.
-- **No bulk reads**: Always use local-rag tools (\`read_relevant\`, \`search_symbols\`, \`project_map\`, etc.) to gather information. Do not Read entire source files.
+- **No bulk reads**: Always use mimirs tools (\`read_relevant\`, \`search_symbols\`, \`project_map\`, etc.) to gather information. Do not Read entire source files.
 - **No guessing signatures**: When documenting function signatures, parameter names, method names, or units — only write what \`read_relevant\` or \`search_symbols\` actually returned. If a chunk shows \`function foo(query: string, db: RagDB, topK: number)\`, write exactly that. Never invent parameter names, reorder parameters, or assume units (e.g., "tokens" vs "characters") without seeing the source.
 - **Verify exports**: When listing a module's key exports, cross-check against \`search_symbols(symbol: "<module-prefix>", type: "export")\` results. Do not list functions that weren't in the results. Do not rename functions to what they "probably" are.
 
@@ -375,7 +375,7 @@ updates can determine which pages to regenerate when source files change.
 
 ### Re-index
 
-Call \`index_files()\` so the wiki pages themselves become searchable via local-rag.
+Call \`index_files()\` so the wiki pages themselves become searchable via mimirs.
 
 ---
 
@@ -406,7 +406,7 @@ Source: <new HEAD ref>.
 export function registerWikiTools(server: McpServer, getDB: GetDB) {
   server.tool(
     "generate_wiki",
-    "Generate or update a structured markdown wiki for the codebase. Call with run: true to immediately execute all phases (recommended). Returns step-by-step instructions that use local-rag tools (read_relevant, search_symbols, project_map, etc.) to build wiki pages in wiki/. When run is true, follow every phase without waiting for user input. Supports incremental updates when wiki/_manifest.json already exists.",
+    "Generate or update a structured markdown wiki for the codebase. Call with run: true to immediately execute all phases (recommended). Returns step-by-step instructions that use mimirs tools (read_relevant, search_symbols, project_map, etc.) to build wiki pages in wiki/. When run is true, follow every phase without waiting for user input. Supports incremental updates when wiki/_manifest.json already exists.",
     {
       directory: z
         .string()

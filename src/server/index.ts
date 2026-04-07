@@ -58,24 +58,24 @@ export function getConnectedDBs(): Array<{ projectDir: string; openedAt: Date; l
   }));
 }
 
-/** Write crash details to .rag/server-error.log so they're visible outside stderr */
+/** Write crash details to .mimirs/server-error.log so they're visible outside stderr */
 function writeStartupError(err: unknown) {
   const msg = err instanceof Error ? err.message : String(err);
   const stack = err instanceof Error ? err.stack : "(no stack)";
   const projectDir = process.env.RAG_PROJECT_DIR || process.cwd();
   try {
-    const ragDir = join(projectDir, ".rag");
+    const ragDir = join(projectDir, ".mimirs");
     mkdirSync(ragDir, { recursive: true });
     writeFileSync(
       join(ragDir, "server-error.log"),
       [
-        `local-rag server failed at ${new Date().toISOString()}`,
+        `mimirs server failed at ${new Date().toISOString()}`,
         ``,
         `Error: ${msg}`,
         ``,
         stack,
         ``,
-        `To diagnose: bunx @winci/local-rag doctor`,
+        `To diagnose: bunx mimirs doctor`,
       ].join("\n")
     );
   } catch {
@@ -90,7 +90,7 @@ export async function startServer() {
   const startupDir = process.env.RAG_PROJECT_DIR || process.cwd();
   const dirCheck = checkIndexDir(startupDir);
   const isHomeDirTrap = !dirCheck.safe;
-  const ragDir = join(startupDir, ".rag");
+  const ragDir = join(startupDir, ".mimirs");
   const statusPath = !isHomeDirTrap ? join(ragDir, "status") : null;
   const instanceId = `pid:${process.pid}`;
 
@@ -178,7 +178,7 @@ export async function startServer() {
   let server: McpServer;
   try {
     server = new McpServer({
-      name: "local-rag",
+      name: "mimirs",
       version,
     });
 
@@ -219,7 +219,7 @@ export async function startServer() {
       ? `Fix: run "brew install sqlite" and restart your editor.`
       : msg.includes("EROFS") || msg.includes("EACCES")
         ? `Fix: set RAG_DB_DIR to a writable directory in your MCP config.`
-        : `Check the local-rag README for setup instructions.`;
+        : `Check the mimirs README for setup instructions.`;
 
     if (isTransient) {
       // Transient lock — another process was briefly holding the DB.
@@ -255,7 +255,7 @@ export async function startServer() {
   const startupConfig = await loadConfig(startupDir);
 
   if (!isHomeDirTrap) {
-    // Ensure .rag/ is gitignored
+    // Ensure .mimirs/ is gitignored
     ensureGitignore(startupDir).catch((err) => {
       log.warn(`Failed to update .gitignore: ${err instanceof Error ? err.message : err}`, "gitignore");
     });

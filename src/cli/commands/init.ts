@@ -31,7 +31,7 @@ export async function initCommand(args: string[], getFlag: (flag: string) => str
     const config = await loadConfig(dir);
     cli.log(`Indexing ${dir}...`);
 
-    const ragDir = join(dir, ".rag");
+    const ragDir = join(dir, ".mimirs");
     const statusPath = join(ragDir, "status");
     const writeStatus = (status: string) => {
       try {

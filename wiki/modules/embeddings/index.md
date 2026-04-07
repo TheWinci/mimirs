@@ -42,7 +42,7 @@ A single file module. All embedding operations run locally (no API calls).
 
 ### Model Details
 
-- **Model cache:** `~/.cache/local-rag/models` -- models are downloaded once
+- **Model cache:** `~/.cache/mimirs/models` -- models are downloaded once
   and reused across projects.
 - **Token limit:** 256 tokens per window with 32-token overlap for long texts.
 - **Pooling:** Mean pooling + L2 normalization produces unit-length vectors

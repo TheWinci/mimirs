@@ -7,7 +7,7 @@ import { cli } from "../../utils/log";
 export async function searchCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const query = args[1];
   if (!query) {
-    cli.error("Usage: local-rag search <query> [--top N]");
+    cli.error("Usage: mimirs search <query> [--top N]");
     process.exit(1);
   }
 
@@ -35,7 +35,7 @@ export async function searchCommand(args: string[], getFlag: (flag: string) => s
 export async function readCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const query = args[1];
   if (!query) {
-    cli.error("Usage: local-rag read <query> [--top N] [--threshold T] [--dir D]");
+    cli.error("Usage: mimirs read <query> [--top N] [--threshold T] [--dir D]");
     process.exit(1);
   }
 

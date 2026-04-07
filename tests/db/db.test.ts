@@ -24,8 +24,8 @@ afterEach(async () => {
 
 describe("RagDB", () => {
   test("creates .rag directory and index.db", () => {
-    expect(existsSync(join(tempDir, ".rag"))).toBe(true);
-    expect(existsSync(join(tempDir, ".rag", "index.db"))).toBe(true);
+    expect(existsSync(join(tempDir, ".mimirs"))).toBe(true);
+    expect(existsSync(join(tempDir, ".mimirs", "index.db"))).toBe(true);
   });
 
   test("upsertFile stores file + chunks + vectors", async () => {

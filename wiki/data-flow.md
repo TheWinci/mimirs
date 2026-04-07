@@ -2,7 +2,7 @@
 
 ## Overview
 
-Data enters local-rag through two pipelines: **file indexing** (source code → chunks → embeddings → SQLite) and **search** (query → embed → hybrid retrieval → ranked results). A third pipeline handles **conversation indexing** (JSONL transcripts → parsed turns → embeddings → searchable history).
+Data enters mimirs through two pipelines: **file indexing** (source code → chunks → embeddings → SQLite) and **search** (query → embed → hybrid retrieval → ranked results). A third pipeline handles **conversation indexing** (JSONL transcripts → parsed turns → embeddings → searchable history).
 
 ## Primary Flows
 
@@ -115,7 +115,7 @@ sequenceDiagram
 ## Error Paths
 
 - **Corrupted model cache**: If the embedding model fails to load with a protobuf error, the cache is deleted and the model is re-downloaded automatically.
-- **Invalid config**: If `.rag/config.json` has invalid JSON or fails Zod validation, defaults are used and a warning is logged.
+- **Invalid config**: If `.mimirs/config.json` has invalid JSON or fails Zod validation, defaults are used and a warning is logged.
 - **File too large**: Files over 50 MB are skipped during indexing to prevent OOM.
 - **Missing SQLite extension**: On macOS, if Apple's bundled SQLite is used (no extension support), the server throws a clear error directing users to `brew install sqlite`.
 

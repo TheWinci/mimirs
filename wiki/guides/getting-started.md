@@ -13,7 +13,7 @@
 Run the init command for your IDE:
 
 ```sh
-bunx @winci/local-rag init --ide claude
+bunx mimirs init --ide claude
 ```
 
 Supported `--ide` values: `claude`, `cursor`, `windsurf`, `copilot`, `jetbrains`, `all`.
@@ -23,9 +23,9 @@ This creates:
 | File | Purpose |
 |---|---|
 | `.mcp.json` | MCP server configuration for your IDE |
-| `CLAUDE.md` (or IDE equivalent) | Codebase instructions referencing local-rag tools |
-| `.rag/config.json` | Project-level RAG configuration ([RagConfig](../glossary.md#ragconfig)) |
-| `.gitignore` entry | Excludes `.rag/` data directory from version control |
+| `CLAUDE.md` (or IDE equivalent) | Codebase instructions referencing mimirs tools |
+| `.mimirs/config.json` | Project-level RAG configuration ([RagConfig](../glossary.md#ragconfig)) |
+| `.gitignore` entry | Excludes `.mimirs/` data directory from version control |
 
 After init completes, the first index runs interactively — it walks your project, chunks source files, generates embeddings, and populates the SQLite database.
 
@@ -62,7 +62,7 @@ hooks/           # Git and IDE hooks
 
 ## Next Steps
 
-Once the initial index completes, your IDE can call local-rag's MCP tools (`search`, `read_relevant`, `project_map`, etc.) to navigate and understand your codebase.
+Once the initial index completes, your IDE can call mimirs's MCP tools (`search`, `read_relevant`, `project_map`, etc.) to navigate and understand your codebase.
 
 ## See Also
 

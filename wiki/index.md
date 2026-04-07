@@ -1,4 +1,4 @@
-# local-rag Wiki
+# mimirs Wiki
 
 Persistent project memory for AI coding agents. Semantic search, code intelligence, and conversation history — all local, all SQLite, no API keys.
 

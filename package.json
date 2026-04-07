@@ -1,12 +1,12 @@
 {
-  "name": "@winci/local-rag",
+  "name": "mimirs",
   "version": "0.6.13",
-  "description": "Semantic search for your codebase — local-first RAG MCP server with hybrid search, AST-aware chunking, and usage analytics",
+  "description": "Persistent project memory for AI coding agents — semantic search, AST-aware chunking, dependency graphs, and conversation history",
   "type": "module",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/TheWinci/local-rag.git"
+    "url": "git+https://github.com/TheWinci/mimirs.git"
   },
   "keywords": [
     "mcp",
@@ -21,7 +21,7 @@
     "bun"
   ],
   "bin": {
-    "local-rag": "src/main.ts"
+    "mimirs": "src/main.ts"
   },
   "files": [
     "src/",

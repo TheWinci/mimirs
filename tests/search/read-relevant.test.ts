@@ -82,7 +82,7 @@ async function seedWithoutEntities() {
   // Simulate heuristic-chunked markdown (no entity metadata)
   const chunks = [
     { text: "## Installation\n\nRun `bun install` to install all dependencies." },
-    { text: "## Configuration\n\nCreate a `.rag/config.json` file in your project root." },
+    { text: "## Configuration\n\nCreate a `.mimirs/config.json` file in your project root." },
   ];
 
   const embeddedChunks = [];

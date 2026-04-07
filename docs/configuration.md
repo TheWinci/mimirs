@@ -1,6 +1,6 @@
 # Configuration
 
-Create `.rag/config.json` in your project root, or run `bunx @winci/local-rag init` to generate one automatically.
+Create `.mimirs/config.json` in your project root, or run `bunx mimirs init` to generate one automatically.
 
 ## Options
 
@@ -24,7 +24,7 @@ Create `.rag/config.json` in your project root, or run `bunx @winci/local-rag in
 ```json
 {
   "include": ["**/*.md", "**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules/**", ".git/**", "dist/**", ".rag/**"]
+  "exclude": ["node_modules/**", ".git/**", "dist/**", ".mimirs/**"]
 }
 ```
 
@@ -33,7 +33,7 @@ Create `.rag/config.json` in your project root, or run `bunx @winci/local-rag in
 ```json
 {
   "include": ["**/*.md", "**/*.ts", "**/*.tsx", "**/*.js", "**/*.py", "**/*.go", "**/*.rs"],
-  "exclude": ["node_modules/**", ".git/**", "dist/**", "build/**", ".rag/**"]
+  "exclude": ["node_modules/**", ".git/**", "dist/**", "build/**", ".mimirs/**"]
 }
 ```
 
@@ -43,7 +43,7 @@ Create `.rag/config.json` in your project root, or run `bunx @winci/local-rag in
 {
   "include": ["**/*"],
   "exclude": [
-    "node_modules/**", ".git/**", "dist/**", "build/**", "out/**", ".rag/**",
+    "node_modules/**", ".git/**", "dist/**", "build/**", "out/**", ".mimirs/**",
     "**/*.lock", "**/package-lock.json", "**/*.min.js", "**/*.map",
     "**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.gif", "**/*.webp", "**/*.ico", "**/*.svg",
     "**/*.pdf", "**/*.zip", "**/*.tar", "**/*.gz",
@@ -63,7 +63,7 @@ For repos with thousands of files, exclude tests and generated code to keep resu
   "include": ["**/*.go", "**/*.md", "**/*.yaml"],
   "exclude": [
     "vendor/**", ".git/**", "**/*_test.go", "**/*.generated.go",
-    "**/zz_generated.*", "**/testdata/**", ".rag/**"
+    "**/zz_generated.*", "**/testdata/**", ".mimirs/**"
   ],
   "searchTopK": 15
 }
@@ -88,7 +88,7 @@ Adjust `hybridWeight` to shift between semantic and keyword matching:
 | Variable | Description |
 |---|---|
 | `RAG_PROJECT_DIR` | Override the project directory (useful for editors like Cursor/Windsurf that don't set cwd) |
-| `RAG_DB_DIR` | Redirect the `.rag/` index to a different path (useful for read-only project directories) |
+| `RAG_DB_DIR` | Redirect the `.mimirs/` index to a different path (useful for read-only project directories) |
 
 ## Embedding merge
 
