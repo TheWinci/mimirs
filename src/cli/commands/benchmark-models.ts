@@ -5,6 +5,7 @@ import { loadConfig, applyEmbeddingConfig } from "../../config";
 import { indexDirectory } from "../../indexing/indexer";
 import { loadBenchmarkQueries, runBenchmark, type BenchmarkSummary } from "../../search/benchmark";
 import { configureEmbedder, resetEmbedder, DEFAULT_MODEL_ID, DEFAULT_EMBEDDING_DIM } from "../../embeddings/embed";
+import { cli } from "../../utils/log";
 
 interface ModelSpec {
   id: string;
@@ -31,10 +32,10 @@ function parseModelArg(arg: string): ModelSpec {
 export async function benchmarkModelsCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const file = args[1];
   if (!file) {
-    console.error("Usage: local-rag benchmark-models <queries.json> --models model1,model2 [--dir D] [--top N]");
-    console.error("\nKnown models:");
+    cli.error("Usage: local-rag benchmark-models <queries.json> --models model1,model2 [--dir D] [--top N]");
+    cli.error("\nKnown models:");
     for (const [name, spec] of Object.entries(KNOWN_MODELS)) {
-      console.error(`  ${name} (${spec.dim}d)`);
+      cli.error(`  ${name} (${spec.dim}d)`);
     }
     process.exit(1);
   }
@@ -45,7 +46,7 @@ export async function benchmarkModelsCommand(args: string[], getFlag: (flag: str
   const modelsArg = getFlag("--models");
 
   if (!modelsArg) {
-    console.error("Error: --models is required. Example: --models Xenova/all-MiniLM-L6-v2,Xenova/bge-small-en-v1.5");
+    cli.error("Error: --models is required. Example: --models Xenova/all-MiniLM-L6-v2,Xenova/bge-small-en-v1.5");
     process.exit(1);
   }
 
@@ -53,10 +54,10 @@ export async function benchmarkModelsCommand(args: string[], getFlag: (flag: str
   const queries = await loadBenchmarkQueries(resolve(file));
   const results: { model: ModelSpec; summary: BenchmarkSummary; indexTimeMs: number }[] = [];
 
-  console.log(`Comparing ${models.length} models on ${queries.length} queries (top-${top})...\n`);
+  cli.log(`Comparing ${models.length} models on ${queries.length} queries (top-${top})...\n`);
 
   for (const model of models) {
-    console.log(`\n--- ${model.id} (${model.dim}d) ---`);
+    cli.log(`\n--- ${model.id} (${model.dim}d) ---`);
 
     // Configure the embedder for this model
     configureEmbedder(model.id, model.dim);
@@ -73,23 +74,23 @@ export async function benchmarkModelsCommand(args: string[], getFlag: (flag: str
 
     try {
       // Index
-      console.log("  Indexing...");
+      cli.log("  Indexing...");
       const indexStart = performance.now();
       const indexResult = await indexDirectory(dir, db, config, (msg) => {
         process.stdout.write(`\r  ${msg}`);
       });
       const indexTimeMs = Math.round(performance.now() - indexStart);
-      console.log(`\n  Indexed ${indexResult.indexed} files in ${(indexTimeMs / 1000).toFixed(1)}s`);
+      cli.log(`\n  Indexed ${indexResult.indexed} files in ${(indexTimeMs / 1000).toFixed(1)}s`);
 
       // Benchmark
-      console.log("  Running benchmark...");
+      cli.log("  Running benchmark...");
       const summary = await runBenchmark(queries, db, dir, top, config.hybridWeight);
 
       results.push({ model, summary, indexTimeMs });
 
-      console.log(`  Recall@${top}: ${(summary.recallAtK * 100).toFixed(1)}%`);
-      console.log(`  MRR: ${summary.mrr.toFixed(3)}`);
-      console.log(`  Zero-miss: ${(summary.zeroMissRate * 100).toFixed(1)}%`);
+      cli.log(`  Recall@${top}: ${(summary.recallAtK * 100).toFixed(1)}%`);
+      cli.log(`  MRR: ${summary.mrr.toFixed(3)}`);
+      cli.log(`  Zero-miss: ${(summary.zeroMissRate * 100).toFixed(1)}%`);
     } finally {
       db.close();
       // Clean up temp DB
@@ -102,17 +103,17 @@ export async function benchmarkModelsCommand(args: string[], getFlag: (flag: str
   resetEmbedder();
 
   // Print comparison table
-  console.log("\n\n=== Comparison ===\n");
+  cli.log("\n\n=== Comparison ===\n");
   const header = `| Model | Dim | Recall@${top} | MRR | Zero-miss | Index time |`;
   const sep = "|---|---|---|---|---|---|";
-  console.log(header);
-  console.log(sep);
+  cli.log(header);
+  cli.log(sep);
   for (const r of results) {
     const recall = `${(r.summary.recallAtK * 100).toFixed(1)}%`;
     const mrr = r.summary.mrr.toFixed(3);
     const zeroMiss = `${(r.summary.zeroMissRate * 100).toFixed(1)}%`;
     const indexTime = `${(r.indexTimeMs / 1000).toFixed(1)}s`;
-    console.log(`| ${r.model.id} | ${r.model.dim} | ${recall} | ${mrr} | ${zeroMiss} | ${indexTime} |`);
+    cli.log(`| ${r.model.id} | ${r.model.dim} | ${recall} | ${mrr} | ${zeroMiss} | ${indexTime} |`);
   }
 
   // Check if any candidate beats the baseline by >5%
@@ -122,15 +123,15 @@ export async function benchmarkModelsCommand(args: string[], getFlag: (flag: str
       const candidate = results[i];
       const recallDiff = (candidate.summary.recallAtK - baseline.summary.recallAtK) * 100;
       const mrrDiff = candidate.summary.mrr - baseline.summary.mrr;
-      console.log(`\n${candidate.model.id} vs ${baseline.model.id}:`);
-      console.log(`  Recall: ${recallDiff >= 0 ? "+" : ""}${recallDiff.toFixed(1)}pp`);
-      console.log(`  MRR: ${mrrDiff >= 0 ? "+" : ""}${mrrDiff.toFixed(3)}`);
+      cli.log(`\n${candidate.model.id} vs ${baseline.model.id}:`);
+      cli.log(`  Recall: ${recallDiff >= 0 ? "+" : ""}${recallDiff.toFixed(1)}pp`);
+      cli.log(`  MRR: ${mrrDiff >= 0 ? "+" : ""}${mrrDiff.toFixed(3)}`);
       if (recallDiff > 5) {
-        console.log(`  → Candidate shows >5pp recall improvement — consider making it default`);
+        cli.log(`  → Candidate shows >5pp recall improvement — consider making it default`);
       } else if (recallDiff > 0) {
-        console.log(`  → Marginal improvement — document but keep current default`);
+        cli.log(`  → Marginal improvement — document but keep current default`);
       } else {
-        console.log(`  → No recall improvement`);
+        cli.log(`  → No recall improvement`);
       }
     }
   }

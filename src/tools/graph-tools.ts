@@ -23,6 +23,9 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
         .describe("Zoom level: 'file' (default) or 'directory' for large projects"),
       maxNodes: z
         .number()
+        .int()
+        .min(1)
+        .max(500)
         .optional()
         .describe("Max nodes in graph (default: 50, auto-switches to directory view if exceeded)"),
     },
@@ -48,7 +51,7 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
     "find_usages",
     "Find every call site or reference to a symbol across all indexed files — with file paths, line numbers, and matching lines. More reliable than grep for usage analysis: searches the chunk index so it won't miss aliased imports or re-exports. Use this before renaming or changing a function signature.",
     {
-      symbol: z.string().describe("Symbol name to search for"),
+      symbol: z.string().min(1).max(200).describe("Symbol name to search for"),
       exact: z
         .boolean()
         .optional()
@@ -57,7 +60,7 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
         .string()
         .optional()
         .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
-      top: z.number().optional().describe("Max results to return (default: 30)"),
+      top: z.number().int().min(1).max(100).optional().describe("Max results to return (default: 30)"),
     },
     async ({ symbol, exact, directory, top }) => {
       const { projectDir, db: ragDb } = await resolveProject(directory, getDB);

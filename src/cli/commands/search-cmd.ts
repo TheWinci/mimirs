@@ -2,11 +2,12 @@ import { resolve } from "path";
 import { RagDB } from "../../db";
 import { loadConfig, applyEmbeddingConfig } from "../../config";
 import { search, searchChunks } from "../../search/hybrid";
+import { cli } from "../../utils/log";
 
 export async function searchCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const query = args[1];
   if (!query) {
-    console.error("Usage: local-rag search <query> [--top N]");
+    cli.error("Usage: local-rag search <query> [--top N]");
     process.exit(1);
   }
 
@@ -19,13 +20,13 @@ export async function searchCommand(args: string[], getFlag: (flag: string) => s
   const results = await search(query, db, top, 0, config.hybridWeight, config.generated);
 
   if (results.length === 0) {
-    console.log("No results found. Has the directory been indexed?");
+    cli.log("No results found. Has the directory been indexed?");
   } else {
     for (const r of results) {
-      console.log(`${r.score.toFixed(4)}  ${r.path}`);
+      cli.log(`${r.score.toFixed(4)}  ${r.path}`);
       const preview = r.snippets[0]?.slice(0, 120).replace(/\n/g, " ");
-      console.log(`         ${preview}...`);
-      console.log();
+      cli.log(`         ${preview}...`);
+      cli.log();
     }
   }
   db.close();
@@ -34,7 +35,7 @@ export async function searchCommand(args: string[], getFlag: (flag: string) => s
 export async function readCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const query = args[1];
   if (!query) {
-    console.error("Usage: local-rag read <query> [--top N] [--threshold T] [--dir D]");
+    cli.error("Usage: local-rag read <query> [--top N] [--threshold T] [--dir D]");
     process.exit(1);
   }
 
@@ -48,13 +49,13 @@ export async function readCommand(args: string[], getFlag: (flag: string) => str
   const results = await searchChunks(query, db, top, threshold, config.hybridWeight, config.generated);
 
   if (results.length === 0) {
-    console.log("No relevant chunks found. Has the directory been indexed?");
+    cli.log("No relevant chunks found. Has the directory been indexed?");
   } else {
     for (const r of results) {
       const entity = r.entityName ? `  •  ${r.entityName}` : "";
-      console.log(`[${r.score.toFixed(2)}] ${r.path}${entity}`);
-      console.log(r.content);
-      console.log("\n---\n");
+      cli.log(`[${r.score.toFixed(2)}] ${r.path}${entity}`);
+      cli.log(r.content);
+      cli.log("\n---\n");
     }
   }
   db.close();

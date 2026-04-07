@@ -13,6 +13,9 @@ export function registerAnalyticsTools(server: McpServer, getDB: GetDB) {
         .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
       days: z
         .number()
+        .int()
+        .min(1)
+        .max(365)
         .optional()
         .default(30)
         .describe("Number of days to look back (default: 30)"),

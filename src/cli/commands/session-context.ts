@@ -1,5 +1,6 @@
 import { resolve } from "path";
 import { RagDB } from "../../db";
+import { cli } from "../../utils/log";
 
 async function runGit(args: string[], cwd: string): Promise<string | null> {
   try {
@@ -95,6 +96,6 @@ export async function sessionContextCommand(args: string[], getFlag: (flag: stri
   }
 
   if (sections.length > 0) {
-    console.log(sections.join("\n\n"));
+    cli.log(sections.join("\n\n"));
   }
 }

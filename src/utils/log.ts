@@ -1,8 +1,11 @@
 /**
- * Lightweight logger that writes to stderr (the MCP diagnostic channel).
- * Configurable via LOG_LEVEL env var: "debug" | "warn" | "error" | "silent"
- * Default: "warn"
+ * All project output in one place.
+ *
+ * - `log`  — MCP diagnostic channel (stderr, level-gated, [local-rag] prefix)
+ * - `cli`  — CLI user-facing output (stdout/stderr, no prefix)
  */
+
+// ── MCP diagnostics (stderr) ───────────────────────────────────
 
 type Level = "debug" | "warn" | "error" | "silent";
 
@@ -38,5 +41,19 @@ export const log = {
   },
   error(msg: string, context?: string) {
     write("error", "ERROR", msg, context);
+  },
+};
+
+// ── CLI output (stdout) ────────────────────────────────────────
+
+export const cli = {
+  /** Normal output (stdout). No args = blank line. */
+  log(msg: string = "") {
+    console.log(msg);
+  },
+
+  /** Error output (stderr). */
+  error(msg: string) {
+    console.error(msg);
   },
 };

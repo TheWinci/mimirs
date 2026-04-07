@@ -2,6 +2,7 @@ import { resolve } from "path";
 import { RagDB } from "../../db";
 import { embed } from "../../embeddings/embed";
 import { discoverSessions } from "../../conversation/parser";
+import { cli } from "../../utils/log";
 
 export async function checkpointCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const subCommand = args[1];
@@ -13,7 +14,7 @@ export async function checkpointCommand(args: string[], getFlag: (flag: string) 
     const title = args[3];
     const summary = args[4];
     if (!type || !title || !summary) {
-      console.error("Usage: local-rag checkpoint create <type> <title> <summary> [--dir D] [--files f1,f2] [--tags t1,t2]");
+      cli.error("Usage: local-rag checkpoint create <type> <title> <summary> [--dir D] [--files f1,f2] [--tags t1,t2]");
       process.exit(1);
     }
 
@@ -32,30 +33,30 @@ export async function checkpointCommand(args: string[], getFlag: (flag: string) 
       sessionId, turnIndex, new Date().toISOString(),
       type, title, summary, filesInvolved, tags, embedding
     );
-    console.log(`Checkpoint #${id} created: [${type}] ${title}`);
+    cli.log(`Checkpoint #${id} created: [${type}] ${title}`);
   } else if (subCommand === "list") {
     const type = getFlag("--type");
     const top = parseInt(getFlag("--top") || "20", 10);
     const checkpoints = db.listCheckpoints(undefined, type, top);
 
     if (checkpoints.length === 0) {
-      console.log("No checkpoints found.");
+      cli.log("No checkpoints found.");
     } else {
       for (const cp of checkpoints) {
         const tagStr = cp.tags.length > 0 ? ` [${cp.tags.join(", ")}]` : "";
-        console.log(`#${cp.id} [${cp.type}] ${cp.title}${tagStr}`);
-        console.log(`  ${cp.timestamp} (turn ${cp.turnIndex})`);
-        console.log(`  ${cp.summary}`);
+        cli.log(`#${cp.id} [${cp.type}] ${cp.title}${tagStr}`);
+        cli.log(`  ${cp.timestamp} (turn ${cp.turnIndex})`);
+        cli.log(`  ${cp.summary}`);
         if (cp.filesInvolved.length > 0) {
-          console.log(`  Files: ${cp.filesInvolved.join(", ")}`);
+          cli.log(`  Files: ${cp.filesInvolved.join(", ")}`);
         }
-        console.log();
+        cli.log();
       }
     }
   } else if (subCommand === "search") {
     const query = args[2];
     if (!query) {
-      console.error("Usage: local-rag checkpoint search <query> [--dir D] [--type T] [--top N]");
+      cli.error("Usage: local-rag checkpoint search <query> [--dir D] [--type T] [--top N]");
       process.exit(1);
     }
 
@@ -65,19 +66,19 @@ export async function checkpointCommand(args: string[], getFlag: (flag: string) 
     const results = db.searchCheckpoints(queryEmb, top, type);
 
     if (results.length === 0) {
-      console.log("No matching checkpoints found.");
+      cli.log("No matching checkpoints found.");
     } else {
       for (const cp of results) {
-        console.log(`${cp.score.toFixed(4)}  #${cp.id} [${cp.type}] ${cp.title}`);
-        console.log(`  ${cp.summary}`);
+        cli.log(`${cp.score.toFixed(4)}  #${cp.id} [${cp.type}] ${cp.title}`);
+        cli.log(`  ${cp.summary}`);
         if (cp.filesInvolved.length > 0) {
-          console.log(`  Files: ${cp.filesInvolved.join(", ")}`);
+          cli.log(`  Files: ${cp.filesInvolved.join(", ")}`);
         }
-        console.log();
+        cli.log();
       }
     }
   } else {
-    console.error("Usage: local-rag checkpoint <create|list|search>");
+    cli.error("Usage: local-rag checkpoint <create|list|search>");
     process.exit(1);
   }
 

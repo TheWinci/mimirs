@@ -1,4 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { resolve } from "path";
+import { existsSync } from "fs";
 import { RagDB } from "../db";
 import { loadConfig, applyEmbeddingConfig, type RagConfig } from "../config";
 import { registerSearchTools } from "./search";
@@ -21,9 +23,16 @@ export async function resolveProject(
   getDB: GetDB
 ): Promise<{ projectDir: string; db: RagDB; config: RagConfig }> {
   const projectDir = directory || process.env.RAG_PROJECT_DIR || process.cwd();
-  const config = await loadConfig(projectDir);
+
+  // Resolve to absolute and verify it doesn't escape via path traversal
+  const resolved = resolve(projectDir);
+  if (!existsSync(resolved)) {
+    throw new Error(`Directory does not exist: ${resolved}`);
+  }
+
+  const config = await loadConfig(resolved);
   applyEmbeddingConfig(config);
-  return { projectDir, db: getDB(projectDir), config };
+  return { projectDir: resolved, db: getDB(resolved), config };
 }
 
 export function registerAllTools(

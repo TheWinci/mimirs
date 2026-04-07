@@ -29,6 +29,52 @@ export function startWatcher(
     return globs.some((g) => g.match(filePath));
   }
 
+  // Serial queue: prevents concurrent indexFile + buildPathToIdMap from interleaving.
+  // While one cycle runs, new files accumulate in nextBatch and get processed next.
+  let processing = false;
+  const nextBatch = new Map<string, "index" | "remove">();
+
+  async function processQueue() {
+    if (processing) return;
+    processing = true;
+
+    try {
+      while (nextBatch.size > 0) {
+        // Snapshot and clear the batch so new events accumulate into a fresh batch
+        const batch = new Map(nextBatch);
+        nextBatch.clear();
+
+        for (const [absPath, action] of batch) {
+          const rel = relative(directory, absPath);
+
+          if (action === "remove") {
+            const removed = db.removeFile(absPath);
+            if (removed) onEvent?.(`Removed deleted file: ${rel}`);
+            continue;
+          }
+
+          const result = await indexFile(absPath, db, config);
+          if (result === "indexed") {
+            const file = db.getFileByPath(absPath);
+            if (file) {
+              // Build lookups once and reuse for all resolve calls.
+              // Safe because the queue ensures no concurrent indexFile is running.
+              const pathToId = buildPathToIdMap(db);
+              const idToPath = buildIdToPathMap(pathToId);
+              resolveImportsForFile(db, file.id, directory, pathToId, idToPath);
+              for (const importerId of db.getImportersOf(file.id)) {
+                resolveImportsForFile(db, importerId, directory, pathToId, idToPath);
+              }
+            }
+            onEvent?.(`Re-indexed: ${rel}`);
+          }
+        }
+      }
+    } finally {
+      processing = false;
+    }
+  }
+
   const fsWatcher = watch(directory, { recursive: true }, (_event, filename) => {
     if (!filename) return;
 
@@ -44,31 +90,16 @@ export function startWatcher(
 
     pending.set(
       absPath,
-      setTimeout(async () => {
+      setTimeout(() => {
         pending.delete(absPath);
 
         if (!existsSync(absPath)) {
-          const removed = db.removeFile(absPath);
-          if (removed) {
-            onEvent?.(`Removed deleted file: ${rel}`);
-          }
-          return;
+          nextBatch.set(absPath, "remove");
+        } else {
+          nextBatch.set(absPath, "index");
         }
 
-        const result = await indexFile(absPath, db, config);
-        if (result === "indexed") {
-          const file = db.getFileByPath(absPath);
-          if (file) {
-            // Build lookups once and reuse for all resolve calls
-            const pathToId = buildPathToIdMap(db);
-            const idToPath = buildIdToPathMap(pathToId);
-            resolveImportsForFile(db, file.id, directory, pathToId, idToPath);
-            for (const importerId of db.getImportersOf(file.id)) {
-              resolveImportsForFile(db, importerId, directory, pathToId, idToPath);
-            }
-          }
-          onEvent?.(`Re-indexed: ${rel}`);
-        }
+        processQueue();
       }, DEBOUNCE_MS)
     );
   });

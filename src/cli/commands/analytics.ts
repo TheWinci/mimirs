@@ -1,5 +1,6 @@
 import { resolve } from "path";
 import { RagDB } from "../../db";
+import { cli } from "../../utils/log";
 
 export async function analyticsCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const dir = resolve(args[1] && !args[1].startsWith("--") ? args[1] : ".");
@@ -12,30 +13,30 @@ export async function analyticsCommand(args: string[], getFlag: (flag: string) =
     ? ((zeroCount / analytics.totalQueries) * 100).toFixed(0)
     : "0";
 
-  console.log(`Search analytics (last ${days} days):`);
-  console.log(`  Total queries:    ${analytics.totalQueries}`);
-  console.log(`  Avg results:      ${analytics.avgResultCount.toFixed(1)}`);
-  console.log(`  Avg top score:    ${analytics.avgTopScore?.toFixed(2) ?? "n/a"}`);
-  console.log(`  Zero-result rate: ${zeroRate}% (${zeroCount} queries)`);
+  cli.log(`Search analytics (last ${days} days):`);
+  cli.log(`  Total queries:    ${analytics.totalQueries}`);
+  cli.log(`  Avg results:      ${analytics.avgResultCount.toFixed(1)}`);
+  cli.log(`  Avg top score:    ${analytics.avgTopScore?.toFixed(2) ?? "n/a"}`);
+  cli.log(`  Zero-result rate: ${zeroRate}% (${zeroCount} queries)`);
 
   if (analytics.topSearchedTerms.length > 0) {
-    console.log("\nTop searches:");
+    cli.log("\nTop searches:");
     for (const t of analytics.topSearchedTerms) {
-      console.log(`  ${t.count}× "${t.query}"`);
+      cli.log(`  ${t.count}× "${t.query}"`);
     }
   }
 
   if (analytics.zeroResultQueries.length > 0) {
-    console.log("\nZero-result queries (consider indexing these topics):");
+    cli.log("\nZero-result queries (consider indexing these topics):");
     for (const q of analytics.zeroResultQueries) {
-      console.log(`  ${q.count}× "${q.query}"`);
+      cli.log(`  ${q.count}× "${q.query}"`);
     }
   }
 
   if (analytics.lowScoreQueries.length > 0) {
-    console.log("\nLow-relevance queries (top score < 0.3):");
+    cli.log("\nLow-relevance queries (top score < 0.3):");
     for (const q of analytics.lowScoreQueries) {
-      console.log(`  "${q.query}" (score: ${q.topScore.toFixed(2)})`);
+      cli.log(`  "${q.query}" (score: ${q.topScore.toFixed(2)})`);
     }
   }
 
@@ -46,12 +47,12 @@ export async function analyticsCommand(args: string[], getFlag: (flag: string) =
     const pctArrow = (delta: number) =>
       delta > 0 ? `+${(delta * 100).toFixed(1)}%` : `${(delta * 100).toFixed(1)}%`;
 
-    console.log(`\nTrend (current ${days}d vs prior ${days}d):`);
-    console.log(`  Queries:          ${trend.current.totalQueries} (${arrow(trend.delta.queries)})`);
+    cli.log(`\nTrend (current ${days}d vs prior ${days}d):`);
+    cli.log(`  Queries:          ${trend.current.totalQueries} (${arrow(trend.delta.queries)})`);
     if (trend.delta.avgTopScore !== null) {
-      console.log(`  Avg top score:    ${trend.current.avgTopScore?.toFixed(2)} (${trend.delta.avgTopScore >= 0 ? "+" : ""}${trend.delta.avgTopScore.toFixed(2)})`);
+      cli.log(`  Avg top score:    ${trend.current.avgTopScore?.toFixed(2)} (${trend.delta.avgTopScore >= 0 ? "+" : ""}${trend.delta.avgTopScore.toFixed(2)})`);
     }
-    console.log(`  Zero-result rate: ${(trend.current.zeroResultRate * 100).toFixed(0)}% (${pctArrow(trend.delta.zeroResultRate)})`);
+    cli.log(`  Zero-result rate: ${(trend.current.zeroResultRate * 100).toFixed(0)}% (${pctArrow(trend.delta.zeroResultRate)})`);
   }
 
   db.close();

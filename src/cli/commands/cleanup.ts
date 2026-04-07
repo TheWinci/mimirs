@@ -3,6 +3,7 @@ import { readFile, writeFile, rm, unlink } from "fs/promises";
 import { join, resolve } from "path";
 import { homedir } from "os";
 import { confirm } from "../setup";
+import { cli } from "../../utils/log";
 
 const MARKER = "<!-- local-rag -->";
 const INSTRUCTIONS_HEADING = "## Using local-rag tools";
@@ -141,15 +142,15 @@ export async function cleanupCommand(args: string[]) {
   pending.push(() => removeGitignoreEntry(dir));
 
   if (!autoYes) {
-    console.log("This will remove all local-rag files from this project:\n");
-    console.log("  - .rag/ directory (index database & config)");
-    console.log("  - local-rag entries from MCP configs (.mcp.json, .cursor/mcp.json, windsurf)");
-    console.log("  - Agent instructions (CLAUDE.md block, .cursor/rules/local-rag.mdc, etc.)");
-    console.log("  - .rag/ entry from .gitignore");
-    console.log();
+    cli.log("This will remove all local-rag files from this project:\n");
+    cli.log("  - .rag/ directory (index database & config)");
+    cli.log("  - local-rag entries from MCP configs (.mcp.json, .cursor/mcp.json, windsurf)");
+    cli.log("  - Agent instructions (CLAUDE.md block, .cursor/rules/local-rag.mdc, etc.)");
+    cli.log("  - .rag/ entry from .gitignore");
+    cli.log();
     const ok = await confirm("Proceed? [y/N] ");
     if (!ok) {
-      console.log("Aborted.");
+      cli.log("Aborted.");
       return;
     }
   }
@@ -161,9 +162,9 @@ export async function cleanupCommand(args: string[]) {
   }
 
   if (actions.length === 0) {
-    console.log("Nothing to clean up — no local-rag files found.");
+    cli.log("Nothing to clean up — no local-rag files found.");
   } else {
-    for (const action of actions) console.log(`  ${action}`);
-    console.log(`\nCleaned up ${actions.length} item(s).`);
+    for (const action of actions) cli.log(`  ${action}`);
+    cli.log(`\nCleaned up ${actions.length} item(s).`);
   }
 }

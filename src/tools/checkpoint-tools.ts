@@ -12,9 +12,11 @@ export function registerCheckpointTools(server: McpServer, getDB: GetDB) {
       type: z
         .enum(["decision", "milestone", "blocker", "direction_change", "handoff"])
         .describe("Type of checkpoint"),
-      title: z.string().describe("Short label, e.g. 'Chose JWT over session cookies'"),
+      title: z.string().min(1).max(200).describe("Short label, e.g. 'Chose JWT over session cookies'"),
       summary: z
         .string()
+        .min(1)
+        .max(2000)
         .describe("2-3 sentence description of what happened and why"),
       filesInvolved: z
         .array(z.string())
@@ -84,7 +86,7 @@ export function registerCheckpointTools(server: McpServer, getDB: GetDB) {
         .enum(["decision", "milestone", "blocker", "direction_change", "handoff"])
         .optional()
         .describe("Filter by checkpoint type"),
-      limit: z.number().optional().default(20).describe("Max results (default: 20)"),
+      limit: z.number().int().min(1).max(100).optional().default(20).describe("Max results (default: 20)"),
       directory: z
         .string()
         .optional()
@@ -119,12 +121,12 @@ export function registerCheckpointTools(server: McpServer, getDB: GetDB) {
     "search_checkpoints",
     "Semantic search over checkpoint titles and summaries.",
     {
-      query: z.string().describe("What to search for in checkpoints"),
+      query: z.string().min(1).max(2000).describe("What to search for in checkpoints"),
       type: z
         .enum(["decision", "milestone", "blocker", "direction_change", "handoff"])
         .optional()
         .describe("Filter by checkpoint type"),
-      limit: z.number().optional().default(5).describe("Max results (default: 5)"),
+      limit: z.number().int().min(1).max(100).optional().default(5).describe("Max results (default: 5)"),
       directory: z
         .string()
         .optional()

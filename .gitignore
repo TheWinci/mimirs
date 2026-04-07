@@ -3,6 +3,7 @@
 node_modules/
 .rag/
 .claude/
+.idea/
 
 .mcp.json
 
@@ -13,3 +14,5 @@ PLAN.md
 CLAUDE.md
 ROADMAP.md
 PROCESS.md
+posts.md
+wiki-project-plan.md

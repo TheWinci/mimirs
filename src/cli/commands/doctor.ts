@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "fs";
 import { join, resolve } from "path";
 import { platform } from "os";
+import { cli } from "../../utils/log";
 
 interface Check {
   name: string;
@@ -20,15 +21,45 @@ export async function doctorCommand(args: string[]) {
       },
     },
     {
-      name: "SQLite (Homebrew)",
+      name: "SQLite (extension-capable)",
       run: () => {
-        if (platform() !== "darwin") return null; // only needed on macOS
-        const paths = [
-          "/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib",
-          "/usr/local/opt/sqlite/lib/libsqlite3.dylib",
-        ];
-        if (paths.some((p) => existsSync(p))) return null;
-        return 'Homebrew SQLite not found. Fix: run "brew install sqlite" and restart your editor.';
+        try {
+          // Actually attempt what RagDB does: load custom SQLite and open a DB
+          const { Database } = require("bun:sqlite");
+          const sqliteVec = require("sqlite-vec");
+
+          if (platform() === "darwin") {
+            const macPaths = [
+              "/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib",
+              "/usr/local/opt/sqlite/lib/libsqlite3.dylib",
+            ];
+            const found = macPaths.find((p) => existsSync(p));
+            if (!found) {
+              return (
+                "Homebrew SQLite not found. Apple's bundled SQLite doesn't support extensions.\n" +
+                '    Fix: run "brew install sqlite" and restart your editor.'
+              );
+            }
+            Database.setCustomSQLite(found);
+          }
+
+          // Verify extensions actually load
+          const testDb = new Database(":memory:");
+          sqliteVec.load(testDb);
+          const row = testDb.query("SELECT vec_version() as v").get() as any;
+          testDb.close();
+          if (!row?.v) return "SQLite loaded but sqlite-vec didn't initialize properly.";
+          return null;
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (platform() === "darwin") {
+            return `SQLite extension load failed: ${msg}\n    Fix: brew install sqlite`;
+          }
+          if (platform() === "linux") {
+            return `SQLite extension load failed: ${msg}\n    Fix: install libsqlite3-dev (Debian/Ubuntu) or sqlite-devel (RHEL/Fedora)`;
+          }
+          return `SQLite extension load failed: ${msg}`;
+        }
       },
     },
     {
@@ -51,8 +82,9 @@ export async function doctorCommand(args: string[]) {
           writeFileSync(probe, "ok");
           unlinkSync(probe);
           return null;
-        } catch (err: any) {
-          return `Cannot write to ${ragDir}: ${err.code || err.message}. Set RAG_DB_DIR to a writable directory.`;
+        } catch (err: unknown) {
+          const detail = err instanceof Error ? (err as NodeJS.ErrnoException).code || err.message : String(err);
+          return `Cannot write to ${ragDir}: ${detail}. Set RAG_DB_DIR to a writable directory.`;
         }
       },
     },
@@ -64,25 +96,22 @@ export async function doctorCommand(args: string[]) {
           const db = new RagDB(projectDir);
           db.close();
           return null;
-        } catch (err: any) {
-          return `Database failed to open: ${err.message}`;
+        } catch (err: unknown) {
+          return `Database failed to open: ${err instanceof Error ? err.message : String(err)}`;
         }
       },
     },
     {
       name: "sqlite-vec extension",
       run: () => {
+        // The SQLite check above already validates sqlite-vec loading.
+        // This check verifies the module can be imported independently.
         try {
-          const { Database } = require("bun:sqlite");
           const sqliteVec = require("sqlite-vec");
-          const db = new Database(":memory:");
-          sqliteVec.load(db);
-          const row = db.query("SELECT vec_version() as v").get() as any;
-          db.close();
-          if (!row?.v) return "sqlite-vec loaded but vec_version() returned nothing";
+          if (!sqliteVec || !sqliteVec.load) return "sqlite-vec module found but missing load function";
           return null;
-        } catch (err: any) {
-          return `sqlite-vec failed to load: ${err.message}`;
+        } catch (err: unknown) {
+          return `sqlite-vec module not found: ${err instanceof Error ? err.message : String(err)}\n    Fix: bun install sqlite-vec`;
         }
       },
     },
@@ -93,31 +122,31 @@ export async function doctorCommand(args: string[]) {
           const { getEmbedding } = require("../../embeddings/embed");
           // Just check the module loads — actual model download is async
           return null;
-        } catch (err: any) {
-          return `Embedding module failed to load: ${err.message}`;
+        } catch (err: unknown) {
+          return `Embedding module failed to load: ${err instanceof Error ? err.message : String(err)}`;
         }
       },
     },
   ];
 
-  console.log(`local-rag doctor — checking ${projectDir}\n`);
+  cli.log(`local-rag doctor — checking ${projectDir}\n`);
 
   for (const check of checks) {
     try {
       const err = check.run();
       if (err) {
         results.push({ name: check.name, ok: false, detail: err });
-        console.log(`  ✗ ${check.name}`);
-        console.log(`    ${err}\n`);
+        cli.log(`  ✗ ${check.name}`);
+        cli.log(`    ${err}\n`);
       } else {
         results.push({ name: check.name, ok: true, detail: "ok" });
-        console.log(`  ✓ ${check.name}`);
+        cli.log(`  ✓ ${check.name}`);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       results.push({ name: check.name, ok: false, detail: msg });
-      console.log(`  ✗ ${check.name}`);
-      console.log(`    ${msg}\n`);
+      cli.log(`  ✗ ${check.name}`);
+      cli.log(`    ${msg}\n`);
     }
   }
 
@@ -125,9 +154,9 @@ export async function doctorCommand(args: string[]) {
   const errorLogPath = join(projectDir, ".rag", "server-error.log");
   if (existsSync(errorLogPath)) {
     const content = readFileSync(errorLogPath, "utf8");
-    console.log(`\n--- Recent crash log (.rag/server-error.log) ---`);
-    console.log(content);
-    console.log(`--- end ---\n`);
+    cli.log(`\n--- Recent crash log (.rag/server-error.log) ---`);
+    cli.log(content);
+    cli.log(`--- end ---\n`);
   }
 
   // Check indexing status
@@ -136,17 +165,17 @@ export async function doctorCommand(args: string[]) {
     const status = readFileSync(statusPath, "utf8");
     const firstLine = status.split("\n")[0];
     if (firstLine === "error" || firstLine === "interrupted") {
-      console.log(`\n--- Indexing status: ${firstLine} ---`);
-      console.log(status);
-      console.log(`--- end ---\n`);
+      cli.log(`\n--- Indexing status: ${firstLine} ---`);
+      cli.log(status);
+      cli.log(`--- end ---\n`);
     }
   }
 
   const failed = results.filter((r) => !r.ok);
   if (failed.length === 0) {
-    console.log(`\nAll checks passed.`);
+    cli.log(`\nAll checks passed.`);
   } else {
-    console.log(`\n${failed.length} check(s) failed. Fix the issues above and retry.`);
+    cli.log(`\n${failed.length} check(s) failed. Fix the issues above and retry.`);
     process.exit(1);
   }
 }

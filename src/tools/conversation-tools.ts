@@ -9,7 +9,7 @@ export function registerConversationTools(server: McpServer, getDB: GetDB) {
     "search_conversation",
     "Search through conversation history. Finds past decisions, discussions, and tool outputs from current or previous sessions.",
     {
-      query: z.string().describe("What to search for in conversation history"),
+      query: z.string().min(1).max(2000).describe("What to search for in conversation history"),
       directory: z
         .string()
         .optional()
@@ -20,6 +20,9 @@ export function registerConversationTools(server: McpServer, getDB: GetDB) {
         .describe("Limit search to a specific session ID. Omit to search all sessions."),
       top: z
         .number()
+        .int()
+        .min(1)
+        .max(100)
         .optional()
         .default(5)
         .describe("Number of results to return (default: 5)"),
