@@ -1,6 +1,7 @@
 import { resolve } from "path";
 import { RagDB } from "../../db";
 import { generateProjectMap } from "../../graph/resolver";
+import { cli } from "../../utils/log";
 
 export async function mapCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const dir = resolve(args[1] && !args[1].startsWith("--") ? args[1] : ".");
@@ -16,6 +17,6 @@ export async function mapCommand(args: string[], getFlag: (flag: string) => stri
     maxNodes: max,
   });
 
-  console.log(map);
+  cli.log(map);
   db.close();
 }

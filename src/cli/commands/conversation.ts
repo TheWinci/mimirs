@@ -4,6 +4,7 @@ import { loadConfig } from "../../config";
 import { embed } from "../../embeddings/embed";
 import { discoverSessions } from "../../conversation/parser";
 import { indexConversation } from "../../conversation/indexer";
+import { cli } from "../../utils/log";
 
 export async function conversationCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const subCommand = args[1];
@@ -13,7 +14,7 @@ export async function conversationCommand(args: string[], getFlag: (flag: string
   if (subCommand === "search") {
     const query = args[2];
     if (!query) {
-      console.error("Usage: local-rag conversation search <query> [--dir D] [--top N]");
+      cli.error("Usage: local-rag conversation search <query> [--dir D] [--top N]");
       process.exit(1);
     }
 
@@ -53,48 +54,48 @@ export async function conversationCommand(args: string[], getFlag: (flag: string
     const results = [...merged.values()].sort((a, b) => b.score - a.score).slice(0, top);
 
     if (results.length === 0) {
-      console.log("No conversation results found.");
+      cli.log("No conversation results found.");
     } else {
       for (const r of results) {
         const tools = r.toolsUsed.length > 0 ? ` [${r.toolsUsed.join(", ")}]` : "";
-        console.log(`Turn ${r.turnIndex} (${r.timestamp})${tools}`);
-        console.log(`  ${r.snippet.slice(0, 200)}`);
+        cli.log(`Turn ${r.turnIndex} (${r.timestamp})${tools}`);
+        cli.log(`  ${r.snippet.slice(0, 200)}`);
         if (r.filesReferenced.length > 0) {
-          console.log(`  Files: ${r.filesReferenced.slice(0, 5).join(", ")}`);
+          cli.log(`  Files: ${r.filesReferenced.slice(0, 5).join(", ")}`);
         }
-        console.log();
+        cli.log();
       }
     }
   } else if (subCommand === "sessions") {
     const sessions = discoverSessions(dir);
     if (sessions.length === 0) {
-      console.log("No conversation sessions found for this project.");
+      cli.log("No conversation sessions found for this project.");
     } else {
       for (const s of sessions) {
         const indexed = db.getSession(s.sessionId);
         const status = indexed ? `${indexed.turnCount} turns indexed` : "not indexed";
         const date = new Date(s.mtime).toISOString().slice(0, 19);
-        console.log(`  ${s.sessionId.slice(0, 8)}...  ${date}  ${status}  (${(s.size / 1024).toFixed(0)}KB)`);
+        cli.log(`  ${s.sessionId.slice(0, 8)}...  ${date}  ${status}  (${(s.size / 1024).toFixed(0)}KB)`);
       }
     }
   } else if (subCommand === "index") {
     const sessions = discoverSessions(dir);
     if (sessions.length === 0) {
-      console.log("No conversation sessions found for this project.");
+      cli.log("No conversation sessions found for this project.");
     } else {
-      console.log(`Found ${sessions.length} sessions, indexing...`);
+      cli.log(`Found ${sessions.length} sessions, indexing...`);
       let totalTurns = 0;
       for (const session of sessions) {
         const result = await indexConversation(session.jsonlPath, session.sessionId, db);
         totalTurns += result.turnsIndexed;
         if (result.turnsIndexed > 0) {
-          console.log(`  ${session.sessionId.slice(0, 8)}...: ${result.turnsIndexed} turns`);
+          cli.log(`  ${session.sessionId.slice(0, 8)}...: ${result.turnsIndexed} turns`);
         }
       }
-      console.log(`Done: ${totalTurns} turns indexed across ${sessions.length} sessions`);
+      cli.log(`Done: ${totalTurns} turns indexed across ${sessions.length} sessions`);
     }
   } else {
-    console.error("Usage: local-rag conversation <search|sessions|index>");
+    cli.error("Usage: local-rag conversation <search|sessions|index>");
     process.exit(1);
   }
 

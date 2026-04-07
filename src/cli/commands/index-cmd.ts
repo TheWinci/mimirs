@@ -3,6 +3,7 @@ import { RagDB } from "../../db";
 import { loadConfig, applyEmbeddingConfig } from "../../config";
 import { indexDirectory } from "../../indexing/indexer";
 import { cliProgress } from "../progress";
+import { cli } from "../../utils/log";
 
 export async function indexCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const dir = resolve(args[1] && !args[1].startsWith("--") ? args[1] : ".");
@@ -15,13 +16,13 @@ export async function indexCommand(args: string[], getFlag: (flag: string) => st
     config.include = patternsStr.split(",").map((p) => p.trim());
   }
 
-  console.log(`Indexing ${dir}...`);
+  cli.log(`Indexing ${dir}...`);
   const result = await indexDirectory(dir, db, config, cliProgress);
-  console.log(
+  cli.log(
     `\nDone: ${result.indexed} indexed, ${result.skipped} skipped, ${result.pruned} pruned`
   );
   if (result.errors.length > 0) {
-    console.error(`Errors: ${result.errors.join("\n  ")}`);
+    cli.error(`Errors: ${result.errors.join("\n  ")}`);
   }
   db.close();
 }

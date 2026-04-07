@@ -2,11 +2,12 @@ import { resolve } from "path";
 import { RagDB } from "../../db";
 import { loadConfig } from "../../config";
 import { loadEvalTasks, runEval, formatEvalReport, saveEvalTraces } from "../../search/eval";
+import { cli } from "../../utils/log";
 
 export async function evalCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const file = args[1];
   if (!file) {
-    console.error("Usage: local-rag eval <file> [--dir D] [--top N] [--out F]");
+    cli.error("Usage: local-rag eval <file> [--dir D] [--top N] [--out F]");
     process.exit(1);
   }
 
@@ -17,14 +18,14 @@ export async function evalCommand(args: string[], getFlag: (flag: string) => str
   const top = parseInt(getFlag("--top") || String(config.benchmarkTopK), 10);
 
   const tasks = await loadEvalTasks(resolve(file));
-  console.log(`Running A/B eval with ${tasks.length} tasks against ${dir}...\n`);
+  cli.log(`Running A/B eval with ${tasks.length} tasks against ${dir}...\n`);
 
   const summary = await runEval(tasks, db, dir, top);
-  console.log(formatEvalReport(summary));
+  cli.log(formatEvalReport(summary));
 
   if (outPath) {
     await saveEvalTraces(summary.traces, resolve(outPath));
-    console.log(`\nTraces saved to ${outPath}`);
+    cli.log(`\nTraces saved to ${outPath}`);
   }
 
   db.close();

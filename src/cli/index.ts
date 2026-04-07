@@ -18,12 +18,13 @@ import { sessionContextCommand } from "./commands/session-context";
 import { demoCommand } from "./commands/demo";
 import { doctorCommand } from "./commands/doctor";
 import { cleanupCommand } from "./commands/cleanup";
+import { cli } from "../utils/log";
 
 const args = process.argv.slice(2);
 const command = args[0];
 
 function usage() {
-  console.log(`local-rag — Local RAG for semantic file search
+  cli.log(`local-rag — Local RAG for semantic file search
 
 Usage:
   local-rag serve                      Start MCP server (stdio)
@@ -141,7 +142,7 @@ export async function main() {
       await demoCommand(args);
       break;
     default:
-      console.error(`Unknown command: ${command}`);
+      cli.error(`Unknown command: ${command}`);
       usage();
       process.exit(1);
   }

@@ -10,7 +10,7 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
     "search",
     "Search the full codebase by meaning — finds files that grep misses. Use natural language ('how does auth work') or symbol names. Searches all indexed files semantically + by keyword in <100ms. Returns ranked file paths with snippets. Use read_relevant next to get full content with line ranges.",
     {
-      query: z.string().describe("The search query (natural language)"),
+      query: z.string().min(1).max(2000).describe("The search query (natural language)"),
       directory: z
         .string()
         .optional()
@@ -19,6 +19,9 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
         ),
       top: z
         .number()
+        .int()
+        .min(1)
+        .max(100)
         .optional()
         .describe("Number of results to return (default: from config or 10)"),
     },
@@ -62,7 +65,7 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
     "read_relevant",
     "Get the actual content of the most relevant code chunks — individual functions, classes, or sections — with exact line ranges for navigation. Smarter than grep: finds code by meaning, not just string matching. Multiple chunks from the same file can appear. Use this instead of search + Read when you need the content itself.",
     {
-      query: z.string().describe("The search query (natural language)"),
+      query: z.string().min(1).max(2000).describe("The search query (natural language)"),
       directory: z
         .string()
         .optional()
@@ -71,10 +74,15 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
         ),
       top: z
         .number()
+        .int()
+        .min(1)
+        .max(100)
         .optional()
         .describe("Max chunks to return (default: 8)"),
       threshold: z
         .number()
+        .min(0)
+        .max(1)
         .optional()
         .describe("Min relevance score to include (default: 0.3)"),
     },
@@ -159,7 +167,7 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
     "search_symbols",
     "Find where a function, class, type, or interface is defined — by name, not semantics. Faster than grep for symbol lookup: searches the pre-built symbol index across all indexed files. Use find_usages next to see where the symbol is called.",
     {
-      symbol: z.string().describe("Symbol name to search for"),
+      symbol: z.string().min(1).max(200).describe("Symbol name to search for"),
       exact: z
         .boolean()
         .optional()
@@ -172,7 +180,7 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
         .string()
         .optional()
         .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
-      top: z.number().optional().describe("Max results (default: 20)"),
+      top: z.number().int().min(1).max(100).optional().describe("Max results (default: 20)"),
     },
     async ({ symbol, exact, type, directory, top }) => {
       const { db: ragDb } = await resolveProject(directory, getDB);
@@ -203,17 +211,22 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
     "write_relevant",
     "Find the best file and location to insert new code or docs. Returns semantically appropriate insertion points with anchors for precise placement. Use this before adding a new function to find which file and position it belongs in.",
     {
-      content: z.string().describe("The content you want to add — a function, class, doc section, etc."),
+      content: z.string().min(1).max(5000).describe("The content you want to add — a function, class, doc section, etc."),
       directory: z
         .string()
         .optional()
         .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
       top: z
         .number()
+        .int()
+        .min(1)
+        .max(100)
         .optional()
         .describe("Number of candidate locations to return (default: 3)"),
       threshold: z
         .number()
+        .min(0)
+        .max(1)
         .optional()
         .describe("Min relevance score (default: 0.3)"),
     },

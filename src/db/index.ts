@@ -29,29 +29,55 @@ export type {
 } from "./types";
 
 // macOS ships with Apple's SQLite which doesn't support extensions.
-// Point bun:sqlite at Homebrew's vanilla build if available.
+// Point bun:sqlite at a vanilla build that supports loadable extensions.
 let sqliteLoaded = false;
 function loadCustomSQLite() {
   if (sqliteLoaded) return;
   sqliteLoaded = true;
 
-  if (platform() !== "darwin") return;
-
-  const paths = [
-    "/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib", // Apple Silicon
-    "/usr/local/opt/sqlite/lib/libsqlite3.dylib",    // Intel Mac
-  ];
-
-  for (const p of paths) {
-    if (existsSync(p)) {
-      Database.setCustomSQLite(p);
-      return;
+  if (platform() === "darwin") {
+    const macPaths = [
+      "/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib", // Homebrew Apple Silicon
+      "/usr/local/opt/sqlite/lib/libsqlite3.dylib",    // Homebrew Intel Mac
+    ];
+    for (const p of macPaths) {
+      if (existsSync(p)) {
+        Database.setCustomSQLite(p);
+        return;
+      }
     }
+    throw new Error(
+      "sqlite-vec requires vanilla SQLite on macOS.\n" +
+      "Apple's bundled SQLite doesn't support extensions.\n" +
+      "Fix: brew install sqlite\n" +
+      "Then restart your editor."
+    );
   }
 
-  throw new Error(
-    "sqlite-vec requires vanilla SQLite on macOS. Install it with: brew install sqlite"
-  );
+  if (platform() === "linux") {
+    // Most Linux distros ship extension-capable SQLite, but check common paths
+    // in case bun:sqlite's bundled version doesn't support extensions.
+    const linuxPaths = [
+      "/usr/lib/x86_64-linux-gnu/libsqlite3.so.0",  // Debian/Ubuntu x86_64
+      "/usr/lib/aarch64-linux-gnu/libsqlite3.so.0",  // Debian/Ubuntu arm64
+      "/usr/lib64/libsqlite3.so.0",                   // RHEL/Fedora
+      "/usr/lib/libsqlite3.so.0",                     // Arch/Alpine
+    ];
+    for (const p of linuxPaths) {
+      if (existsSync(p)) {
+        try {
+          Database.setCustomSQLite(p);
+          return;
+        } catch {
+          // If it fails, try next path or fall through to use built-in
+        }
+      }
+    }
+    // On Linux, bun's built-in SQLite usually supports extensions — don't throw,
+    // let sqlite-vec.load() fail with a specific error if it doesn't work.
+  }
+
+  // Windows and other platforms: rely on bun's built-in SQLite
 }
 
 export class RagDB {
@@ -68,13 +94,14 @@ export class RagDB {
 
     try {
       mkdirSync(ragDir, { recursive: true });
-    } catch (err: any) {
-      if (err.code === "EROFS" || err.code === "EACCES") {
+    } catch (err: unknown) {
+      const code = err instanceof Error ? (err as NodeJS.ErrnoException).code : undefined;
+      if (code === "EROFS" || code === "EACCES") {
         const where = process.env.RAG_DB_DIR
           ? `RAG_DB_DIR path "${ragDir}"`
           : `project directory "${projectDir}"`;
         throw new Error(
-          `local-rag: cannot write to ${where} (${err.code}).\n` +
+          `local-rag: cannot write to ${where} (${code}).\n` +
           `Set RAG_DB_DIR to a writable directory in your MCP server config:\n` +
           `  "env": { "RAG_DB_DIR": "/tmp/my-project-rag", "RAG_PROJECT_DIR": "..." }`
         );

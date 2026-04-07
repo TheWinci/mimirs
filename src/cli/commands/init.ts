@@ -5,6 +5,7 @@ import { loadConfig } from "../../config";
 import { indexDirectory } from "../../indexing/indexer";
 import { runSetup, confirm, parseIdeFlag, mcpConfigSnippet } from "../setup";
 import { cliProgress } from "../progress";
+import { cli } from "../../utils/log";
 
 export async function initCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const dir = resolve(args[1] && !args[1].startsWith("--") ? args[1] : ".");
@@ -13,22 +14,22 @@ export async function initCommand(args: string[], getFlag: (flag: string) => str
   const ides = ideFlag ? parseIdeFlag(ideFlag) : undefined;
   const { actions, unknownIdes } = await runSetup(dir, ides);
   if (actions.length === 0 && unknownIdes.length === 0) {
-    console.log("Already set up — nothing to do.");
+    cli.log("Already set up — nothing to do.");
   } else {
-    for (const action of actions) console.log(action);
+    for (const action of actions) cli.log(action);
   }
 
   if (unknownIdes.length > 0) {
-    console.log(`\nAdd this to your agent's MCP config (${unknownIdes.join(", ")}):\n`);
-    console.log(mcpConfigSnippet(dir));
+    cli.log(`\nAdd this to your agent's MCP config (${unknownIdes.join(", ")}):\n`);
+    cli.log(mcpConfigSnippet(dir));
   }
 
-  console.log();
+  cli.log();
   const shouldIndex = autoYes || await confirm("Index project now? [Y/n] ");
   if (shouldIndex) {
     const db = new RagDB(dir);
     const config = await loadConfig(dir);
-    console.log(`Indexing ${dir}...`);
+    cli.log(`Indexing ${dir}...`);
 
     const ragDir = join(dir, ".rag");
     const statusPath = join(ragDir, "status");
@@ -68,7 +69,7 @@ export async function initCommand(args: string[], getFlag: (flag: string) => str
     // Clean up status file on completion
     try { unlinkSync(statusPath); } catch { /* already gone */ }
 
-    console.log(
+    cli.log(
       `\nDone: ${result.indexed} indexed, ${result.skipped} skipped, ${result.pruned} pruned`
     );
     db.close();

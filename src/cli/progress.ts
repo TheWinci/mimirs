@@ -1,3 +1,5 @@
+import { cli } from "../utils/log";
+
 /**
  * CLI progress callback for indexDirectory.
  * Transient messages (e.g. batch progress) overwrite the current line.
@@ -16,6 +18,6 @@ export function cliProgress(msg: string, opts?: { transient?: boolean }): void {
       process.stdout.write("\r" + " ".repeat((process.stdout.columns || 80) - 1) + "\r");
       lastWasTransient = false;
     }
-    console.log(msg);
+    cli.log(msg);
   }
 }
