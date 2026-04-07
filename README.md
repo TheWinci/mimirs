@@ -5,17 +5,50 @@ Persistent project memory for AI coding agents. One command to set up, nothing t
 [![npm](https://img.shields.io/npm/v/@winci/local-rag)](https://www.npmjs.com/package/@winci/local-rag)
 [![license](https://img.shields.io/npm/l/@winci/local-rag)](LICENSE)
 
-Your agent starts every session blind — it guesses filenames, greps for keywords, burns context reading irrelevant files, and forgets everything you discussed yesterday. On a real project, that meant **380K tokens per prompt and 12-second response times**. After indexing with local-rag: **91K tokens, 3 seconds**.
+Your agent starts every session blind — guessing filenames, grepping for keywords, burning context on irrelevant files, and forgetting everything you discussed yesterday.
+
+On a real project, that costs **380K tokens per prompt and 12-second response times**.
+
+After indexing with local-rag: **91K tokens, 3 seconds**. A 76% reduction — depending on your model and usage, that's hundreds to thousands in monthly API savings.
 
 No API keys. No cloud. No Docker. Just [bun](https://bun.sh/docs/installation) and SQLite.
+
+### Works with
+
+Claude Code &nbsp;·&nbsp; Cursor &nbsp;·&nbsp; Windsurf &nbsp;·&nbsp; JetBrains (Junie) &nbsp;·&nbsp; GitHub Copilot &nbsp;·&nbsp; any MCP client
+
+## Search quality
+
+100% recall. Benchmarked on four real codebases — including Kubernetes at 8,691 files — with known expected results per query. Full methodology in [BENCHMARKS.md](BENCHMARKS.md).
+
+| Codebase | Language | Files | Queries | Recall@10 | MRR | Zero-miss |
+|---|---|---|---|---|---|---|
+| local-rag | TypeScript | 97 | 20 | 100.0% | 0.651 | 0.0% |
+| Express.js | JavaScript | 161 | 15 | 100.0% | 0.922 | 0.0% |
+| Excalidraw | TypeScript | 676 | 20 | 100.0% | 0.366 | 0.0% |
+| Kubernetes | Go | 8,691 | 20 | 100.0%* | 0.496 | 0.0%* |
+
+\*With config tuning. At default top-10, Recall is 80%. See [BENCHMARKS.md](BENCHMARKS.md) for details.
+
+## How it compares
+
+|  | local-rag | No tool (grep + Read) | Context stuffing | Cloud RAG services |
+|---|---|---|---|---|
+| Setup | One command | Nothing | Nothing | API keys, accounts |
+| Token cost | ~91K/prompt | ~380K/prompt | Entire codebase | Varies |
+| Search quality | 100% Recall@10 | Depends on keywords | N/A (everything loaded) | Varies |
+| Code understanding | AST-aware (24 langs) | Line-level | None | Usually line-level |
+| Cross-session memory | Conversations + checkpoints | None | None | Some |
+| Privacy | Fully local | Local | Local | Data leaves your machine |
+| Price | Free | Free | High token bills | $10-50/mo + tokens |
 
 ## What it gives your agent
 
 **Find code by meaning, not filename.**
-"Where do we handle authentication errors?" doesn't map to any symbol name — but local-rag finds `middleware/session-guard.ts` anyway. Hybrid vector + BM25 search, boosted by dependency graph centrality. [100% recall](#search-quality) across codebases up to 8.7K files.
+"Where do we handle authentication errors?" → local-rag finds `middleware/session-guard.ts`. Hybrid vector + BM25 search, boosted by dependency graph centrality.
 
 **Remember past sessions.**
-Conversation transcripts are indexed in real time. Three days later, your agent can search for "why did we switch to JWT?" and get the exact discussion — no re-explaining.
+Conversation transcripts are indexed in real time. Three days later, your agent can search for "why did we switch to JWT?" and get the exact discussion.
 
 **Know what changed since last time.**
 `git_context` shows uncommitted changes and recent commits in one call, so agents don't propose edits that conflict with in-progress work.
@@ -30,14 +63,12 @@ Checkpoints capture milestones, direction changes, and blockers. Searchable acro
 Dependency graphs, reverse-dependency lookups, and `find_usages` show the blast radius before any refactor.
 
 **Generate a project wiki.**
-`generate_wiki` produces a structured, cross-linked markdown wiki — architecture docs, module pages, entity pages, guides, and Mermaid diagrams — all built from the semantic index. Supports incremental updates when source files change.
+`generate_wiki` produces a structured, cross-linked markdown wiki — architecture docs, module pages, entity pages, guides, and Mermaid diagrams — all built from the semantic index.
 
 **Expose documentation gaps.**
 Analytics log every query locally — nothing leaves your machine. Zero-result and low-relevance queries reveal what's missing from your docs.
 
 ## Quick start
-
-Works with any MCP-compatible agent or IDE. The `init` command auto-configures Claude Code, Cursor, Windsurf, JetBrains (Junie), and Copilot — but you can point any MCP client at the server manually.
 
 ### 1. Install SQLite (macOS)
 
@@ -71,19 +102,6 @@ For deeper integration, local-rag is also available as a Claude Code plugin. In 
 ```
 
 The plugin adds **SessionStart** (context summary), **PostToolUse** (auto-reindex on edit), and **SessionEnd** (auto-checkpoint) hooks. No `CLAUDE.md` instructions needed — the plugin's built-in skill handles tool usage.
-
-## Search quality
-
-Benchmarked on four codebases with known expected files per query. Full details in [BENCHMARKS.md](BENCHMARKS.md).
-
-| Codebase | Language | Files | Queries | Recall@10 | MRR | Zero-miss |
-|---|---|---|---|---|---|---|
-| local-rag (this project) | TypeScript | 97 | 20 | 100.0% | 0.651 | 0.0% |
-| Express.js | JavaScript | 161 | 15 | 100.0% | 0.922 | 0.0% |
-| Excalidraw | TypeScript | 676 | 20 | 100.0% | 0.366 | 0.0% |
-| Kubernetes | Go | 8,691 | 20 | 100.0%* | 0.496 | 0.0%* |
-
-\*With config tuning. At default top-10, Recall is 80%. See [BENCHMARKS.md](BENCHMARKS.md) for details.
 
 ## How it works
 
