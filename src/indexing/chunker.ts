@@ -153,7 +153,7 @@ async function _chunkText(
           const chunk: Chunk = {
             text: c.text,
             index: i,
-            startLine: c.startLine + 1, // bun-chunk is 0-indexed, local-rag is 1-indexed
+            startLine: c.startLine + 1, // bun-chunk is 0-indexed, mimirs is 1-indexed
             endLine: c.endLine + 1,
           };
           if (c.imports?.length) chunk.imports = c.imports;

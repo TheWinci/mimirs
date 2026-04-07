@@ -25,7 +25,7 @@ interface WorkerResult {
 }
 
 async function runWorker(dtype: "fp32" | "q8"): Promise<WorkerResult> {
-  const ragDir = resolve(tmpdir(), `local-rag-quality-${dtype}-${Date.now()}`);
+  const ragDir = resolve(tmpdir(), `mimirs-quality-${dtype}-${Date.now()}`);
 
   const proc = Bun.spawn(["bun", workerScript, dtype, directory, ragDir], {
     stdout: "pipe",

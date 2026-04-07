@@ -14,7 +14,7 @@ export async function checkpointCommand(args: string[], getFlag: (flag: string) 
     const title = args[3];
     const summary = args[4];
     if (!type || !title || !summary) {
-      cli.error("Usage: local-rag checkpoint create <type> <title> <summary> [--dir D] [--files f1,f2] [--tags t1,t2]");
+      cli.error("Usage: mimirs checkpoint create <type> <title> <summary> [--dir D] [--files f1,f2] [--tags t1,t2]");
       process.exit(1);
     }
 
@@ -56,7 +56,7 @@ export async function checkpointCommand(args: string[], getFlag: (flag: string) 
   } else if (subCommand === "search") {
     const query = args[2];
     if (!query) {
-      cli.error("Usage: local-rag checkpoint search <query> [--dir D] [--type T] [--top N]");
+      cli.error("Usage: mimirs checkpoint search <query> [--dir D] [--type T] [--top N]");
       process.exit(1);
     }
 
@@ -78,7 +78,7 @@ export async function checkpointCommand(args: string[], getFlag: (flag: string) 
       }
     }
   } else {
-    cli.error("Usage: local-rag checkpoint <create|list|search>");
+    cli.error("Usage: mimirs checkpoint <create|list|search>");
     process.exit(1);
   }
 

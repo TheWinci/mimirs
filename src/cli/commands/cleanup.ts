@@ -5,11 +5,11 @@ import { homedir } from "os";
 import { confirm } from "../setup";
 import { cli } from "../../utils/log";
 
-const MARKER = "<!-- local-rag -->";
-const INSTRUCTIONS_HEADING = "## Using local-rag tools";
+const MARKER = "<!-- mimirs -->";
+const INSTRUCTIONS_HEADING = "## Using mimirs tools";
 
 /**
- * Remove the `<!-- local-rag -->` instructions block from a markdown file.
+ * Remove the `<!-- mimirs -->` instructions block from a markdown file.
  * If the file becomes empty (or whitespace-only) after removal, delete it.
  */
 async function removeInstructionsBlock(filePath: string): Promise<string | null> {
@@ -40,14 +40,14 @@ async function removeInstructionsBlock(filePath: string): Promise<string | null>
   const cleaned = (content.slice(0, start) + content.slice(end)).replace(/\n{3,}/g, "\n\n").trim();
   if (!cleaned) {
     await unlink(filePath);
-    return `Deleted ${filePath} (was only local-rag content)`;
+    return `Deleted ${filePath} (was only mimirs content)`;
   }
   await writeFile(filePath, cleaned + "\n");
-  return `Removed local-rag block from ${filePath}`;
+  return `Removed mimirs block from ${filePath}`;
 }
 
 /**
- * Remove the `local-rag` key from a JSON MCP config file.
+ * Remove the `mimirs` key from a JSON MCP config file.
  * If the file has no other servers after removal, delete it.
  */
 async function removeMcpEntry(mcpPath: string): Promise<string | null> {
@@ -58,9 +58,9 @@ async function removeMcpEntry(mcpPath: string): Promise<string | null> {
   } catch {
     return null;
   }
-  if (!raw.mcpServers?.["local-rag"]) return null;
+  if (!raw.mcpServers?.["mimirs"]) return null;
 
-  delete raw.mcpServers["local-rag"];
+  delete raw.mcpServers["mimirs"];
 
   if (Object.keys(raw.mcpServers).length === 0) {
     // If mcpServers was the only key, delete the file
@@ -73,12 +73,12 @@ async function removeMcpEntry(mcpPath: string): Promise<string | null> {
   }
 
   await writeFile(mcpPath, JSON.stringify(raw, null, 2) + "\n");
-  return `Removed local-rag from ${mcpPath}`;
+  return `Removed mimirs from ${mcpPath}`;
 }
 
 /**
- * Remove a file if it exists and was created entirely by local-rag.
- * (e.g. .cursor/rules/local-rag.mdc)
+ * Remove a file if it exists and was created entirely by mimirs.
+ * (e.g. .cursor/rules/mimirs.mdc)
  */
 async function removeOwnedFile(filePath: string): Promise<string | null> {
   if (!existsSync(filePath)) return null;
@@ -87,7 +87,7 @@ async function removeOwnedFile(filePath: string): Promise<string | null> {
 }
 
 /**
- * Remove the `.rag/` line from .gitignore.
+ * Remove the `.mimirs/` line from .gitignore.
  */
 async function removeGitignoreEntry(projectDir: string): Promise<string | null> {
   const gitignorePath = join(projectDir, ".gitignore");
@@ -96,18 +96,18 @@ async function removeGitignoreEntry(projectDir: string): Promise<string | null> 
   const lines = content.split("\n");
   const filtered = lines.filter(line => {
     const trimmed = line.trim();
-    if (trimmed === ".rag/" || trimmed === ".rag") return false;
-    if (trimmed === "# local-rag index") return false;
+    if (trimmed === ".mimirs/" || trimmed === ".mimirs") return false;
+    if (trimmed === "# mimirs index") return false;
     return true;
   });
   const cleaned = filtered.join("\n").replace(/\n{3,}/g, "\n\n").trim();
   if (cleaned === content.trim()) return null;
   if (!cleaned) {
     await unlink(gitignorePath);
-    return "Deleted .gitignore (was only local-rag content)";
+    return "Deleted .gitignore (was only mimirs content)";
   }
   await writeFile(gitignorePath, cleaned + "\n");
-  return "Removed .rag/ from .gitignore";
+  return "Removed .mimirs/ from .gitignore";
 }
 
 export async function cleanupCommand(args: string[]) {
@@ -117,12 +117,12 @@ export async function cleanupCommand(args: string[]) {
   // Collect what we'd remove
   const pending: (() => Promise<string | null>)[] = [];
 
-  // .rag/ directory
-  const ragDir = join(dir, ".rag");
+  // .mimirs/ directory
+  const ragDir = join(dir, ".mimirs");
   if (existsSync(ragDir)) {
     pending.push(async () => {
       await rm(ragDir, { recursive: true, force: true });
-      return "Deleted .rag/ directory";
+      return "Deleted .mimirs/ directory";
     });
   }
 
@@ -134,19 +134,19 @@ export async function cleanupCommand(args: string[]) {
 
   // Agent instruction files
   pending.push(() => removeInstructionsBlock(join(dir, "CLAUDE.md")));
-  pending.push(() => removeOwnedFile(join(dir, ".cursor", "rules", "local-rag.mdc")));
-  pending.push(() => removeOwnedFile(join(dir, ".windsurf", "rules", "local-rag.md")));
+  pending.push(() => removeOwnedFile(join(dir, ".cursor", "rules", "mimirs.mdc")));
+  pending.push(() => removeOwnedFile(join(dir, ".windsurf", "rules", "mimirs.md")));
   pending.push(() => removeInstructionsBlock(join(dir, ".github", "copilot-instructions.md")));
 
   // .gitignore
   pending.push(() => removeGitignoreEntry(dir));
 
   if (!autoYes) {
-    cli.log("This will remove all local-rag files from this project:\n");
-    cli.log("  - .rag/ directory (index database & config)");
-    cli.log("  - local-rag entries from MCP configs (.mcp.json, .cursor/mcp.json, windsurf)");
-    cli.log("  - Agent instructions (CLAUDE.md block, .cursor/rules/local-rag.mdc, etc.)");
-    cli.log("  - .rag/ entry from .gitignore");
+    cli.log("This will remove all mimirs files from this project:\n");
+    cli.log("  - .mimirs/ directory (index database & config)");
+    cli.log("  - mimirs entries from MCP configs (.mcp.json, .cursor/mcp.json, windsurf)");
+    cli.log("  - Agent instructions (CLAUDE.md block, .cursor/rules/mimirs.mdc, etc.)");
+    cli.log("  - .mimirs/ entry from .gitignore");
     cli.log();
     const ok = await confirm("Proceed? [y/N] ");
     if (!ok) {
@@ -162,7 +162,7 @@ export async function cleanupCommand(args: string[]) {
   }
 
   if (actions.length === 0) {
-    cli.log("Nothing to clean up — no local-rag files found.");
+    cli.log("Nothing to clean up — no mimirs files found.");
   } else {
     for (const action of actions) cli.log(`  ${action}`);
     cli.log(`\nCleaned up ${actions.length} item(s).`);

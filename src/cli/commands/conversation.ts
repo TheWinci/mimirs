@@ -14,7 +14,7 @@ export async function conversationCommand(args: string[], getFlag: (flag: string
   if (subCommand === "search") {
     const query = args[2];
     if (!query) {
-      cli.error("Usage: local-rag conversation search <query> [--dir D] [--top N]");
+      cli.error("Usage: mimirs conversation search <query> [--dir D] [--top N]");
       process.exit(1);
     }
 
@@ -95,7 +95,7 @@ export async function conversationCommand(args: string[], getFlag: (flag: string
       cli.log(`Done: ${totalTurns} turns indexed across ${sessions.length} sessions`);
     }
   } else {
-    cli.error("Usage: local-rag conversation <search|sessions|index>");
+    cli.error("Usage: mimirs conversation <search|sessions|index>");
     process.exit(1);
   }
 

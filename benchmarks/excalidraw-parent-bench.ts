@@ -11,7 +11,7 @@ import { chunkFile } from "@winci/bun-chunk";
 import { readdirSync } from "fs";
 
 const EXCALIDRAW_DIR = "/Users/winci/repos/excalidraw";
-const TMP_DIR = resolve(import.meta.dir, "..", ".rag", "bench-excalidraw");
+const TMP_DIR = resolve(import.meta.dir, "..", ".mimirs", "bench-excalidraw");
 const TOP_K = 8;
 
 // ── Parent lookup (same as parent-promotion-bench.ts) ──

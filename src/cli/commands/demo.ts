@@ -24,7 +24,7 @@ function pause(ms: number): Promise<void> {
 export async function demoCommand(args: string[]) {
   const dir = resolve(args[1] && !args[1].startsWith("--") ? args[1] : ".");
 
-  cli.log(`${BOLD}local-rag demo${RESET}`);
+  cli.log(`${BOLD}mimirs demo${RESET}`);
   cli.log(`${DIM}Running against: ${dir}${RESET}`);
 
   // Step 1: Index
@@ -96,7 +96,7 @@ export async function demoCommand(args: string[]) {
   cli.log(
     `${DIM}The project_map tool generates a Mermaid dependency graph\n` +
     `showing how files import from each other. Run:${RESET}\n\n` +
-    `  local-rag map ${dir}\n`
+    `  mimirs map ${dir}\n`
   );
 
   // Step 6: Unique features summary
@@ -112,9 +112,9 @@ export async function demoCommand(args: string[]) {
 
   cli.log(`\n${BOLD}Done.${RESET} Add to your editor with:\n`);
   cli.log(`  ${DIM}# Start the MCP server${RESET}`);
-  cli.log(`  bunx @winci/local-rag serve\n`);
+  cli.log(`  bunx mimirs serve\n`);
   cli.log(`  ${DIM}# Then add to your editor's MCP config (Claude Code, Cursor, Windsurf, VS Code):${RESET}`);
-  cli.log(`  { "mcpServers": { "local-rag": { "command": "bunx", "args": ["@winci/local-rag", "serve"] } } }\n`);
+  cli.log(`  { "mcpServers": { "mimirs": { "command": "bunx", "args": ["mimirs", "serve"] } } }\n`);
 
   db.close();
 }

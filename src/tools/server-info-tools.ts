@@ -43,7 +43,7 @@ export function registerServerInfoTools(
         `  model: ${getModelId()}`,
         `  dim:   ${getEmbeddingDim()}`,
         "",
-        "## Config (.rag/config.json)",
+        "## Config (.mimirs/config.json)",
         `  chunk_size:      ${config.chunkSize}`,
         `  chunk_overlap:   ${config.chunkOverlap}`,
         `  hybrid_weight:   ${config.hybridWeight}`,

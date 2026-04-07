@@ -5,11 +5,11 @@ import { homedir } from "os";
 import { createInterface } from "readline";
 import { loadConfig } from "../config";
 
-const MARKER = "<!-- local-rag -->";
+const MARKER = "<!-- mimirs -->";
 
-const INSTRUCTIONS_BLOCK = `## Using local-rag tools
+const INSTRUCTIONS_BLOCK = `## Using mimirs tools
 
-This project has a local RAG index (local-rag). Use these MCP tools:
+This project has a local RAG index (mimirs). Use these MCP tools:
 
 - **\`search\`**: Discover which files are relevant to a topic. Returns file paths
   with snippet previews — use this when you need to know *where* something is.
@@ -56,12 +56,12 @@ This project has a local RAG index (local-rag). Use these MCP tools:
   point — returns the most semantically appropriate file and anchor.
 - **\`generate_wiki\`**: Generate or update a structured markdown wiki for the
   codebase. Call with \`run: true\` to immediately execute all phases. Follow
-  the returned instructions step by step using the other local-rag tools to
+  the returned instructions step by step using the other mimirs tools to
   build wiki pages in \`wiki/\`.`;
 
 const MDC_BLOCK = `${MARKER}
 ---
-description: local-rag tool usage instructions
+description: mimirs tool usage instructions
 alwaysApply: true
 ---
 
@@ -70,7 +70,7 @@ ${INSTRUCTIONS_BLOCK}`;
 const WINDSURF_BLOCK = `${MARKER}
 ---
 trigger: always_on
-description: local-rag tool usage instructions
+description: mimirs tool usage instructions
 ---
 
 ${INSTRUCTIONS_BLOCK}`;
@@ -83,31 +83,31 @@ export interface SetupResult {
 }
 
 export async function ensureConfig(projectDir: string): Promise<string | null> {
-  const configPath = join(projectDir, ".rag", "config.json");
+  const configPath = join(projectDir, ".mimirs", "config.json");
   if (existsSync(configPath)) return null;
   // loadConfig auto-creates the file with defaults if missing
   await loadConfig(projectDir);
-  return "Created .rag/config.json";
+  return "Created .mimirs/config.json";
 }
 
 export async function ensureGitignore(projectDir: string): Promise<string | null> {
   const gitignorePath = join(projectDir, ".gitignore");
   if (!existsSync(gitignorePath)) {
-    await writeFile(gitignorePath, "# local-rag index\n.rag/\n");
-    return "Created .gitignore with .rag/";
+    await writeFile(gitignorePath, "# mimirs index\n.mimirs/\n");
+    return "Created .gitignore with .mimirs/";
   }
   const content = await readFile(gitignorePath, "utf-8");
-  if (content.split("\n").some(line => line.trim() === ".rag/" || line.trim() === ".rag")) {
+  if (content.split("\n").some(line => line.trim() === ".mimirs/" || line.trim() === ".mimirs")) {
     return null;
   }
-  await writeFile(gitignorePath, content.trimEnd() + "\n\n# local-rag index\n.rag/\n");
-  return "Added .rag/ to .gitignore";
+  await writeFile(gitignorePath, content.trimEnd() + "\n\n# mimirs index\n.mimirs/\n");
+  return "Added .mimirs/ to .gitignore";
 }
 
 async function injectMarkdown(filePath: string, block: string): Promise<string | null> {
   if (existsSync(filePath)) {
     const content = await readFile(filePath, "utf-8");
-    if (content.includes(MARKER) || content.includes("## Using local-rag tools")) return null;
+    if (content.includes(MARKER) || content.includes("## Using mimirs tools")) return null;
     await writeFile(filePath, content.trimEnd() + "\n\n" + block + "\n");
     return `Updated ${filePath}`;
   }
@@ -165,28 +165,28 @@ export async function ensureAgentInstructions(projectDir: string, ides?: string[
     await mkdir(join(projectDir, ".cursor"), { recursive: true });
   }
   const cursorAction = await injectMdc(
-    join(projectDir, ".cursor", "rules", "local-rag.mdc"),
+    join(projectDir, ".cursor", "rules", "mimirs.mdc"),
     join(projectDir, ".cursor")
   );
   if (cursorAction) actions.push(cursorAction);
 
-  // Windsurf — .windsurf/rules/local-rag.md (uses .md with trigger frontmatter, not .mdc)
+  // Windsurf — .windsurf/rules/mimirs.md (uses .md with trigger frontmatter, not .mdc)
   if (forced.has("windsurf") && !existsSync(join(projectDir, ".windsurf"))) {
     await mkdir(join(projectDir, ".windsurf"), { recursive: true });
   }
   const windsurfAction = await injectWindsurfRule(
-    join(projectDir, ".windsurf", "rules", "local-rag.md"),
+    join(projectDir, ".windsurf", "rules", "mimirs.md"),
     join(projectDir, ".windsurf")
   );
   if (windsurfAction) actions.push(windsurfAction);
 
-  // JetBrains (Junie) — .junie/guidelines/local-rag.md
+  // JetBrains (Junie) — .junie/guidelines/mimirs.md
   if (forced.has("jetbrains") && !existsSync(join(projectDir, ".junie"))) {
     await mkdir(join(projectDir, ".junie"), { recursive: true });
   }
   if (existsSync(join(projectDir, ".junie"))) {
     const junieAction = await injectMarkdown(
-      join(projectDir, ".junie", "guidelines", "local-rag.md"),
+      join(projectDir, ".junie", "guidelines", "mimirs.md"),
       MARKDOWN_BLOCK
     );
     if (junieAction) actions.push(junieAction);
@@ -210,9 +210,9 @@ export async function ensureAgentInstructions(projectDir: string, ides?: string[
 export function mcpConfigSnippet(projectDir: string): string {
   const abs = resolve(projectDir);
   return JSON.stringify({
-    "local-rag": {
+    "mimirs": {
       command: "bunx",
-      args: ["@winci/local-rag@latest", "serve"],
+      args: ["mimirs@latest", "serve"],
       env: { RAG_PROJECT_DIR: abs },
     },
   }, null, 2);
@@ -221,26 +221,31 @@ export function mcpConfigSnippet(projectDir: string): string {
 function mcpServerEntry(projectDir: string) {
   return {
     command: "bunx",
-    args: ["@winci/local-rag@latest", "serve"],
+    args: ["mimirs@latest", "serve"],
     env: { RAG_PROJECT_DIR: resolve(projectDir) },
   };
 }
 
 async function upsertMcpJson(mcpPath: string, entry: object): Promise<string | null> {
   if (existsSync(mcpPath)) {
-    const raw = JSON.parse(await readFile(mcpPath, "utf-8"));
-    if (raw.mcpServers?.["local-rag"]) return null;
+    let raw: any;
+    try {
+      raw = JSON.parse(await readFile(mcpPath, "utf-8"));
+    } catch {
+      return `Skipped ${mcpPath} (invalid JSON — fix it manually or delete it)`;
+    }
+    if (raw.mcpServers?.["mimirs"]) return null;
     raw.mcpServers = raw.mcpServers || {};
-    raw.mcpServers["local-rag"] = entry;
+    raw.mcpServers["mimirs"] = entry;
     await writeFile(mcpPath, JSON.stringify(raw, null, 2) + "\n");
-    return `Added local-rag to ${mcpPath}`;
+    return `Added mimirs to ${mcpPath}`;
   }
   await mkdir(join(mcpPath, ".."), { recursive: true });
   await writeFile(
     mcpPath,
-    JSON.stringify({ mcpServers: { "local-rag": entry } }, null, 2) + "\n"
+    JSON.stringify({ mcpServers: { "mimirs": entry } }, null, 2) + "\n"
   );
-  return `Created ${mcpPath} with local-rag`;
+  return `Created ${mcpPath} with mimirs`;
 }
 
 export async function ensureMcpJson(projectDir: string, ides?: string[]): Promise<string[]> {

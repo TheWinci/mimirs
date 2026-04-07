@@ -1,6 +1,6 @@
 # CLI Module
 
-The CLI module (`src/cli/`) is the command-line interface for local-rag. It
+The CLI module (`src/cli/`) is the command-line interface for mimirs. It
 parses arguments, dispatches to command handlers, provides progress display,
 and handles first-run setup across multiple AI agent hosts (Claude Code,
 Cursor, Windsurf, Copilot).
@@ -53,11 +53,11 @@ identifies the command name, and dispatches to the matching handler via a
 Handles first-run configuration and IDE integration. Key exports:
 
 - **`runSetup()`** -- interactive setup wizard
-- **`ensureConfig()`** -- creates `.rag/config.json` with defaults if absent
-- **`ensureAgentInstructions()`** -- injects local-rag tool guidance into the
+- **`ensureConfig()`** -- creates `.mimirs/config.json` with defaults if absent
+- **`ensureAgentInstructions()`** -- injects mimirs tool guidance into the
   agent's instruction file (e.g., `CLAUDE.md`)
 - **`ensureMcpJson()`** -- writes the MCP server entry into the IDE's config
-- **`ensureGitignore()`** -- adds `.rag/` to `.gitignore`
+- **`ensureGitignore()`** -- adds `.mimirs/` to `.gitignore`
 - **`mcpConfigSnippet()`** -- generates the JSON snippet for MCP registration
 - **`detectAgentHints()`** -- auto-detects which AI agent is in use
 - **`parseIdeFlag()`** -- parses `--ide` flag value
@@ -85,7 +85,7 @@ embedding. Used by command handlers to show real-time feedback in the terminal.
 | `doctor` | `doctor.ts` | Diagnose common setup problems |
 | `eval` | `eval.ts` | Evaluate search result quality |
 | `index` | `index-cmd.ts` | Index project files |
-| `init` | `init.ts` | Initialize local-rag in a project |
+| `init` | `init.ts` | Initialize mimirs in a project |
 | `map` | `map.ts` | Generate project dependency maps |
 | `remove` | `remove.ts` | Remove files from the index |
 | `search` | `search-cmd.ts` | Search the index from the terminal |

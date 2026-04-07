@@ -1,14 +1,14 @@
 {
-  "name": "local-rag",
-  "version": "0.6.13",
-  "description": "Semantic search for your codebase and conversation history — zero config, local-first, with gap analysis",
+  "name": "mimirs",
+  "version": "1.0.0",
+  "description": "Persistent project memory for AI coding agents — semantic search, AST-aware chunking, dependency graphs, and conversation history",
   "author": {
     "name": "TheWinci",
     "url": "https://github.com/TheWinci"
   },
-  "homepage": "https://github.com/TheWinci/local-rag",
-  "repository": "https://github.com/TheWinci/local-rag",
-  "license": "MIT",
+  "homepage": "https://github.com/TheWinci/mimirs",
+  "repository": "https://github.com/TheWinci/mimirs",
+  "license": "Apache-2.0",
   "keywords": [
     "rag",
     "semantic-search",
@@ -16,13 +16,15 @@
     "codebase",
     "local-first",
     "embeddings",
-    "code-intelligence"
+    "code-intelligence",
+    "mcp",
+    "project-memory"
   ],
   "skills": "./skills/",
   "mcpServers": {
-    "local-rag": {
+    "mimirs": {
       "command": "bunx",
-      "args": ["@winci/local-rag@latest", "serve"]
+      "args": ["mimirs@latest", "serve"]
     }
   }
 }

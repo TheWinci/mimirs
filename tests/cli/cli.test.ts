@@ -51,26 +51,26 @@ describe("CLI", () => {
   test("--help prints usage", async () => {
     const { stdout, exitCode } = await runCLI("--help");
     expect(exitCode).toBe(0);
-    expect(stdout).toContain("local-rag");
+    expect(stdout).toContain("mimirs");
     expect(stdout).toContain("Usage:");
     expect(stdout).toContain("index");
     expect(stdout).toContain("search");
     expect(stdout).toContain("analytics");
   });
 
-  test("init creates .rag/config.json and CLAUDE.md", async () => {
+  test("init creates .mimirs/config.json and CLAUDE.md", async () => {
     const { stdout, exitCode } = await runCLIWithStdin("n\n", "init", tempDir);
     expect(exitCode).toBe(0);
-    expect(stdout).toContain(".rag/config.json");
+    expect(stdout).toContain(".mimirs/config.json");
     expect(stdout).toContain("CLAUDE.md");
-    expect(stdout).toContain("local-rag");
+    expect(stdout).toContain("mimirs");
 
     // RAG_PROJECT_DIR is in the .mcp.json file, not stdout
     const mcpContent = await Bun.file(join(tempDir, ".mcp.json")).text();
     expect(mcpContent).toContain("RAG_PROJECT_DIR");
 
     const { existsSync } = await import("fs");
-    expect(existsSync(join(tempDir, ".rag", "config.json"))).toBe(true);
+    expect(existsSync(join(tempDir, ".mimirs", "config.json"))).toBe(true);
     expect(existsSync(join(tempDir, "CLAUDE.md"))).toBe(true);
   });
 

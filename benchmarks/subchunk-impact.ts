@@ -20,8 +20,8 @@ import { parseFile } from "../src/indexing/parse";
 import { resolveImports } from "../src/graph/resolver";
 
 const PROJECT_DIR = resolve(import.meta.dir, "..");
-const QUERIES_PATH = join(PROJECT_DIR, "benchmarks", "local-rag-queries.json");
-const TMP_DIR = join(PROJECT_DIR, ".rag", "bench-subchunk");
+const QUERIES_PATH = join(PROJECT_DIR, "benchmarks", "mimirs-queries.json");
+const TMP_DIR = join(PROJECT_DIR, ".mimirs", "bench-subchunk");
 const TOP_K = 10;
 
 // ── Helpers ──

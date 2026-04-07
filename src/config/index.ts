@@ -97,8 +97,8 @@ const DEFAULT_CONFIG: RagConfig = {
     "target/**",
     // Go
     "vendor/**",
-    // Local RAG index
-    ".rag/**",
+    // Mimirs index
+    ".mimirs/**",
   ],
   chunkSize: 512,
   chunkOverlap: 50,
@@ -112,12 +112,12 @@ const DEFAULT_CONFIG: RagConfig = {
 };
 
 /**
- * Load config from .rag/config.json.
+ * Load config from .mimirs/config.json.
  * If the file doesn't exist, writes the defaults there first so users can
  * edit the file directly — no hidden merge logic, what's on disk is what runs.
  */
 export async function loadConfig(projectDir: string): Promise<RagConfig> {
-  const ragDir = join(projectDir, ".rag");
+  const ragDir = join(projectDir, ".mimirs");
   const configPath = join(ragDir, "config.json");
 
   if (!existsSync(configPath)) {

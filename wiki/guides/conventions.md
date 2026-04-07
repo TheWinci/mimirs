@@ -34,7 +34,7 @@ Database sub-modules are **delegates** — standalone functions that receive the
 ## Configuration
 
 - All configuration uses **Zod schemas** for validation.
-- Defaults are auto-written to disk (`.rag/config.json`) so users can inspect and override them.
+- Defaults are auto-written to disk (`.mimirs/config.json`) so users can inspect and override them.
 - See [RagConfig](../glossary.md#ragconfig) in the glossary.
 
 ## Imports

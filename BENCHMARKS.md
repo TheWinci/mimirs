@@ -8,7 +8,7 @@ Search quality benchmarks measured on four codebases. Last updated 2026-03-30.
 
 All results use hybrid search (70% vector / 30% BM25) with pipeline improvements (source/test path boost, symbol expansion, dependency graph boost, doc expansion, filename affinity boost, boilerplate demotion). Default top-K is 10.
 
-### local-rag (97 files, 20 queries)
+### mimirs (97 files, 20 queries)
 
 | Config | Recall@10 | MRR | Zero-miss |
 |---|---|---|---|
@@ -68,7 +68,7 @@ At 8.7k files, Kubernetes is 12× larger than Excalidraw and represents an extre
 
 | Codebase | Files | Recall@10 | MRR | Zero-miss |
 |---|---|---|---|---|
-| local-rag | 97 | 100.0% | 0.651 | 0.0% |
+| mimirs | 97 | 100.0% | 0.651 | 0.0% |
 | Express.js | 161 | 100.0% | 0.922 | 0.0% |
 | Excalidraw | 676 | 100.0% | 0.366 | 0.0% |
 | Kubernetes | 8,691 | 80.0% (100% @15) | 0.496 | 20.0% (0% @15) |
@@ -79,7 +79,7 @@ At 8.7k files, Kubernetes is 12× larger than Excalidraw and represents an extre
 
 We benchmarked at K=5, 7, 10, 15, 20 across all three codebases to find the diminishing-returns point.
 
-| K | local-rag | Express | Excalidraw | Extra tokens vs K=10 |
+| K | mimirs | Express | Excalidraw | Extra tokens vs K=10 |
 |---|---|---|---|---|
 | 5 | 92.5% | 86.7% | 80.0% | −750 |
 | 7 | 97.5% | 93.3% | 85.0% | −450 |
@@ -95,7 +95,7 @@ Comprehensive comparison of all 384-dimension ONNX embedding models viable for l
 
 #### Recall@10
 
-| Model | local-rag (97) | Express (161) | Excalidraw (676) |
+| Model | mimirs (97) | Express (161) | Excalidraw (676) |
 |---|---|---|---|
 | **all-MiniLM-L6-v2 (default)** | **100.0%** | **93.3%** | **90.0%** |
 | snowflake-arctic-embed-xs | 100.0% | 73.3% | 75.0% |
@@ -106,7 +106,7 @@ Comprehensive comparison of all 384-dimension ONNX embedding models viable for l
 
 #### MRR
 
-| Model | local-rag | Express | Excalidraw |
+| Model | mimirs | Express | Excalidraw |
 |---|---|---|---|
 | **all-MiniLM-L6-v2 (default)** | **0.572** | **0.672** | **0.491** |
 | snowflake-arctic-embed-xs | 0.581 | 0.561 | 0.387 |
@@ -158,7 +158,7 @@ This trades ~60% slower indexing for +5pp recall on large codebases (676 files: 
 
 all-MiniLM-L6-v2 has a hard 256-token max sequence length. Anything beyond that is silently truncated — the embedding vector only represents the beginning of the chunk. AST-aware chunking preserves whole functions (no size limit), so large functions lose significant content from their embedding.
 
-### Truncation analysis (local-rag, 883 AST chunks)
+### Truncation analysis (mimirs, 883 AST chunks)
 
 | Metric | Value |
 |---|---|
@@ -191,7 +191,7 @@ Merged embeddings consistently improve retrieval for content past the truncation
 - **Query time**: zero overhead — merge happens entirely at index time
 - **Storage**: identical — one 384d vector per chunk regardless of strategy
 
-Enabled by default (`embeddingMerge: true`). Disable with `"embeddingMerge": false` in `.rag/config.json`.
+Enabled by default (`embeddingMerge: true`). Disable with `"embeddingMerge": false` in `.mimirs/config.json`.
 
 ### Reproducing
 
@@ -215,19 +215,19 @@ Cross-encoder reranking was removed in v0.3.27 — it loaded a ~80MB model, adde
 ## Reproducing
 
 ```bash
-bunx @winci/local-rag index .
-bunx @winci/local-rag benchmark benchmarks/local-rag-queries.json --dir . --top 10
+bunx mimirs index .
+bunx mimirs benchmark benchmarks/mimirs-queries.json --dir . --top 10
 
 # Excalidraw (clone first: git clone --depth 1 https://github.com/excalidraw/excalidraw.git /tmp/excalidraw-bench)
-bunx @winci/local-rag index /tmp/excalidraw-bench
-bunx @winci/local-rag benchmark benchmarks/excalidraw-queries.json --dir /tmp/excalidraw-bench --top 10
+bunx mimirs index /tmp/excalidraw-bench
+bunx mimirs benchmark benchmarks/excalidraw-queries.json --dir /tmp/excalidraw-bench --top 10
 
 # Compare models
-bunx @winci/local-rag benchmark-models benchmarks/local-rag-queries.json \
+bunx mimirs benchmark-models benchmarks/mimirs-queries.json \
   --models "Xenova/all-MiniLM-L6-v2,Xenova/bge-small-en-v1.5" --dir . --top 10
 ```
 
-Query files: [local-rag](benchmarks/local-rag-queries.json) (20 queries), [Express.js](benchmarks/express-queries.json) (15 queries), [Excalidraw](benchmarks/excalidraw-queries.json) (20 queries), [Kubernetes](benchmarks/kubernetes-queries.json) (20 queries).
+Query files: [mimirs](benchmarks/mimirs-queries.json) (20 queries), [Express.js](benchmarks/express-queries.json) (15 queries), [Excalidraw](benchmarks/excalidraw-queries.json) (20 queries), [Kubernetes](benchmarks/kubernetes-queries.json) (20 queries).
 
 ### Kubernetes
 
@@ -237,16 +237,16 @@ git clone --depth 1 https://github.com/kubernetes/kubernetes.git /tmp/k8s-bench
 
 # Configure: Go files only, exclude test files
 mkdir -p /tmp/k8s-bench/.rag
-cat > /tmp/k8s-bench/.rag/config.json << 'EOF'
+cat > /tmp/k8s-bench/.mimirs/config.json << 'EOF'
 {
   "include": ["**/*.go"],
-  "exclude": ["vendor/**", ".git/**", "**/*_test.go", "test/**", "third_party/**", "hack/**", ".rag/**"]
+  "exclude": ["vendor/**", ".git/**", "**/*_test.go", "test/**", "third_party/**", "hack/**", ".mimirs/**"]
 }
 EOF
 
 # Index (~39 min on M-series Mac)
-bunx @winci/local-rag index /tmp/k8s-bench
+bunx mimirs index /tmp/k8s-bench
 
 # Benchmark
-bunx @winci/local-rag benchmark benchmarks/kubernetes-queries.json --dir /tmp/k8s-bench --top 10
+bunx mimirs benchmark benchmarks/kubernetes-queries.json --dir /tmp/k8s-bench --top 10
 ```

@@ -7,7 +7,7 @@ tags: [testing, sample, markdown]
 
 ## Introduction
 
-This is a sample markdown document used for testing the local-rag system.
+This is a sample markdown document used for testing the mimirs system.
 
 ## Details
 

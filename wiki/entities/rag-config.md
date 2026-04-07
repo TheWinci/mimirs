@@ -1,7 +1,7 @@
 # RagConfig
 
-Typed configuration object for a local-rag project. Loaded from
-`.rag/config.json` with Zod validation; missing files get populated with
+Typed configuration object for a mimirs project. Loaded from
+`.mimirs/config.json` with Zod validation; missing files get populated with
 sensible defaults.
 
 **Source:** `src/config/index.ts`
@@ -48,7 +48,7 @@ export function applyEmbeddingConfig(config: RagConfig): void;
 
 ### loadConfig
 
-1. Resolves `<projectDir>/.rag/config.json`.
+1. Resolves `<projectDir>/.mimirs/config.json`.
 2. If the file does not exist, writes `DEFAULT_CONFIG` as JSON and returns it.
 3. If the file exists, parses JSON and validates with `RagConfigSchema`.
 4. On invalid JSON or validation failure, logs a warning and returns
@@ -95,7 +95,7 @@ Build / config: `**/Makefile`, `**/Dockerfile`, `**/*.yaml`, `**/*.toml`,
 
 `node_modules/**`, `.git/**`, `dist/**`, `build/**`, `out/**`, `.next/**`,
 `coverage/**`, `.env`, `.env.*`, `.idea/**`, `.vscode/**`,
-`__pycache__/**`, `.venv/**`, `target/**`, `vendor/**`, `.rag/**`
+`__pycache__/**`, `.venv/**`, `target/**`, `vendor/**`, `.mimirs/**`
 
 ## Usage
 

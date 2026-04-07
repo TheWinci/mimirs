@@ -16,7 +16,7 @@ export async function doctorCommand(args: string[]) {
     {
       name: "Bun runtime",
       run: () => {
-        if (typeof Bun === "undefined") return "Bun runtime not detected. local-rag requires Bun.";
+        if (typeof Bun === "undefined") return "Bun runtime not detected. mimirs requires Bun.";
         return null;
       },
     },
@@ -46,7 +46,7 @@ export async function doctorCommand(args: string[]) {
           // Verify extensions actually load
           const testDb = new Database(":memory:");
           sqliteVec.load(testDb);
-          const row = testDb.query("SELECT vec_version() as v").get() as any;
+          const row = testDb.query("SELECT vec_version() as v").get() as { v: string } | null;
           testDb.close();
           if (!row?.v) return "SQLite loaded but sqlite-vec didn't initialize properly.";
           return null;
@@ -74,7 +74,7 @@ export async function doctorCommand(args: string[]) {
       run: () => {
         const ragDir = process.env.RAG_DB_DIR
           ? resolve(process.env.RAG_DB_DIR)
-          : join(projectDir, ".rag");
+          : join(projectDir, ".mimirs");
         try {
           const { mkdirSync, writeFileSync, unlinkSync } = require("fs");
           mkdirSync(ragDir, { recursive: true });
@@ -129,7 +129,7 @@ export async function doctorCommand(args: string[]) {
     },
   ];
 
-  cli.log(`local-rag doctor — checking ${projectDir}\n`);
+  cli.log(`mimirs doctor — checking ${projectDir}\n`);
 
   for (const check of checks) {
     try {
@@ -151,16 +151,16 @@ export async function doctorCommand(args: string[]) {
   }
 
   // Check for recent server crash log
-  const errorLogPath = join(projectDir, ".rag", "server-error.log");
+  const errorLogPath = join(projectDir, ".mimirs", "server-error.log");
   if (existsSync(errorLogPath)) {
     const content = readFileSync(errorLogPath, "utf8");
-    cli.log(`\n--- Recent crash log (.rag/server-error.log) ---`);
+    cli.log(`\n--- Recent crash log (.mimirs/server-error.log) ---`);
     cli.log(content);
     cli.log(`--- end ---\n`);
   }
 
   // Check indexing status
-  const statusPath = join(projectDir, ".rag", "status");
+  const statusPath = join(projectDir, ".mimirs", "status");
   if (existsSync(statusPath)) {
     const status = readFileSync(statusPath, "utf8");
     const firstLine = status.split("\n")[0];

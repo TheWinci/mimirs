@@ -11,7 +11,7 @@ let db: RagDB;
 
 const config: RagConfig = {
   include: ["**/*.ts", "**/*.md"],
-  exclude: ["node_modules/**", ".git/**", ".rag/**"],
+  exclude: ["node_modules/**", ".git/**", ".mimirs/**"],
   chunkSize: 512,
   chunkOverlap: 50,
   hybridWeight: 0.7,

@@ -33,7 +33,7 @@ describe("loadConfig", () => {
     expect(config.chunkOverlap).toBe(50);
 
     // Verify it was written to disk
-    const configPath = join(tempDir, ".rag", "config.json");
+    const configPath = join(tempDir, ".mimirs", "config.json");
     expect(existsSync(configPath)).toBe(true);
     const onDisk = JSON.parse(await readFile(configPath, "utf-8"));
     expect(onDisk.include).toEqual(config.include);
@@ -41,9 +41,9 @@ describe("loadConfig", () => {
   });
 
   test("loads user config from disk without merging defaults", async () => {
-    await mkdir(join(tempDir, ".rag"), { recursive: true });
+    await mkdir(join(tempDir, ".mimirs"), { recursive: true });
     await writeFile(
-      join(tempDir, ".rag", "config.json"),
+      join(tempDir, ".mimirs", "config.json"),
       JSON.stringify({
         include: ["**/*.md", "**/*.ts", "**/*.py"],
         chunkSize: 1024,

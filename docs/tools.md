@@ -23,29 +23,29 @@ These tools are available to any MCP client (Claude Code, Cursor, Windsurf, VS C
 | `depends_on` | List all files that a given file imports (its dependencies) |
 | `depended_on_by` | List all files that import a given file (reverse dependencies) |
 | `write_relevant` | Find the best insertion point for new content — returns semantically appropriate files and anchors |
-| `generate_wiki` | Generate or update a structured markdown wiki for the codebase — returns step-by-step instructions that the agent follows using other local-rag tools. Supports incremental updates |
+| `generate_wiki` | Generate or update a structured markdown wiki for the codebase — returns step-by-step instructions that the agent follows using other mimirs tools. Supports incremental updates |
 
 ## CLI
 
-`local-rag` is a CLI-first tool. The MCP server runs as the `serve` subcommand.
+`mimirs` is a CLI-first tool. The MCP server runs as the `serve` subcommand.
 
 ```bash
-local-rag serve              # Start MCP server (stdio transport)
-local-rag init [dir]         # Set up editor config, rules, .rag/, .gitignore (--ide claude|cursor|windsurf|copilot|jetbrains|all)
-local-rag index [dir]        # Index files in a directory
-local-rag search <query>     # Semantic search
-local-rag read <query>       # Chunk-level retrieval (like read_relevant)
-local-rag status [dir]       # Show index stats
-local-rag remove <path>      # Remove a file from the index
-local-rag analytics [dir]    # Usage analytics with trend comparison
-local-rag map [dir]          # Dependency graph (text format)
-local-rag benchmark [dir]    # Run search quality benchmark
-local-rag eval [dir]         # A/B eval harness
-local-rag conversation       # Conversation subcommands (search, sessions, index)
-local-rag checkpoint         # Checkpoint subcommands (create, list, search)
-local-rag annotations [dir]  # List annotations (optionally filter by --path)
-local-rag session-context    # Session start context summary (used by hook)
-local-rag demo [dir]         # Interactive feature demo
+mimirs serve              # Start MCP server (stdio transport)
+mimirs init [dir]         # Set up editor config, rules, .mimirs/, .gitignore (--ide claude|cursor|windsurf|copilot|jetbrains|all)
+mimirs index [dir]        # Index files in a directory
+mimirs search <query>     # Semantic search
+mimirs read <query>       # Chunk-level retrieval (like read_relevant)
+mimirs status [dir]       # Show index stats
+mimirs remove <path>      # Remove a file from the index
+mimirs analytics [dir]    # Usage analytics with trend comparison
+mimirs map [dir]          # Dependency graph (text format)
+mimirs benchmark [dir]    # Run search quality benchmark
+mimirs eval [dir]         # A/B eval harness
+mimirs conversation       # Conversation subcommands (search, sessions, index)
+mimirs checkpoint         # Checkpoint subcommands (create, list, search)
+mimirs annotations [dir]  # List annotations (optionally filter by --path)
+mimirs session-context    # Session start context summary (used by hook)
+mimirs demo [dir]         # Interactive feature demo
 ```
 
 ## Analytics

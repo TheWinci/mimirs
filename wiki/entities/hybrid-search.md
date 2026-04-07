@@ -103,7 +103,7 @@ All adjustments are applied after hybrid merging:
 ## Behaviour details
 
 - **Hybrid weight** defaults to 0.7 (70% vector, 30% BM25). Configurable via
-  `hybridWeight` in `.rag/config.json`.
+  `hybridWeight` in `.mimirs/config.json`.
 - **Symbol expansion** extracts identifiers from the query (camelCase,
   snake_case, dot-qualified) and runs `db.searchSymbols` for exact matches.
   Hits get a 0.75 base score or a 1.3x boost if the file already appeared.

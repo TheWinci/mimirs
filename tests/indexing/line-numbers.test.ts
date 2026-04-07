@@ -10,7 +10,7 @@ let db: RagDB;
 
 const tsConfig: RagConfig = {
   include: ["**/*.ts"],
-  exclude: ["node_modules/**", ".git/**", ".rag/**"],
+  exclude: ["node_modules/**", ".git/**", ".mimirs/**"],
   chunkSize: 512,
   chunkOverlap: 50,
 };

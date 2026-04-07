@@ -6,7 +6,7 @@
 
 ## BM25
 
-**Best Matching 25** — A probabilistic text ranking algorithm. local-rag uses BM25 via SQLite's [FTS5](#fts5) extension for keyword matching, which is combined with vector similarity in [hybrid search](#hybrid-search).
+**Best Matching 25** — A probabilistic text ranking algorithm. mimirs uses BM25 via SQLite's [FTS5](#fts5) extension for keyword matching, which is combined with vector similarity in [hybrid search](#hybrid-search).
 
 ## Chunk
 
@@ -34,11 +34,11 @@ The primary search strategy. Combines [embedding](#embedding)-based vector simil
 
 ## MCP
 
-**Model Context Protocol** — A standard for exposing tools to AI agents. local-rag runs as an MCP server, presenting tools like `search`, `read_relevant`, and `project_map` to IDEs that support the protocol.
+**Model Context Protocol** — A standard for exposing tools to AI agents. mimirs runs as an MCP server, presenting tools like `search`, `read_relevant`, and `project_map` to IDEs that support the protocol.
 
 ## RagConfig
 
-The Zod-validated configuration type that controls all tunable behavior (chunk sizes, search weights, embedding model, etc.). Stored in `.rag/config.json` and auto-populated with defaults on `init`. See the [Conventions guide](guides/conventions.md#configuration).
+The Zod-validated configuration type that controls all tunable behavior (chunk sizes, search weights, embedding model, etc.). Stored in `.mimirs/config.json` and auto-populated with defaults on `init`. See the [Conventions guide](guides/conventions.md#configuration).
 
 ## RagDB
 
@@ -50,7 +50,7 @@ A SQLite extension that enables vector similarity search via [vec0](#vec0) virtu
 
 ## Tree-sitter
 
-An incremental parser framework that produces [ASTs](#ast) for source code. local-rag uses tree-sitter (via `bun-chunk`) to parse 24 languages and split files into semantic [chunks](#chunk).
+An incremental parser framework that produces [ASTs](#ast) for source code. mimirs uses tree-sitter (via `bun-chunk`) to parse 24 languages and split files into semantic [chunks](#chunk).
 
 ## vec0
 
@@ -58,7 +58,7 @@ The [sqlite-vec](#sqlite-vec) virtual table type. Each row stores a `Float32` ve
 
 ## WAL
 
-**Write-Ahead Logging** — A SQLite journal mode that allows concurrent readers while a single writer is active. local-rag uses WAL mode so the MCP server can handle search queries without blocking the indexer.
+**Write-Ahead Logging** — A SQLite journal mode that allows concurrent readers while a single writer is active. mimirs uses WAL mode so the MCP server can handle search queries without blocking the indexer.
 
 ## See Also
 

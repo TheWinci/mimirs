@@ -1,15 +1,15 @@
-# local-rag
+# mimirs
 
 Persistent project memory for AI coding agents. One command to set up, nothing to maintain.
 
-[![npm](https://img.shields.io/npm/v/@winci/local-rag)](https://www.npmjs.com/package/@winci/local-rag)
-[![license](https://img.shields.io/npm/l/@winci/local-rag)](LICENSE)
+[![npm](https://img.shields.io/npm/v/mimirs)](https://www.npmjs.com/package/mimirs)
+[![license](https://img.shields.io/npm/l/mimirs)](LICENSE)
 
 Your agent starts every session blind — guessing filenames, grepping for keywords, burning context on irrelevant files, and forgetting everything you discussed yesterday.
 
 On a real project, that costs **380K tokens per prompt and 12-second response times**.
 
-After indexing with local-rag: **91K tokens, 3 seconds**. A 76% reduction — depending on your model and usage, that's hundreds to thousands in monthly API savings.
+After indexing with mimirs: **91K tokens, 3 seconds**. A 76% reduction — depending on your model and usage, that's hundreds to thousands in monthly API savings.
 
 No API keys. No cloud. No Docker. Just [bun](https://bun.sh/docs/installation) and SQLite.
 
@@ -23,7 +23,7 @@ Claude Code &nbsp;·&nbsp; Cursor &nbsp;·&nbsp; Windsurf &nbsp;·&nbsp; JetBrai
 
 | Codebase | Language | Files | Queries | Recall@10 | MRR | Zero-miss |
 |---|---|---|---|---|---|---|
-| local-rag | TypeScript | 97 | 20 | 100.0% | 0.651 | 0.0% |
+| mimirs | TypeScript | 97 | 20 | 100.0% | 0.651 | 0.0% |
 | Express.js | JavaScript | 161 | 15 | 100.0% | 0.922 | 0.0% |
 | Excalidraw | TypeScript | 676 | 20 | 100.0% | 0.366 | 0.0% |
 | Kubernetes | Go | 8,691 | 20 | 100.0%* | 0.496 | 0.0%* |
@@ -32,7 +32,7 @@ Claude Code &nbsp;·&nbsp; Cursor &nbsp;·&nbsp; Windsurf &nbsp;·&nbsp; JetBrai
 
 ## How it compares
 
-|  | local-rag | No tool (grep + Read) | Context stuffing | Cloud RAG services |
+|  | mimirs | No tool (grep + Read) | Context stuffing | Cloud RAG services |
 |---|---|---|---|---|
 | Setup | One command | Nothing | Nothing | API keys, accounts |
 | Token cost | ~91K/prompt | ~380K/prompt | Entire codebase | Varies |
@@ -45,7 +45,7 @@ Claude Code &nbsp;·&nbsp; Cursor &nbsp;·&nbsp; Windsurf &nbsp;·&nbsp; JetBrai
 ## What it gives your agent
 
 **Find code by meaning, not filename.**
-"Where do we handle authentication errors?" → local-rag finds `middleware/session-guard.ts`. Hybrid vector + BM25 search, boosted by dependency graph centrality.
+"Where do we handle authentication errors?" → mimirs finds `middleware/session-guard.ts`. Hybrid vector + BM25 search, boosted by dependency graph centrality.
 
 **Remember past sessions.**
 Conversation transcripts are indexed in real time. Three days later, your agent can search for "why did we switch to JWT?" and get the exact discussion.
@@ -81,24 +81,24 @@ brew install sqlite
 ### 2. Set up your editor
 
 ```bash
-bunx @winci/local-rag init --ide claude   # or: cursor, windsurf, copilot, jetbrains, all
+bunx mimirs init --ide claude   # or: cursor, windsurf, copilot, jetbrains, all
 ```
 
-This creates the MCP server config, editor rules, `.rag/config.json`, and `.gitignore` entry. Run with `--ide all` to set up every supported editor at once.
+This creates the MCP server config, editor rules, `.mimirs/config.json`, and `.gitignore` entry. Run with `--ide all` to set up every supported editor at once.
 
 ### 3. Try the demo (optional)
 
 ```bash
-bunx @winci/local-rag demo
+bunx mimirs demo
 ```
 
 ### Claude Code plugin
 
-For deeper integration, local-rag is also available as a Claude Code plugin. In a Claude Code session:
+For deeper integration, mimirs is also available as a Claude Code plugin. In a Claude Code session:
 
 ```
-/plugin marketplace add https://github.com/TheWinci/local-rag.git
-/plugin install local-rag
+/plugin marketplace add https://github.com/TheWinci/mimirs.git
+/plugin install mimirs
 ```
 
 The plugin adds **SessionStart** (context summary), **PostToolUse** (auto-reindex on edit), and **SessionEnd** (auto-checkpoint) hooks. No `CLAUDE.md` instructions needed — the plugin's built-in skill handles tool usage.
@@ -147,4 +147,4 @@ Also indexes: Markdown, JSON, XML, SQL, GraphQL, Protobuf, Terraform, Dockerfile
 | MCP | @modelcontextprotocol/sdk (stdio transport) |
 | Plugin | Claude Code plugin with skills + hooks |
 
-All data lives in `.rag/` inside your project — add it to `.gitignore`.
+All data lives in `.mimirs/` inside your project — add it to `.gitignore`.

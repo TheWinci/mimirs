@@ -34,7 +34,7 @@ import { type EmbeddedChunk } from "../src/types";
 const directory = resolve(process.argv[2] || ".");
 
 function makeTempRagDir(label: string): string {
-  const dir = resolve(tmpdir(), `local-rag-bench2-${label}-${Date.now()}`);
+  const dir = resolve(tmpdir(), `mimirs-bench2-${label}-${Date.now()}`);
   mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -170,7 +170,7 @@ async function createModel(dtype: "fp32" | "q8") {
   const { cpus, homedir } = await import("os");
   const { join } = await import("path");
 
-  env.cacheDir = join(homedir(), ".cache", "local-rag", "models");
+  env.cacheDir = join(homedir(), ".cache", "mimirs", "models");
   const numThreads = Math.max(2, Math.floor(cpus().length / 3));
 
   return hfPipeline("feature-extraction", DEFAULT_MODEL_ID, {
