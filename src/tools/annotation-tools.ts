@@ -86,4 +86,30 @@ export function registerAnnotationTools(server: McpServer, getDB: GetDB) {
       return { content: [{ type: "text" as const, text }] };
     }
   );
+
+  server.tool(
+    "delete_annotation",
+    "Remove an annotation that is no longer relevant — e.g. a bug that was fixed, a constraint that no longer applies, or a note on a deleted file/symbol. Use get_annotations first to find the annotation ID.",
+    {
+      id: z.number().int().min(1).describe("Annotation ID to delete (from get_annotations results)"),
+      directory: z
+        .string()
+        .optional()
+        .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
+    },
+    async ({ id, directory }) => {
+      const { db: ragDb } = await resolveProject(directory, getDB);
+
+      const deleted = ragDb.deleteAnnotation(id);
+      if (!deleted) {
+        return {
+          content: [{ type: "text" as const, text: `Annotation #${id} not found.` }],
+        };
+      }
+
+      return {
+        content: [{ type: "text" as const, text: `Annotation #${id} deleted.` }],
+      };
+    }
+  );
 }
