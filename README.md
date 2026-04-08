@@ -1,11 +1,13 @@
-# mimirs
-
-*Named after [Mímir](https://en.wikipedia.org/wiki/M%C3%ADmir), the Norse god of wisdom and knowledge.*
-
-Persistent project memory for AI coding agents. One command to set up, nothing to maintain.
-
-[![npm](https://img.shields.io/npm/v/mimirs)](https://www.npmjs.com/package/mimirs)
-[![license](https://img.shields.io/npm/l/mimirs)](LICENSE)
+<div align="center">
+  <img src="mimirs-logo-2.png" alt="mimirs logo" width="200">
+  <h1>MIMIRS</h1>
+  <p><i>Named after <a href="https://en.wikipedia.org/wiki/M%C3%ADmir">Mímir</a>, the Norse god of wisdom and knowledge.</i></p>
+  <p>Persistent project memory for AI coding agents. One command to set up, nothing to maintain.</p>
+  <p>
+    <a href="https://www.npmjs.com/package/mimirs"><img src="https://img.shields.io/npm/v/mimirs" alt="npm"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/npm/l/mimirs" alt="license"></a>
+  </p>
+</div>
 
 Your agent starts every session blind — guessing filenames, grepping for keywords, burning context on irrelevant files, and forgetting everything you discussed yesterday.
 
@@ -15,9 +17,15 @@ After indexing with mimirs: **91K tokens, 3 seconds**. A 76% reduction — depen
 
 No API keys. No cloud. No Docker. Just [bun](https://bun.sh/docs/installation) and SQLite.
 
-### Works with
+Works with: Claude Code &nbsp;·&nbsp; Cursor &nbsp;·&nbsp; Windsurf &nbsp;·&nbsp; JetBrains (Junie) &nbsp;·&nbsp; GitHub Copilot &nbsp;·&nbsp; any MCP client
 
-Claude Code &nbsp;·&nbsp; Cursor &nbsp;·&nbsp; Windsurf &nbsp;·&nbsp; JetBrains (Junie) &nbsp;·&nbsp; GitHub Copilot &nbsp;·&nbsp; any MCP client
+## Auto-generated project wiki
+
+One command turns your codebase into a structured, cross-linked markdown wiki — architecture docs, module pages, entity pages, guides, and Mermaid diagrams — all built from the semantic index. [See the wiki generated for this project →](wiki/index.md)
+
+<p align="center">
+  <img src="wiki-screen.png" alt="generated wiki example" width="700">
+</p>
 
 ## Search quality
 
