@@ -40,6 +40,9 @@ This project has a local RAG index (mimirs). Use these MCP tools proactively:
   `read_relevant` results automatically.
 - **`get_annotations`**: Retrieve all notes for a file, or search semantically
   across all annotations.
+- **`delete_annotation`**: Remove an annotation that is no longer relevant — a
+  fixed bug, a lifted constraint, or a note on deleted code. Use
+  `get_annotations` first to find the ID.
 - **`write_relevant`**: Before adding new code or docs, find the best insertion
   point — returns the most semantically appropriate file and anchor.
 - **`generate_wiki`**: Generate or update a structured markdown wiki for the

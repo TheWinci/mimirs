@@ -49,6 +49,9 @@ This project has a local RAG index (mimirs). Use these MCP tools:
   \`[NOTE]\` blocks inline in \`read_relevant\` results automatically.
 - **\`get_annotations\`**: Retrieve all notes for a file, or search semantically
   across all annotations to find relevant caveats before editing.
+- **\`delete_annotation\`**: Remove an annotation that is no longer relevant — a
+  fixed bug, a lifted constraint, or a note on deleted code. Use
+  \`get_annotations\` first to find the ID.
 - **\`depends_on\`**: List all files that a given file imports — its dependencies.
 - **\`depended_on_by\`**: List all files that import a given file — reverse
   dependencies. Use before modifying a shared module to see who depends on it.
