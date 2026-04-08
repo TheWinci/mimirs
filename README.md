@@ -1,5 +1,7 @@
 # mimirs
 
+*Named after [Mímir](https://en.wikipedia.org/wiki/M%C3%ADmir), the Norse god of wisdom and knowledge.*
+
 Persistent project memory for AI coding agents. One command to set up, nothing to maintain.
 
 [![npm](https://img.shields.io/npm/v/mimirs)](https://www.npmjs.com/package/mimirs)
