@@ -11,52 +11,62 @@ entire server lifecycle:
 ```mermaid
 flowchart TD
   startFn["startServer()"]
-  createMcp["Create MCP server via @modelcontextprotocol/sdk"]
-  stdio["Connect stdio transport"]
+  writeStatus["Write status file"]
+  createMcp["Create MCP server"]
   registerTools["registerAllTools()"]
+  stdio["Connect stdio transport"]
   loadConf["loadConfig()"]
   bgIndex["Background: index project files"]
   bgConv["Background: index conversation history"]
   fileWatch["Watch files for changes"]
-  shutdown["Graceful shutdown handler"]
+  shutdown_handler["Graceful shutdown handlers"]
 
+  startFn --> writeStatus
+  startFn --> shutdown_handler
   startFn --> createMcp
-  createMcp --> stdio
-  startFn --> registerTools
-  startFn --> loadConf
+  createMcp --> registerTools
+  registerTools --> stdio
+  stdio --> loadConf
   loadConf --> bgIndex
+  bgIndex --> fileWatch
   loadConf --> bgConv
-  startFn --> fileWatch
-  startFn --> shutdown
 ```
 
 ### Startup Sequence
 
-1. **Create MCP server** -- instantiates the server using
+1. **Write status** -- writes `starting` to `.mimirs/status` with version and
+   timestamp. Overwrites any stale status from a previous instance.
+2. **Register shutdown handlers** -- `SIGINT`, `SIGTERM`, `SIGHUP`, stdin
+   close, uncaught exceptions, and unhandled rejections all trigger graceful
+   cleanup. Each handler writes an `interrupted` status with the reason.
+3. **Create MCP server** -- instantiates the server using
    `@modelcontextprotocol/sdk`.
-2. **Connect stdio transport** -- the server communicates with the AI agent
-   over stdin/stdout (MCP standard).
-3. **Register tools** -- calls `registerAllTools()` from the Tools module to
+4. **Register tools** -- calls `registerAllTools()` from the Tools module to
    make all mimirs tools available to the agent.
-4. **Load config** -- reads `.mimirs/config.json` via the Config module.
-5. **Background indexing** -- kicks off file indexing in the background so the
-   server is responsive immediately while the index builds.
-6. **Conversation indexing** -- indexes conversation history from Claude Code
-   JSONL logs, with live tailing for the current session.
-7. **File watching** -- monitors the project directory for file changes and
-   re-indexes affected files automatically.
-8. **Graceful shutdown** -- handles `SIGINT`/`SIGTERM` to close the database
-   and clean up resources.
+5. **Connect stdio transport** -- done **immediately** after tool registration
+   so the MCP client's `initialize` handshake is answered before any slow
+   startup work. Without this, the client may time out.
+6. **Preflight DB** -- verifies the database can be opened. Transient lock
+   errors are not cached (next tool call retries). Permanent errors (missing
+   Homebrew SQLite, read-only filesystem) are cached so every tool call gets
+   a clear error message.
+7. **Background indexing** -- kicks off file indexing with progress reported
+   via the status file. Does not block server startup.
+8. **Conversation indexing** -- indexes conversation history from Claude Code
+   JSONL logs, with live tailing for the most recent session.
+9. **File watching** -- starts after initial indexing completes, monitoring
+   the project directory for changes and re-indexing affected files.
 
 ### Key Behaviors
 
-- The server is **single-project**: one server instance per project directory.
-- File watching triggers incremental re-indexing -- only changed files are
-  reprocessed.
-- Conversation tailing keeps search over the current session up to date in
-  real time.
+- The server manages a **lazy-init DB map** -- one `RagDB` per project
+  directory, kept open for the server's lifetime. Cleanup happens on shutdown.
+- The `instanceId` (`pid:<N>`) written to the status file prevents a new
+  server instance from overwriting another's status.
 - All logging goes to stderr (the MCP diagnostic channel) to avoid corrupting
   the stdio protocol.
+- The `doctor` CLI command and status file help diagnose startup failures
+  without needing server logs.
 
 ## Dependencies and Dependents
 
@@ -67,7 +77,7 @@ flowchart LR
   configMod["Config"]
   indexingMod["Indexing"]
   convMod["Conversation"]
-  setupMod["CLI — setup"]
+  setupMod["CLI -- setup"]
   toolsMod["Tools"]
   serverMod["Server"]
   cliServe["CLI serve command"]

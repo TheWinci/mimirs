@@ -10,27 +10,27 @@ for evaluation and benchmarking.
 ```mermaid
 flowchart TD
   subgraph SearchModule["Search Module (src/search/)"]
-    hybrid["hybrid.ts — core search engine"]
-    usages["usages.ts — regex & FTS helpers"]
-    evalFile["eval.ts — A/B evaluation"]
-    bench["benchmark.ts — recall benchmarks"]
+    hybrid_file["hybrid.ts -- core search engine"]
+    usages_file["usages.ts -- regex and FTS helpers"]
+    eval_file["eval.ts -- A/B evaluation"]
+    bench_file["benchmark.ts -- recall benchmarks"]
   end
 
-  hybrid --> dbMod["DB Module"]
-  hybrid --> embedMod["Embeddings Module"]
-  hybrid --> configMod["Config Module"]
-  hybrid --> utilsMod["Utils Module"]
+  hybrid_file --> dbMod["DB Module"]
+  hybrid_file --> embedMod["Embeddings Module"]
+  hybrid_file --> configMod["Config Module"]
+  hybrid_file --> utilsMod["Utils Module"]
 
-  evalFile --> hybrid
-  bench --> hybrid
-  evalFile --> configMod
-  bench --> configMod
+  eval_file --> hybrid_file
+  bench_file --> hybrid_file
+  eval_file --> configMod
+  bench_file --> configMod
 
-  toolsMod["Tools Module"] --> hybrid
-  toolsMod --> usages
-  cliMod["CLI Module"] --> hybrid
-  cliMod --> evalFile
-  cliMod --> bench
+  toolsMod["Tools Module"] --> hybrid_file
+  toolsMod --> usages_file
+  cliMod["CLI Module"] --> hybrid_file
+  cliMod --> eval_file
+  cliMod --> bench_file
 ```
 
 ## Files
@@ -72,7 +72,8 @@ search(
    boosts files that match by exact symbol name (1.3x boost for existing
    results, 0.75 base score for symbol-only matches).
 7. Apply path-based score adjustments (see below).
-8. Sort by score and return the top K.
+8. Expand doc window to prevent markdown files from displacing code results.
+9. Sort by score and return the top K.
 
 ### `searchChunks()`
 
@@ -92,7 +93,9 @@ searchChunks(
 
 Uses the same hybrid merge pipeline but operates on chunk-level DB methods
 (`db.searchChunks`, `db.textSearchChunks`) and applies score adjustments
-per-chunk rather than per-file.
+per-chunk rather than per-file. Adds parent grouping to replace sibling
+sub-chunks with their parent when >= `parentGroupingMinCount` (default 2)
+siblings appear.
 
 ### `mergeHybridScores()`
 
@@ -121,8 +124,8 @@ adjustments based on file metadata:
 | Filename affinity | +10% per word | Query words found in the filename stem |
 | Path segment match | +5% per word | Query words found in parent directory names |
 | Boilerplate demotion | -20% | Known low-signal files (`types.go`, `doc.go`, `index.d.ts`, etc.) |
-| Generated demotion | -25% | Files matching `config.generated` glob patterns |
-| Dep graph boost | +0.05 * log2(importers + 1) | Files imported by many others are more central |
+| Generated demotion | -50% | Files matching `config.generated` glob patterns |
+| Dep graph boost | +5% * log2(importers + 1) | Files imported by many others are more central |
 
 ### Key Interfaces
 
@@ -138,11 +141,11 @@ interface ChunkResult {
   score: number;
   content: string;
   chunkIndex: number;
-  entityName: string;
-  chunkType: string;
-  startLine: number;
-  endLine: number;
-  parentId: number;
+  entityName: string | null;
+  chunkType: string | null;
+  startLine: number | null;
+  endLine: number | null;
+  parentId: number | null;
 }
 ```
 
@@ -171,36 +174,6 @@ under both conditions.
 | `formatEvalReport(summary)` | Format results as a human-readable table |
 | `saveEvalTraces(traces, outputPath)` | Persist traces as JSON for later analysis |
 
-### Types
-
-```ts
-interface EvalTask {
-  task: string;
-  grading: string;        // human-readable criteria
-  expectedFiles?: string[];
-}
-
-interface EvalTrace {
-  task: string;
-  grading: string;
-  condition: "with-rag" | "without-rag";
-  searchResults: DedupedResult[];
-  filesReferenced: string[];
-  searchCount: number;
-  durationMs: number;
-}
-
-interface EvalSummary {
-  totalTasks: number;
-  withRag: { avgSearchResults, avgFilesReferenced, avgDurationMs, fileHitRate };
-  withoutRag: { avgSearchResults, avgFilesReferenced, avgDurationMs, fileHitRate };
-  traces: EvalTrace[];
-}
-```
-
-The report compares avg results, avg files found, file hit rate, and avg
-latency between the two conditions, plus a per-task breakdown.
-
 ## Benchmarks -- `benchmark.ts`
 
 Measures retrieval quality using recall@K and mean reciprocal rank (MRR).
@@ -213,32 +186,6 @@ Measures retrieval quality using recall@K and mean reciprocal rank (MRR).
 | `runBenchmark(queries, db, projectDir, topK?, hybridWeight?)` | Execute all queries and compute metrics |
 | `formatBenchmarkReport(summary, topK?)` | Format results with missed/partial breakdown |
 
-### Types
-
-```ts
-interface BenchmarkQuery {
-  query: string;
-  expected: string[];  // file paths that should appear in results
-}
-
-interface BenchmarkResult {
-  query: string;
-  expected: string[];
-  results: { path: string; score: number }[];
-  recall: number;          // fraction of expected files found
-  reciprocalRank: number;  // 1/rank of first expected file
-  hit: boolean;            // at least one expected file found
-}
-
-interface BenchmarkSummary {
-  total: number;
-  recallAtK: number;     // average recall across queries
-  mrr: number;           // mean reciprocal rank
-  zeroMissRate: number;  // fraction of queries that missed all expected files
-  results: BenchmarkResult[];
-}
-```
-
 The CLI `benchmark` command exits non-zero if recall or MRR fall below
 configured thresholds (`benchmarkMinRecall`, `benchmarkMinMrr`).
 
@@ -246,15 +193,17 @@ configured thresholds (`benchmarkMinRecall`, `benchmarkMinMrr`).
 
 | Direction | Module |
 |---|---|
-| Imports from | [DB](../db/index.md), [Config](../config/index.md), [Embeddings](../embeddings/index.md), [Utils](../utils/index.md) |
-| Imported by | [Tools](../tools/index.md), [CLI](../cli/index.md) |
+| Imports from | [DB](../db/), [Config](../config/), [Embeddings](../embeddings/), [Utils](../utils/) |
+| Imported by | [Tools](../tools/), [CLI](../cli/) |
 
 ## See Also
 
-- [DB Module -- Search Operations](../db/index.md) -- the underlying SQLite
-  vector and FTS5 queries that `hybrid.ts` calls
-- [Embeddings Module](../embeddings/index.md) -- how query strings are
+- [Hybrid Search entity](../../entities/hybrid-search.md) -- detailed search
+  internals and pipeline diagram
+- [DB Module -- Search Operations](../db/internals.md#searchts--search-queries)
+  -- the underlying SQLite vector and FTS5 queries
+- [Embeddings Module](../embeddings/) -- how query strings are
   converted to vectors
-- [Indexing Module](../indexing/index.md) -- how content enters the search
-  index
+- [Indexing Module](../indexing/) -- how content enters the search index
+- [Data Flow](../../data-flow.md) -- search pipeline diagram
 - [Architecture](../../architecture.md) -- system-wide overview

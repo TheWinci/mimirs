@@ -26,20 +26,20 @@ export function applyEmbeddingConfig(config: RagConfig): void;
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `include` | `string[]` | 53 glob patterns | File patterns to index (source, markdown, config, infra) |
-| `exclude` | `string[]` | 29 glob patterns | Patterns to skip (node_modules, .git, build output, etc.) |
-| `generated` | `string[]` | `[]` | Glob patterns for generated files (demoted -25% in search) |
+| `include` | `string[]` | 50+ glob patterns | File patterns to index (source, markdown, config, infra) |
+| `exclude` | `string[]` | 20+ glob patterns | Patterns to skip (node_modules, .git, build output, etc.) |
+| `generated` | `string[]` | `[]` | Glob patterns for generated files (demoted -50% in search) |
 | `chunkSize` | `number` | 512 | Max chunk size in **characters** (not tokens). Min 64. |
 | `chunkOverlap` | `number` | 50 | Overlap between adjacent fixed-size chunks in characters. Min 0. |
 | `hybridWeight` | `number` | 0.7 | Vector vs BM25 balance. 1.0 = pure vector, 0.0 = pure BM25. |
 | `searchTopK` | `number` | 10 | Default number of results returned by search. Min 1. |
 | `embeddingModel` | `string?` | `"Xenova/all-MiniLM-L6-v2"` | ONNX model ID for embeddings |
 | `embeddingDim` | `number?` | 384 | Embedding vector dimensionality |
-| `embeddingMerge` | `boolean` | `true` | Whether to merge embedding batches |
+| `embeddingMerge` | `boolean` | `true` | Whether to merge oversized chunk embeddings via windowing |
 | `incrementalChunks` | `boolean` | `false` | Re-index only changed chunks within a file |
-| `indexBatchSize` | `number?` | 50 | Files per indexing batch. Min 1. |
-| `indexThreads` | `number?` | auto | Worker threads for parallel indexing |
-| `parentGroupingMinCount` | `number` | 2 | Min sibling chunks before parent grouping triggers. Min 2. |
+| `indexBatchSize` | `number?` | 50 | Chunks per embedding batch. Min 1. |
+| `indexThreads` | `number?` | auto | ONNX worker threads for parallel embedding |
+| `parentGroupingMinCount` | `number` | 2 | Min sibling chunks before parent grouping triggers in search. Min 2. |
 | `benchmarkTopK` | `number` | 5 | Top-K for benchmark evaluation |
 | `benchmarkMinRecall` | `number` | 0.8 | Minimum recall threshold for benchmarks |
 | `benchmarkMinMrr` | `number` | 0.6 | Minimum MRR threshold for benchmarks |
@@ -69,12 +69,12 @@ will be used.
 flowchart TD
     configMod["config/index"]
     embedMod["embeddings/embed"]
-    indexer["indexing/indexer"]
+    indexer_node["indexing/indexer"]
     hybridMod["search/hybrid"]
     mcpTools["tools/*"]
 
     configMod --> embedMod
-    indexer --> configMod
+    indexer_node --> configMod
     hybridMod -.->|hybridWeight, generated| configMod
     mcpTools --> configMod
 ```
@@ -111,6 +111,8 @@ console.log(config.hybridWeight); // 0.7
 
 ## See also
 
-- [RagDB](rag-db.md) — database initialized using embedding dimensions from config
-- [Hybrid Search](hybrid-search.md) — uses `hybridWeight`, `searchTopK`, and `generated`
-- [Chunk](chunk.md) — uses `chunkSize` and `chunkOverlap`
+- [RagDB](rag-db.md) -- database initialized using embedding dimensions from config
+- [Hybrid Search](hybrid-search.md) -- uses `hybridWeight`, `searchTopK`, and `generated`
+- [Chunk](chunk.md) -- uses `chunkSize` and `chunkOverlap`
+- [Config module](../modules/config/) -- module context
+- [API Surface](../api-surface.md) -- configuration options table

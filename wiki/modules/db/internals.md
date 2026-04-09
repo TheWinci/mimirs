@@ -131,16 +131,16 @@ within each matching chunk. Returns `UsageResult[]`.
 
 ```mermaid
 flowchart TD
-  query["User query"]
-  embed["Embed query"]
-  vecSearch["vec_chunks MATCH"]
-  ftsSearch["fts_chunks MATCH"]
-  joinChunks["JOIN chunks + files"]
-  score["Compute score"]
-  results["SearchResult[]"]
+  query_input["User query"]
+  embed_step["Embed query"]
+  vecSearch_step["vec_chunks MATCH"]
+  ftsSearch_step["fts_chunks MATCH"]
+  joinChunks_step["JOIN chunks + files"]
+  score_step["Compute score"]
+  results_out["SearchResult[]"]
 
-  query --> embed --> vecSearch --> joinChunks --> score --> results
-  query --> ftsSearch --> joinChunks
+  query_input --> embed_step --> vecSearch_step --> joinChunks_step --> score_step --> results_out
+  query_input --> ftsSearch_step --> joinChunks_step
 ```
 
 ---
@@ -190,13 +190,13 @@ reverse dependencies (who imports this file).
 
 ```mermaid
 flowchart LR
-  seed["Seed file IDs"]
-  hop1["Hop 1: query neighbors"]
-  hop2["Hop 2: query neighbors"]
-  load["Load nodes + edges for visited set"]
-  result["{ nodes, edges }"]
+  seed_nodes["Seed file IDs"]
+  hop1_step["Hop 1: query neighbors"]
+  hop2_step["Hop 2: query neighbors"]
+  load_step["Load nodes + edges for visited set"]
+  result_out["{ nodes, edges }"]
 
-  seed --> hop1 --> hop2 --> load --> result
+  seed_nodes --> hop1_step --> hop2_step --> load_step --> result_out
 ```
 
 ---
@@ -342,6 +342,7 @@ previous, delta }` where each contains `totalQueries`, `avgTopScore`, and
 ## See Also
 
 - [DB module overview](index.md)
+- [RagDB entity](../../entities/rag-db.md) -- class-level reference
 - [Search module](../search/) -- orchestration layer that calls these DB functions
 - [Indexing module](../indexing/) -- writes files/chunks/graph data through RagDB
 - [Embeddings module](../embeddings/) -- produces the vectors stored in vec0 tables

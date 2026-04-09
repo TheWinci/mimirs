@@ -2,17 +2,17 @@
 
 The Indexing module (`src/indexing/`) is responsible for turning source files
 into searchable chunks with embeddings. It handles file parsing, intelligent
-chunking across 24+ languages, incremental updates, and live file watching.
+chunking across 30+ languages, incremental updates, and live file watching.
 
 ## Architecture
 
 ```mermaid
 flowchart TD
   subgraph IndexingModule["Indexing Module (src/indexing/)"]
-    indexer["indexer.ts — orchestrator"]
-    chunker["chunker.ts — text splitting"]
-    parser["parse.ts — file parsing"]
-    watcher["watcher.ts — live file watch"]
+    indexer["indexer.ts -- orchestrator"]
+    chunker["chunker.ts -- text splitting"]
+    parser["parse.ts -- file parsing"]
+    watcher["watcher.ts -- live file watch"]
   end
 
   indexer --> parser
@@ -70,6 +70,7 @@ indexDirectory(
    - Compute content hash; skip if unchanged.
    - Call `parseFile` to detect type and strip frontmatter.
    - Call `chunkText` to split into semantic chunks.
+   - Detect parent groups and create parent chunks for multi-method classes.
    - Attempt **incremental update** (`processFileIncremental`) if the file
      already exists in the DB and fewer than 50% of chunks changed.
    - Otherwise, embed chunks in **batches of 50** and write all to DB.
@@ -123,23 +124,20 @@ chunkText(
 
 | Strategy | When | How |
 |---|---|---|
-| **AST-aware** | 24 tree-sitter languages (TS, JS, Python, Go, Rust, Java, C/C++, C#, Ruby, PHP, Scala, HTML, CSS, Kotlin, Lua, Zig, Elixir, Bash, TOML, YAML, Haskell, OCaml, Dart) | Uses `bun-chunk` tree-sitter bindings to split at function/class/block boundaries. Extracts imports, exports, entity names, and types. |
+| **AST-aware** | 30+ tree-sitter languages (TS, JS, Python, Go, Rust, Java, C/C++, C#, Ruby, PHP, Scala, HTML, CSS, Kotlin, Lua, Zig, Elixir, Bash, TOML, YAML, Haskell, OCaml, Dart) | Uses `bun-chunk` tree-sitter bindings to split at function/class/block boundaries. Extracts imports, exports, entity names, and types. |
 | **Heading-based** | Markdown (`.md`, `.mdx`, `.markdown`) | Splits on heading boundaries (`#`, `##`, etc.), then by size |
 | **Heuristic** | Swift, Fish, Terraform, Protobuf, GraphQL, XML, and other code-like files without tree-sitter support | Splits on blank-line-separated blocks, then by size |
-| **Specialized** | YAML, JSON, SQL, TOML, Dockerfile, Makefile | Custom splitters tuned for each format's structure |
 | **Fixed-size** | Fallback for unrecognized formats | Splits at `chunkSize` boundaries with overlap |
 
 Small files (content length <= `chunkSize`) are returned as a single chunk
-without splitting.
-
-Tiny consecutive chunks are merged to avoid creating embeddings for
-near-empty fragments.
+without splitting. Tiny consecutive chunks are merged to avoid creating
+embeddings for near-empty fragments.
 
 ### `KNOWN_EXTENSIONS`
 
-An exported `Set<string>` of every extension the chunker can handle. Files
-with extensions outside this set are skipped by the indexer -- binaries and
-unrecognized formats never enter the DB.
+An exported `Set<string>` of every extension the chunker can handle (~60
+entries). Files with extensions outside this set are skipped by the indexer --
+binaries and unrecognized formats never enter the DB.
 
 ### Key Interfaces
 
@@ -161,16 +159,6 @@ interface ChunkTextResult {
   chunks: Chunk[];
   fileImports?: ChunkImport[];
   fileExports?: ChunkExport[];
-}
-
-interface ChunkImport {
-  source: string;
-  symbols?: string[];
-}
-
-interface ChunkExport {
-  name: string;
-  kind?: string;
 }
 ```
 
@@ -240,17 +228,20 @@ interface Watcher {
 
 | Direction | Module |
 |---|---|
-| Imports from | [DB](../db/index.md), [Embeddings](../embeddings/index.md), [Graph](../graph/index.md), [Utils](../utils/index.md) |
-| Imported by | [Server](../server/index.md), [Tools](../tools/index.md), [Conversation](../conversation/index.md), [CLI](../cli/index.md) |
+| Imports from | [DB](../db/), [Embeddings](../embeddings/), [Graph](../graph/), [Utils](../utils/) |
+| Imported by | [Server](../server/), [Tools](../tools/), [Conversation](../conversation/), [CLI](../cli/) |
 
 ## See Also
 
-- [Search Module](../search/index.md) -- queries the chunks and embeddings
+- [Chunk entity](../../entities/chunk.md) -- the data structure produced by
+  the chunker
+- [Search Module](../search/) -- queries the chunks and embeddings
   that this module produces
-- [DB Module](../db/index.md) -- where chunks, embeddings, and file metadata
+- [DB Module](../db/) -- where chunks, embeddings, and file metadata
   are persisted
-- [Graph Module](../graph/index.md) -- dependency graph built from
+- [Graph Module](../graph/) -- dependency graph built from
   import/export data extracted during chunking
-- [Embeddings Module](../embeddings/index.md) -- the embedding model used to
+- [Embeddings Module](../embeddings/) -- the embedding model used to
   vectorize chunks
+- [Data Flow](../../data-flow.md) -- file indexing pipeline diagram
 - [Architecture](../../architecture.md) -- system-wide overview

@@ -10,17 +10,17 @@ ranking.
 ```mermaid
 flowchart TD
   subgraph RagDBClass["RagDB (src/db/index.ts)"]
-    init["Constructor & Schema Init"]
+    init_fn["Constructor and Schema Init"]
   end
 
-  init --> fileOps["files.ts"]
-  init --> searchOps["search.ts"]
-  init --> graphOps["graph.ts"]
-  init --> convOps["conversation.ts"]
-  init --> cpOps["checkpoints.ts"]
-  init --> annOps["annotations.ts"]
-  init --> anlOps["analytics.ts"]
-  init --> types["types.ts"]
+  init_fn --> fileOps["files.ts"]
+  init_fn --> searchOps["search.ts"]
+  init_fn --> graphOps["graph.ts"]
+  init_fn --> convOps["conversation.ts"]
+  init_fn --> cpOps["checkpoints.ts"]
+  init_fn --> annOps["annotations.ts"]
+  init_fn --> anlOps["analytics.ts"]
+  init_fn --> types_file["types.ts"]
 
   fileOps --> sqlite["bun:sqlite + sqlite-vec"]
   searchOps --> sqlite
@@ -42,7 +42,7 @@ constructor(projectDir: string, customRagDir?: string)
 
 - **projectDir** -- used to derive the default `.mimirs/` storage directory.
 - **customRagDir** -- explicit override. If omitted, falls back to
-  `RAG_DB_DIR` env var, then `<projectDir>/.rag`.
+  `RAG_DB_DIR` env var, then `<projectDir>/.mimirs`.
 
 On instantiation the class:
 
@@ -100,24 +100,24 @@ The `RagDB` class delegates to seven sub-module files. Each receives the raw
 
 ```mermaid
 flowchart LR
-  embeddings["embeddings/embed.ts"]
-  ragdb["RagDB"]
-  tools["Tools"]
-  searchMod["Search"]
-  indexing["Indexing"]
-  graphMod["Graph"]
-  convMod["Conversation"]
-  server["Server"]
-  cli["CLI"]
+  embeddings_dep["embeddings/embed.ts"]
+  ragdb_node["RagDB"]
+  tools_dep["Tools"]
+  searchMod_dep["Search"]
+  indexing_dep["Indexing"]
+  graphMod_dep["Graph"]
+  convMod_dep["Conversation"]
+  server_dep["Server"]
+  cli_dep["CLI"]
 
-  embeddings -->|getEmbeddingDim| ragdb
-  ragdb --> tools
-  ragdb --> searchMod
-  ragdb --> indexing
-  ragdb --> graphMod
-  ragdb --> convMod
-  ragdb --> server
-  ragdb --> cli
+  embeddings_dep -->|getEmbeddingDim| ragdb_node
+  ragdb_node --> tools_dep
+  ragdb_node --> searchMod_dep
+  ragdb_node --> indexing_dep
+  ragdb_node --> graphMod_dep
+  ragdb_node --> convMod_dep
+  ragdb_node --> server_dep
+  ragdb_node --> cli_dep
 ```
 
 - **Depends on:** `embeddings/embed.ts` (for `getEmbeddingDim` used to size
@@ -138,6 +138,7 @@ If neither is found, the constructor throws with a message suggesting
 ## See Also
 
 - [Internals](internals.md) -- detailed breakdown of every sub-module file
+- [RagDB entity](../../entities/rag-db.md) -- class signature and method reference
 - [Search module](../search/) -- higher-level search orchestration that calls into DB
 - [Indexing module](../indexing/) -- file indexing pipeline that writes to DB
 - [Graph module](../graph/) -- graph operations built on the DB graph sub-module
