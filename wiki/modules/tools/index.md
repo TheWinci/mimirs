@@ -10,8 +10,7 @@ capabilities.
 ```mermaid
 flowchart TD
   subgraph toolsEntry["src/tools/"]
-    indexFile["index.ts — registerAllTools()"]
-    types["types.ts"]
+    indexFile["index.ts -- registerAllTools()"]
   end
 
   subgraph toolFiles["Tool Files"]
@@ -37,7 +36,6 @@ flowchart TD
   indexFile --> analyticsTools
   indexFile --> serverInfoTools
   indexFile --> wikiTools
-  indexFile --> types
 ```
 
 ## Entry Point -- `index.ts`
@@ -49,10 +47,7 @@ Exports:
   startup.
 - **`resolveProject(directory, getDB)`** -- Resolves a project directory to
   its `RagDB` instance. Used by tools that accept a `directory` parameter.
-
-### Types (`types.ts`)
-
-- **`GetDB`** -- Function type for retrieving a `RagDB` instance.
+- **`GetDB`** -- Function type `(dir: string) => RagDB`.
 - **`WriteStatus`** -- Function type for writing server status messages.
 
 ## Tools Overview
@@ -72,6 +67,7 @@ Exports:
 | `remove_file` | `index-tools.ts` | Remove a file from the index |
 | `annotate` | `annotation-tools.ts` | Attach a persistent note to a file or symbol |
 | `get_annotations` | `annotation-tools.ts` | Retrieve annotations for a file or search all |
+| `delete_annotation` | `annotation-tools.ts` | Remove an annotation by ID |
 | `create_checkpoint` | `checkpoint-tools.ts` | Mark a project milestone |
 | `list_checkpoints` | `checkpoint-tools.ts` | List recent checkpoints |
 | `search_checkpoints` | `checkpoint-tools.ts` | Search checkpoints semantically |
@@ -116,4 +112,5 @@ flowchart LR
 - [Server module](../server/) -- registers tools via `registerAllTools()`
 - [Search module](../search/) -- search logic used by search tools
 - [Graph module](../graph/) -- graph logic used by graph tools
+- [API Surface](../../api-surface.md) -- complete tools and CLI reference
 - [Architecture overview](../../architecture.md)

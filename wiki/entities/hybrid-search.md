@@ -97,7 +97,7 @@ All adjustments are applied after hybrid merging:
 | Filename affinity | + 10%/word | Query words found in the filename stem |
 | Path segment affinity | + 5%/word | Query words found in directory segments |
 | Boilerplate demotion | x 0.80 | Basename in known boilerplate set (`types.go`, `doc.go`, etc.) |
-| Generated demotion | x 0.75 | Path matches configured `generated` patterns |
+| Generated demotion | x 0.50 | Path matches configured `generated` patterns |
 | Dep graph boost | + 0.05 * log2(importers + 1) | File has reverse dependencies in the graph |
 
 ## Behaviour details
@@ -108,10 +108,12 @@ All adjustments are applied after hybrid merging:
   snake_case, dot-qualified) and runs `db.searchSymbols` for exact matches.
   Hits get a 0.75 base score or a 1.3x boost if the file already appeared.
 - **Doc expansion** ensures markdown files in the top-K don't displace code
-  results — the window is widened by the number of doc results.
+  results -- the window is widened by the number of doc results.
 - **Parent grouping** (`searchChunks` only) collapses sibling sub-chunks into
   their parent chunk when >= `parentGroupingMinCount` (default 2) siblings
   appear, preventing method-level fragments from consuming multiple slots.
+- **FTS fallback** -- if BM25 search throws (malformed query syntax), search
+  falls back to vector-only results and logs a debug message.
 
 ## Relationships
 
@@ -143,6 +145,8 @@ const chunks = await searchChunks("authentication middleware", db);
 
 ## See also
 
-- [RagDB](rag-db.md) — provides vector and BM25 primitives consumed by the hybrid layer
-- [Chunk](chunk.md) — the unit of content that search operates on
-- [RagConfig](rag-config.md) — `hybridWeight`, `searchTopK`, and `generated` patterns
+- [RagDB](rag-db.md) -- provides vector and BM25 primitives consumed by the hybrid layer
+- [Chunk](chunk.md) -- the unit of content that search operates on
+- [RagConfig](rag-config.md) -- `hybridWeight`, `searchTopK`, and `generated` patterns
+- [Search module](../modules/search/) -- module context and evaluation tools
+- [Data Flow](../data-flow.md) -- search pipeline diagram

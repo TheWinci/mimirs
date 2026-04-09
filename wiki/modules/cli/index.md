@@ -3,19 +3,19 @@
 The CLI module (`src/cli/`) is the command-line interface for mimirs. It
 parses arguments, dispatches to command handlers, provides progress display,
 and handles first-run setup across multiple AI agent hosts (Claude Code,
-Cursor, Windsurf, Copilot).
+Cursor, Windsurf, Copilot, JetBrains).
 
 ## Structure
 
 ```mermaid
 flowchart TD
   subgraph cliCore["src/cli/"]
-    entrypoint["index.ts — main()"]
+    entrypoint["index.ts -- main()"]
     progress["progress.ts"]
     setup["setup.ts"]
   end
 
-  subgraph commands["src/cli/commands/ (18 commands)"]
+  subgraph commands["src/cli/commands/ (18+ commands)"]
     analytics["analytics.ts"]
     annotations["annotations.ts"]
     benchmarkModels["benchmark-models.ts"]
@@ -63,7 +63,7 @@ Handles first-run configuration and IDE integration. Key exports:
 - **`parseIdeFlag()`** -- parses `--ide` flag value
 - **`confirm()`** -- simple y/n prompt
 
-Supported IDEs: Claude Code, Cursor, Windsurf, Copilot.
+Supported IDEs: Claude Code, Cursor, Windsurf, Copilot, JetBrains.
 
 ## Progress -- `progress.ts`
 
@@ -75,20 +75,20 @@ embedding. Used by command handlers to show real-time feedback in the terminal.
 | Command | File | Purpose |
 |---------|------|---------|
 | `analytics` | `analytics.ts` | View search analytics and query trends |
-| `annotations` | `annotations.ts` | Manage persistent file/symbol annotations |
+| `annotations` | `annotations.ts` | List persistent file/symbol annotations |
 | `benchmark-models` | `benchmark-models.ts` | Compare embedding model performance |
 | `benchmark` | `benchmark.ts` | Run search quality benchmarks |
-| `checkpoint` | `checkpoint.ts` | Create and list project checkpoints |
-| `cleanup` | `cleanup.ts` | Remove stale data from the index |
+| `checkpoint` | `checkpoint.ts` | Create, list, and search project checkpoints |
+| `cleanup` | `cleanup.ts` | Remove all mimirs files from a project |
 | `conversation` | `conversation.ts` | Index and search conversation history |
-| `demo` | `demo.ts` | Run an interactive demo |
+| `demo` | `demo.ts` | Run an interactive feature demo |
 | `doctor` | `doctor.ts` | Diagnose common setup problems |
-| `eval` | `eval.ts` | Evaluate search result quality |
+| `eval` | `eval.ts` | A/B evaluation of search quality |
 | `index` | `index-cmd.ts` | Index project files |
 | `init` | `init.ts` | Initialize mimirs in a project |
 | `map` | `map.ts` | Generate project dependency maps |
 | `remove` | `remove.ts` | Remove files from the index |
-| `search` | `search-cmd.ts` | Search the index from the terminal |
+| `search` / `read` | `search-cmd.ts` | Search the index from the terminal |
 | `serve` | `serve.ts` | Start the MCP server |
 | `session-context` | `session-context.ts` | Show session context information |
 | `status` | `status.ts` | Show index status and statistics |

@@ -9,8 +9,8 @@ decisions.
 
 ```mermaid
 flowchart TD
-  parser["parser.ts — JSONL parsing"]
-  indexer["indexer.ts — embedding & storage"]
+  parser["parser.ts -- JSONL parsing"]
+  indexer["indexer.ts -- embedding and storage"]
 
   parser -->|ParsedTurn| indexer
   indexer -->|chunks + embeddings| dbMod["DB"]
@@ -25,11 +25,14 @@ Parses Claude Code's JSONL conversation logs into structured data. Exports:
 - **`readJSONL(path, fromOffset)`** -- Reads a JSONL file, optionally starting
   from a byte offset for incremental reads.
 - **`parseTurns(entries, sessionId, startIndex)`** -- Converts raw journal
-  entries into `ParsedTurn` objects, grouping by conversation turn.
+  entries into `ParsedTurn` objects, grouping by conversation turn. A "turn"
+  starts with a user text message and includes everything until the next user
+  text message. Tool use/result exchanges within a turn are aggregated.
 - **`buildTurnText(turn)`** -- Renders a `ParsedTurn` into plain text suitable
   for embedding.
 - **`discoverSessions(projectDir)`** -- Scans the Claude Code data directory
-  to find all available session JSONL files.
+  (`~/.claude/projects/<encoded-path>/`) to find all available session JSONL
+  files. Returns sessions sorted by modification time (most recent first).
 
 #### Types
 
@@ -60,8 +63,8 @@ Exports:
 
 ```mermaid
 flowchart LR
-  indexingMod["Indexing — chunkText"]
-  embeddingsMod["Embeddings — embedBatch"]
+  indexingMod["Indexing -- chunkText"]
+  embeddingsMod["Embeddings -- embedBatch"]
   convMod["Conversation"]
   toolsMod["Tools"]
   serverMod["Server"]
@@ -83,4 +86,5 @@ flowchart LR
 - [Tools module](../tools/) -- `search_conversation` tool wraps this module
 - [Server module](../server/) -- uses `startConversationTail` for live indexing
 - [DB module](../db/) -- conversation tables that store the indexed data
+- [Data Flow](../../data-flow.md) -- conversation indexing pipeline diagram
 - [Architecture overview](../../architecture.md)

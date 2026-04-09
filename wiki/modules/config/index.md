@@ -10,10 +10,14 @@ A single file module with the following exports:
 
 - **`RagConfigSchema`** -- Zod schema defining all config fields and their
   validation rules.
+- **`RagConfig`** -- TypeScript type inferred from the Zod schema.
 - **`DEFAULT_CONFIG`** -- Default values used when creating a new config file.
+  Includes 50+ include patterns covering 20+ languages, 20+ exclude patterns,
+  and sensible defaults for all tunable parameters.
 - **`loadConfig(projectDir)`** -- Reads `.mimirs/config.json`, validates it
   against the Zod schema, and returns the parsed config. Auto-creates the file
-  with defaults if it does not exist.
+  with defaults if it does not exist. On invalid JSON or validation failure,
+  logs a warning and returns `DEFAULT_CONFIG`.
 - **`applyEmbeddingConfig(config)`** -- Takes a loaded config and calls
   `configureEmbedder()` from the Embeddings module to set the active model
   and dimension.
@@ -21,16 +25,17 @@ A single file module with the following exports:
 ## Config Location
 
 Configuration is stored at `<projectDir>/.mimirs/config.json`. The file is
-auto-created with `DEFAULT_CONFIG` values on first access.
+auto-created with `DEFAULT_CONFIG` values on first access. There is no hidden
+merge logic -- whatever is on disk is what runs.
 
 ## Key Config Fields
 
 > **Important:** `chunkSize` and `chunkOverlap` are measured in **characters**,
 > not tokens. This is a common source of confusion.
 
-The Zod schema validates all fields. Unknown keys are rejected. Refer to
-`RagConfigSchema` in `src/config/index.ts` for the full set of fields and
-their types.
+The Zod schema validates all fields. See [RagConfig](../../entities/rag-config.md)
+for the full schema reference and [API Surface](../../api-surface.md) for the
+configuration options table.
 
 ## Dependencies and Dependents
 
@@ -59,6 +64,7 @@ flowchart LR
 
 ## See Also
 
+- [RagConfig entity](../../entities/rag-config.md) -- full schema with all fields
 - [Embeddings module](../embeddings/) -- provides `configureEmbedder()` called
   by `applyEmbeddingConfig`
 - [Utils module](../utils/) -- utility functions used by config loading

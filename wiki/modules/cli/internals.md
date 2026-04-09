@@ -14,6 +14,10 @@ The dispatch is straightforward -- no plugin system or dynamic loading. Adding
 a new command means adding a `case` branch and a corresponding file in
 `commands/`.
 
+The `serve` command is imported **dynamically** to avoid loading native
+dependencies (bun:sqlite, sqlite-vec) at CLI startup time. This ensures
+commands like `doctor` remain usable even if the native modules fail to load.
+
 ## `setup.ts` -- First-Run Configuration
 
 The setup module handles onboarding across multiple IDE environments. The flow:
@@ -44,12 +48,13 @@ flowchart TD
 
 `detectAgentHints()` inspects the project directory for IDE-specific markers:
 
-- **Claude Code** -- looks for `CLAUDE.md` or `.claude/` directory
-- **Cursor** -- looks for `.cursor/` or `.cursorrules`
-- **Windsurf** -- looks for `.windsurf/` or `.windsurfrules`
-- **Copilot** -- looks for `.github/copilot-instructions.md`
+- **Claude Code** -- looks for `.mcp.json`
+- **Cursor** -- looks for `.cursor/`
+- **Windsurf** -- looks for `.windsurf/`
+- **JetBrains** -- looks for `.junie/`
 
 `parseIdeFlag()` converts the `--ide` argument string into an enum value.
+Supported values: `claude`, `cursor`, `windsurf`, `copilot`, `jetbrains`, `all`.
 
 ### Config and Instructions
 
@@ -70,11 +75,12 @@ throughout setup to allow users to skip individual steps.
 
 Provides terminal progress indicators for long-running operations. Used by
 command handlers (especially `index` and `conversation`) to show real-time
-feedback. Outputs to stderr to avoid interfering with stdout data.
+feedback. Outputs to stderr to avoid interfering with stdout data. Transient
+messages overwrite the current line; persistent messages print on a new line.
 
 ## Command Files
 
-All 18 command handlers live in `src/cli/commands/`. Each exports a function
+All 18+ command handlers live in `src/cli/commands/`. Each exports a function
 that receives parsed arguments and executes the command logic. Commands
 typically:
 
@@ -86,22 +92,22 @@ typically:
 | File | Command | Key Operations |
 |------|---------|---------------|
 | `analytics.ts` | `analytics` | Reads query log from DB, displays trends |
-| `annotations.ts` | `annotations` | CRUD operations on file/symbol annotations |
+| `annotations.ts` | `annotations` | Lists annotations, optionally filtered by path |
 | `benchmark-models.ts` | `benchmark-models` | Runs embedding benchmarks across models |
-| `benchmark.ts` | `benchmark` | Runs search quality benchmarks |
-| `checkpoint.ts` | `checkpoint` | Creates checkpoints, lists history |
-| `cleanup.ts` | `cleanup` | Prunes stale files and orphaned chunks |
-| `conversation.ts` | `conversation` | Indexes JSONL logs, searches conversation |
-| `demo.ts` | `demo` | Interactive demo walkthrough |
+| `benchmark.ts` | `benchmark` | Runs search quality benchmarks against expected results |
+| `checkpoint.ts` | `checkpoint` | Creates checkpoints, lists history, searches semantically |
+| `cleanup.ts` | `cleanup` | Removes all mimirs files and MCP config entries |
+| `conversation.ts` | `conversation` | Indexes JSONL logs, searches conversation, lists sessions |
+| `demo.ts` | `demo` | Interactive demo walkthrough showing key features |
 | `doctor.ts` | `doctor` | Checks SQLite, embeddings, config health |
-| `eval.ts` | `eval` | Evaluates search precision/recall |
-| `index-cmd.ts` | `index` | Triggers file indexing pipeline |
-| `init.ts` | `init` | Runs setup wizard |
-| `map.ts` | `map` | Generates and displays project maps |
+| `eval.ts` | `eval` | Evaluates search precision/recall with/without RAG |
+| `index-cmd.ts` | `index` | Triggers file indexing pipeline with progress display |
+| `init.ts` | `init` | Runs setup wizard, optionally indexes after setup |
+| `map.ts` | `map` | Generates and displays project dependency maps |
 | `remove.ts` | `remove` | Removes files from the index |
-| `search-cmd.ts` | `search` | Runs search queries, displays results |
-| `serve.ts` | `serve` | Starts MCP server via Server module |
-| `session-context.ts` | `session-context` | Displays session metadata |
+| `search-cmd.ts` | `search` / `read` | Runs search queries, displays results |
+| `serve.ts` | `serve` | Starts MCP server via dynamic import of Server module |
+| `session-context.ts` | `session-context` | Displays session context summary |
 | `status.ts` | `status` | Shows index statistics |
 
 ## See Also

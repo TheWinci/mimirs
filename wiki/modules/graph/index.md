@@ -22,19 +22,34 @@ Handles TypeScript path aliases by reading `tsconfig.json` `compilerOptions.path
 ### `resolveImportsForFile(db, fileId, projectDir)`
 
 Same resolution logic as `resolveImports` but scoped to a single file.
-Used when you only need the dependency graph for one file rather than the
-entire project.
+Used by the watcher when a single file changes, to update that file's
+dependency graph and the graphs of all its importers.
 
-### `generateProjectMap(db, projectDir, opts)`
+### `generateProjectMap(db, opts)`
 
-Builds a text-based dependency graph. Supports two zoom levels:
+Builds a text-based Mermaid dependency graph. Accepts `GraphOptions`:
 
-- **File level** -- shows individual file dependencies.
+```ts
+interface GraphOptions {
+  zoom?: "file" | "directory";
+  focus?: string;
+  maxNodes?: number;
+  maxHops?: number;
+  showExternals?: boolean;
+  projectDir: string;
+}
+```
+
+Supports two zoom levels:
+
+- **File level** -- shows individual file dependencies. Default mode for small
+  graphs (<= maxNodes).
 - **Directory level** -- aggregates file relationships into module-level
-  dependencies for a high-level overview.
+  dependencies. Auto-switches when the node count exceeds `maxNodes` (default 50).
 
-Accepts a `focus` option to zoom into a specific file's neighborhood,
-showing only its direct dependencies and dependents.
+The `focus` option zooms into a specific file's neighborhood using BFS
+subgraph extraction (`db.getSubgraph`), showing only files within `maxHops`
+(default 2) of the focused file.
 
 ## Import Resolution Details
 

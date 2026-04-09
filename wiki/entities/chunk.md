@@ -1,8 +1,8 @@
 # Chunk
 
 A Chunk is the atomic unit of indexed content in mimirs. Each chunk
-represents a semantically meaningful fragment of a file — a function, a class,
-a markdown section, or a fixed-size text block — and carries optional metadata
+represents a semantically meaningful fragment of a file -- a function, a class,
+a markdown section, or a fixed-size text block -- and carries optional metadata
 about its origin.
 
 **Source:** `src/indexing/chunker.ts`
@@ -64,30 +64,26 @@ export async function chunkText(
 
 ```mermaid
 flowchart TD
-    input["chunkText(content, ext)"]
+    input_node["chunkText(content, ext)"]
     astCheck{"ext in AST_SUPPORTED?"}
     heuCheck{"ext in HEURISTIC_CODE?"}
     mdCheck{"ext is .md/.mdx/.markdown?"}
-    specCheck{"Specialised?\n(YAML, JSON, SQL,\nTOML, Dockerfile,\nMakefile, Bruno)"}
 
     astStrategy["AST chunking\n(tree-sitter via bun-chunk)"]
     heuStrategy["Heuristic blank-line\nsplitting"]
     mdStrategy["Heading-based\nsplitting"]
-    specStrategy["Format-specific\nparser"]
-    fallback["Fixed-size\nfallback"]
+    fallbackStrategy["Fixed-size\nfallback"]
 
-    input --> astCheck
+    input_node --> astCheck
     astCheck -- yes --> astStrategy
     astCheck -- no --> heuCheck
     heuCheck -- yes --> heuStrategy
     heuCheck -- no --> mdCheck
     mdCheck -- yes --> mdStrategy
-    mdCheck -- no --> specCheck
-    specCheck -- yes --> specStrategy
-    specCheck -- no --> fallback
+    mdCheck -- no --> fallbackStrategy
 ```
 
-### AST-aware (24 languages via tree-sitter)
+### AST-aware (30+ languages via tree-sitter)
 
 Supported extensions: `.ts`, `.tsx`, `.js`, `.jsx`, `.py`, `.go`, `.rs`,
 `.java`, `.c`, `.h`, `.cpp`, `.cc`, `.cxx`, `.hpp`, `.hh`, `.hxx`, `.cs`,
@@ -97,7 +93,8 @@ Supported extensions: `.ts`, `.tsx`, `.js`, `.jsx`, `.py`, `.go`, `.rs`,
 
 Produces chunks with `imports`, `exports`, `name`, `chunkType`, and
 `parentName` metadata. Line numbers are converted from 0-indexed (bun-chunk)
-to 1-indexed (mimirs convention).
+to 1-indexed (mimirs convention). Content hashes (`hash`) are included for
+incremental re-indexing.
 
 ### Heuristic blank-line splitting
 
@@ -110,30 +107,29 @@ For languages without tree-sitter support: `.swift`, `.fish`, `.tf`, `.proto`,
 Splits on `#`-prefixed headings, then by size if a section exceeds
 `chunkSize`.
 
-### Specialised parsers
-
-Format-specific logic for YAML, JSON, SQL, TOML, Dockerfile, Makefile, and
-Bruno `.bru` files.
-
 ### Fixed-size fallback
 
 Plain character-window splitting with `chunkOverlap` overlap. Used for `.txt`
 and any recognised extension that doesn't match the above strategies.
 
+Small files (content length <= `chunkSize`) are returned as a single chunk
+without splitting. Tiny consecutive chunks are merged to avoid creating
+embeddings for near-empty fragments.
+
 ## Relationships
 
 ```mermaid
 flowchart TD
-    chunker["indexing/chunker"]
+    chunker_node["indexing/chunker"]
     bunChunk["@winci/bun-chunk\n(tree-sitter)"]
-    indexer["indexing/indexer"]
+    indexer_node["indexing/indexer"]
     ragDB["RagDB"]
     ragConfig["RagConfig"]
 
-    chunker --> bunChunk
-    indexer --> chunker
-    indexer --> ragDB
-    ragConfig -.->|chunkSize, chunkOverlap| chunker
+    chunker_node --> bunChunk
+    indexer_node --> chunker_node
+    indexer_node --> ragDB
+    ragConfig -.->|chunkSize, chunkOverlap| chunker_node
 ```
 
 ## Usage
@@ -149,6 +145,7 @@ for (const chunk of result.chunks) {
 
 ## See also
 
-- [RagDB](rag-db.md) — stores embedded chunks in the `chunks` + `vec_chunks` tables
-- [Hybrid Search](hybrid-search.md) — retrieves and ranks chunks at query time
-- [RagConfig](rag-config.md) — `chunkSize` and `chunkOverlap` defaults
+- [RagDB](rag-db.md) -- stores embedded chunks in the `chunks` + `vec_chunks` tables
+- [Hybrid Search](hybrid-search.md) -- retrieves and ranks chunks at query time
+- [RagConfig](rag-config.md) -- `chunkSize` and `chunkOverlap` defaults
+- [Indexing module](../modules/indexing/) -- full indexing pipeline

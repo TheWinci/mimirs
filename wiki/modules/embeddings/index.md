@@ -15,7 +15,9 @@ A single file module. All embedding operations run locally (no API calls).
 - **`embedBatch(texts, threads?, onProgress?)`** -- Embeds multiple texts in
   batch. Returns an array of `Float32Array` vectors (one per input).
 - **`embedBatchMerged(texts, threads?, onProgress?)`** -- Embeds multiple texts
-  and merges them into a single vector via mean pooling.
+  with windowed merging for oversized chunks. Splits text exceeding 256 tokens
+  into overlapping windows, embeds each window separately, then mean-pools into
+  a single vector. Returns an array of `Float32Array` vectors.
 - **`mergeEmbeddings(embeddings)`** -- Combines multiple embedding vectors into
   one via mean pooling + L2 normalization.
 
@@ -77,5 +79,6 @@ flowchart LR
 
 - [Config module](../config/) -- calls `configureEmbedder` to set model/dimension
 - [DB module](../db/) -- uses `getEmbeddingDim` to size `vec0` virtual table columns
+- [Indexing module](../indexing/) -- uses `embedBatch` and `embedBatchMerged`
 - [Conversation module](../conversation/) -- uses `embedBatch` for conversation chunks
 - [Architecture overview](../../architecture.md)
