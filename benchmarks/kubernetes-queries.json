@@ -78,5 +78,45 @@
   {
     "query": "API discovery rootAPIsHandler goRestfulContainer /apis group version list",
     "expected": ["staging/src/k8s.io/apiserver/pkg/endpoints/discovery/root.go"]
+  },
+  {
+    "query": "StatefulSet controller syncStatefulSet pod ordinal identity management",
+    "expected": ["pkg/controller/statefulset/stateful_set.go"]
+  },
+  {
+    "query": "ClusterRoleAggregation controller applyClusterRole aggregation label rules",
+    "expected": ["pkg/controller/clusterroleaggregation/clusterroleaggregation_controller.go"]
+  },
+  {
+    "query": "DaemonSet controller syncDaemonSet manage node pod scheduling",
+    "expected": ["pkg/controller/daemon/daemon_controller.go"]
+  },
+  {
+    "query": "master lease endpoint reconciler apiserver election",
+    "expected": ["pkg/controlplane/reconcilers/lease.go"]
+  },
+  {
+    "query": "volume binding plugin Reserve PreBind persistent volume claim scheduler",
+    "expected": ["pkg/scheduler/framework/plugins/volumebinding/volume_binding.go"]
+  },
+  {
+    "query": "CronJob controller syncCronJob getRecentUnmetScheduleTimes job creation",
+    "expected": ["pkg/controller/cronjob/cronjob_controllerv2.go"]
+  },
+  {
+    "query": "deny service external IPs admission validation plugin",
+    "expected": ["plugin/pkg/admission/network/denyserviceexternalips/admission.go"]
+  },
+  {
+    "query": "node authorizer graph kubelet authorization secret configmap",
+    "expected": ["plugin/pkg/auth/authorizer/node/node_authorizer.go"]
+  },
+  {
+    "query": "goroutine map named operation backoff wait completion",
+    "expected": ["pkg/util/goroutinemap/goroutinemap.go"]
+  },
+  {
+    "query": "mutation detector cache object deep copy watch corruption",
+    "expected": ["staging/src/k8s.io/client-go/tools/cache/mutation_detector.go"]
   }
 ]

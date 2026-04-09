@@ -29,16 +29,16 @@ One command turns your codebase into a structured, cross-linked markdown wiki �
 
 ## Search quality
 
-100% recall. Benchmarked on four real codebases — including Kubernetes at 8,691 files — with known expected results per query. Full methodology in [BENCHMARKS.md](BENCHMARKS.md).
+93–98% recall. Benchmarked on four real codebases across three languages (120 queries total) — from 97 files to 8,553 — with known expected results per query. Full methodology in [BENCHMARKS.md](BENCHMARKS.md).
 
 | Codebase | Language | Files | Queries | Recall@10 | MRR | Zero-miss |
 |---|---|---|---|---|---|---|
-| mimirs | TypeScript | 97 | 20 | 100.0% | 0.651 | 0.0% |
-| Express.js | JavaScript | 161 | 15 | 100.0% | 0.922 | 0.0% |
-| Excalidraw | TypeScript | 676 | 20 | 100.0% | 0.366 | 0.0% |
-| Kubernetes | Go | 8,691 | 20 | 100.0%* | 0.496 | 0.0%* |
+| mimirs | TypeScript | 97 | 30 | 98.3% | 0.683 | 0.0% |
+| Excalidraw | TypeScript | 693 | 30 | 96.7% | 0.442 | 3.3% |
+| Django | Python | 3,090 | 30 | 93.3% | 0.688 | 6.7% |
+| Kubernetes | Go | 8,553 | 30 | 90.0% | 0.589 | 10.0% |
 
-\*With config tuning. At default top-10, Recall is 80%. See [BENCHMARKS.md](BENCHMARKS.md) for details.
+Kubernetes excludes test files and demotes generated files. With `searchTopK: 15`, recall reaches 100%. See [Kubernetes benchmarks](BENCHMARKS.md#kubernetes-8553-files-30-queries) for details.
 
 ## How it compares
 
@@ -46,7 +46,7 @@ One command turns your codebase into a structured, cross-linked markdown wiki �
 |---|---|---|---|---|
 | Setup | One command | Nothing | Nothing | API keys, accounts |
 | Token cost | ~91K/prompt | ~380K/prompt | Entire codebase | Varies |
-| Search quality | 100% Recall@10 | Depends on keywords | N/A (everything loaded) | Varies |
+| Search quality | 93–98% Recall@10 | Depends on keywords | N/A (everything loaded) | Varies |
 | Code understanding | AST-aware (24 langs) | Line-level | None | Usually line-level |
 | Cross-session memory | Conversations + checkpoints | None | None | Some |
 | Privacy | Fully local | Local | Local | Data leaves your machine |

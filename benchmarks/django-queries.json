@@ -1,0 +1,122 @@
+[
+  {
+    "query": "QuerySet filter exclude annotate aggregate ORM evaluation",
+    "expected": ["django/db/models/query.py"]
+  },
+  {
+    "query": "Model metaclass Options field contributions class_prepared",
+    "expected": ["django/db/models/base.py"]
+  },
+  {
+    "query": "MigrationLoader build_graph load_disk applied migrations",
+    "expected": ["django/db/migrations/loader.py"]
+  },
+  {
+    "query": "HttpRequest POST GET META QueryDict parsing",
+    "expected": ["django/http/request.py"]
+  },
+  {
+    "query": "HttpResponse content headers set_cookie streaming",
+    "expected": ["django/http/response.py"]
+  },
+  {
+    "query": "View dispatch as_view setup method handler",
+    "expected": ["django/views/generic/base.py"]
+  },
+  {
+    "query": "CharField IntegerField EmailField clean validate form",
+    "expected": ["django/forms/fields.py"]
+  },
+  {
+    "query": "Widget render Input Select RadioSelect HTML attrs",
+    "expected": ["django/forms/widgets.py"]
+  },
+  {
+    "query": "Engine find_template get_template DjangoTemplates loaders",
+    "expected": ["django/template/engine.py"]
+  },
+  {
+    "query": "BaseCommand handle add_arguments management execute",
+    "expected": ["django/core/management/base.py"]
+  },
+  {
+    "query": "Serializer serialize deserialize JSON queryset",
+    "expected": ["django/core/serializers/json.py"]
+  },
+  {
+    "query": "User AbstractUser Permission Group authentication model",
+    "expected": ["django/contrib/auth/models.py"]
+  },
+  {
+    "query": "AdminSite register get_urls app_index each_context",
+    "expected": ["django/contrib/admin/sites.py"]
+  },
+  {
+    "query": "CsrfViewMiddleware _check_token process_view CSRF secret",
+    "expected": ["django/middleware/csrf.py"]
+  },
+  {
+    "query": "URLResolver resolve_error_handler URL pattern matching route",
+    "expected": ["django/urls/resolvers.py"]
+  },
+  {
+    "query": "Signal connect send send_robust receiver dispatch",
+    "expected": ["django/dispatch/dispatcher.py"]
+  },
+  {
+    "query": "LazySettings ENVIRONMENT_VARIABLE Settings configure global",
+    "expected": ["django/conf/__init__.py"]
+  },
+  {
+    "query": "method_decorator classonlymethod decorator_from_middleware",
+    "expected": ["django/utils/decorators.py"]
+  },
+  {
+    "query": "Field CharField IntegerField db_type contribute_to_class",
+    "expected": ["django/db/models/fields/__init__.py"]
+  },
+  {
+    "query": "Manager BaseManager from_queryset get_queryset objects",
+    "expected": ["django/db/models/manager.py"]
+  },
+  {
+    "query": "ForeignKey ManyToManyField OneToOneField related descriptor",
+    "expected": ["django/db/models/fields/related.py"]
+  },
+  {
+    "query": "ModelForm modelform_factory fields_for_model Meta",
+    "expected": ["django/forms/models.py"]
+  },
+  {
+    "query": "Template compile_string NodeList Lexer Parser render",
+    "expected": ["django/template/base.py"]
+  },
+  {
+    "query": "CacheHandler BaseCache cache backends connection",
+    "expected": ["django/core/cache/__init__.py"]
+  },
+  {
+    "query": "ModelBackend authenticate get_user_permissions has_perm",
+    "expected": ["django/contrib/auth/backends.py"]
+  },
+  {
+    "query": "EmailMessage EmailMultiAlternatives send attach SMTP",
+    "expected": ["django/core/mail/message.py"]
+  },
+  {
+    "query": "MultipleObjectMixin get_queryset paginate_by ListView",
+    "expected": ["django/views/generic/list.py"]
+  },
+  {
+    "query": "ModelAdmin get_changeform changeform_view fieldsets actions",
+    "expected": ["django/contrib/admin/options.py"]
+  },
+  {
+    "query": "SecurityMiddleware SECURE_HSTS SECURE_SSL_REDIRECT headers",
+    "expected": ["django/middleware/security.py"]
+  },
+  {
+    "query": "Collector collect CASCADE SET_NULL deletion dependencies",
+    "expected": ["django/db/models/deletion.py"]
+  }
+]

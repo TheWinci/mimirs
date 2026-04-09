@@ -78,5 +78,45 @@
   {
     "query": "actionDeleteSelected fixBindingsAfterDeletion",
     "expected": ["packages/excalidraw/actions/actionDeleteSelected.tsx"]
+  },
+  {
+    "query": "pointInPolygon winding number raycast inclusion test",
+    "expected": ["packages/math/src/polygon.ts"]
+  },
+  {
+    "query": "ellipse intersection point distance perimeter check",
+    "expected": ["packages/math/src/ellipse.ts"]
+  },
+  {
+    "query": "colorOn hue saturation dark mode color transformation",
+    "expected": ["packages/common/src/colors.ts"]
+  },
+  {
+    "query": "distanceToElement point nearest curve segment measurement",
+    "expected": ["packages/element/src/distance.ts"]
+  },
+  {
+    "query": "headingForPoint cardinal direction vector angle snap",
+    "expected": ["packages/element/src/heading.ts"]
+  },
+  {
+    "query": "BinaryHeap priority queue push pop bubbleUp sinkDown",
+    "expected": ["packages/common/src/binary-heap.ts"]
+  },
+  {
+    "query": "clipboard paste copy elements parseClipboard mime data",
+    "expected": ["packages/excalidraw/clipboard.ts"]
+  },
+  {
+    "query": "LaserTrails animated pointer trail collaborative drawing",
+    "expected": ["packages/excalidraw/laser-trails.ts"]
+  },
+  {
+    "query": "reconcileElements remote conflict version resolution merge",
+    "expected": ["packages/excalidraw/data/reconcile.ts"]
+  },
+  {
+    "query": "AnimationFrameHandler easing requestAnimationFrame transition",
+    "expected": ["packages/excalidraw/renderer/animation.ts"]
   }
 ]
