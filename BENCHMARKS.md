@@ -1,6 +1,6 @@
 # Benchmarks
 
-Search quality benchmarks measured on four codebases. Last updated 2026-03-30.
+Search quality benchmarks measured on four codebases. Last updated 2026-04-09.
 
 **Metrics:** Recall@K (fraction of expected files in top-K), MRR (1/rank of first hit), Zero-miss (queries with no expected file in results).
 
@@ -8,38 +8,41 @@ Search quality benchmarks measured on four codebases. Last updated 2026-03-30.
 
 All results use hybrid search (70% vector / 30% BM25) with pipeline improvements (source/test path boost, symbol expansion, dependency graph boost, doc expansion, filename affinity boost, boilerplate demotion). Default top-K is 10.
 
-### mimirs (97 files, 20 queries)
+### mimirs (97 files, 30 queries)
 
 | Config | Recall@10 | MRR | Zero-miss |
 |---|---|---|---|
-| **all-MiniLM-L6-v2 (default)** | **100.0%** | **0.715** | **0.0%** |
+| **all-MiniLM-L6-v2 (default)** | **98.3%** | **0.683** | **0.0%** |
 
-### Express.js (161 files, 15 queries)
-
-| Config | Recall@10 | MRR | Zero-miss |
-|---|---|---|---|
-| **all-MiniLM-L6-v2 (default)** | **100.0%** | **0.922** | **0.0%** |
-
-### Excalidraw (676 files, 20 queries)
+### Excalidraw (693 files, 30 queries)
 
 | Config | Recall@10 | MRR | Zero-miss |
 |---|---|---|---|
-| **all-MiniLM-L6-v2 (default)** | **100.0%** | **0.366** | **0.0%** |
+| **all-MiniLM-L6-v2 (default)** | **96.7%** | **0.442** | **3.3%** |
 
-Excalidraw is a stress test — a large monorepo with 676 indexed files across `packages/`, `excalidraw-app/`, `dev-docs/`, and `examples/`. MRR is lower than the smaller codebases because heavily-imported utility files have many consumers that score competitively, pushing the source definition lower in rank — but it always lands in the top 10.
+Excalidraw is a stress test — a large monorepo with 693 indexed files across `packages/`, `excalidraw-app/`, `dev-docs/`, and `examples/`. MRR is lower than the smaller codebases because heavily-imported utility files have many consumers that score competitively, pushing the source definition lower in rank. One math utility (`polygon.ts`) doesn't land until top-20, crowded out by element files that use the same geometric vocabulary.
 
-### Kubernetes (8,691 files, 20 queries)
+### Django (3,090 files, 30 queries)
 
-The scale test — the full Kubernetes codebase (Go), excluding test files and vendor/. 8,691 source files (including generated), 351 MB index.
+The mid-scale test — Django's full codebase (Python) with all files indexed including tests and docs. 3,090 files, 85k chunks.
 
-| Config | Recall@10 | Recall@15 | MRR | Zero-miss@10 |
-|---|---|---|---|---|
-| **Excl. tests + generated demotion + top-15** | **100.0%** | **100.0%** | **0.496** | **0.0%** |
-| Excl. tests + generated demotion (default top-10) | 80.0% | 100.0% | 0.471 | 20.0% |
-| Excl. tests only (before pipeline v2) | 65.0% | — | 0.320 | 35.0% |
-| Including test files (11,193 files) | 65.0% | — | 0.272 | 35.0% |
+| Config | Recall@10 | MRR | Zero-miss |
+|---|---|---|---|
+| **all-MiniLM-L6-v2 (default)** | **93.3%** | **0.688** | **6.7%** |
 
-At 8.7k files, Kubernetes is 12× larger than Excalidraw and represents an extreme test of semantic search. With proper configuration — excluding test files, demoting generated files via the `generated` config, and `"searchTopK": 15` — recall reaches **100%**. The 4 files that miss at top-10 all rank 11th–15th, pushed down by structurally similar siblings (e.g. `chain.go` among dozens of `admission.go` plugins, `csi_plugin.go` among other volume plugins).
+Django is harder than Excalidraw despite having fewer source files because test `models.py` files (dozens of them) share the same vocabulary as Django's core `models.py`, and docs extensively reference the same settings and middleware names as the source. Two queries miss at top-10: `auth/models.py` gets buried by test model files, and `middleware/security.py` loses to docs that discuss the same HSTS/SSL settings. Both land by top-15.
+
+### Kubernetes (8,553 files, 30 queries)
+
+The scale test — the full Kubernetes codebase (Go), excluding test files and vendor/. 8,553 source files (including generated).
+
+| Config | Recall | MRR | Zero-miss |
+|---|---|---|---|
+| **Excl. tests + generated demotion** | **90.0%** | **0.589** | **10.0%** |
+| Excl. tests only (before pipeline v2) | 65.0% | 0.320 | 35.0% |
+| Including test files (11,193 files) | 65.0% | 0.272 | 35.0% |
+
+All measured at default top-10. The 3 queries that miss at top-10 all land by top-15, pushed down by structurally similar siblings (e.g. `chain.go` among dozens of `admission.go` plugins, `csi_plugin.go` among other volume plugins). Setting `searchTopK: 15` brings recall to 100%.
 
 **Recommended Kubernetes config:**
 
@@ -52,7 +55,7 @@ At 8.7k files, Kubernetes is 12× larger than Excalidraw and represents an extre
 }
 ```
 
-**Impact of excluding test files:** Removing 2,640 test files eliminated 57,753 chunks (28%), shrunk the DB by 34% (521→344 MB), cut index time by 37% (62→39 min), and improved MRR by 18% (0.272→0.320). Recall@20 gained 5pp (85→90%). Test files contain the same domain vocabulary as source files, creating ranking noise without adding navigational value.
+**Impact of excluding test files:** Removing 2,640 test files eliminated 57,753 chunks (28%), shrunk the DB by 34% (521→344 MB), and cut index time by 37% (62→39 min). Test files contain the same domain vocabulary as source files, creating ranking noise without adding navigational value.
 
 **Indexing performance:**
 
@@ -66,78 +69,41 @@ At 8.7k files, Kubernetes is 12× larger than Excalidraw and represents an extre
 
 ### Scaling behavior
 
-| Codebase | Files | Recall@10 | MRR | Zero-miss |
-|---|---|---|---|---|
-| mimirs | 97 | 100.0% | 0.651 | 0.0% |
-| Express.js | 161 | 100.0% | 0.922 | 0.0% |
-| Excalidraw | 676 | 100.0% | 0.366 | 0.0% |
-| Kubernetes | 8,691 | 80.0% (100% @15) | 0.496 | 20.0% (0% @15) |
+| Codebase | Language | Files | Queries | Recall@10 | MRR | Zero-miss |
+|---|---|---|---|---|---|---|
+| mimirs | TypeScript | 97 | 30 | 98.3% | 0.683 | 0.0% |
+| Excalidraw | TypeScript | 693 | 30 | 96.7% | 0.442 | 3.3% |
+| Django | Python | 3,090 | 30 | 93.3% | 0.688 | 6.7% |
+| Kubernetes | Go | 8,553 | 30 | 90.0% (100% @15) | 0.589 | 10.0% (0% @15) |
 
-100% recall on codebases up to ~700 files at default top-10. At Kubernetes scale (8.7k files), recall reaches 80% at top-10 and **100% at top-15** with proper configuration (test exclusion, generated file demotion, `searchTopK: 15`). The 5 extra results add ~750 tokens per query — negligible for agents that routinely consume thousands of tokens per tool call.
+93–98% recall at default top-10 across all codebases, with a clear scaling pattern: recall decreases as codebase size grows, from 98% at 97 files to 90% at 8.5k files. All codebases reach **100% at top-20**. At Kubernetes scale, `searchTopK: 15` is sufficient for 100% recall with proper configuration (test exclusion, generated file demotion). The 5 extra results add ~750 tokens per query — negligible for agents that routinely consume thousands of tokens per tool call.
 
 ### Why top-10?
 
-We benchmarked at K=5, 7, 10, 15, 20 across all three codebases to find the diminishing-returns point.
+We benchmarked at K=5, 7, 10, 15, 20 across all four codebases to find the diminishing-returns point.
 
-| K | mimirs | Express | Excalidraw | Extra tokens vs K=10 |
+| K | mimirs (30q) | Excalidraw (30q) | Django (30q) | Kubernetes (30q) | Extra tokens vs K=10 |
+|---|---|---|---|---|---|
+| 5 | 95.0% | 90.0% | 93.3% | 70.0% | −750 |
+| 7 | 95.0% | 96.7% | 93.3% | 76.7% | −450 |
+| **10** | **98.3%** | **96.7%** | **93.3%** | **90.0%** | **baseline** |
+| 15 | 98.3% | 96.7% | 100.0% | 100.0% | +750 |
+| 20 | 100.0% | 100.0% | 100.0% | 100.0% | +1500 |
+
+K=10 hits 90–98% recall across all codebases. Django and Kubernetes both reach 100% at K=15 — their misses rank 11th–15th, pushed down by structurally similar siblings (test `models.py` files in Django, dozens of `admission.go` plugins in Kubernetes). Excalidraw's one miss (`polygon.ts`) doesn't land until top-20, crowded out by element files sharing geometric vocabulary. Each result adds ~150 tokens (~$0.0005 at Sonnet pricing), so the cost of 10 results vs 5 is negligible for agents that routinely consume thousands of tokens per tool call.
+
+### Model comparison
+
+Six 384-dimension ONNX embedding models were evaluated on mimirs and Excalidraw with hybrid search (70/30 vector/BM25). The two viable options:
+
+| Model | Download | Recall (Excalidraw) | MRR (Excalidraw) | Index speed |
 |---|---|---|---|---|
-| 5 | 92.5% | 86.7% | 80.0% | −750 |
-| 7 | 97.5% | 93.3% | 85.0% | −450 |
-| **10** | **97.5%** | **93.3%** | **90.0%** | **baseline** |
-| 15 | 100.0% | 93.3% | 90.0% | +750 |
-| 20 | 100.0% | 100.0% | 90.0% | +1500 |
+| **all-MiniLM-L6-v2 (default)** | 23MB | 90.0% | 0.491 | 1.0× |
+| gte-small | 67MB | 95.0% | 0.507 | 1.6× |
 
-K=10 is the plateau for large codebases — Excalidraw gains nothing past 10. Each result adds ~150 tokens (~$0.0005 at Sonnet pricing), so the cost of 10 results vs 5 is negligible for agents that routinely consume thousands of tokens per tool call.
+The other four candidates (snowflake-arctic-embed-xs, mxbai-embed-xsmall-v1, snowflake-arctic-embed-s, all-MiniLM-L12-v2) all degraded at scale — recall dropped to 60–85% on larger codebases — and are not recommended.
 
-### Model comparison (5 candidates, 384d)
-
-Comprehensive comparison of all 384-dimension ONNX embedding models viable for local code search. All models tested on identical queries with hybrid search (70/30 vector/BM25) and pipeline improvements. Note: these numbers were collected before the reranker removal — the default model's current scores are in the tables above.
-
-#### Recall@10
-
-| Model | mimirs (97) | Express (161) | Excalidraw (676) |
-|---|---|---|---|
-| **all-MiniLM-L6-v2 (default)** | **100.0%** | **93.3%** | **90.0%** |
-| snowflake-arctic-embed-xs | 100.0% | 73.3% | 75.0% |
-| mxbai-embed-xsmall-v1 | 100.0% | 93.3% | 90.0% |
-| **gte-small** | **100.0%** | **100.0%** | **95.0%** |
-| snowflake-arctic-embed-s | 87.5% | 60.0% | 85.0% |
-| all-MiniLM-L12-v2 | 100.0% | 93.3% | 80.0% |
-
-#### MRR
-
-| Model | mimirs | Express | Excalidraw |
-|---|---|---|---|
-| **all-MiniLM-L6-v2 (default)** | **0.572** | **0.672** | **0.491** |
-| snowflake-arctic-embed-xs | 0.581 | 0.561 | 0.387 |
-| mxbai-embed-xsmall-v1 | 0.603 | 0.669 | 0.464 |
-| **gte-small** | **0.656** | **0.731** | **0.507** |
-| snowflake-arctic-embed-s | 0.654 | 0.327 | 0.394 |
-| all-MiniLM-L12-v2 | 0.645 | 0.636 | 0.404 |
-
-#### Index time
-
-| Model | 97 files | 161 files | 676 files | Relative |
-|---|---|---|---|---|
-| all-MiniLM-L6-v2 | 59s | 57s | 593s | 1.0× |
-| snowflake-arctic-embed-xs | 69s | 59s | 458s | ~0.9× |
-| mxbai-embed-xsmall-v1 | 69s | 69s | 448s | ~0.9× |
-| gte-small | 132s | 118s | 866s | ~1.6× |
-| snowflake-arctic-embed-s | 120s | 115s | 869s | ~1.6× |
-| all-MiniLM-L12-v2 | ~86s | — | ~863s | ~1.5× |
-
-#### Summary
-
-| Model | Download | Strengths | Weaknesses |
-|---|---|---|---|
-| **all-MiniLM-L6-v2** | 23MB | Fast indexing, good recall at all scales | Lower MRR than gte-small |
-| snowflake-arctic-embed-xs | 45MB | Fast indexing | Poor recall at scale (75% on Excalidraw) |
-| mxbai-embed-xsmall-v1 | 60MB | Matches L6 recall, fast | Slightly lower MRR |
-| gte-small | 67MB | Best recall and MRR across all codebases | 1.6× slower indexing |
-| snowflake-arctic-embed-s | 110MB | — | Worst recall (60% on Express), slow |
-| all-MiniLM-L12-v2 | 33MB | Good MRR on small codebases | −10pp recall on Excalidraw, 1.5× slower |
-
-**gte-small** is the clear runner-up: +5pp recall and +0.016 MRR on Excalidraw, +6.7pp recall and +0.059 MRR on Express, with identical 100% recall on small codebases. The cost is 1.6× slower indexing and a 67MB download (vs 23MB). The two Snowflake models and MiniLM-L12 all degrade at scale and are not recommended.
+**gte-small** is the clear runner-up: +5pp recall and higher MRR across all codebases, at the cost of 1.6× slower indexing and a 67MB download (vs 23MB).
 
 ## Decision
 
@@ -210,7 +176,7 @@ The search pipeline applies six post-retrieval optimizations (no re-indexing nee
 5. **Filename affinity boost** — if query words match the filename stem, boost 1.0 + 0.1 × match count
 6. **Boilerplate demotion** — type definitions (`types.go`), generated files (`zz_generated*`), and boilerplate paths (`applyconfigurations/`, `testing/`) are demoted 0.75–0.85×
 
-Cross-encoder reranking was removed in v0.3.27 — it loaded a ~80MB model, added latency to every query, and benchmarked at +0pp recall at top-10 across all three codebases. Worse, the ms-marco cross-encoder (trained on web Q&A) actively hurt code search by preferring test files over source definitions. Removing it improved recall from 90-97.5% to 100% across the board.
+Cross-encoder reranking was removed in v0.3.27 — it loaded a ~80MB model, added latency to every query, and benchmarked at +0pp recall at top-10. Worse, the ms-marco cross-encoder (trained on web Q&A) actively hurt code search by preferring test files over source definitions.
 
 ## Reproducing
 
@@ -222,12 +188,16 @@ bunx mimirs benchmark benchmarks/mimirs-queries.json --dir . --top 10
 bunx mimirs index /tmp/excalidraw-bench
 bunx mimirs benchmark benchmarks/excalidraw-queries.json --dir /tmp/excalidraw-bench --top 10
 
+# Django (clone first: git clone --depth 1 https://github.com/django/django.git /tmp/django-bench)
+bunx mimirs index /tmp/django-bench
+bunx mimirs benchmark benchmarks/django-queries.json --dir /tmp/django-bench --top 10
+
 # Compare models
 bunx mimirs benchmark-models benchmarks/mimirs-queries.json \
   --models "Xenova/all-MiniLM-L6-v2,Xenova/bge-small-en-v1.5" --dir . --top 10
 ```
 
-Query files: [mimirs](benchmarks/mimirs-queries.json) (20 queries), [Express.js](benchmarks/express-queries.json) (15 queries), [Excalidraw](benchmarks/excalidraw-queries.json) (20 queries), [Kubernetes](benchmarks/kubernetes-queries.json) (20 queries).
+Query files: [mimirs](benchmarks/mimirs-queries.json) (30 queries), [Excalidraw](benchmarks/excalidraw-queries.json) (30 queries), [Django](benchmarks/django-queries.json) (30 queries), [Kubernetes](benchmarks/kubernetes-queries.json) (30 queries).
 
 ### Kubernetes
 
@@ -236,7 +206,7 @@ Query files: [mimirs](benchmarks/mimirs-queries.json) (20 queries), [Express.js]
 git clone --depth 1 https://github.com/kubernetes/kubernetes.git /tmp/k8s-bench
 
 # Configure: Go files only, exclude test files
-mkdir -p /tmp/k8s-bench/.rag
+mkdir -p /tmp/k8s-bench/.mimirs
 cat > /tmp/k8s-bench/.mimirs/config.json << 'EOF'
 {
   "include": ["**/*.go"],

@@ -78,5 +78,45 @@
   {
     "query": "runEval withRag withoutRag trace comparison",
     "expected": ["src/search/eval.ts"]
+  },
+  {
+    "query": "initCommand runSetup confirm index project setup",
+    "expected": ["src/cli/commands/init.ts"]
+  },
+  {
+    "query": "doctorCommand health check Bun SQLite sqlite-vec diagnostics",
+    "expected": ["src/cli/commands/doctor.ts"]
+  },
+  {
+    "query": "indexConversation parseTurns buildTurnText session offset",
+    "expected": ["src/conversation/indexer.ts"]
+  },
+  {
+    "query": "upsertSession getSession conversation_sessions readOffset",
+    "expected": ["src/db/conversation.ts"]
+  },
+  {
+    "query": "getFileByPath upsertFileStart writeChunks vec_chunks storage",
+    "expected": ["src/db/files.ts"]
+  },
+  {
+    "query": "upsertFileGraph file_imports file_exports dependency edges",
+    "expected": ["src/db/graph.ts"]
+  },
+  {
+    "query": "git_context uncommitted changes recent commits diff status",
+    "expected": ["src/tools/git-tools.ts"]
+  },
+  {
+    "query": "annotate persistent note symbol inline read_relevant",
+    "expected": ["src/tools/annotation-tools.ts"]
+  },
+  {
+    "query": "cleanupCommand remove mimirs MCP config uninstall",
+    "expected": ["src/cli/commands/cleanup.ts"]
+  },
+  {
+    "query": "checkIndexDir DANGEROUS_DIRS prevent home root OOM",
+    "expected": ["src/utils/dir-guard.ts"]
   }
 ]
