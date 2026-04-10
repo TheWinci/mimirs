@@ -1,6 +1,6 @@
 {
   "name": "mimirs",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Persistent project memory for AI coding agents — semantic search, AST-aware chunking, dependency graphs, and conversation history",
   "author": {
     "name": "TheWinci",
