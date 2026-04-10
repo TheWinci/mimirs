@@ -30,7 +30,9 @@ Usage:
   mimirs serve                      Start MCP server (stdio)
   mimirs init [dir] [--ide IDEs]    Create default .mimirs/config.json
               IDEs: claude,cursor,windsurf,copilot,all
+              [-v|--verbose]        Show per-file indexing output
   mimirs index [dir] [--patterns ...] Index files in directory
+              [-v|--verbose]        Show per-file indexing output
   mimirs search <query> [--top N]   Search indexed files
   mimirs read <query> [--top N]     Read relevant chunks (full content)
               [--threshold T] [--dir D]
