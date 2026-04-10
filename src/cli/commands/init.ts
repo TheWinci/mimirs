@@ -4,12 +4,13 @@ import { RagDB } from "../../db";
 import { loadConfig } from "../../config";
 import { indexDirectory } from "../../indexing/indexer";
 import { runSetup, confirm, parseIdeFlag, mcpConfigSnippet } from "../setup";
-import { cliProgress } from "../progress";
+import { cliProgress, createQuietProgress } from "../progress";
 import { cli } from "../../utils/log";
 
 export async function initCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const dir = resolve(args[1] && !args[1].startsWith("--") ? args[1] : ".");
   const autoYes = args.includes("--yes") || args.includes("-y");
+  const verbose = args.includes("--verbose") || args.includes("-v");
   const ideFlag = getFlag("--ide");
   const ides = ideFlag ? parseIdeFlag(ideFlag) : undefined;
   const { actions, unknownIdes } = await runSetup(dir, ides);
@@ -42,6 +43,8 @@ export async function initCommand(args: string[], getFlag: (flag: string) => str
 
     let totalFiles = 0;
     let processedFiles = 0;
+    let quietProgress: ReturnType<typeof createQuietProgress> | null = null;
+    const startTime = Date.now();
 
     const result = await indexDirectory(dir, db, config, (msg, progressOpts) => {
       if (msg === "file:done") {
@@ -56,21 +59,29 @@ export async function initCommand(args: string[], getFlag: (flag: string) => str
       if (foundMatch) {
         totalFiles = parseInt(foundMatch[1], 10);
         writeStatus(`0/${totalFiles} files`);
+        if (!verbose) {
+          quietProgress = createQuietProgress(totalFiles);
+        }
       }
 
       if (msg.startsWith("scanning files")) {
         writeStatus(msg);
       }
 
-      // Forward to CLI progress for terminal output
-      cliProgress(msg, progressOpts);
+      // Forward to quiet or verbose progress for terminal output
+      if (quietProgress && !verbose) {
+        quietProgress(msg, progressOpts);
+      } else {
+        cliProgress(msg, progressOpts);
+      }
     });
 
     // Clean up status file on completion
     try { unlinkSync(statusPath); } catch { /* already gone */ }
 
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     cli.log(
-      `\nDone: ${result.indexed} indexed, ${result.skipped} skipped, ${result.pruned} pruned`
+      `\nDone: ${result.indexed} indexed, ${result.skipped} skipped, ${result.pruned} pruned (${elapsed}s)`
     );
     db.close();
   }
