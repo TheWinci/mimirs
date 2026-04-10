@@ -14,6 +14,7 @@ import * as conversationOps from "./conversation";
 import * as checkpointOps from "./checkpoints";
 import * as annotationOps from "./annotations";
 import * as analyticsOps from "./analytics";
+import * as gitHistoryOps from "./git-history";
 
 // Re-export all types so consumers keep importing from "../db"
 export type {
@@ -26,6 +27,8 @@ export type {
   SymbolResult,
   CheckpointRow,
   ConversationSearchResult,
+  GitCommitRow,
+  GitCommitSearchResult,
 } from "./types";
 
 // macOS ships with Apple's SQLite which doesn't support extensions.
@@ -272,6 +275,53 @@ export class RagDB {
         duration_ms INTEGER NOT NULL,
         created_at TEXT NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS git_commits (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        hash        TEXT UNIQUE NOT NULL,
+        short_hash  TEXT NOT NULL,
+        message     TEXT NOT NULL,
+        author_name TEXT NOT NULL,
+        author_email TEXT NOT NULL,
+        date        TEXT NOT NULL,
+        files_changed TEXT NOT NULL,
+        insertions  INTEGER DEFAULT 0,
+        deletions   INTEGER DEFAULT 0,
+        is_merge    INTEGER DEFAULT 0,
+        refs        TEXT,
+        diff_summary TEXT,
+        indexed_at  TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS git_commit_files (
+        commit_id   INTEGER NOT NULL REFERENCES git_commits(id) ON DELETE CASCADE,
+        file_path   TEXT NOT NULL,
+        insertions  INTEGER DEFAULT 0,
+        deletions   INTEGER DEFAULT 0,
+        PRIMARY KEY (commit_id, file_path)
+      );
+      CREATE INDEX IF NOT EXISTS idx_gcf_path ON git_commit_files(file_path);
+
+      CREATE VIRTUAL TABLE IF NOT EXISTS vec_git_commits USING vec0(
+        commit_id INTEGER PRIMARY KEY,
+        embedding FLOAT[${getEmbeddingDim()}]
+      );
+
+      CREATE VIRTUAL TABLE IF NOT EXISTS fts_git_commits USING fts5(
+        message,
+        diff_summary,
+        content='git_commits',
+        content_rowid='id'
+      );
+
+      CREATE TRIGGER IF NOT EXISTS git_commits_ai AFTER INSERT ON git_commits BEGIN
+        INSERT INTO fts_git_commits(rowid, message, diff_summary)
+        VALUES (new.id, new.message, new.diff_summary);
+      END;
+      CREATE TRIGGER IF NOT EXISTS git_commits_ad AFTER DELETE ON git_commits BEGIN
+        INSERT INTO fts_git_commits(fts_git_commits, rowid, message, diff_summary)
+        VALUES ('delete', old.id, old.message, old.diff_summary);
+      END;
     `);
 
     this.db.exec(`
@@ -544,6 +594,39 @@ export class RagDB {
   }
   deleteAnnotation(id: number) {
     return annotationOps.deleteAnnotation(this.db, id);
+  }
+
+  // ── Git history operations ────────────────────────────────────
+
+  insertCommitBatch(commits: gitHistoryOps.GitCommitInsert[]) {
+    gitHistoryOps.insertCommitBatch(this.db, commits);
+  }
+  getLastIndexedCommit() {
+    return gitHistoryOps.getLastIndexedCommit(this.db);
+  }
+  hasCommit(hash: string) {
+    return gitHistoryOps.hasCommit(this.db, hash);
+  }
+  searchGitCommits(queryEmbedding: Float32Array, topK?: number, author?: string, since?: string, until?: string, path?: string) {
+    return gitHistoryOps.searchGitCommits(this.db, queryEmbedding, topK, author, since, until, path);
+  }
+  textSearchGitCommits(query: string, topK?: number, author?: string, since?: string, until?: string, path?: string) {
+    return gitHistoryOps.textSearchGitCommits(this.db, query, topK, author, since, until, path);
+  }
+  getFileHistory(filePath: string, topK?: number, since?: string) {
+    return gitHistoryOps.getFileHistory(this.db, filePath, topK, since);
+  }
+  getAllCommitHashes() {
+    return gitHistoryOps.getAllCommitHashes(this.db);
+  }
+  purgeOrphanedCommits(reachableHashes: Set<string>) {
+    return gitHistoryOps.purgeOrphanedCommits(this.db, reachableHashes);
+  }
+  clearGitHistory() {
+    gitHistoryOps.clearGitHistory(this.db);
+  }
+  getGitHistoryStatus() {
+    return gitHistoryOps.getGitHistoryStatus(this.db);
   }
 
   // ── Analytics operations ──────────────────────────────────────

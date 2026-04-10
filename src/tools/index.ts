@@ -11,6 +11,7 @@ import { registerCheckpointTools } from "./checkpoint-tools";
 import { registerAnnotationTools } from "./annotation-tools";
 import { registerAnalyticsTools } from "./analytics-tools";
 import { registerGitTools } from "./git-tools";
+import { registerGitHistoryTools } from "./git-history-tools";
 import { registerServerInfoTools, type ConnectedDBInfo } from "./server-info-tools";
 import { registerWikiTools } from "./wiki-tools";
 
@@ -49,6 +50,7 @@ export function registerAllTools(
   registerAnnotationTools(server, getDB);
   registerAnalyticsTools(server, getDB);
   registerGitTools(server, getDB);
+  registerGitHistoryTools(server, getDB);
   registerServerInfoTools(server, getDB, getConnectedDBs);
   registerWikiTools(server, getDB);
 }

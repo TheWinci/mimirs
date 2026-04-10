@@ -12,6 +12,7 @@ import { conversationCommand } from "./commands/conversation";
 import { checkpointCommand } from "./commands/checkpoint";
 import { annotationsCommand } from "./commands/annotations";
 import { sessionContextCommand } from "./commands/session-context";
+import { historyCommand } from "./commands/history";
 // serve is imported dynamically below — its transitive deps include native
 // modules (bun:sqlite, sqlite-vec) and top-level awaits that would crash the
 // entire CLI if they fail at module load time, blocking even `doctor`.
@@ -58,6 +59,11 @@ Usage:
                 [--type T] [--top N]
   mimirs checkpoint search <query>  Search checkpoints
                 [--dir D] [--type T] [--top N]
+  mimirs history index [dir]         Index git commit history
+              [--since REF] [-v|--verbose]
+  mimirs history search <query>      Search commit history
+              [--top N] [--author A] [--since S]
+  mimirs history status [dir]        Show git history index stats
   mimirs annotations [dir]          List annotations
                 [--path P] [--dir D]
   mimirs session-context [dir]      Session start context summary
@@ -127,6 +133,9 @@ export async function main() {
       break;
     case "checkpoint":
       await checkpointCommand(args, getFlag);
+      break;
+    case "history":
+      await historyCommand(args, getFlag);
       break;
     case "annotations":
       await annotationsCommand(args, getFlag);
