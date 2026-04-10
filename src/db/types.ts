@@ -74,6 +74,26 @@ export interface CheckpointRow {
   tags: string[];
 }
 
+export interface GitCommitRow {
+  id: number;
+  hash: string;
+  shortHash: string;
+  message: string;
+  authorName: string;
+  authorEmail: string;
+  date: string;
+  filesChanged: string[];
+  insertions: number;
+  deletions: number;
+  isMerge: boolean;
+  refs: string[];
+  diffSummary: string | null;
+}
+
+export interface GitCommitSearchResult extends GitCommitRow {
+  score: number;
+}
+
 export interface ConversationSearchResult {
   turnId: number;
   turnIndex: number;
