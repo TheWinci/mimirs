@@ -56,6 +56,7 @@ export async function getEmbedder(
     };
     onProgress?.(`Loading embedding model ${currentModelId}...`);
     try {
+      // @ts-expect-error — pipeline() overload union is too complex for tsc
       extractor = await pipeline("feature-extraction", currentModelId, pipelineOptions);
     } catch (err) {
       // If the cached model is corrupted, delete it and retry once
@@ -64,7 +65,7 @@ export async function getEmbedder(
         const modelDir = join(CACHE_DIR, ...currentModelId.split("/"));
         rmSync(modelDir, { recursive: true, force: true });
         onProgress?.(`Retrying model load (cache was corrupted)...`);
-        extractor = await pipeline("feature-extraction", currentModelId, pipelineOptions);
+        extractor = await pipeline("feature-extraction", currentModelId, pipelineOptions) as FeatureExtractionPipeline;
       } else {
         throw err;
       }

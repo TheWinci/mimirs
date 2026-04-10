@@ -1,5 +1,6 @@
 import { dirname, resolve, relative, basename, extname } from "path";
 import { resolveImport as bcResolveImport, loadTsConfig, EXTENSION_MAP } from "@winci/bun-chunk";
+import type { Language } from "@winci/bun-chunk";
 import { RagDB } from "../db";
 
 // Extensions to try when resolving relative imports (DB-based fallback)
@@ -9,9 +10,9 @@ const INDEX_FILES = RESOLVE_EXTENSIONS.map((ext) => `/index${ext}`);
 /**
  * Detect language from file extension using bun-chunk's EXTENSION_MAP.
  */
-function detectLanguage(filePath: string) {
+function detectLanguage(filePath: string): Language | null {
   const ext = extname(filePath).toLowerCase();
-  return (EXTENSION_MAP as Record<string, string>)[ext] ?? null;
+  return ((EXTENSION_MAP as Record<string, string>)[ext] as Language) ?? null;
 }
 
 /**
