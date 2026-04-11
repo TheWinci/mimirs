@@ -34,6 +34,10 @@ This project has a local RAG index (mimirs). Use these MCP tools proactively:
   Use this to understand the blast radius of a rename or API change.
 - **`git_context`**: At the start of a session, call this to see what files have
   already been modified, recent commits, and which changed files are in the index.
+- **`search_commits`**: Semantically search git commit history — find *why* code
+  was changed, when decisions were made, or what an author worked on.
+- **`file_history`**: Get the commit history for a specific file — returns commits
+  that touched it, sorted by date.
 - **`annotate`**: Call this immediately when you encounter a known bug, race
   condition, fragile code, non-obvious constraint, or workaround while reading
   code. Notes persist across sessions and surface as `[NOTE]` blocks inline in

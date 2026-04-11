@@ -1,5 +1,5 @@
 ---
-name: local-rag
+name: mimirs
 description: >
   TRIGGER when: starting a new session, exploring unfamiliar code, searching for
   functions/types/files, planning refactors, or needing context about past decisions.
@@ -8,9 +8,9 @@ description: >
 user-invocable: false
 ---
 
-## Using local-rag tools
+## Using mimirs tools
 
-This project has a local RAG index (local-rag). Use these MCP tools:
+This project has a local RAG index (mimirs). Use these MCP tools:
 
 - **`search`**: Discover which files are relevant to a topic. Returns file paths
   with snippet previews — use this when you need to know *where* something is.
@@ -45,6 +45,11 @@ This project has a local RAG index (local-rag). Use these MCP tools:
   call this to see what files have already been modified, recent commits, and
   which changed files are in the index. Avoids redundant searches and conflicting
   edits on already-modified files.
+- **`search_commits`**: Semantically search git commit history — find *why* code
+  was changed, when decisions were made, or what an author worked on. Supports
+  filters for author, date range, and file path.
+- **`file_history`**: Get the commit history for a specific file. Returns commits
+  that touched it, sorted by date.
 - **`annotate`**: Call this immediately when you encounter a known bug, race
   condition, fragile code, non-obvious constraint, or workaround while reading
   code. Notes persist across sessions and surface as `[NOTE]` blocks inline in
@@ -58,5 +63,5 @@ This project has a local RAG index (local-rag). Use these MCP tools:
   point — returns the most semantically appropriate file and anchor.
 - **`generate_wiki`**: Generate or update a structured markdown wiki for the
   codebase. Call with `run: true` to immediately execute all phases. Follow
-  the returned instructions step by step using the other local-rag tools to
+  the returned instructions step by step using the other mimirs tools to
   build wiki pages in `wiki/`.

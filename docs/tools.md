@@ -18,6 +18,8 @@ These tools are available to any MCP client (Claude Code, Cursor, Windsurf, VS C
 | `search_symbols` | Find exported symbols by name — functions, classes, types, interfaces, enums. Faster than semantic search when you know the symbol name |
 | `find_usages` | Find every call site of a symbol across the codebase — returns file paths, line numbers (`path:line`), and the matching line. Excludes the defining file |
 | `git_context` | Show uncommitted changes (annotated `[indexed]`/`[not indexed]`), recent commits, and changed files. Optional unified diff (`include_diff`). Non-git directories return a graceful message |
+| `search_commits` | Semantically search indexed git commit history — find why code changed, when decisions were made, or what an author worked on. Supports filters: `author`, `since`, `until`, `path`, `threshold` |
+| `file_history` | Get the commit history for a specific file — returns commits that touched it, sorted by date (newest first) |
 | `annotate` | Attach a persistent note to a file or symbol. Notes survive sessions and surface inline in `read_relevant` results. Upserts by `(path, symbol)` key |
 | `get_annotations` | Retrieve notes by file path, or search semantically across all annotations |
 | `depends_on` | List all files that a given file imports (its dependencies) |
@@ -41,6 +43,7 @@ mimirs analytics [dir]    # Usage analytics with trend comparison
 mimirs map [dir]          # Dependency graph (text format)
 mimirs benchmark [dir]    # Run search quality benchmark
 mimirs eval [dir]         # A/B eval harness
+mimirs history            # Git history subcommands (index, search, status)
 mimirs conversation       # Conversation subcommands (search, sessions, index)
 mimirs checkpoint         # Checkpoint subcommands (create, list, search)
 mimirs annotations [dir]  # List annotations (optionally filter by --path)
