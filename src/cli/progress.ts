@@ -22,6 +22,10 @@ function clearTransient(): void {
 }
 
 export function cliProgress(msg: string, opts?: { transient?: boolean }): void {
+  // file:start / file:done are bookkeeping for quiet mode; verbose already
+  // shows per-file Indexing/Skipped/Indexed messages.
+  if (msg.startsWith("file:")) return;
+
   if (opts?.transient) {
     writeTransient(msg);
   } else {
@@ -41,7 +45,15 @@ export function createQuietProgress(totalFiles: number): (msg: string, opts?: { 
   const startTime = Date.now();
 
   return (msg: string, opts?: { transient?: boolean }) => {
-    // Track current file being indexed
+    // Track current file — fired before processFile, so it covers
+    // indexed, skipped, and errored files alike.
+    if (msg.startsWith("file:start ")) {
+      currentFile = msg.slice("file:start ".length);
+      writeTransient(`Indexing: ${processed}/${totalFiles} files — ${currentFile}`);
+      return;
+    }
+
+    // Legacy: also pick up file name from processFile's own message
     if (msg.startsWith("Indexing ") && !msg.startsWith("Indexing:")) {
       currentFile = msg.slice("Indexing ".length);
       return;

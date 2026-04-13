@@ -627,6 +627,9 @@ export async function indexDirectory(
   for (const filePath of matchedFiles) {
     if (signal?.aborted) break;
 
+    const relPath = relative(directory, filePath);
+    onProgress?.(`file:start ${relPath}`);
+
     try {
       const status = await processFile(filePath, db, {
         config,
