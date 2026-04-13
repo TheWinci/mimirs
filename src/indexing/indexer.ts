@@ -136,6 +136,10 @@ function buildExcludeFilter(patterns: string[]): (rel: string) => boolean {
     // "*.egg-info/**" → path segment ends with suffix
     const suffixDirMatch = p.match(/^\*([^*?/]+)\/\*\*$/);
     if (suffixDirMatch) { basenameSuffixes.push(suffixDirMatch[1]); continue; }
+
+    // "*.min.js", "*.bundle.js" → filename ends with suffix (any depth)
+    const suffixMatch = p.match(/^\*([^*?/]+)$/);
+    if (suffixMatch) { filenameSuffixes.push(suffixMatch[1]); continue; }
   }
 
   return (rel: string) => {
