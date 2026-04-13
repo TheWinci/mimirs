@@ -22,7 +22,6 @@ export function registerConversationTools(server: McpServer, getDB: GetDB) {
         .number()
         .int()
         .min(1)
-        .max(100)
         .optional()
         .default(5)
         .describe("Number of results to return (default: 5)"),
