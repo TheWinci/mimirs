@@ -380,6 +380,18 @@ async function processFile(
   }
 
   const relPath = baseDir ? relative(baseDir, filePath) : filePath;
+
+  // Detect minified / obfuscated files: extremely long average line length
+  // means the file has no meaningful structure for semantic chunking and would
+  // explode into tens of thousands of useless character-sliced chunks.
+  const MAX_AVG_LINE_LEN = 1000;
+  const lineCount = raw.split("\n").length || 1;
+  const avgLineLen = raw.length / lineCount;
+  if (avgLineLen > MAX_AVG_LINE_LEN) {
+    onProgress?.(`Skipped (minified/obfuscated, avg line ${Math.round(avgLineLen)} chars): ${relPath}`);
+    return "skipped";
+  }
+
   onProgress?.(`Indexing ${relPath}`);
 
   const parsed = parseFile(filePath, raw);
