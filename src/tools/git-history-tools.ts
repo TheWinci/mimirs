@@ -37,7 +37,7 @@ export function registerGitHistoryTools(server: McpServer, getDB: GetDB) {
     "Semantically search git commit history. Use this to find why code was changed, when decisions were made, or what an author worked on. Returns commits ranked by relevance to the query.",
     {
       query: z.string().max(2000).describe("Semantic search query"),
-      top: z.number().int().min(1).max(50).optional().default(10)
+      top: z.number().int().min(1).optional().default(10)
         .describe("Number of results to return"),
       author: z.string().optional()
         .describe("Filter by author name or email (case-insensitive substring match)"),
@@ -113,7 +113,7 @@ export function registerGitHistoryTools(server: McpServer, getDB: GetDB) {
     "Get the commit history for a specific file. Returns commits that touched the file, sorted by date (newest first). Faster than git log for indexed repositories.",
     {
       path: z.string().describe("File path (relative to project root, substring match)"),
-      top: z.number().int().min(1).max(100).optional().default(20)
+      top: z.number().int().min(1).optional().default(20)
         .describe("Max commits to return"),
       since: z.string().optional()
         .describe("Only show commits after this ISO date"),

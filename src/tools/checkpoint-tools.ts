@@ -86,7 +86,7 @@ export function registerCheckpointTools(server: McpServer, getDB: GetDB) {
         .enum(["decision", "milestone", "blocker", "direction_change", "handoff"])
         .optional()
         .describe("Filter by checkpoint type"),
-      limit: z.number().int().min(1).max(100).optional().default(20).describe("Max results (default: 20)"),
+      limit: z.number().int().min(1).optional().default(20).describe("Max results (default: 20)"),
       directory: z
         .string()
         .optional()
@@ -126,7 +126,7 @@ export function registerCheckpointTools(server: McpServer, getDB: GetDB) {
         .enum(["decision", "milestone", "blocker", "direction_change", "handoff"])
         .optional()
         .describe("Filter by checkpoint type"),
-      limit: z.number().int().min(1).max(100).optional().default(5).describe("Max results (default: 5)"),
+      limit: z.number().int().min(1).optional().default(5).describe("Max results (default: 5)"),
       directory: z
         .string()
         .optional()

@@ -21,7 +21,7 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
         .number()
         .int()
         .min(1)
-        .max(100)
+        .max(1000)
         .optional()
         .describe("Number of results to return (default: from config or 10)"),
     },
@@ -76,7 +76,7 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
         .number()
         .int()
         .min(1)
-        .max(100)
+        .max(1000)
         .optional()
         .describe("Max chunks to return (default: 8)"),
       threshold: z
@@ -180,7 +180,7 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
         .string()
         .optional()
         .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
-      top: z.number().int().min(1).max(100).optional().describe("Max results (default: 20)"),
+      top: z.number().int().min(1).optional().describe("Max results (default: 20)"),
     },
     async ({ symbol, exact, type, directory, top }) => {
       const { db: ragDb } = await resolveProject(directory, getDB);
@@ -220,7 +220,6 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
         .number()
         .int()
         .min(1)
-        .max(100)
         .optional()
         .describe("Number of candidate locations to return (default: 3)"),
       threshold: z

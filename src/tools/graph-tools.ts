@@ -25,7 +25,6 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
         .number()
         .int()
         .min(1)
-        .max(500)
         .optional()
         .describe("Max nodes in graph (default: 50, auto-switches to directory view if exceeded)"),
     },
@@ -60,7 +59,7 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
         .string()
         .optional()
         .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
-      top: z.number().int().min(1).max(100).optional().describe("Max results to return (default: 30)"),
+      top: z.number().int().min(1).optional().describe("Max results to return (default: 30)"),
     },
     async ({ symbol, exact, directory, top }) => {
       const { projectDir, db: ragDb } = await resolveProject(directory, getDB);
