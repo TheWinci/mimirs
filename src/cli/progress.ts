@@ -42,18 +42,15 @@ export function cliProgress(msg: string, opts?: { transient?: boolean }): void {
 export function createQuietProgress(totalFiles: number): (msg: string, opts?: { transient?: boolean }) => void {
   let processed = 0;
   let currentFile = "";
-  let totalChunks = 0;
   let fileChunksProcessed = 0;
   let fileChunksTotal = 0;
 
   function render(): void {
     if (totalFiles <= 0) return;
     const pct = Math.round((processed / totalFiles) * 100);
-    const chunks = totalChunks + fileChunksProcessed;
-    const chunkPart = chunks > 0 ? ` | ${chunks} chunks` : "";
+    const chunkPart = fileChunksTotal > 0 ? ` | ${fileChunksProcessed}/${fileChunksTotal}` : "";
     const filePart = currentFile ? ` — ${currentFile}` : "";
-    const embedPart = fileChunksTotal > 0 ? ` [${fileChunksProcessed}/${fileChunksTotal}]` : "";
-    writeTransient(`Indexing: ${processed}/${totalFiles} files (${pct}%)${chunkPart}${embedPart}${filePart}`);
+    writeTransient(`Indexing: ${processed}/${totalFiles} files (${pct}%)${chunkPart}${filePart}`);
   }
 
   return (msg: string, opts?: { transient?: boolean }) => {
@@ -79,15 +76,6 @@ export function createQuietProgress(totalFiles: number): (msg: string, opts?: { 
       fileChunksProcessed = parseInt(embedMatch[1], 10);
       fileChunksTotal = parseInt(embedMatch[2], 10);
       render();
-      return;
-    }
-
-    // Track completed file chunks: "Indexed: path (N chunks)" or "Indexed (incremental): ..."
-    const indexedMatch = msg.match(/^Indexed.*\((\d+).*chunk/);
-    if (indexedMatch) {
-      totalChunks += parseInt(indexedMatch[1], 10);
-      fileChunksProcessed = 0;
-      fileChunksTotal = 0;
       return;
     }
 
