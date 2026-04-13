@@ -79,8 +79,9 @@ const DEFAULT_CONFIG: RagConfig = {
     "node_modules/**", ".yarn/**", ".pnp.*",
     // Version control
     ".git/**",
-    // Build output
+    // Build output & bundled/minified assets
     "dist/**", "build/**", "out/**", ".output/**",
+    "*.min.js", "*.min.css", "*.bundle.js", "*.chunk.js",
     // Framework caches & generated
     ".next/**", ".nuxt/**", ".svelte-kit/**", ".turbo/**",
     // Tool caches
