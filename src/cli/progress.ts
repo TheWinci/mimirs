@@ -42,14 +42,28 @@ export function cliProgress(msg: string, opts?: { transient?: boolean }): void {
 export function createQuietProgress(totalFiles: number): (msg: string, opts?: { transient?: boolean }) => void {
   let processed = 0;
   let currentFile = "";
-  const startTime = Date.now();
+  let totalChunks = 0;
+  let fileChunksProcessed = 0;
+  let fileChunksTotal = 0;
+
+  function render(): void {
+    if (totalFiles <= 0) return;
+    const pct = Math.round((processed / totalFiles) * 100);
+    const chunks = totalChunks + fileChunksProcessed;
+    const chunkPart = chunks > 0 ? ` | ${chunks} chunks` : "";
+    const filePart = currentFile ? ` — ${currentFile}` : "";
+    const embedPart = fileChunksTotal > 0 ? ` [${fileChunksProcessed}/${fileChunksTotal}]` : "";
+    writeTransient(`Indexing: ${processed}/${totalFiles} files (${pct}%)${chunkPart}${embedPart}${filePart}`);
+  }
 
   return (msg: string, opts?: { transient?: boolean }) => {
     // Track current file — fired before processFile, so it covers
     // indexed, skipped, and errored files alike.
     if (msg.startsWith("file:start ")) {
       currentFile = msg.slice("file:start ".length);
-      writeTransient(`Indexing: ${processed}/${totalFiles} files — ${currentFile}`);
+      fileChunksProcessed = 0;
+      fileChunksTotal = 0;
+      render();
       return;
     }
 
@@ -59,14 +73,28 @@ export function createQuietProgress(totalFiles: number): (msg: string, opts?: { 
       return;
     }
 
+    // Track per-file chunk embedding progress: "Embedded 50/200 chunks for ..."
+    const embedMatch = msg.match(/^Embedded (\d+)\/(\d+)/);
+    if (embedMatch) {
+      fileChunksProcessed = parseInt(embedMatch[1], 10);
+      fileChunksTotal = parseInt(embedMatch[2], 10);
+      render();
+      return;
+    }
+
+    // Track completed file chunks: "Indexed: path (N chunks)" or "Indexed (incremental): ..."
+    const indexedMatch = msg.match(/^Indexed.*\((\d+).*chunk/);
+    if (indexedMatch) {
+      totalChunks += parseInt(indexedMatch[1], 10);
+      fileChunksProcessed = 0;
+      fileChunksTotal = 0;
+      return;
+    }
+
     // Count completed files and update progress line
     if (msg === "file:done") {
       processed++;
-      if (totalFiles > 0) {
-        const pct = Math.round((processed / totalFiles) * 100);
-        const display = currentFile || "";
-        writeTransient(`Indexing: ${processed}/${totalFiles} files (${pct}%)${display ? ` — ${display}` : ""}`);
-      }
+      render();
       return;
     }
 
