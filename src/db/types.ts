@@ -60,6 +60,11 @@ export interface SymbolResult {
   symbolType: string;
   snippet: string | null;
   chunkIndex: number | null;
+  hasChildren: boolean;
+  childCount: number;
+  referenceCount: number;
+  referenceModuleCount: number;
+  isReexport: boolean;
 }
 
 export interface CheckpointRow {

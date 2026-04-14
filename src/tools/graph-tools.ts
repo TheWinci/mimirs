@@ -7,7 +7,7 @@ import { type GetDB, resolveProject } from "./index";
 export function registerGraphTools(server: McpServer, getDB: GetDB) {
   server.tool(
     "project_map",
-    "Visualize how files relate to each other — imports, exports, and entry points. Faster than reading import statements across many files. Use 'focus' to zoom into a specific file's neighborhood. Use search or read_relevant next to explore specific areas of the map.",
+    "Visualize how files relate to each other — imports, exports, and entry points. Faster than reading import statements across many files. Use 'focus' to zoom into a specific file's neighborhood. Use format 'json' for structured data with fan-in/fan-out metrics. Use search or read_relevant next to explore specific areas of the map.",
     {
       directory: z
         .string()
@@ -26,9 +26,13 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
         .int()
         .min(1)
         .optional()
-        .describe("Max nodes in graph (default: 50, auto-switches to directory view if exceeded)"),
+        .describe("Max nodes in graph (default: 50, auto-switches to directory view if exceeded). No upper limit."),
+      format: z
+        .enum(["text", "json"])
+        .optional()
+        .describe("Output format: 'text' (default) for readable output, 'json' for structured data with fan-in/fan-out metrics and all exports."),
     },
-    async ({ directory, focus, zoom, maxNodes }) => {
+    async ({ directory, focus, zoom, maxNodes, format }) => {
       const { projectDir, db: ragDb } = await resolveProject(directory, getDB);
 
       const map = generateProjectMap(ragDb, {
@@ -36,7 +40,14 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
         focus,
         zoom: zoom ?? "file",
         maxNodes: maxNodes ?? 50,
+        format: format ?? "text",
       });
+
+      if (format === "json") {
+        return {
+          content: [{ type: "text" as const, text: map }],
+        };
+      }
 
       const footer = `\n── Tip: call search("<topic>") to find files related to a specific area, or depends_on/depended_on_by for a single file's connections. ──`;
 

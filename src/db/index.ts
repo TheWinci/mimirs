@@ -478,7 +478,7 @@ export class RagDB {
   textSearchChunks(query: string, topK?: number) {
     return searchOps.textSearchChunks(this.db, query, topK);
   }
-  searchSymbols(query: string, exact?: boolean, type?: string, topK?: number) {
+  searchSymbols(query?: string, exact?: boolean, type?: string, topK?: number) {
     return searchOps.searchSymbols(this.db, query, exact, type, topK);
   }
   findUsages(symbolName: string, exact: boolean, top: number) {

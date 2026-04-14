@@ -320,3 +320,130 @@ describe("generateProjectMap", () => {
     expect(map).toContain("server.ts");
   });
 });
+
+describe("generateProjectMap — JSON format", () => {
+  test("file-level JSON returns structured nodes and edges", () => {
+    const emb = new Float32Array(384);
+    const pathA = join(tempDir, "src", "server.ts");
+    const pathB = join(tempDir, "src", "db.ts");
+
+    db.upsertFile(pathA, "ha", [{ snippet: "a", embedding: emb }]);
+    db.upsertFile(pathB, "hb", [{ snippet: "b", embedding: emb }]);
+
+    const a = db.getFileByPath(pathA)!;
+    const b = db.getFileByPath(pathB)!;
+
+    db.upsertFileGraph(a.id, [{ name: "RagDB", source: "./db" }], [{ name: "main", type: "function" }]);
+    db.upsertFileGraph(b.id, [], [{ name: "RagDB", type: "class" }, { name: "createDB", type: "function" }]);
+    db.resolveImport(db.getImportsForFile(a.id)[0].id, b.id);
+
+    const raw = generateProjectMap(db, { projectDir: tempDir, zoom: "file", format: "json" });
+    const data = JSON.parse(raw);
+
+    expect(data.level).toBe("file");
+    expect(data.nodes).toBeArray();
+    expect(data.edges).toBeArray();
+
+    // Check node structure
+    const serverNode = data.nodes.find((n: any) => n.path.includes("server.ts"));
+    const dbNode = data.nodes.find((n: any) => n.path.includes("db.ts"));
+    expect(serverNode).toBeDefined();
+    expect(dbNode).toBeDefined();
+
+    // server.ts imports from db.ts → fanOut=1, fanIn=0
+    expect(serverNode.fanOut).toBe(1);
+    expect(serverNode.fanIn).toBe(0);
+    expect(serverNode.isEntryPoint).toBe(true);
+
+    // db.ts is imported by server.ts → fanIn=1, fanOut=0
+    expect(dbNode.fanIn).toBe(1);
+    expect(dbNode.fanOut).toBe(0);
+    expect(dbNode.isEntryPoint).toBe(false);
+
+    // db.ts exports should include ALL exports (no truncation)
+    expect(dbNode.exports).toHaveLength(2);
+    expect(dbNode.exports.map((e: any) => e.name)).toContain("RagDB");
+    expect(dbNode.exports.map((e: any) => e.name)).toContain("createDB");
+
+    // Edge
+    expect(data.edges).toHaveLength(1);
+    expect(data.edges[0].from).toContain("server.ts");
+    expect(data.edges[0].to).toContain("db.ts");
+  });
+
+  test("directory-level JSON returns structured directories and edges", () => {
+    const emb = new Float32Array(384);
+    const pathA = join(tempDir, "src", "server.ts");
+    const pathB = join(tempDir, "lib", "db.ts");
+
+    db.upsertFile(pathA, "ha", [{ snippet: "a", embedding: emb }]);
+    db.upsertFile(pathB, "hb", [{ snippet: "b", embedding: emb }]);
+
+    const a = db.getFileByPath(pathA)!;
+    const b = db.getFileByPath(pathB)!;
+
+    db.upsertFileGraph(a.id, [{ name: "DB", source: "../lib/db" }], [{ name: "main", type: "function" }]);
+    db.upsertFileGraph(b.id, [], [{ name: "DB", type: "class" }]);
+    db.resolveImport(db.getImportsForFile(a.id)[0].id, b.id);
+
+    const raw = generateProjectMap(db, { projectDir: tempDir, zoom: "directory", format: "json" });
+    const data = JSON.parse(raw);
+
+    expect(data.level).toBe("directory");
+    expect(data.directories).toBeArray();
+    expect(data.edges).toBeArray();
+
+    const srcDir = data.directories.find((d: any) => d.path === "src");
+    const libDir = data.directories.find((d: any) => d.path === "lib");
+    expect(srcDir).toBeDefined();
+    expect(libDir).toBeDefined();
+
+    // src has 1 file, lib has 1 file
+    expect(srcDir.fileCount).toBe(1);
+    expect(libDir.fileCount).toBe(1);
+
+    // src → lib edge
+    expect(srcDir.fanOut).toBe(1);
+    expect(libDir.fanIn).toBe(1);
+
+    // totalExports
+    expect(srcDir.totalExports).toBe(1); // main
+    expect(libDir.totalExports).toBe(1); // DB
+
+    // Edge with import count
+    expect(data.edges).toHaveLength(1);
+    expect(data.edges[0].from).toBe("src");
+    expect(data.edges[0].to).toBe("lib");
+    expect(data.edges[0].importCount).toBe(1);
+  });
+
+  test("empty graph returns valid JSON", () => {
+    const raw = generateProjectMap(db, { projectDir: tempDir, format: "json" });
+    const data = JSON.parse(raw);
+
+    expect(data.level).toBe("file");
+    expect(data.nodes).toEqual([]);
+    expect(data.edges).toEqual([]);
+  });
+
+  test("JSON format does not truncate exports", () => {
+    const emb = new Float32Array(384);
+    const pathA = join(tempDir, "big.ts");
+
+    db.upsertFile(pathA, "ha", [{ snippet: "a", embedding: emb }]);
+    const a = db.getFileByPath(pathA)!;
+
+    // Create 15 exports — text mode truncates at 8, JSON should not
+    const exports = Array.from({ length: 15 }, (_, i) => ({
+      name: `export${i}`,
+      type: "function",
+    }));
+    db.upsertFileGraph(a.id, [], exports);
+
+    const raw = generateProjectMap(db, { projectDir: tempDir, format: "json" });
+    const data = JSON.parse(raw);
+
+    const node = data.nodes[0];
+    expect(node.exports).toHaveLength(15);
+  });
+});
