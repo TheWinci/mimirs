@@ -165,9 +165,13 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
 
   server.tool(
     "search_symbols",
-    "Find where a function, class, type, or interface is defined — by name, not semantics. Faster than grep for symbol lookup: searches the pre-built symbol index across all indexed files. Use find_usages next to see where the symbol is called.",
+    "Find where a function, class, type, or interface is defined — by name, not semantics. Faster than grep for symbol lookup: searches the pre-built symbol index across all indexed files. Omit symbol to list all exports (filtered by type). Returns enrichment data: hasChildren, childCount, referenceCount, isReexport. Use find_usages next to see where the symbol is called.",
     {
-      symbol: z.string().min(1).max(200).describe("Symbol name to search for"),
+      symbol: z
+        .string()
+        .max(200)
+        .optional()
+        .describe("Symbol name to search for. Omit to list all exports (filtered by type if provided)."),
       exact: z
         .boolean()
         .optional()
@@ -180,23 +184,33 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
         .string()
         .optional()
         .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
-      top: z.number().int().min(1).optional().describe("Max results (default: 20)"),
+      top: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe("Max results (default: 20 when searching, 200 when listing). No upper limit — pass higher values for large projects."),
     },
     async ({ symbol, exact, type, directory, top }) => {
       const { db: ragDb } = await resolveProject(directory, getDB);
 
-      const results = ragDb.searchSymbols(symbol, exact ?? false, type, top ?? 20);
+      const results = ragDb.searchSymbols(symbol, exact ?? false, type, top);
 
       if (results.length === 0) {
+        const filterDesc = symbol ? `matching "${symbol}"` : (type ? `of type "${type}"` : "");
         return {
-          content: [{ type: "text" as const, text: `No exported symbols matching "${symbol}" found.` }],
+          content: [{ type: "text" as const, text: `No exported symbols ${filterDesc} found.` }],
         };
       }
 
       const body = results
         .map((r) => {
           const snippet = r.snippet ? `\n${r.snippet.slice(0, 300)}` : "";
-          return `${r.path}  •  ${r.symbolName} (${r.symbolType})${snippet}`;
+          const meta: string[] = [r.symbolType];
+          if (r.hasChildren) meta.push(`${r.childCount} children`);
+          if (r.referenceCount > 0) meta.push(`${r.referenceCount} refs, ${r.referenceModuleCount} modules`);
+          if (r.isReexport) meta.push("re-export");
+          return `${r.path}  •  ${r.symbolName} (${meta.join(", ")})${snippet}`;
         })
         .join("\n\n---\n\n");
 

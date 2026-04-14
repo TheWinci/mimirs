@@ -156,6 +156,7 @@ export interface GraphOptions {
   maxNodes?: number;
   maxHops?: number;
   showExternals?: boolean;
+  format?: "text" | "json";
   projectDir: string;
 }
 
@@ -176,6 +177,7 @@ interface GraphEdge {
 /**
  * Generate a structured text dependency map optimized for AI agent consumption.
  * Replaces the old Mermaid format with a more parseable, information-dense output.
+ * When format is "json", returns structured data instead of prose.
  */
 export function generateProjectMap(
   db: RagDB,
@@ -186,6 +188,7 @@ export function generateProjectMap(
     focus,
     maxNodes = 50,
     maxHops = 2,
+    format = "text",
     projectDir,
   } = options;
 
@@ -203,11 +206,21 @@ export function generateProjectMap(
   }
 
   if (graph.nodes.length === 0) {
+    if (format === "json") {
+      return JSON.stringify({ level: zoom, nodes: [], edges: [], directories: [] });
+    }
     return "No files indexed or no dependencies found.";
   }
 
   // Auto-switch to directory view if too many nodes
   const effectiveZoom = graph.nodes.length > maxNodes ? "directory" : zoom;
+
+  if (format === "json") {
+    if (effectiveZoom === "directory") {
+      return generateDirectoryMapJson(graph, projectDir);
+    }
+    return generateFileMapJson(graph, projectDir);
+  }
 
   if (effectiveZoom === "directory") {
     return generateDirectoryMap(graph, projectDir);
@@ -344,4 +357,98 @@ function generateDirectoryMap(
   }
 
   return lines.join("\n");
+}
+
+function generateFileMapJson(
+  graph: { nodes: GraphNode[]; edges: GraphEdge[] },
+  projectDir: string
+): string {
+  const fanIn = new Map<number, number>();
+  const fanOut = new Map<number, number>();
+  const idToRel = new Map<number, string>();
+
+  for (const node of graph.nodes) {
+    idToRel.set(node.id, relative(projectDir, node.path));
+    fanIn.set(node.id, 0);
+    fanOut.set(node.id, 0);
+  }
+
+  for (const edge of graph.edges) {
+    fanOut.set(edge.fromId, (fanOut.get(edge.fromId) ?? 0) + 1);
+    fanIn.set(edge.toId, (fanIn.get(edge.toId) ?? 0) + 1);
+  }
+
+  const nodes = graph.nodes.map((node) => ({
+    path: idToRel.get(node.id)!,
+    exports: node.exports.map((e) => ({ name: e.name, type: e.type })),
+    fanIn: fanIn.get(node.id) ?? 0,
+    fanOut: fanOut.get(node.id) ?? 0,
+    isEntryPoint: (fanIn.get(node.id) ?? 0) === 0,
+  }));
+
+  const edges = graph.edges.map((edge) => ({
+    from: idToRel.get(edge.fromId)!,
+    to: idToRel.get(edge.toId)!,
+    source: edge.source,
+  }));
+
+  return JSON.stringify({ level: "file", nodes, edges });
+}
+
+function generateDirectoryMapJson(
+  graph: { nodes: GraphNode[]; edges: GraphEdge[] },
+  projectDir: string
+): string {
+  const dirFiles = new Map<string, string[]>();
+  const dirExportCounts = new Map<string, number>();
+  const nodeToDir = new Map<number, string>();
+
+  for (const node of graph.nodes) {
+    const relPath = relative(projectDir, node.path);
+    const dir = dirname(relPath) || ".";
+    nodeToDir.set(node.id, dir);
+    if (!dirFiles.has(dir)) {
+      dirFiles.set(dir, []);
+      dirExportCounts.set(dir, 0);
+    }
+    dirFiles.get(dir)!.push(basename(relPath));
+    dirExportCounts.set(dir, dirExportCounts.get(dir)! + node.exports.length);
+  }
+
+  // Compute directory-level fan-in/fan-out and edge counts
+  const dirFanIn = new Map<string, Set<string>>();
+  const dirFanOut = new Map<string, Set<string>>();
+  const dirEdgeCounts = new Map<string, number>();
+
+  for (const dir of dirFiles.keys()) {
+    dirFanIn.set(dir, new Set());
+    dirFanOut.set(dir, new Set());
+  }
+
+  for (const edge of graph.edges) {
+    const fromDir = nodeToDir.get(edge.fromId)!;
+    const toDir = nodeToDir.get(edge.toId)!;
+    if (fromDir !== toDir) {
+      dirFanOut.get(fromDir)!.add(toDir);
+      dirFanIn.get(toDir)!.add(fromDir);
+      const key = `${fromDir}->${toDir}`;
+      dirEdgeCounts.set(key, (dirEdgeCounts.get(key) ?? 0) + 1);
+    }
+  }
+
+  const directories = [...dirFiles.entries()].map(([dir, files]) => ({
+    path: dir,
+    fileCount: files.length,
+    files,
+    totalExports: dirExportCounts.get(dir) ?? 0,
+    fanIn: dirFanIn.get(dir)?.size ?? 0,
+    fanOut: dirFanOut.get(dir)?.size ?? 0,
+  }));
+
+  const edges = [...dirEdgeCounts.entries()].map(([key, count]) => {
+    const [from, to] = key.split("->");
+    return { from, to, importCount: count };
+  });
+
+  return JSON.stringify({ level: "directory", directories, edges });
 }
