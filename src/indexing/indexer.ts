@@ -106,17 +106,17 @@ function buildExcludeFilter(patterns: string[]): (rel: string) => boolean {
   const filenameSuffixes: string[] = [];
 
   for (const p of patterns) {
-    // "dir/**" or "dir" → directory prefix
+    // "**/dir/**" → explicit any-depth directory match
+    const anyDepthDirMatch = p.match(/^\*\*\/([^*?/]+)\/\*\*$/);
+    if (anyDepthDirMatch) {
+      anyDepthDirNames.push(anyDepthDirMatch[1]);
+      continue;
+    }
+
+    // "dir/**" → root-anchored directory prefix
     const dirMatch = p.match(/^([^*?]+?)\/?\*\*$/);
     if (dirMatch) {
-      const dir = dirMatch[1];
-      // If the pattern has no slashes it's a bare directory name like
-      // "node_modules" — match it at any depth in the tree.
-      if (!dir.includes("/")) {
-        anyDepthDirNames.push(dir);
-      } else {
-        anchoredDirPrefixes.push(dir);
-      }
+      anchoredDirPrefixes.push(dirMatch[1]);
       continue;
     }
 
