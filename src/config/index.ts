@@ -76,7 +76,7 @@ const DEFAULT_CONFIG: RagConfig = {
   ],
   exclude: [
     // Package managers & dependencies
-    "node_modules/**", ".yarn/**", ".pnp.*",
+    "**/node_modules/**", ".yarn/**", ".pnp.*",
     // Version control
     ".git/**",
     // Build output & bundled/minified assets
@@ -93,11 +93,11 @@ const DEFAULT_CONFIG: RagConfig = {
     // IDE settings (config, not code)
     ".idea/**", ".vscode/**",
     // Python
-    "__pycache__/**", ".venv/**", "venv/**", ".tox/**", "*.egg-info/**",
+    "**/__pycache__/**", ".venv/**", "venv/**", ".tox/**", "*.egg-info/**",
     // Rust
     "target/**",
     // Go
-    "vendor/**",
+    "**/vendor/**",
     // Mimirs index
     ".mimirs/**",
   ],
