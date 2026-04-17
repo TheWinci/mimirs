@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import { dirname } from "path";
+import { dirname, basename } from "path";
 import { type SearchResult, type ChunkSearchResult, type SymbolResult, type UsageResult } from "./types";
 import { escapeRegex, sanitizeFTS } from "../search/usages";
 
@@ -220,6 +220,10 @@ export function searchSymbols(
       // Compute referenceModuleCount from reference paths using directory as module proxy
       const refPaths = r.reference_paths ? r.reference_paths.split(",") : [];
       const refDirs = new Set(refPaths.map((p) => dirname(p)));
+      const referenceModules = [...refDirs]
+        .map((d) => basename(d))
+        .filter((v, i, a) => a.indexOf(v) === i)
+        .sort();
       return {
         path: r.path,
         symbolName: r.symbol_name,
@@ -230,6 +234,7 @@ export function searchSymbols(
         childCount: r.child_count,
         referenceCount: r.reference_count,
         referenceModuleCount: refDirs.size,
+        referenceModules,
         isReexport: r.is_reexport === 1,
       };
     });

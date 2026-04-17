@@ -64,6 +64,7 @@ export interface SymbolResult {
   childCount: number;
   referenceCount: number;
   referenceModuleCount: number;
+  referenceModules: string[];
   isReexport: boolean;
 }
 

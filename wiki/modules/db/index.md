@@ -1,145 +1,134 @@
-# DB Module
+# db
 
-The DB module (`src/db/`) is the persistence layer for mimirs. It wraps
-SQLite via `bun:sqlite`, loading the [sqlite-vec](https://github.com/asg017/sqlite-vec)
-extension for vector similarity search and using FTS5 for BM25 full-text
-ranking.
+The `db` module is the persistence boundary of mimirs. Every other module — indexer, search, conversation, graph, tools, CLI — reaches the SQLite store through the `RagDB` facade exported from `src/db/index.ts`. The class holds a single `bun:sqlite` connection with `sqlite-vec` loaded, runs schema migrations on open, and forwards work into ten topic files (`files.ts`, `search.ts`, `graph.ts`, `conversation.ts`, `checkpoints.ts`, `annotations.ts`, `analytics.ts`, `git-history.ts`, `types.ts` for row shapes, plus `index.ts` itself). No code outside this module opens `Database` directly; the facade is the rule.
 
-## Architecture
+## How it works
 
 ```mermaid
-flowchart TD
-  subgraph RagDBClass["RagDB (src/db/index.ts)"]
-    init_fn["Constructor and Schema Init"]
-  end
+sequenceDiagram
+  participant caller as "caller (tool / CLI)"
+  participant facade as "RagDB"
+  participant sub as "src/db/*.ts"
+  participant sqlite as "bun:sqlite + vec0 + FTS5"
 
-  init_fn --> fileOps["files.ts"]
-  init_fn --> searchOps["search.ts"]
-  init_fn --> graphOps["graph.ts"]
-  init_fn --> convOps["conversation.ts"]
-  init_fn --> cpOps["checkpoints.ts"]
-  init_fn --> annOps["annotations.ts"]
-  init_fn --> anlOps["analytics.ts"]
-  init_fn --> types_file["types.ts"]
+  caller->>facade: "ragDB.upsertFile(path, hash, chunks)"
+  facade->>sub: "upsertFile(this.db, ...)"
+  sub->>sqlite: "INSERT / UPDATE files, chunks, vec_chunks"
+  sqlite-->>sub: "row ids"
+  sub-->>facade: "result"
+  facade-->>caller: "result"
 
-  fileOps --> sqlite["bun:sqlite + sqlite-vec"]
-  searchOps --> sqlite
-  graphOps --> sqlite
-  convOps --> sqlite
-  cpOps --> sqlite
-  annOps --> sqlite
-  anlOps --> sqlite
+  note over sqlite: "FTS5 triggers keep fts_chunks in sync on<br/>INSERT / UPDATE / DELETE of chunks rows."
 ```
 
-## Entry Point -- `RagDB` Class
+1. **Open** — `new RagDB(projectDir)` calls `loadCustomSQLite()` (points bun at Homebrew SQLite on macOS), creates `.mimirs/` (or `RAG_DB_DIR`), opens `index.db`, sets `journal_mode=WAL`, `busy_timeout=5000`, loads `sqlite-vec`, and runs `initSchema()`.
+2. **Route** — every instance method on `RagDB` forwards into one of the per-concern files. The facade itself holds no SQL; each sub-file's function takes the raw `Database` parameter, which makes them trivially unit-testable against an in-memory DB.
+3. **Persist** — writes go through triggers: inserting a chunks row fires an FTS insert; updating it fires a delete + insert on FTS. Only `vec_chunks` rows are written explicitly with the embedding bytes — FTS and the core table stay in lockstep automatically.
 
-All database access flows through the `RagDB` class exported from
-`src/db/index.ts`. The constructor accepts:
+## Per-file breakdown
 
-```ts
-constructor(projectDir: string, customRagDir?: string)
-```
+### `index.ts` — `RagDB` facade
 
-- **projectDir** -- used to derive the default `.mimirs/` storage directory.
-- **customRagDir** -- explicit override. If omitted, falls back to
-  `RAG_DB_DIR` env var, then `<projectDir>/.mimirs`.
+The class. Constructor takes `projectDir` and an optional `customRagDir`; resolution precedence is `customRagDir → RAG_DB_DIR → <projectDir>/.mimirs`. `initSchema()` runs the full CREATE-IF-NOT-EXISTS block — files, chunks, `vec_chunks(FLOAT[dim])`, `fts_chunks`, FTS sync triggers, `file_imports` / `file_exports`, conversation tables, checkpoints, `vec_checkpoints`, `query_log`, `git_commits` / `git_commit_files`, `vec_git_commits`, and `fts_git_commits`. The embedding dimension is read lazily from `getEmbeddingDim()` so `configureEmbedder(modelId, dim)` calls before schema init produce the right `vec0` column width.
 
-On instantiation the class:
+### `files.ts` — file rows and chunks
 
-1. Calls `loadCustomSQLite()` -- on macOS, swaps Apple's bundled SQLite
-   (which lacks extension support) for Homebrew's build.
-2. Creates the `.mimirs/` directory if absent.
-3. Opens `index.db` with WAL mode and a 5-second busy timeout.
-4. Loads the sqlite-vec extension.
-5. Runs `initSchema()` to create all tables, virtual tables, triggers,
-   and indexes.
-6. Runs incremental migrations (`migrateChunksEntityColumns`,
-   `migrateParentChunkColumns`, `migrateGraphColumns`).
+Owns `getFileByPath`, `getAllFilePaths`, `upsertFileStart`, `upsertFile`, `insertChunkBatch`, `removeFile`, `pruneDeleted`, `getStatus`. `upsertFileStart` returns the file id as the streaming path — the indexer calls it first, then `insertChunkBatch(fileId, chunks, startIndex)` in transactional batches. `pruneDeleted(existingPaths)` drops rows whose path is no longer on disk; cascaded deletes clean up `chunks`, `vec_chunks`, and both `file_*` graph tables.
 
-The underlying `Database` handle is **private** -- consumers interact
-exclusively through the facade methods on `RagDB`.
+### `search.ts` — vector + BM25 + symbols
 
-## Tables
+Exposes `vectorSearch`, `vectorSearchChunks`, `textSearch`, `textSearchChunks`, `searchSymbols`, and `findUsages`. Vector searches run `SELECT * FROM vec_chunks WHERE embedding MATCH ?` with `k = topK`; text searches run FTS5 `MATCH` against `fts_chunks`. Chunk-level variants do not dedupe by file; file-level variants aggregate to one row per path. `searchSymbols` walks the `chunks` + `file_exports` tables to answer "what is the type/declaration of this name" without re-embedding; `findUsages` is the grep-adjacent fallback that returns line-anchored snippets.
 
-| Table | Engine | Purpose |
-|---|---|---|
-| `files` | regular | Indexed file paths and content hashes |
-| `chunks` | regular | Code/doc snippets with entity metadata and line ranges |
-| `vec_chunks` | vec0 | Vector embeddings for chunk similarity search |
-| `fts_chunks` | FTS5 | BM25 full-text index over chunk snippets |
-| `file_imports` | regular | Import edges for the dependency graph |
-| `file_exports` | regular | Export declarations per file |
-| `conversation_sessions` | regular | Claude Code JSONL session metadata |
-| `conversation_turns` | regular | Individual conversation turns with summaries |
-| `conversation_chunks` | regular | Chunked conversation text |
-| `vec_conversation` | vec0 | Vector embeddings for conversation search |
-| `fts_conversation` | FTS5 | BM25 full-text index over conversation chunks |
-| `conversation_checkpoints` | regular | Milestone markers across sessions |
-| `vec_checkpoints` | vec0 | Vector embeddings for checkpoint search |
-| `query_log` | regular | Search analytics (query text, scores, timing) |
-| `annotations` | regular | Persistent notes on files and symbols |
-| `fts_annotations` | FTS5 | Full-text index over annotation notes |
-| `vec_annotations` | vec0 | Vector embeddings for annotation search |
+### `graph.ts` — imports / exports / resolution
 
-## Sub-Modules
+Owns `upsertFileGraph` (bulk-writes `file_imports` and `file_exports` for a file), `getGraph`, `getSubgraph(fileIds, maxHops)`, `getImportersOf`, `getImportsForFile`, plus the two-pass resolver's helpers `getUnresolvedImports` and `resolveImport(importId, resolvedFileId)`. Unresolved imports are inserted with `resolved_file_id = NULL` during the first walk; the resolver then runs after all files are indexed and patches the ids.
 
-The `RagDB` class delegates to seven sub-module files. Each receives the raw
-`Database` handle as its first argument.
+### `conversation.ts` — JSONL sessions and turns
 
-| File | Responsibility |
-|---|---|
-| [`files.ts`](internals.md#filests--filechunk-crud) | File and chunk CRUD, pruning, incremental updates |
-| [`search.ts`](internals.md#searchts--search-queries) | Vector and FTS queries for chunks and symbols |
-| [`graph.ts`](internals.md#graphts--dependency-graph) | Import/export graph storage, BFS subgraph extraction |
-| [`conversation.ts`](internals.md#conversationts--conversation-tables) | Session and turn persistence, conversation search |
-| [`checkpoints.ts`](internals.md#checkpointsts--checkpoints) | Checkpoint create/list/search |
-| [`annotations.ts`](internals.md#annotationsts--annotations) | Annotation upsert with FTS+vector sync |
-| [`analytics.ts`](internals.md#analyticsts--analytics) | Query logging and trend analysis |
+`upsertSession`, `getSession`, `updateSessionStats`, and `getTurnCount` manage session rows keyed by Claude Code session uuid; `insertTurn(sessionId, turnIndex, timestamp, userText, assistantText, toolsUsed, filesReferenced, tokenCost, summary, chunks)` writes one row to `conversation_turns` plus N chunks + N embeddings in one transaction. `searchConversation` and `textSearchConversation` are the query variants against `vec_conversation` and `fts_conversation`.
+
+### `checkpoints.ts` — session-scoped decisions
+
+`createCheckpoint`, `getCheckpoint`, `listCheckpoints`, `searchCheckpoints`. Rows land in `conversation_checkpoints`; the accompanying `vec_checkpoints` table holds the embedding so `searchCheckpoints` can blend semantic match with `type` / `sessionId` filters.
+
+### `annotations.ts` — inline notes
+
+`getAnnotations(path?, symbolName?)`, `deleteAnnotation(id)`, `searchAnnotations(queryEmbedding, topK)`. Writes happen through the `annotate` MCP tool, which inserts on `annotations` (defined in the schema). Read-side is what surfaces `[NOTE]` blocks inline in `read_relevant` output.
+
+### `analytics.ts` — query log
+
+`logQuery(query, resultCount, topScore, topPath, durationMs)` is called by every hybrid search; `getAnalytics(days)` and `getAnalyticsTrend(days)` aggregate `query_log` into the payloads the `search_analytics` tool returns.
+
+### `git-history.ts` — commits
+
+`GitCommitInsert` is the write-side shape; `insertCommitBatch(commits)` uses `INSERT OR IGNORE` on the unique `hash` column so re-runs are idempotent. `getLastIndexedCommit` anchors the next `git log` range; `hasCommit(hash)` is the fast-path dedupe. `searchGitCommits` / `textSearchGitCommits` query `vec_git_commits` / `fts_git_commits` with optional `author`, `since`, `until`, `path` filters. `getFileHistory(filePath, topK, since?)` is the file-scoped query backing the `file_history` tool.
+
+### `types.ts` — row shapes
+
+Eleven interfaces re-exported through `index.ts`: `StoredFile`, `StoredChunk`, `SearchResult`, `ChunkSearchResult`, `UsageResult`, `SymbolResult`, `AnnotationRow`, `CheckpointRow`, `ConversationSearchResult`, `GitCommitRow`, `GitCommitSearchResult`. Having them in one file is what makes the `import { ... } from "../db"` idiom work across the codebase.
 
 ## Dependencies and Dependents
 
 ```mermaid
 flowchart LR
-  embeddings_dep["embeddings/embed.ts"]
-  ragdb_node["RagDB"]
-  tools_dep["Tools"]
-  searchMod_dep["Search"]
-  indexing_dep["Indexing"]
-  graphMod_dep["Graph"]
-  convMod_dep["Conversation"]
-  server_dep["Server"]
-  cli_dep["CLI"]
+  subgraph Upstream["Depends on"]
+    bunsqlite["bun:sqlite"]
+    vec0["sqlite-vec"]
+    embed["embeddings (getEmbeddingDim)"]
+  end
+  self["db (RagDB)"]
+  subgraph Downstream["Depended on by"]
+    indexer["indexing"]
+    search["search"]
+    graphmod["graph"]
+    conv["conversation"]
+    git["git/indexer"]
+    tools["tools"]
+    cmds["commands"]
+    wiki["wiki"]
+    tests["tests + benchmarks"]
+  end
 
-  embeddings_dep -->|getEmbeddingDim| ragdb_node
-  ragdb_node --> tools_dep
-  ragdb_node --> searchMod_dep
-  ragdb_node --> indexing_dep
-  ragdb_node --> graphMod_dep
-  ragdb_node --> convMod_dep
-  ragdb_node --> server_dep
-  ragdb_node --> cli_dep
+  bunsqlite --> self
+  vec0 --> self
+  embed --> self
+  self --> indexer
+  self --> search
+  self --> graphmod
+  self --> conv
+  self --> git
+  self --> tools
+  self --> cmds
+  self --> wiki
+  self --> tests
 ```
 
-- **Depends on:** `embeddings/embed.ts` (for `getEmbeddingDim` used to size
-  `vec0` virtual table columns).
-- **Depended on by:** Tools, Search, Indexing, Graph, Conversation, Server, CLI.
+## Internals
 
-## macOS SQLite Workaround
+- **`sqlite-vec` requires a vanilla SQLite build.** On macOS, `loadCustomSQLite()` calls `Database.setCustomSQLite()` with the Homebrew path (`/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib` or the Intel equivalent) and throws a specific `brew install sqlite` error otherwise. On Linux, a list of common distro paths is tried; if none match, the loader falls through and lets `sqlite-vec.load()` raise its own error. Windows uses bun's bundled SQLite.
+- **Every embedding column sizes itself from `getEmbeddingDim()`.** `vec_chunks`, `vec_conversation`, `vec_checkpoints`, and `vec_git_commits` all use `FLOAT[${getEmbeddingDim()}]` at schema-init time. Switching models requires dropping the db — existing vec rows would be dimensionally wrong.
+- **FTS stays in sync via triggers.** Three triggers per FTS-backed table (`*_ai` / `*_ad` / `*_au`) forward every chunk insert/delete/update to the FTS5 virtual table. No code path writes to FTS directly.
+- **`WAL` + `busy_timeout=5000`.** Journal mode is WAL so the indexer can write while a search reads; the 5-second busy timeout accommodates the rare lock contention during bulk upserts.
+- **Unresolved imports linger.** `upsertFileGraph` always inserts imports with `resolved_file_id = NULL`. `src/graph/resolver.ts` runs after the walk and patches them via `resolveImport`, avoiding a file-ordering dependency.
 
-Apple ships a custom SQLite build that blocks extension loading. On Darwin,
-`loadCustomSQLite()` searches for Homebrew's vanilla SQLite at:
+## Configuration
 
-1. `/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib` (Apple Silicon)
-2. `/usr/local/opt/sqlite/lib/libsqlite3.dylib` (Intel)
+- `RAG_DB_DIR` (env) — relocates the whole index outside the project directory. Resolved before `.mimirs/` default. Use when the project dir is read-only (nix store, Docker image).
+- `customRagDir` (constructor arg) — takes precedence over the env var. Tests use it with `createTempDir()`.
 
-If neither is found, the constructor throws with a message suggesting
-`brew install sqlite`.
+## Known issues
 
-## See Also
+- **macOS system SQLite fails silently on `sqlite-vec` load.** The constructor throws a specific error pointing to `brew install sqlite` before the load would otherwise fail with a confusing "extension not supported" message.
+- **EACCES / EROFS on `.mimirs/`.** The constructor catches the mkdir error, names the offending path, and instructs the caller to set `RAG_DB_DIR`. Other OS errors propagate unchanged.
+- **Re-indexing after a model change requires a DB reset.** Changing the embedding model changes `getEmbeddingDim()`, which means new `vec_chunks` inserts would be dimensionally incompatible with existing rows. Delete `.mimirs/index.db` and re-index.
 
-- [Internals](internals.md) -- detailed breakdown of every sub-module file
-- [RagDB entity](../../entities/rag-db.md) -- class signature and method reference
-- [Search module](../search/) -- higher-level search orchestration that calls into DB
-- [Indexing module](../indexing/) -- file indexing pipeline that writes to DB
-- [Graph module](../graph/) -- graph operations built on the DB graph sub-module
-- [Architecture overview](../../architecture.md)
+## See also
+
+- [types](types.md)
+- [files](files.md)
+- [git-history](git-history.md)
+- [conversation](conversation.md)
+- [graph](graph.md)
+- [Architecture](../../architecture.md)
+- [Data Flows](../../data-flows.md)
+- [Conventions](../../guides/conventions.md)
