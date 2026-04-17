@@ -11,7 +11,7 @@ let transport: StdioClientTransport;
 beforeAll(async () => {
   tempDir = await createTempDir();
 
-  // Seed a few files so the index isn't empty for the "indexed" tests
+  // Seed a few files so the index isn't empty
   await writeFixture(
     tempDir,
     "src/db.ts",
@@ -70,42 +70,82 @@ describe("generate_wiki", () => {
     expect(names).toContain("generate_wiki");
   });
 
-  test("returns wiki instructions with index stats", async () => {
+  test("init mode returns page list and writing rules", async () => {
     const result = await client.callTool({
       name: "generate_wiki",
       arguments: { directory: tempDir },
     });
 
     const text = getText(result);
-    // Should contain index stats
-    expect(text).toMatch(/Index: \d+ files, \d+ chunks/);
-    // Should contain the wiki instructions phases
-    expect(text).toContain("Phase 0: Mode Detection");
-    expect(text).toContain("Phase 1: Discover Structure");
-    expect(text).toContain("Phase 6: Index + Finalize");
-    expect(text).toContain("Phase 7: Incremental Update");
+    // Should contain the computed page count
+    expect(text).toContain("Wiki Generation Plan");
+    expect(text).toContain("Computed");
+    expect(text).toContain("pages");
+    // Should contain writing rules
+    expect(text).toContain("Writing Rules");
+    expect(text).toContain("Kebab-case");
+    expect(text).toContain("Mermaid");
+    expect(text).toContain("No guessing");
+    // Should contain instructions
+    expect(text).toContain("generate_wiki(page: N)");
   });
 
-  test("run=true includes action-required preamble", async () => {
+  test("init mode writes JSON artifacts", async () => {
+    const { existsSync } = require("fs");
+    // Init was already called in the previous test — artifacts should exist
+    expect(existsSync(join(tempDir, "wiki", "_manifest.json"))).toBe(true);
+    expect(existsSync(join(tempDir, "wiki", "_content.json"))).toBe(true);
+    expect(existsSync(join(tempDir, "wiki", "_classified.json"))).toBe(true);
+    expect(existsSync(join(tempDir, "wiki", "_discovery.json"))).toBe(true);
+  });
+
+  test("page mode returns lightweight summary with sections", async () => {
     const result = await client.callTool({
       name: "generate_wiki",
-      arguments: { directory: tempDir, run: true },
+      arguments: { directory: tempDir, page: 0 },
     });
 
     const text = getText(result);
-    expect(text).toContain("ACTION REQUIRED");
-    expect(text).toContain("Follow the phases below step by step");
+    // Should have page metadata
+    expect(text).toContain("Page:");
+    expect(text).toContain("**Path:**");
+    expect(text).toContain("**Kind:**");
+    // Should have either candidate sections (module/file) or an exemplar (aggregate)
+    const hasCandidates = text.includes("Candidate sections");
+    const hasExemplar = text.includes("**Exemplar:**");
+    expect(hasCandidates || hasExemplar).toBe(true);
+    // Should have available sections manifest
+    expect(text).toContain("Available sections");
   });
 
-  test("run=false does not include action-required preamble", async () => {
+  test("page mode with section returns section data", async () => {
+    // First find a page that has an overview section
     const result = await client.callTool({
       name: "generate_wiki",
-      arguments: { directory: tempDir, run: false },
+      arguments: { directory: tempDir, page: 0 },
+    });
+    const summary = getText(result);
+
+    // Try fetching a section — overview or exports if available
+    if (summary.includes("**overview**")) {
+      const sectionResult = await client.callTool({
+        name: "generate_wiki",
+        arguments: { directory: tempDir, page: 0, section: "overview" },
+      });
+      const sectionText = getText(sectionResult);
+      expect(sectionText).toContain("# Overview");
+    }
+  });
+
+  test("page mode with invalid section returns error", async () => {
+    const result = await client.callTool({
+      name: "generate_wiki",
+      arguments: { directory: tempDir, page: 0, section: "nonexistent" },
     });
 
     const text = getText(result);
-    expect(text).not.toContain("ACTION REQUIRED");
-    expect(text).toContain("Ready to generate");
+    expect(text).toContain("Unknown section");
+    expect(text).toContain("Valid sections");
   });
 
   test("warns about empty index for unindexed directory", async () => {
@@ -121,36 +161,28 @@ describe("generate_wiki", () => {
     await cleanupTempDir(emptyDir);
   });
 
-  test("instructions include all required wiki rules", async () => {
+  test("resume mode reports remaining pages", async () => {
+    // Init was already called — all pages should be remaining (none written yet)
     const result = await client.callTool({
       name: "generate_wiki",
-      arguments: { directory: tempDir },
+      arguments: { directory: tempDir, resume: true },
     });
 
     const text = getText(result);
-    // Key rules from the WIKI_INSTRUCTIONS constant
-    expect(text).toContain("Kebab-case");
-    expect(text).toContain("See Also");
-    expect(text).toContain("Mermaid");
-    expect(text).toContain("_manifest.json");
-    expect(text).toContain("No bulk reads");
-    expect(text).toContain("No guessing signatures");
+    expect(text).toContain("Wiki Resume");
+    expect(text).toContain("Remaining");
+    expect(text).toContain("Writing Rules");
   });
 
-  test("instructions reference expected wiki file structure", async () => {
+  test("page mode without init returns error", async () => {
+    const emptyDir = await createTempDir();
     const result = await client.callTool({
       name: "generate_wiki",
-      arguments: { directory: tempDir },
+      arguments: { directory: emptyDir, page: 0 },
     });
 
     const text = getText(result);
-    expect(text).toContain("wiki/");
-    expect(text).toContain("architecture.md");
-    expect(text).toContain("data-flow.md");
-    expect(text).toContain("api-surface.md");
-    expect(text).toContain("glossary.md");
-    expect(text).toContain("modules/");
-    expect(text).toContain("entities/");
-    expect(text).toContain("guides/");
+    expect(text).toContain("No manifest found");
+    await cleanupTempDir(emptyDir);
   });
 });

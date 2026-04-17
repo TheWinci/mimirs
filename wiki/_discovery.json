@@ -1,0 +1,5891 @@
+{
+  "fileCount": 160,
+  "chunkCount": 1743,
+  "lastIndexed": "2026-04-17T20:33:46.578Z",
+  "modules": [
+    {
+      "name": "src",
+      "path": "src",
+      "entryFile": "src/main.ts",
+      "files": [
+        "src/main.ts",
+        "src/types.ts"
+      ],
+      "exports": [],
+      "fanIn": 0,
+      "fanOut": 1,
+      "internalEdges": 0,
+      "children": [
+        {
+          "name": "cli",
+          "path": "src/cli",
+          "entryFile": "src/cli/index.ts",
+          "files": [
+            "src/cli/index.ts",
+            "src/cli/progress.ts",
+            "src/cli/setup.ts"
+          ],
+          "exports": [
+            "cliProgress",
+            "SetupResult",
+            "ensureConfig",
+            "ensureGitignore",
+            "KnownIDE",
+            "KNOWN_IDES",
+            "unknownIdes",
+            "parseIdeFlag",
+            "ensureAgentInstructions",
+            "mcpConfigSnippet",
+            "ensureMcpJson",
+            "detectAgentHints",
+            "confirm",
+            "runSetup"
+          ],
+          "fanIn": 3,
+          "fanOut": 3,
+          "internalEdges": 0,
+          "children": [
+            {
+              "name": "commands",
+              "path": "src/cli/commands",
+              "entryFile": null,
+              "files": [
+                "src/cli/commands/analytics.ts",
+                "src/cli/commands/annotations.ts",
+                "src/cli/commands/benchmark-models.ts",
+                "src/cli/commands/benchmark.ts",
+                "src/cli/commands/checkpoint.ts",
+                "src/cli/commands/cleanup.ts",
+                "src/cli/commands/conversation.ts",
+                "src/cli/commands/demo.ts",
+                "src/cli/commands/doctor.ts",
+                "src/cli/commands/eval.ts",
+                "src/cli/commands/history.ts",
+                "src/cli/commands/index-cmd.ts",
+                "src/cli/commands/init.ts",
+                "src/cli/commands/map.ts",
+                "src/cli/commands/remove.ts",
+                "src/cli/commands/search-cmd.ts",
+                "src/cli/commands/serve.ts",
+                "src/cli/commands/session-context.ts",
+                "src/cli/commands/status.ts"
+              ],
+              "exports": [
+                "analyticsCommand",
+                "annotationsCommand",
+                "benchmarkCommand",
+                "cleanupCommand",
+                "evalCommand",
+                "historyCommand",
+                "indexCommand",
+                "mapCommand",
+                "removeCommand",
+                "searchCommand",
+                "readCommand",
+                "serveCommand",
+                "statusCommand"
+              ],
+              "fanIn": 1,
+              "fanOut": 10,
+              "internalEdges": 0
+            }
+          ]
+        },
+        {
+          "name": "config",
+          "path": "src/config",
+          "entryFile": "src/config/index.ts",
+          "files": [
+            "src/config/index.ts"
+          ],
+          "exports": [
+            "RagConfig"
+          ],
+          "fanIn": 10,
+          "fanOut": 2,
+          "internalEdges": 0
+        },
+        {
+          "name": "conversation",
+          "path": "src/conversation",
+          "entryFile": null,
+          "files": [
+            "src/conversation/indexer.ts",
+            "src/conversation/parser.ts"
+          ],
+          "exports": [
+            "JournalEntry",
+            "ContentBlock",
+            "ParsedTurn",
+            "ToolResultInfo",
+            "SessionInfo"
+          ],
+          "fanIn": 4,
+          "fanOut": 2,
+          "internalEdges": 3
+        },
+        {
+          "name": "db",
+          "path": "src/db",
+          "entryFile": "src/db/index.ts",
+          "files": [
+            "src/db/analytics.ts",
+            "src/db/annotations.ts",
+            "src/db/checkpoints.ts",
+            "src/db/conversation.ts",
+            "src/db/files.ts",
+            "src/db/git-history.ts",
+            "src/db/graph.ts",
+            "src/db/index.ts",
+            "src/db/search.ts",
+            "src/db/types.ts"
+          ],
+          "exports": [
+            "logQuery",
+            "getAnalytics",
+            "getAnalyticsTrend",
+            "getAnnotations",
+            "searchAnnotations",
+            "deleteAnnotation",
+            "createCheckpoint",
+            "listCheckpoints",
+            "searchCheckpoints",
+            "getCheckpoint",
+            "upsertSession",
+            "getSession",
+            "updateSessionStats",
+            "insertTurn",
+            "getTurnCount",
+            "searchConversation",
+            "textSearchConversation",
+            "getFileByPath",
+            "upsertFileStart",
+            "insertChunkBatch",
+            "upsertFile",
+            "removeFile",
+            "pruneDeleted",
+            "getAllFilePaths",
+            "getStatus",
+            "GitCommitInsert",
+            "insertCommitBatch",
+            "getLastIndexedCommit",
+            "hasCommit",
+            "searchGitCommits",
+            "textSearchGitCommits",
+            "getFileHistory",
+            "getGitHistoryStatus",
+            "upsertFileGraph",
+            "resolveImport",
+            "getUnresolvedImports",
+            "getGraph",
+            "getSubgraph",
+            "getImportsForFile",
+            "getImportersOf",
+            "RagDB",
+            "vectorSearch",
+            "textSearch",
+            "vectorSearchChunks",
+            "textSearchChunks",
+            "StoredChunk",
+            "StoredFile",
+            "SearchResult",
+            "ChunkSearchResult",
+            "UsageResult",
+            "AnnotationRow",
+            "SymbolResult",
+            "CheckpointRow",
+            "GitCommitRow",
+            "GitCommitSearchResult",
+            "ConversationSearchResult"
+          ],
+          "fanIn": 15,
+          "fanOut": 2,
+          "internalEdges": 8
+        },
+        {
+          "name": "embeddings",
+          "path": "src/embeddings",
+          "entryFile": null,
+          "files": [
+            "src/embeddings/embed.ts"
+          ],
+          "exports": [
+            "getEmbedder",
+            "embed",
+            "embedBatch",
+            "getTokenizer",
+            "mergeEmbeddings",
+            "EMBEDDING_DIM",
+            "DEFAULT_MODEL_ID",
+            "DEFAULT_EMBEDDING_DIM"
+          ],
+          "fanIn": 17,
+          "fanOut": 0,
+          "internalEdges": 0
+        },
+        {
+          "name": "git",
+          "path": "src/git",
+          "entryFile": null,
+          "files": [
+            "src/git/indexer.ts"
+          ],
+          "exports": [
+            "GitIndexResult"
+          ],
+          "fanIn": 2,
+          "fanOut": 2,
+          "internalEdges": 0
+        },
+        {
+          "name": "graph",
+          "path": "src/graph",
+          "entryFile": null,
+          "files": [
+            "src/graph/resolver.ts"
+          ],
+          "exports": [
+            "buildIdToPathMap",
+            "GraphOptions"
+          ],
+          "fanIn": 8,
+          "fanOut": 1,
+          "internalEdges": 0
+        },
+        {
+          "name": "indexing",
+          "path": "src/indexing",
+          "entryFile": null,
+          "files": [
+            "src/indexing/chunker.ts",
+            "src/indexing/indexer.ts",
+            "src/indexing/parse.ts",
+            "src/indexing/watcher.ts"
+          ],
+          "exports": [
+            "Chunk",
+            "ChunkTextResult",
+            "IndexResult",
+            "ParsedFile",
+            "parseFile",
+            "Watcher",
+            "startWatcher"
+          ],
+          "fanIn": 9,
+          "fanOut": 4,
+          "internalEdges": 4
+        },
+        {
+          "name": "search",
+          "path": "src/search",
+          "entryFile": null,
+          "files": [
+            "src/search/benchmark.ts",
+            "src/search/eval.ts",
+            "src/search/hybrid.ts",
+            "src/search/usages.ts"
+          ],
+          "exports": [
+            "BenchmarkQuery",
+            "BenchmarkResult",
+            "BenchmarkSummary",
+            "loadBenchmarkQueries",
+            "runBenchmark",
+            "formatBenchmarkReport",
+            "EvalTask",
+            "EvalTrace",
+            "EvalSummary",
+            "loadEvalTasks",
+            "runEval",
+            "formatEvalReport",
+            "saveEvalTraces",
+            "DedupedResult",
+            "ChunkResult",
+            "escapeRegex"
+          ],
+          "fanIn": 5,
+          "fanOut": 4,
+          "internalEdges": 2
+        },
+        {
+          "name": "server",
+          "path": "src/server",
+          "entryFile": "src/server/index.ts",
+          "files": [
+            "src/server/index.ts"
+          ],
+          "exports": [
+            "startServer"
+          ],
+          "fanIn": 0,
+          "fanOut": 7,
+          "internalEdges": 0
+        },
+        {
+          "name": "tools",
+          "path": "src/tools",
+          "entryFile": "src/tools/index.ts",
+          "files": [
+            "src/tools/analytics-tools.ts",
+            "src/tools/annotation-tools.ts",
+            "src/tools/checkpoint-tools.ts",
+            "src/tools/conversation-tools.ts",
+            "src/tools/git-history-tools.ts",
+            "src/tools/git-tools.ts",
+            "src/tools/graph-tools.ts",
+            "src/tools/index-tools.ts",
+            "src/tools/index.ts",
+            "src/tools/search.ts",
+            "src/tools/server-info-tools.ts",
+            "src/tools/wiki-tools.ts"
+          ],
+          "exports": [
+            "registerAnalyticsTools",
+            "GetDB",
+            "WriteStatus",
+            "registerAllTools",
+            "ConnectedDBInfo"
+          ],
+          "fanIn": 1,
+          "fanOut": 9,
+          "internalEdges": 22
+        },
+        {
+          "name": "utils",
+          "path": "src/utils",
+          "entryFile": null,
+          "files": [
+            "src/utils/dir-guard.ts",
+            "src/utils/log.ts"
+          ],
+          "exports": [
+            "DirCheckResult",
+            "log",
+            "cli"
+          ],
+          "fanIn": 8,
+          "fanOut": 0,
+          "internalEdges": 0
+        },
+        {
+          "name": "wiki",
+          "path": "src/wiki",
+          "entryFile": "src/wiki/index.ts",
+          "files": [
+            "src/wiki/categorization.ts",
+            "src/wiki/content-prefetch.ts",
+            "src/wiki/discovery.ts",
+            "src/wiki/index.ts",
+            "src/wiki/page-payload.ts",
+            "src/wiki/page-tree.ts",
+            "src/wiki/section-selector.ts",
+            "src/wiki/types.ts"
+          ],
+          "exports": [
+            "runDiscovery",
+            "runCategorization",
+            "buildPageTree",
+            "prefetchContent",
+            "buildPagePayload",
+            "CandidateSection",
+            "SelectionContext",
+            "FileLevelNode",
+            "FileLevelEdge",
+            "FileLevelGraph",
+            "DirectoryEntry",
+            "DirectoryEdge",
+            "DirectoryLevelGraph",
+            "DiscoveryModule",
+            "DiscoveryResult",
+            "SymbolTier",
+            "Scope",
+            "ClassifiedSymbol",
+            "HubPath",
+            "ClassifiedFile",
+            "ClassifiedModule",
+            "ClassifiedInventory",
+            "PageDepth",
+            "ManifestPage",
+            "PageManifest",
+            "PageContentCache",
+            "ContentCache",
+            "SemanticQuery",
+            "ToolBreadcrumb",
+            "CandidateSection",
+            "PagePayload",
+            "WikiPlanResult"
+          ],
+          "fanIn": 2,
+          "fanOut": 2,
+          "internalEdges": 46,
+          "children": [
+            {
+              "name": "exemplars",
+              "path": "src/wiki/exemplars",
+              "entryFile": "src/wiki/exemplars/index.md",
+              "files": [
+                "src/wiki/exemplars/architecture.md",
+                "src/wiki/exemplars/conventions.md",
+                "src/wiki/exemplars/data-flows.md",
+                "src/wiki/exemplars/getting-started.md",
+                "src/wiki/exemplars/index.md",
+                "src/wiki/exemplars/testing.md"
+              ],
+              "exports": [],
+              "fanIn": 0,
+              "fanOut": 0,
+              "internalEdges": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "tests",
+      "path": "tests",
+      "entryFile": null,
+      "files": [
+        "tests/helpers.ts"
+      ],
+      "exports": [
+        "createTempDir",
+        "cleanupTempDir",
+        "writeFixture"
+      ],
+      "fanIn": 11,
+      "fanOut": 0,
+      "internalEdges": 0
+    }
+  ],
+  "graphData": {
+    "fileLevel": {
+      "level": "file",
+      "nodes": [
+        {
+          "path": ".claude-plugin/skills/mimirs/SKILL.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": ".claude-plugin/skills/wiki/SKILL.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": ".claude/projects/-Users-winci-repos-claude-skills-local-rag/memory/MEMORY.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": ".claude/projects/-Users-winci-repos-claude-skills-local-rag/memory/feedback_use_bun.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": ".claude/projects/-Users-winci-repos-claude-skills-local-rag/memory/project_plugin_cr.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "BENCHMARKS.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "CHANGELOG.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "CLAUDE.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "README.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "benchmarks/ast-truncation-analysis.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 7,
+          "isEntryPoint": true
+        },
+        {
+          "path": "benchmarks/collect-files-bench.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "benchmarks/count-grouping-sim.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 4,
+          "isEntryPoint": true
+        },
+        {
+          "path": "benchmarks/excalidraw-parent-bench.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 5,
+          "isEntryPoint": true
+        },
+        {
+          "path": "benchmarks/indexing-bench-v2.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 9,
+          "isEntryPoint": true
+        },
+        {
+          "path": "benchmarks/indexing-bench.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 13,
+          "isEntryPoint": true
+        },
+        {
+          "path": "benchmarks/large-json.bench.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 8,
+          "isEntryPoint": true
+        },
+        {
+          "path": "benchmarks/parent-promotion-bench.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 4,
+          "isEntryPoint": true
+        },
+        {
+          "path": "benchmarks/quality-bench-worker.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 11,
+          "isEntryPoint": true
+        },
+        {
+          "path": "benchmarks/quality-bench.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "benchmarks/subchunk-impact.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 11,
+          "isEntryPoint": true
+        },
+        {
+          "path": "docs/configuration.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "docs/tools.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "hooks/scripts/reindex-file.sh",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "hooks/scripts/session-end.sh",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "hooks/scripts/session-start.sh",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "scripts/bump-version.sh",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "skills/mimirs/SKILL.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "skills/wiki/SKILL.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/cli/commands/analytics.ts",
+          "exports": [
+            {
+              "name": "analyticsCommand",
+              "type": "function"
+            }
+          ],
+          "fanIn": 1,
+          "fanOut": 2,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/cli/commands/annotations.ts",
+          "exports": [
+            {
+              "name": "annotationsCommand",
+              "type": "function"
+            }
+          ],
+          "fanIn": 1,
+          "fanOut": 2,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/cli/commands/benchmark-models.ts",
+          "exports": [],
+          "fanIn": 1,
+          "fanOut": 11,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/cli/commands/benchmark.ts",
+          "exports": [
+            {
+              "name": "benchmarkCommand",
+              "type": "function"
+            }
+          ],
+          "fanIn": 1,
+          "fanOut": 6,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/cli/commands/checkpoint.ts",
+          "exports": [],
+          "fanIn": 1,
+          "fanOut": 4,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/cli/commands/cleanup.ts",
+          "exports": [
+            {
+              "name": "cleanupCommand",
+              "type": "function"
+            }
+          ],
+          "fanIn": 1,
+          "fanOut": 2,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/cli/commands/conversation.ts",
+          "exports": [],
+          "fanIn": 1,
+          "fanOut": 6,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/cli/commands/demo.ts",
+          "exports": [],
+          "fanIn": 1,
+          "fanOut": 7,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/cli/commands/doctor.ts",
+          "exports": [],
+          "fanIn": 1,
+          "fanOut": 1,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/cli/commands/eval.ts",
+          "exports": [
+            {
+              "name": "evalCommand",
+              "type": "function"
+            }
+          ],
+          "fanIn": 1,
+          "fanOut": 7,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/cli/commands/history.ts",
+          "exports": [
+            {
+              "name": "historyCommand",
+              "type": "function"
+            }
+          ],
+          "fanIn": 1,
+          "fanOut": 8,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/cli/commands/index-cmd.ts",
+          "exports": [
+            {
+              "name": "indexCommand",
+              "type": "function"
+            }
+          ],
+          "fanIn": 1,
+          "fanOut": 7,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/cli/commands/init.ts",
+          "exports": [],
+          "fanIn": 1,
+          "fanOut": 10,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/cli/commands/map.ts",
+          "exports": [
+            {
+              "name": "mapCommand",
+              "type": "function"
+            }
+          ],
+          "fanIn": 1,
+          "fanOut": 3,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/cli/commands/remove.ts",
+          "exports": [
+            {
+              "name": "removeCommand",
+              "type": "function"
+            }
+          ],
+          "fanIn": 1,
+          "fanOut": 2,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/cli/commands/search-cmd.ts",
+          "exports": [
+            {
+              "name": "searchCommand",
+              "type": "function"
+            },
+            {
+              "name": "readCommand",
+              "type": "function"
+            }
+          ],
+          "fanIn": 2,
+          "fanOut": 6,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/cli/commands/serve.ts",
+          "exports": [
+            {
+              "name": "serveCommand",
+              "type": "function"
+            }
+          ],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/cli/commands/session-context.ts",
+          "exports": [],
+          "fanIn": 1,
+          "fanOut": 2,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/cli/commands/status.ts",
+          "exports": [
+            {
+              "name": "statusCommand",
+              "type": "function"
+            }
+          ],
+          "fanIn": 1,
+          "fanOut": 2,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/cli/index.ts",
+          "exports": [],
+          "fanIn": 1,
+          "fanOut": 20,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/cli/progress.ts",
+          "exports": [
+            {
+              "name": "cliProgress",
+              "type": "function"
+            }
+          ],
+          "fanIn": 7,
+          "fanOut": 1,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/cli/setup.ts",
+          "exports": [
+            {
+              "name": "SetupResult",
+              "type": "interface"
+            },
+            {
+              "name": "ensureConfig",
+              "type": "function"
+            },
+            {
+              "name": "ensureGitignore",
+              "type": "function"
+            },
+            {
+              "name": "KnownIDE",
+              "type": "type"
+            },
+            {
+              "name": "KNOWN_IDES",
+              "type": "variable"
+            },
+            {
+              "name": "unknownIdes",
+              "type": "function"
+            },
+            {
+              "name": "parseIdeFlag",
+              "type": "function"
+            },
+            {
+              "name": "ensureAgentInstructions",
+              "type": "function"
+            },
+            {
+              "name": "mcpConfigSnippet",
+              "type": "function"
+            },
+            {
+              "name": "ensureMcpJson",
+              "type": "function"
+            },
+            {
+              "name": "detectAgentHints",
+              "type": "function"
+            },
+            {
+              "name": "confirm",
+              "type": "function"
+            },
+            {
+              "name": "runSetup",
+              "type": "function"
+            }
+          ],
+          "fanIn": 6,
+          "fanOut": 1,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/config/index.ts",
+          "exports": [
+            {
+              "name": "RagConfig",
+              "type": "type"
+            }
+          ],
+          "fanIn": 40,
+          "fanOut": 4,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/conversation/indexer.ts",
+          "exports": [],
+          "fanIn": 4,
+          "fanOut": 5,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/conversation/parser.ts",
+          "exports": [
+            {
+              "name": "JournalEntry",
+              "type": "interface"
+            },
+            {
+              "name": "ContentBlock",
+              "type": "type"
+            },
+            {
+              "name": "ParsedTurn",
+              "type": "interface"
+            },
+            {
+              "name": "ToolResultInfo",
+              "type": "interface"
+            },
+            {
+              "name": "SessionInfo",
+              "type": "interface"
+            }
+          ],
+          "fanIn": 11,
+          "fanOut": 0,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/db/analytics.ts",
+          "exports": [
+            {
+              "name": "logQuery",
+              "type": "function"
+            },
+            {
+              "name": "getAnalytics",
+              "type": "function"
+            },
+            {
+              "name": "getAnalyticsTrend",
+              "type": "function"
+            }
+          ],
+          "fanIn": 1,
+          "fanOut": 0,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/db/annotations.ts",
+          "exports": [
+            {
+              "name": "getAnnotations",
+              "type": "function"
+            },
+            {
+              "name": "searchAnnotations",
+              "type": "function"
+            },
+            {
+              "name": "deleteAnnotation",
+              "type": "function"
+            }
+          ],
+          "fanIn": 1,
+          "fanOut": 0,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/db/checkpoints.ts",
+          "exports": [
+            {
+              "name": "createCheckpoint",
+              "type": "function"
+            },
+            {
+              "name": "listCheckpoints",
+              "type": "function"
+            },
+            {
+              "name": "searchCheckpoints",
+              "type": "function"
+            },
+            {
+              "name": "getCheckpoint",
+              "type": "function"
+            }
+          ],
+          "fanIn": 1,
+          "fanOut": 0,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/db/conversation.ts",
+          "exports": [
+            {
+              "name": "upsertSession",
+              "type": "function"
+            },
+            {
+              "name": "getSession",
+              "type": "function"
+            },
+            {
+              "name": "updateSessionStats",
+              "type": "function"
+            },
+            {
+              "name": "insertTurn",
+              "type": "function"
+            },
+            {
+              "name": "getTurnCount",
+              "type": "function"
+            },
+            {
+              "name": "searchConversation",
+              "type": "function"
+            },
+            {
+              "name": "textSearchConversation",
+              "type": "function"
+            }
+          ],
+          "fanIn": 1,
+          "fanOut": 1,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/db/files.ts",
+          "exports": [
+            {
+              "name": "getFileByPath",
+              "type": "function"
+            },
+            {
+              "name": "upsertFileStart",
+              "type": "function"
+            },
+            {
+              "name": "insertChunkBatch",
+              "type": "function"
+            },
+            {
+              "name": "upsertFile",
+              "type": "function"
+            },
+            {
+              "name": "removeFile",
+              "type": "function"
+            },
+            {
+              "name": "pruneDeleted",
+              "type": "function"
+            },
+            {
+              "name": "getAllFilePaths",
+              "type": "function"
+            },
+            {
+              "name": "getStatus",
+              "type": "function"
+            }
+          ],
+          "fanIn": 1,
+          "fanOut": 0,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/db/git-history.ts",
+          "exports": [
+            {
+              "name": "GitCommitInsert",
+              "type": "interface"
+            },
+            {
+              "name": "insertCommitBatch",
+              "type": "function"
+            },
+            {
+              "name": "getLastIndexedCommit",
+              "type": "function"
+            },
+            {
+              "name": "hasCommit",
+              "type": "function"
+            },
+            {
+              "name": "searchGitCommits",
+              "type": "function"
+            },
+            {
+              "name": "textSearchGitCommits",
+              "type": "function"
+            },
+            {
+              "name": "getFileHistory",
+              "type": "function"
+            },
+            {
+              "name": "getGitHistoryStatus",
+              "type": "function"
+            }
+          ],
+          "fanIn": 1,
+          "fanOut": 1,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/db/graph.ts",
+          "exports": [
+            {
+              "name": "upsertFileGraph",
+              "type": "function"
+            },
+            {
+              "name": "resolveImport",
+              "type": "function"
+            },
+            {
+              "name": "getUnresolvedImports",
+              "type": "function"
+            },
+            {
+              "name": "getGraph",
+              "type": "function"
+            },
+            {
+              "name": "getSubgraph",
+              "type": "function"
+            },
+            {
+              "name": "getImportsForFile",
+              "type": "function"
+            },
+            {
+              "name": "getImportersOf",
+              "type": "function"
+            }
+          ],
+          "fanIn": 1,
+          "fanOut": 0,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/db/index.ts",
+          "exports": [
+            {
+              "name": "RagDB",
+              "type": "class"
+            }
+          ],
+          "fanIn": 55,
+          "fanOut": 9,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/db/search.ts",
+          "exports": [
+            {
+              "name": "vectorSearch",
+              "type": "function"
+            },
+            {
+              "name": "textSearch",
+              "type": "function"
+            },
+            {
+              "name": "vectorSearchChunks",
+              "type": "function"
+            },
+            {
+              "name": "textSearchChunks",
+              "type": "function"
+            }
+          ],
+          "fanIn": 1,
+          "fanOut": 2,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/db/types.ts",
+          "exports": [
+            {
+              "name": "StoredChunk",
+              "type": "interface"
+            },
+            {
+              "name": "StoredFile",
+              "type": "interface"
+            },
+            {
+              "name": "SearchResult",
+              "type": "interface"
+            },
+            {
+              "name": "ChunkSearchResult",
+              "type": "interface"
+            },
+            {
+              "name": "UsageResult",
+              "type": "interface"
+            },
+            {
+              "name": "AnnotationRow",
+              "type": "interface"
+            },
+            {
+              "name": "SymbolResult",
+              "type": "interface"
+            },
+            {
+              "name": "CheckpointRow",
+              "type": "interface"
+            },
+            {
+              "name": "GitCommitRow",
+              "type": "interface"
+            },
+            {
+              "name": "GitCommitSearchResult",
+              "type": "interface"
+            },
+            {
+              "name": "ConversationSearchResult",
+              "type": "interface"
+            }
+          ],
+          "fanIn": 2,
+          "fanOut": 0,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/embeddings/embed.ts",
+          "exports": [
+            {
+              "name": "getEmbedder",
+              "type": "function"
+            },
+            {
+              "name": "embed",
+              "type": "function"
+            },
+            {
+              "name": "embedBatch",
+              "type": "function"
+            },
+            {
+              "name": "getTokenizer",
+              "type": "function"
+            },
+            {
+              "name": "mergeEmbeddings",
+              "type": "function"
+            },
+            {
+              "name": "EMBEDDING_DIM",
+              "type": "variable"
+            },
+            {
+              "name": "DEFAULT_MODEL_ID",
+              "type": "variable"
+            },
+            {
+              "name": "DEFAULT_EMBEDDING_DIM",
+              "type": "variable"
+            }
+          ],
+          "fanIn": 75,
+          "fanOut": 0,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/git/indexer.ts",
+          "exports": [
+            {
+              "name": "GitIndexResult",
+              "type": "interface"
+            }
+          ],
+          "fanIn": 2,
+          "fanOut": 2,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/graph/resolver.ts",
+          "exports": [
+            {
+              "name": "buildIdToPathMap",
+              "type": "function"
+            },
+            {
+              "name": "GraphOptions",
+              "type": "interface"
+            }
+          ],
+          "fanIn": 17,
+          "fanOut": 1,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/indexing/chunker.ts",
+          "exports": [
+            {
+              "name": "Chunk",
+              "type": "interface"
+            },
+            {
+              "name": "ChunkTextResult",
+              "type": "interface"
+            }
+          ],
+          "fanIn": 17,
+          "fanOut": 1,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/indexing/indexer.ts",
+          "exports": [
+            {
+              "name": "IndexResult",
+              "type": "interface"
+            }
+          ],
+          "fanIn": 17,
+          "fanOut": 10,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/indexing/parse.ts",
+          "exports": [
+            {
+              "name": "ParsedFile",
+              "type": "interface"
+            },
+            {
+              "name": "parseFile",
+              "type": "function"
+            }
+          ],
+          "fanIn": 7,
+          "fanOut": 0,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/indexing/watcher.ts",
+          "exports": [
+            {
+              "name": "Watcher",
+              "type": "interface"
+            },
+            {
+              "name": "startWatcher",
+              "type": "function"
+            }
+          ],
+          "fanIn": 2,
+          "fanOut": 4,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/main.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 1,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/search/benchmark.ts",
+          "exports": [
+            {
+              "name": "BenchmarkQuery",
+              "type": "interface"
+            },
+            {
+              "name": "BenchmarkResult",
+              "type": "interface"
+            },
+            {
+              "name": "BenchmarkSummary",
+              "type": "interface"
+            },
+            {
+              "name": "loadBenchmarkQueries",
+              "type": "function"
+            },
+            {
+              "name": "runBenchmark",
+              "type": "function"
+            },
+            {
+              "name": "formatBenchmarkReport",
+              "type": "function"
+            }
+          ],
+          "fanIn": 12,
+          "fanOut": 3,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/search/eval.ts",
+          "exports": [
+            {
+              "name": "EvalTask",
+              "type": "interface"
+            },
+            {
+              "name": "EvalTrace",
+              "type": "interface"
+            },
+            {
+              "name": "EvalSummary",
+              "type": "interface"
+            },
+            {
+              "name": "loadEvalTasks",
+              "type": "function"
+            },
+            {
+              "name": "runEval",
+              "type": "function"
+            },
+            {
+              "name": "formatEvalReport",
+              "type": "function"
+            },
+            {
+              "name": "saveEvalTraces",
+              "type": "function"
+            }
+          ],
+          "fanIn": 8,
+          "fanOut": 3,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/search/hybrid.ts",
+          "exports": [
+            {
+              "name": "DedupedResult",
+              "type": "interface"
+            },
+            {
+              "name": "ChunkResult",
+              "type": "interface"
+            }
+          ],
+          "fanIn": 18,
+          "fanOut": 3,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/search/usages.ts",
+          "exports": [
+            {
+              "name": "escapeRegex",
+              "type": "function"
+            }
+          ],
+          "fanIn": 4,
+          "fanOut": 0,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/server/index.ts",
+          "exports": [
+            {
+              "name": "startServer",
+              "type": "function"
+            }
+          ],
+          "fanIn": 0,
+          "fanOut": 11,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/tools/analytics-tools.ts",
+          "exports": [
+            {
+              "name": "registerAnalyticsTools",
+              "type": "function"
+            }
+          ],
+          "fanIn": 1,
+          "fanOut": 1,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/tools/annotation-tools.ts",
+          "exports": [],
+          "fanIn": 1,
+          "fanOut": 2,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/tools/checkpoint-tools.ts",
+          "exports": [],
+          "fanIn": 1,
+          "fanOut": 3,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/tools/conversation-tools.ts",
+          "exports": [],
+          "fanIn": 1,
+          "fanOut": 3,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/tools/git-history-tools.ts",
+          "exports": [],
+          "fanIn": 1,
+          "fanOut": 2,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/tools/git-tools.ts",
+          "exports": [],
+          "fanIn": 1,
+          "fanOut": 1,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/tools/graph-tools.ts",
+          "exports": [],
+          "fanIn": 1,
+          "fanOut": 2,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/tools/index-tools.ts",
+          "exports": [],
+          "fanIn": 1,
+          "fanOut": 2,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/tools/index.ts",
+          "exports": [
+            {
+              "name": "GetDB",
+              "type": "type"
+            },
+            {
+              "name": "WriteStatus",
+              "type": "type"
+            },
+            {
+              "name": "registerAllTools",
+              "type": "function"
+            }
+          ],
+          "fanIn": 12,
+          "fanOut": 14,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/tools/search.ts",
+          "exports": [],
+          "fanIn": 1,
+          "fanOut": 3,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/tools/server-info-tools.ts",
+          "exports": [
+            {
+              "name": "ConnectedDBInfo",
+              "type": "interface"
+            }
+          ],
+          "fanIn": 1,
+          "fanOut": 3,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/tools/wiki-tools.ts",
+          "exports": [],
+          "fanIn": 1,
+          "fanOut": 7,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/types.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/utils/dir-guard.ts",
+          "exports": [
+            {
+              "name": "DirCheckResult",
+              "type": "interface"
+            }
+          ],
+          "fanIn": 2,
+          "fanOut": 0,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/utils/log.ts",
+          "exports": [
+            {
+              "name": "log",
+              "type": "variable"
+            },
+            {
+              "name": "cli",
+              "type": "variable"
+            }
+          ],
+          "fanIn": 27,
+          "fanOut": 0,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/wiki/categorization.ts",
+          "exports": [],
+          "fanIn": 2,
+          "fanOut": 11,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/wiki/content-prefetch.ts",
+          "exports": [],
+          "fanIn": 1,
+          "fanOut": 8,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/wiki/discovery.ts",
+          "exports": [],
+          "fanIn": 3,
+          "fanOut": 2,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/wiki/exemplars/architecture.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/wiki/exemplars/conventions.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/wiki/exemplars/data-flows.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/wiki/exemplars/getting-started.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/wiki/exemplars/index.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/wiki/exemplars/testing.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/wiki/index.ts",
+          "exports": [
+            {
+              "name": "runDiscovery",
+              "type": "variable"
+            },
+            {
+              "name": "runCategorization",
+              "type": "variable"
+            },
+            {
+              "name": "buildPageTree",
+              "type": "variable"
+            },
+            {
+              "name": "prefetchContent",
+              "type": "variable"
+            },
+            {
+              "name": "buildPagePayload",
+              "type": "variable"
+            }
+          ],
+          "fanIn": 2,
+          "fanOut": 11,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/wiki/page-payload.ts",
+          "exports": [],
+          "fanIn": 1,
+          "fanOut": 10,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/wiki/page-tree.ts",
+          "exports": [],
+          "fanIn": 2,
+          "fanOut": 8,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/wiki/section-selector.ts",
+          "exports": [
+            {
+              "name": "CandidateSection",
+              "type": "interface"
+            },
+            {
+              "name": "SelectionContext",
+              "type": "interface"
+            }
+          ],
+          "fanIn": 4,
+          "fanOut": 3,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/wiki/sections/configuration.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/wiki/sections/cross-cutting-inventory.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/wiki/sections/dependency-graph.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/wiki/sections/dependency-table.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/wiki/sections/entry-points.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/wiki/sections/how-it-works-sequence.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/wiki/sections/hub-analysis.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/wiki/sections/internals.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/wiki/sections/key-exports-table.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/wiki/sections/known-issues.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/wiki/sections/module-inventory.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/wiki/sections/overview.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/wiki/sections/per-file-breakdown.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/wiki/sections/public-api.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/wiki/sections/see-also.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/wiki/sections/test-structure.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/wiki/sections/usage-examples.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "src/wiki/types.ts",
+          "exports": [
+            {
+              "name": "FileLevelNode",
+              "type": "interface"
+            },
+            {
+              "name": "FileLevelEdge",
+              "type": "interface"
+            },
+            {
+              "name": "FileLevelGraph",
+              "type": "interface"
+            },
+            {
+              "name": "DirectoryEntry",
+              "type": "interface"
+            },
+            {
+              "name": "DirectoryEdge",
+              "type": "interface"
+            },
+            {
+              "name": "DirectoryLevelGraph",
+              "type": "interface"
+            },
+            {
+              "name": "DiscoveryModule",
+              "type": "interface"
+            },
+            {
+              "name": "DiscoveryResult",
+              "type": "interface"
+            },
+            {
+              "name": "SymbolTier",
+              "type": "type"
+            },
+            {
+              "name": "Scope",
+              "type": "type"
+            },
+            {
+              "name": "ClassifiedSymbol",
+              "type": "interface"
+            },
+            {
+              "name": "HubPath",
+              "type": "type"
+            },
+            {
+              "name": "ClassifiedFile",
+              "type": "interface"
+            },
+            {
+              "name": "ClassifiedModule",
+              "type": "interface"
+            },
+            {
+              "name": "ClassifiedInventory",
+              "type": "interface"
+            },
+            {
+              "name": "PageDepth",
+              "type": "type"
+            },
+            {
+              "name": "ManifestPage",
+              "type": "interface"
+            },
+            {
+              "name": "PageManifest",
+              "type": "interface"
+            },
+            {
+              "name": "PageContentCache",
+              "type": "interface"
+            },
+            {
+              "name": "ContentCache",
+              "type": "type"
+            },
+            {
+              "name": "SemanticQuery",
+              "type": "interface"
+            },
+            {
+              "name": "ToolBreadcrumb",
+              "type": "interface"
+            },
+            {
+              "name": "CandidateSection",
+              "type": "interface"
+            },
+            {
+              "name": "PagePayload",
+              "type": "interface"
+            },
+            {
+              "name": "WikiPlanResult",
+              "type": "interface"
+            }
+          ],
+          "fanIn": 50,
+          "fanOut": 1,
+          "isEntryPoint": false
+        },
+        {
+          "path": "tests/cli/cli.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 3,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/config/config.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 3,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/conversation/conversation-index.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 8,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/conversation/conversation.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 3,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/db/db.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 5,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/embeddings/embed.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 5,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/features/annotations.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 5,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/features/checkpoint.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 5,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/features/git-context.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 3,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/features/git-history.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 7,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/fixtures/frontmatter-only.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/fixtures/large.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/fixtures/no-frontmatter.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/fixtures/sample.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/fixtures/sample.ts",
+          "exports": [
+            {
+              "name": "createConnection",
+              "type": "function"
+            },
+            {
+              "name": "runQuery",
+              "type": "function"
+            }
+          ],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/fixtures/sample.txt",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/graph/graph.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 9,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/helpers.ts",
+          "exports": [
+            {
+              "name": "createTempDir",
+              "type": "function"
+            },
+            {
+              "name": "cleanupTempDir",
+              "type": "function"
+            },
+            {
+              "name": "writeFixture",
+              "type": "function"
+            }
+          ],
+          "fanIn": 65,
+          "fanOut": 0,
+          "isEntryPoint": false
+        },
+        {
+          "path": "tests/indexing/chunker.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 1,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/indexing/indexer.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 7,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/indexing/line-numbers.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 8,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/indexing/parse.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 1,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/indexing/watcher.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 8,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/search/analytics.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 3,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/search/benchmark.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 9,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/search/eval.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 9,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/search/find-usages.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 5,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/search/fts-special-chars.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 10,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/search/hybrid-search.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 6,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/search/read-relevant.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 6,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/search/search-symbols.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 7,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/search/search.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 6,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/tools/server.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 3,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/tools/wiki-tools.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 3,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/wiki/categorization.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 9,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/wiki/discovery.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 7,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/wiki/page-tree.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 7,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/wiki/section-selector.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 3,
+          "isEntryPoint": true
+        }
+      ],
+      "edges": [
+        {
+          "from": "src/main.ts",
+          "to": "src/cli/index.ts",
+          "source": "./cli"
+        },
+        {
+          "from": "tests/tools/server.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/tools/server.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/tools/server.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "benchmarks/subchunk-impact.ts",
+          "to": "src/db/index.ts",
+          "source": "../src/db"
+        },
+        {
+          "from": "benchmarks/subchunk-impact.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/subchunk-impact.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/subchunk-impact.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../src/indexing/indexer"
+        },
+        {
+          "from": "benchmarks/subchunk-impact.ts",
+          "to": "src/search/benchmark.ts",
+          "source": "../src/search/benchmark"
+        },
+        {
+          "from": "benchmarks/subchunk-impact.ts",
+          "to": "src/search/benchmark.ts",
+          "source": "../src/search/benchmark"
+        },
+        {
+          "from": "benchmarks/subchunk-impact.ts",
+          "to": "src/search/benchmark.ts",
+          "source": "../src/search/benchmark"
+        },
+        {
+          "from": "benchmarks/subchunk-impact.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../src/indexing/chunker"
+        },
+        {
+          "from": "benchmarks/subchunk-impact.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../src/indexing/chunker"
+        },
+        {
+          "from": "benchmarks/subchunk-impact.ts",
+          "to": "src/indexing/parse.ts",
+          "source": "../src/indexing/parse"
+        },
+        {
+          "from": "benchmarks/subchunk-impact.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../src/graph/resolver"
+        },
+        {
+          "from": "benchmarks/indexing-bench-v2.ts",
+          "to": "src/db/index.ts",
+          "source": "../src/db"
+        },
+        {
+          "from": "benchmarks/indexing-bench-v2.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/indexing-bench-v2.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/indexing-bench-v2.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/indexing-bench-v2.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/indexing-bench-v2.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../src/indexing/chunker"
+        },
+        {
+          "from": "benchmarks/indexing-bench-v2.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../src/indexing/chunker"
+        },
+        {
+          "from": "benchmarks/indexing-bench-v2.ts",
+          "to": "src/indexing/parse.ts",
+          "source": "../src/indexing/parse"
+        },
+        {
+          "from": "benchmarks/indexing-bench-v2.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../src/graph/resolver"
+        },
+        {
+          "from": "benchmarks/parent-promotion-bench.ts",
+          "to": "src/db/index.ts",
+          "source": "../src/db"
+        },
+        {
+          "from": "benchmarks/parent-promotion-bench.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/parent-promotion-bench.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/parent-promotion-bench.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../src/search/hybrid"
+        },
+        {
+          "from": "benchmarks/large-json.bench.test.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../src/indexing/indexer"
+        },
+        {
+          "from": "benchmarks/large-json.bench.test.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../src/indexing/indexer"
+        },
+        {
+          "from": "benchmarks/large-json.bench.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../src/db"
+        },
+        {
+          "from": "benchmarks/large-json.bench.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/large-json.bench.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../tests/helpers"
+        },
+        {
+          "from": "benchmarks/large-json.bench.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../tests/helpers"
+        },
+        {
+          "from": "benchmarks/large-json.bench.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../tests/helpers"
+        },
+        {
+          "from": "benchmarks/large-json.bench.test.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/excalidraw-parent-bench.ts",
+          "to": "src/db/index.ts",
+          "source": "../src/db"
+        },
+        {
+          "from": "benchmarks/excalidraw-parent-bench.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/excalidraw-parent-bench.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/excalidraw-parent-bench.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../src/indexing/indexer"
+        },
+        {
+          "from": "benchmarks/excalidraw-parent-bench.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../src/search/hybrid"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/db/index.ts",
+          "source": "../src/db"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../src/indexing/indexer"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../src/indexing/chunker"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../src/indexing/chunker"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/indexing/parse.ts",
+          "source": "../src/indexing/parse"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../src/graph/resolver"
+        },
+        {
+          "from": "benchmarks/ast-truncation-analysis.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../src/indexing/chunker"
+        },
+        {
+          "from": "benchmarks/ast-truncation-analysis.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../src/indexing/chunker"
+        },
+        {
+          "from": "benchmarks/ast-truncation-analysis.ts",
+          "to": "src/indexing/parse.ts",
+          "source": "../src/indexing/parse"
+        },
+        {
+          "from": "benchmarks/ast-truncation-analysis.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/ast-truncation-analysis.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/ast-truncation-analysis.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/ast-truncation-analysis.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/quality-bench-worker.ts",
+          "to": "src/db/index.ts",
+          "source": "../src/db"
+        },
+        {
+          "from": "benchmarks/quality-bench-worker.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/quality-bench-worker.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/quality-bench-worker.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/quality-bench-worker.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../src/indexing/chunker"
+        },
+        {
+          "from": "benchmarks/quality-bench-worker.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../src/indexing/chunker"
+        },
+        {
+          "from": "benchmarks/quality-bench-worker.ts",
+          "to": "src/indexing/parse.ts",
+          "source": "../src/indexing/parse"
+        },
+        {
+          "from": "benchmarks/quality-bench-worker.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../src/graph/resolver"
+        },
+        {
+          "from": "benchmarks/quality-bench-worker.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../src/search/hybrid"
+        },
+        {
+          "from": "benchmarks/quality-bench-worker.ts",
+          "to": "src/search/benchmark.ts",
+          "source": "../src/search/benchmark"
+        },
+        {
+          "from": "benchmarks/quality-bench-worker.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../src/search/hybrid"
+        },
+        {
+          "from": "benchmarks/count-grouping-sim.ts",
+          "to": "src/db/index.ts",
+          "source": "../src/db"
+        },
+        {
+          "from": "benchmarks/count-grouping-sim.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/count-grouping-sim.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/count-grouping-sim.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../src/search/hybrid"
+        },
+        {
+          "from": "tests/cli/cli.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/cli/cli.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/cli/cli.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/graph/graph.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/graph/graph.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/graph/graph.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/graph/graph.test.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../../src/indexing/chunker"
+        },
+        {
+          "from": "tests/graph/graph.test.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../../src/graph/resolver"
+        },
+        {
+          "from": "tests/graph/graph.test.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../../src/graph/resolver"
+        },
+        {
+          "from": "tests/graph/graph.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/graph/graph.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/graph/graph.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/conversation/conversation-index.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/conversation/conversation-index.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/conversation/conversation-index.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/conversation/conversation-index.test.ts",
+          "to": "src/conversation/indexer.ts",
+          "source": "../../src/conversation/indexer"
+        },
+        {
+          "from": "tests/conversation/conversation-index.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/conversation/conversation-index.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/conversation/conversation-index.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/conversation/conversation-index.test.ts",
+          "to": "src/conversation/parser.ts",
+          "source": "../../src/conversation/parser"
+        },
+        {
+          "from": "tests/conversation/conversation.test.ts",
+          "to": "src/conversation/parser.ts",
+          "source": "../../src/conversation/parser"
+        },
+        {
+          "from": "tests/conversation/conversation.test.ts",
+          "to": "src/conversation/parser.ts",
+          "source": "../../src/conversation/parser"
+        },
+        {
+          "from": "tests/conversation/conversation.test.ts",
+          "to": "src/conversation/parser.ts",
+          "source": "../../src/conversation/parser"
+        },
+        {
+          "from": "src/cli/progress.ts",
+          "to": "src/utils/log.ts",
+          "source": "../utils/log"
+        },
+        {
+          "from": "src/cli/setup.ts",
+          "to": "src/config/index.ts",
+          "source": "../config"
+        },
+        {
+          "from": "src/cli/index.ts",
+          "to": "src/cli/commands/init.ts",
+          "source": "./commands/init"
+        },
+        {
+          "from": "src/cli/index.ts",
+          "to": "src/cli/commands/index-cmd.ts",
+          "source": "./commands/index-cmd"
+        },
+        {
+          "from": "src/cli/index.ts",
+          "to": "src/cli/commands/search-cmd.ts",
+          "source": "./commands/search-cmd"
+        },
+        {
+          "from": "src/cli/index.ts",
+          "to": "src/cli/commands/search-cmd.ts",
+          "source": "./commands/search-cmd"
+        },
+        {
+          "from": "src/cli/index.ts",
+          "to": "src/cli/commands/status.ts",
+          "source": "./commands/status"
+        },
+        {
+          "from": "src/cli/index.ts",
+          "to": "src/cli/commands/remove.ts",
+          "source": "./commands/remove"
+        },
+        {
+          "from": "src/cli/index.ts",
+          "to": "src/cli/commands/analytics.ts",
+          "source": "./commands/analytics"
+        },
+        {
+          "from": "src/cli/index.ts",
+          "to": "src/cli/commands/map.ts",
+          "source": "./commands/map"
+        },
+        {
+          "from": "src/cli/index.ts",
+          "to": "src/cli/commands/benchmark.ts",
+          "source": "./commands/benchmark"
+        },
+        {
+          "from": "src/cli/index.ts",
+          "to": "src/cli/commands/benchmark-models.ts",
+          "source": "./commands/benchmark-models"
+        },
+        {
+          "from": "src/cli/index.ts",
+          "to": "src/cli/commands/eval.ts",
+          "source": "./commands/eval"
+        },
+        {
+          "from": "src/cli/index.ts",
+          "to": "src/cli/commands/conversation.ts",
+          "source": "./commands/conversation"
+        },
+        {
+          "from": "src/cli/index.ts",
+          "to": "src/cli/commands/checkpoint.ts",
+          "source": "./commands/checkpoint"
+        },
+        {
+          "from": "src/cli/index.ts",
+          "to": "src/cli/commands/annotations.ts",
+          "source": "./commands/annotations"
+        },
+        {
+          "from": "src/cli/index.ts",
+          "to": "src/cli/commands/session-context.ts",
+          "source": "./commands/session-context"
+        },
+        {
+          "from": "src/cli/index.ts",
+          "to": "src/cli/commands/history.ts",
+          "source": "./commands/history"
+        },
+        {
+          "from": "src/cli/index.ts",
+          "to": "src/cli/commands/demo.ts",
+          "source": "./commands/demo"
+        },
+        {
+          "from": "src/cli/index.ts",
+          "to": "src/cli/commands/doctor.ts",
+          "source": "./commands/doctor"
+        },
+        {
+          "from": "src/cli/index.ts",
+          "to": "src/cli/commands/cleanup.ts",
+          "source": "./commands/cleanup"
+        },
+        {
+          "from": "src/cli/index.ts",
+          "to": "src/utils/log.ts",
+          "source": "../utils/log"
+        },
+        {
+          "from": "src/conversation/indexer.ts",
+          "to": "src/conversation/parser.ts",
+          "source": "./parser"
+        },
+        {
+          "from": "src/conversation/indexer.ts",
+          "to": "src/conversation/parser.ts",
+          "source": "./parser"
+        },
+        {
+          "from": "src/conversation/indexer.ts",
+          "to": "src/conversation/parser.ts",
+          "source": "./parser"
+        },
+        {
+          "from": "src/conversation/indexer.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../indexing/chunker"
+        },
+        {
+          "from": "src/conversation/indexer.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/tools/checkpoint-tools.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/tools/checkpoint-tools.ts",
+          "to": "src/conversation/parser.ts",
+          "source": "../conversation/parser"
+        },
+        {
+          "from": "src/tools/checkpoint-tools.ts",
+          "to": "src/tools/index.ts",
+          "source": "./index"
+        },
+        {
+          "from": "src/tools/search.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../search/hybrid"
+        },
+        {
+          "from": "src/tools/search.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../search/hybrid"
+        },
+        {
+          "from": "src/tools/search.ts",
+          "to": "src/tools/index.ts",
+          "source": "./index"
+        },
+        {
+          "from": "src/tools/git-tools.ts",
+          "to": "src/tools/index.ts",
+          "source": "./index"
+        },
+        {
+          "from": "src/tools/conversation-tools.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/tools/conversation-tools.ts",
+          "to": "src/utils/log.ts",
+          "source": "../utils/log"
+        },
+        {
+          "from": "src/tools/conversation-tools.ts",
+          "to": "src/tools/index.ts",
+          "source": "./index"
+        },
+        {
+          "from": "src/tools/analytics-tools.ts",
+          "to": "src/tools/index.ts",
+          "source": "./index"
+        },
+        {
+          "from": "src/tools/git-history-tools.ts",
+          "to": "src/tools/index.ts",
+          "source": "./index"
+        },
+        {
+          "from": "src/tools/git-history-tools.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/db/index.ts",
+          "source": "../db"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/config/index.ts",
+          "source": "../config"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/config/index.ts",
+          "source": "../config"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/tools/search.ts",
+          "source": "./search"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/tools/index-tools.ts",
+          "source": "./index-tools"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/tools/graph-tools.ts",
+          "source": "./graph-tools"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/tools/conversation-tools.ts",
+          "source": "./conversation-tools"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/tools/checkpoint-tools.ts",
+          "source": "./checkpoint-tools"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/tools/annotation-tools.ts",
+          "source": "./annotation-tools"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/tools/analytics-tools.ts",
+          "source": "./analytics-tools"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/tools/git-tools.ts",
+          "source": "./git-tools"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/tools/git-history-tools.ts",
+          "source": "./git-history-tools"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/tools/server-info-tools.ts",
+          "source": "./server-info-tools"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/tools/wiki-tools.ts",
+          "source": "./wiki-tools"
+        },
+        {
+          "from": "src/tools/annotation-tools.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/tools/annotation-tools.ts",
+          "to": "src/tools/index.ts",
+          "source": "./index"
+        },
+        {
+          "from": "src/tools/server-info-tools.ts",
+          "to": "src/tools/index.ts",
+          "source": "./index"
+        },
+        {
+          "from": "src/tools/server-info-tools.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/tools/server-info-tools.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/tools/index-tools.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../indexing/indexer"
+        },
+        {
+          "from": "src/tools/index-tools.ts",
+          "to": "src/tools/index.ts",
+          "source": "./index"
+        },
+        {
+          "from": "src/tools/graph-tools.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../graph/resolver"
+        },
+        {
+          "from": "src/tools/graph-tools.ts",
+          "to": "src/tools/index.ts",
+          "source": "./index"
+        },
+        {
+          "from": "src/git/indexer.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/git/indexer.ts",
+          "to": "src/utils/log.ts",
+          "source": "../utils/log"
+        },
+        {
+          "from": "tests/db/db.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/db/db.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/db/db.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/db/db.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/db/db.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/features/git-context.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/features/git-context.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/features/git-context.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/features/checkpoint.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/features/checkpoint.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/features/checkpoint.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/features/checkpoint.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/features/checkpoint.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/features/annotations.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/features/annotations.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/features/annotations.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/features/annotations.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/features/annotations.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/features/git-history.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/features/git-history.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/features/git-history.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/features/git-history.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/features/git-history.test.ts",
+          "to": "src/git/indexer.ts",
+          "source": "../../src/git/indexer"
+        },
+        {
+          "from": "tests/features/git-history.test.ts",
+          "to": "src/config/index.ts",
+          "source": "../../src/config"
+        },
+        {
+          "from": "tests/features/git-history.test.ts",
+          "to": "src/config/index.ts",
+          "source": "../../src/config"
+        },
+        {
+          "from": "src/indexing/watcher.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "./indexer"
+        },
+        {
+          "from": "src/indexing/watcher.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../graph/resolver"
+        },
+        {
+          "from": "src/indexing/watcher.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../graph/resolver"
+        },
+        {
+          "from": "src/indexing/watcher.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../graph/resolver"
+        },
+        {
+          "from": "src/indexing/chunker.ts",
+          "to": "src/utils/log.ts",
+          "source": "../utils/log"
+        },
+        {
+          "from": "src/db/git-history.ts",
+          "to": "src/search/usages.ts",
+          "source": "../search/usages"
+        },
+        {
+          "from": "src/db/conversation.ts",
+          "to": "src/search/usages.ts",
+          "source": "../search/usages"
+        },
+        {
+          "from": "src/db/index.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/db/index.ts",
+          "to": "src/db/files.ts",
+          "source": "./files"
+        },
+        {
+          "from": "src/db/index.ts",
+          "to": "src/db/search.ts",
+          "source": "./search"
+        },
+        {
+          "from": "src/db/index.ts",
+          "to": "src/db/graph.ts",
+          "source": "./graph"
+        },
+        {
+          "from": "src/db/index.ts",
+          "to": "src/db/conversation.ts",
+          "source": "./conversation"
+        },
+        {
+          "from": "src/db/index.ts",
+          "to": "src/db/checkpoints.ts",
+          "source": "./checkpoints"
+        },
+        {
+          "from": "src/db/index.ts",
+          "to": "src/db/annotations.ts",
+          "source": "./annotations"
+        },
+        {
+          "from": "src/db/index.ts",
+          "to": "src/db/analytics.ts",
+          "source": "./analytics"
+        },
+        {
+          "from": "src/db/index.ts",
+          "to": "src/db/git-history.ts",
+          "source": "./git-history"
+        },
+        {
+          "from": "tests/search/find-usages.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/search/find-usages.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/search/find-usages.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/search/find-usages.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/search/find-usages.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/search/read-relevant.test.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../../src/search/hybrid"
+        },
+        {
+          "from": "tests/search/read-relevant.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/search/read-relevant.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/search/read-relevant.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/search/read-relevant.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/search/read-relevant.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/search/analytics.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/search/analytics.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/search/analytics.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/search/fts-special-chars.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/search/fts-special-chars.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/search/fts-special-chars.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/search/fts-special-chars.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/search/fts-special-chars.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/search/fts-special-chars.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/search/fts-special-chars.test.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../../src/indexing/indexer"
+        },
+        {
+          "from": "tests/search/fts-special-chars.test.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../../src/search/hybrid"
+        },
+        {
+          "from": "tests/search/fts-special-chars.test.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../../src/search/hybrid"
+        },
+        {
+          "from": "tests/search/fts-special-chars.test.ts",
+          "to": "src/config/index.ts",
+          "source": "../../src/config"
+        },
+        {
+          "from": "tests/search/search-symbols.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/search/search-symbols.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/search/search-symbols.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/search/search-symbols.test.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../../src/indexing/chunker"
+        },
+        {
+          "from": "tests/search/search-symbols.test.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../../src/graph/resolver"
+        },
+        {
+          "from": "tests/search/search-symbols.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/search/search-symbols.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/search/search.test.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../../src/search/hybrid"
+        },
+        {
+          "from": "tests/search/search.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/search/search.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/search/search.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/search/search.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/search/search.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/search/eval.test.ts",
+          "to": "src/search/eval.ts",
+          "source": "../../src/search/eval"
+        },
+        {
+          "from": "tests/search/eval.test.ts",
+          "to": "src/search/eval.ts",
+          "source": "../../src/search/eval"
+        },
+        {
+          "from": "tests/search/eval.test.ts",
+          "to": "src/search/eval.ts",
+          "source": "../../src/search/eval"
+        },
+        {
+          "from": "tests/search/eval.test.ts",
+          "to": "src/search/eval.ts",
+          "source": "../../src/search/eval"
+        },
+        {
+          "from": "tests/search/eval.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/search/eval.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/search/eval.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/search/eval.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/search/eval.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/search/benchmark.test.ts",
+          "to": "src/search/benchmark.ts",
+          "source": "../../src/search/benchmark"
+        },
+        {
+          "from": "tests/search/benchmark.test.ts",
+          "to": "src/search/benchmark.ts",
+          "source": "../../src/search/benchmark"
+        },
+        {
+          "from": "tests/search/benchmark.test.ts",
+          "to": "src/search/benchmark.ts",
+          "source": "../../src/search/benchmark"
+        },
+        {
+          "from": "tests/search/benchmark.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/search/benchmark.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/search/benchmark.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/search/benchmark.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/search/benchmark.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/search/benchmark.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/search/hybrid-search.test.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../../src/search/hybrid"
+        },
+        {
+          "from": "tests/search/hybrid-search.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/search/hybrid-search.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/search/hybrid-search.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/search/hybrid-search.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/search/hybrid-search.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "src/server/index.ts",
+          "to": "src/utils/dir-guard.ts",
+          "source": "../utils/dir-guard"
+        },
+        {
+          "from": "src/server/index.ts",
+          "to": "src/db/index.ts",
+          "source": "../db"
+        },
+        {
+          "from": "src/server/index.ts",
+          "to": "src/config/index.ts",
+          "source": "../config"
+        },
+        {
+          "from": "src/server/index.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../indexing/indexer"
+        },
+        {
+          "from": "src/server/index.ts",
+          "to": "src/indexing/watcher.ts",
+          "source": "../indexing/watcher"
+        },
+        {
+          "from": "src/server/index.ts",
+          "to": "src/conversation/parser.ts",
+          "source": "../conversation/parser"
+        },
+        {
+          "from": "src/server/index.ts",
+          "to": "src/conversation/indexer.ts",
+          "source": "../conversation/indexer"
+        },
+        {
+          "from": "src/server/index.ts",
+          "to": "src/conversation/indexer.ts",
+          "source": "../conversation/indexer"
+        },
+        {
+          "from": "src/server/index.ts",
+          "to": "src/cli/setup.ts",
+          "source": "../cli/setup"
+        },
+        {
+          "from": "src/server/index.ts",
+          "to": "src/tools/index.ts",
+          "source": "../tools"
+        },
+        {
+          "from": "src/server/index.ts",
+          "to": "src/utils/log.ts",
+          "source": "../utils/log"
+        },
+        {
+          "from": "tests/embeddings/embed.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/embeddings/embed.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/embeddings/embed.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/embeddings/embed.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/embeddings/embed.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "src/search/eval.ts",
+          "to": "src/db/index.ts",
+          "source": "../db"
+        },
+        {
+          "from": "src/search/eval.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "./hybrid"
+        },
+        {
+          "from": "src/search/eval.ts",
+          "to": "src/config/index.ts",
+          "source": "../config"
+        },
+        {
+          "from": "src/search/hybrid.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/search/hybrid.ts",
+          "to": "src/db/index.ts",
+          "source": "../db"
+        },
+        {
+          "from": "src/search/hybrid.ts",
+          "to": "src/utils/log.ts",
+          "source": "../utils/log"
+        },
+        {
+          "from": "src/search/benchmark.ts",
+          "to": "src/db/index.ts",
+          "source": "../db"
+        },
+        {
+          "from": "src/search/benchmark.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "./hybrid"
+        },
+        {
+          "from": "src/search/benchmark.ts",
+          "to": "src/config/index.ts",
+          "source": "../config"
+        },
+        {
+          "from": "src/cli/commands/history.ts",
+          "to": "src/db/index.ts",
+          "source": "../../db"
+        },
+        {
+          "from": "src/cli/commands/history.ts",
+          "to": "src/config/index.ts",
+          "source": "../../config"
+        },
+        {
+          "from": "src/cli/commands/history.ts",
+          "to": "src/config/index.ts",
+          "source": "../../config"
+        },
+        {
+          "from": "src/cli/commands/history.ts",
+          "to": "src/git/indexer.ts",
+          "source": "../../git/indexer"
+        },
+        {
+          "from": "src/cli/commands/history.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../embeddings/embed"
+        },
+        {
+          "from": "src/cli/commands/history.ts",
+          "to": "src/cli/progress.ts",
+          "source": "../progress"
+        },
+        {
+          "from": "src/cli/commands/history.ts",
+          "to": "src/cli/progress.ts",
+          "source": "../progress"
+        },
+        {
+          "from": "src/cli/commands/history.ts",
+          "to": "src/utils/log.ts",
+          "source": "../../utils/log"
+        },
+        {
+          "from": "src/cli/commands/status.ts",
+          "to": "src/db/index.ts",
+          "source": "../../db"
+        },
+        {
+          "from": "src/cli/commands/status.ts",
+          "to": "src/utils/log.ts",
+          "source": "../../utils/log"
+        },
+        {
+          "from": "src/cli/commands/search-cmd.ts",
+          "to": "src/db/index.ts",
+          "source": "../../db"
+        },
+        {
+          "from": "src/cli/commands/search-cmd.ts",
+          "to": "src/config/index.ts",
+          "source": "../../config"
+        },
+        {
+          "from": "src/cli/commands/search-cmd.ts",
+          "to": "src/config/index.ts",
+          "source": "../../config"
+        },
+        {
+          "from": "src/cli/commands/search-cmd.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../../search/hybrid"
+        },
+        {
+          "from": "src/cli/commands/search-cmd.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../../search/hybrid"
+        },
+        {
+          "from": "src/cli/commands/search-cmd.ts",
+          "to": "src/utils/log.ts",
+          "source": "../../utils/log"
+        },
+        {
+          "from": "src/cli/commands/doctor.ts",
+          "to": "src/utils/log.ts",
+          "source": "../../utils/log"
+        },
+        {
+          "from": "src/cli/commands/annotations.ts",
+          "to": "src/db/index.ts",
+          "source": "../../db"
+        },
+        {
+          "from": "src/cli/commands/annotations.ts",
+          "to": "src/utils/log.ts",
+          "source": "../../utils/log"
+        },
+        {
+          "from": "src/cli/commands/init.ts",
+          "to": "src/db/index.ts",
+          "source": "../../db"
+        },
+        {
+          "from": "src/cli/commands/init.ts",
+          "to": "src/config/index.ts",
+          "source": "../../config"
+        },
+        {
+          "from": "src/cli/commands/init.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../../indexing/indexer"
+        },
+        {
+          "from": "src/cli/commands/init.ts",
+          "to": "src/cli/setup.ts",
+          "source": "../setup"
+        },
+        {
+          "from": "src/cli/commands/init.ts",
+          "to": "src/cli/setup.ts",
+          "source": "../setup"
+        },
+        {
+          "from": "src/cli/commands/init.ts",
+          "to": "src/cli/setup.ts",
+          "source": "../setup"
+        },
+        {
+          "from": "src/cli/commands/init.ts",
+          "to": "src/cli/setup.ts",
+          "source": "../setup"
+        },
+        {
+          "from": "src/cli/commands/init.ts",
+          "to": "src/cli/progress.ts",
+          "source": "../progress"
+        },
+        {
+          "from": "src/cli/commands/init.ts",
+          "to": "src/cli/progress.ts",
+          "source": "../progress"
+        },
+        {
+          "from": "src/cli/commands/init.ts",
+          "to": "src/utils/log.ts",
+          "source": "../../utils/log"
+        },
+        {
+          "from": "src/cli/commands/demo.ts",
+          "to": "src/db/index.ts",
+          "source": "../../db"
+        },
+        {
+          "from": "src/cli/commands/demo.ts",
+          "to": "src/config/index.ts",
+          "source": "../../config"
+        },
+        {
+          "from": "src/cli/commands/demo.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../../indexing/indexer"
+        },
+        {
+          "from": "src/cli/commands/demo.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../../search/hybrid"
+        },
+        {
+          "from": "src/cli/commands/demo.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../../search/hybrid"
+        },
+        {
+          "from": "src/cli/commands/demo.ts",
+          "to": "src/cli/progress.ts",
+          "source": "../progress"
+        },
+        {
+          "from": "src/cli/commands/demo.ts",
+          "to": "src/utils/log.ts",
+          "source": "../../utils/log"
+        },
+        {
+          "from": "src/cli/commands/eval.ts",
+          "to": "src/db/index.ts",
+          "source": "../../db"
+        },
+        {
+          "from": "src/cli/commands/eval.ts",
+          "to": "src/config/index.ts",
+          "source": "../../config"
+        },
+        {
+          "from": "src/cli/commands/eval.ts",
+          "to": "src/search/eval.ts",
+          "source": "../../search/eval"
+        },
+        {
+          "from": "src/cli/commands/eval.ts",
+          "to": "src/search/eval.ts",
+          "source": "../../search/eval"
+        },
+        {
+          "from": "src/cli/commands/eval.ts",
+          "to": "src/search/eval.ts",
+          "source": "../../search/eval"
+        },
+        {
+          "from": "src/cli/commands/eval.ts",
+          "to": "src/search/eval.ts",
+          "source": "../../search/eval"
+        },
+        {
+          "from": "src/cli/commands/eval.ts",
+          "to": "src/utils/log.ts",
+          "source": "../../utils/log"
+        },
+        {
+          "from": "src/cli/commands/benchmark-models.ts",
+          "to": "src/db/index.ts",
+          "source": "../../db"
+        },
+        {
+          "from": "src/cli/commands/benchmark-models.ts",
+          "to": "src/config/index.ts",
+          "source": "../../config"
+        },
+        {
+          "from": "src/cli/commands/benchmark-models.ts",
+          "to": "src/config/index.ts",
+          "source": "../../config"
+        },
+        {
+          "from": "src/cli/commands/benchmark-models.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../../indexing/indexer"
+        },
+        {
+          "from": "src/cli/commands/benchmark-models.ts",
+          "to": "src/search/benchmark.ts",
+          "source": "../../search/benchmark"
+        },
+        {
+          "from": "src/cli/commands/benchmark-models.ts",
+          "to": "src/search/benchmark.ts",
+          "source": "../../search/benchmark"
+        },
+        {
+          "from": "src/cli/commands/benchmark-models.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../embeddings/embed"
+        },
+        {
+          "from": "src/cli/commands/benchmark-models.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../embeddings/embed"
+        },
+        {
+          "from": "src/cli/commands/benchmark-models.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../embeddings/embed"
+        },
+        {
+          "from": "src/cli/commands/benchmark-models.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../embeddings/embed"
+        },
+        {
+          "from": "src/cli/commands/benchmark-models.ts",
+          "to": "src/utils/log.ts",
+          "source": "../../utils/log"
+        },
+        {
+          "from": "src/cli/commands/analytics.ts",
+          "to": "src/db/index.ts",
+          "source": "../../db"
+        },
+        {
+          "from": "src/cli/commands/analytics.ts",
+          "to": "src/utils/log.ts",
+          "source": "../../utils/log"
+        },
+        {
+          "from": "src/cli/commands/map.ts",
+          "to": "src/db/index.ts",
+          "source": "../../db"
+        },
+        {
+          "from": "src/cli/commands/map.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../../graph/resolver"
+        },
+        {
+          "from": "src/cli/commands/map.ts",
+          "to": "src/utils/log.ts",
+          "source": "../../utils/log"
+        },
+        {
+          "from": "src/cli/commands/cleanup.ts",
+          "to": "src/cli/setup.ts",
+          "source": "../setup"
+        },
+        {
+          "from": "src/cli/commands/cleanup.ts",
+          "to": "src/utils/log.ts",
+          "source": "../../utils/log"
+        },
+        {
+          "from": "src/cli/commands/remove.ts",
+          "to": "src/db/index.ts",
+          "source": "../../db"
+        },
+        {
+          "from": "src/cli/commands/remove.ts",
+          "to": "src/utils/log.ts",
+          "source": "../../utils/log"
+        },
+        {
+          "from": "src/cli/commands/index-cmd.ts",
+          "to": "src/db/index.ts",
+          "source": "../../db"
+        },
+        {
+          "from": "src/cli/commands/index-cmd.ts",
+          "to": "src/config/index.ts",
+          "source": "../../config"
+        },
+        {
+          "from": "src/cli/commands/index-cmd.ts",
+          "to": "src/config/index.ts",
+          "source": "../../config"
+        },
+        {
+          "from": "src/cli/commands/index-cmd.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../../indexing/indexer"
+        },
+        {
+          "from": "src/cli/commands/index-cmd.ts",
+          "to": "src/cli/progress.ts",
+          "source": "../progress"
+        },
+        {
+          "from": "src/cli/commands/index-cmd.ts",
+          "to": "src/cli/progress.ts",
+          "source": "../progress"
+        },
+        {
+          "from": "src/cli/commands/index-cmd.ts",
+          "to": "src/utils/log.ts",
+          "source": "../../utils/log"
+        },
+        {
+          "from": "src/cli/commands/conversation.ts",
+          "to": "src/db/index.ts",
+          "source": "../../db"
+        },
+        {
+          "from": "src/cli/commands/conversation.ts",
+          "to": "src/config/index.ts",
+          "source": "../../config"
+        },
+        {
+          "from": "src/cli/commands/conversation.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../embeddings/embed"
+        },
+        {
+          "from": "src/cli/commands/conversation.ts",
+          "to": "src/conversation/parser.ts",
+          "source": "../../conversation/parser"
+        },
+        {
+          "from": "src/cli/commands/conversation.ts",
+          "to": "src/conversation/indexer.ts",
+          "source": "../../conversation/indexer"
+        },
+        {
+          "from": "src/cli/commands/conversation.ts",
+          "to": "src/utils/log.ts",
+          "source": "../../utils/log"
+        },
+        {
+          "from": "src/cli/commands/checkpoint.ts",
+          "to": "src/db/index.ts",
+          "source": "../../db"
+        },
+        {
+          "from": "src/cli/commands/checkpoint.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../embeddings/embed"
+        },
+        {
+          "from": "src/cli/commands/checkpoint.ts",
+          "to": "src/conversation/parser.ts",
+          "source": "../../conversation/parser"
+        },
+        {
+          "from": "src/cli/commands/checkpoint.ts",
+          "to": "src/utils/log.ts",
+          "source": "../../utils/log"
+        },
+        {
+          "from": "src/cli/commands/benchmark.ts",
+          "to": "src/db/index.ts",
+          "source": "../../db"
+        },
+        {
+          "from": "src/cli/commands/benchmark.ts",
+          "to": "src/config/index.ts",
+          "source": "../../config"
+        },
+        {
+          "from": "src/cli/commands/benchmark.ts",
+          "to": "src/search/benchmark.ts",
+          "source": "../../search/benchmark"
+        },
+        {
+          "from": "src/cli/commands/benchmark.ts",
+          "to": "src/search/benchmark.ts",
+          "source": "../../search/benchmark"
+        },
+        {
+          "from": "src/cli/commands/benchmark.ts",
+          "to": "src/search/benchmark.ts",
+          "source": "../../search/benchmark"
+        },
+        {
+          "from": "src/cli/commands/benchmark.ts",
+          "to": "src/utils/log.ts",
+          "source": "../../utils/log"
+        },
+        {
+          "from": "src/cli/commands/session-context.ts",
+          "to": "src/db/index.ts",
+          "source": "../../db"
+        },
+        {
+          "from": "src/cli/commands/session-context.ts",
+          "to": "src/utils/log.ts",
+          "source": "../../utils/log"
+        },
+        {
+          "from": "tests/indexing/indexer.test.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../../src/indexing/indexer"
+        },
+        {
+          "from": "tests/indexing/indexer.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/indexing/indexer.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/indexing/indexer.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/indexing/indexer.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/indexing/indexer.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/indexing/indexer.test.ts",
+          "to": "src/config/index.ts",
+          "source": "../../src/config"
+        },
+        {
+          "from": "tests/indexing/watcher.test.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../../src/indexing/indexer"
+        },
+        {
+          "from": "tests/indexing/watcher.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/indexing/watcher.test.ts",
+          "to": "src/config/index.ts",
+          "source": "../../src/config"
+        },
+        {
+          "from": "tests/indexing/watcher.test.ts",
+          "to": "src/indexing/watcher.ts",
+          "source": "../../src/indexing/watcher"
+        },
+        {
+          "from": "tests/indexing/watcher.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/indexing/watcher.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/indexing/watcher.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/indexing/watcher.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/indexing/parse.test.ts",
+          "to": "src/indexing/parse.ts",
+          "source": "../../src/indexing/parse"
+        },
+        {
+          "from": "tests/indexing/chunker.test.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../../src/indexing/chunker"
+        },
+        {
+          "from": "tests/indexing/line-numbers.test.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../../src/indexing/indexer"
+        },
+        {
+          "from": "tests/indexing/line-numbers.test.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../../src/indexing/indexer"
+        },
+        {
+          "from": "tests/indexing/line-numbers.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/indexing/line-numbers.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/indexing/line-numbers.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/indexing/line-numbers.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/indexing/line-numbers.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/indexing/line-numbers.test.ts",
+          "to": "src/config/index.ts",
+          "source": "../../src/config"
+        },
+        {
+          "from": "src/config/index.ts",
+          "to": "src/utils/log.ts",
+          "source": "../utils/log"
+        },
+        {
+          "from": "src/config/index.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/config/index.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/config/index.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/indexing/indexer.ts",
+          "to": "src/indexing/parse.ts",
+          "source": "./parse"
+        },
+        {
+          "from": "src/indexing/indexer.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/indexing/indexer.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/indexing/indexer.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/indexing/indexer.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "./chunker"
+        },
+        {
+          "from": "src/indexing/indexer.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "./chunker"
+        },
+        {
+          "from": "src/indexing/indexer.ts",
+          "to": "src/db/index.ts",
+          "source": "../db"
+        },
+        {
+          "from": "src/indexing/indexer.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../graph/resolver"
+        },
+        {
+          "from": "src/indexing/indexer.ts",
+          "to": "src/utils/log.ts",
+          "source": "../utils/log"
+        },
+        {
+          "from": "src/indexing/indexer.ts",
+          "to": "src/utils/dir-guard.ts",
+          "source": "../utils/dir-guard"
+        },
+        {
+          "from": "tests/config/config.test.ts",
+          "to": "src/config/index.ts",
+          "source": "../../src/config"
+        },
+        {
+          "from": "tests/config/config.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/config/config.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "src/graph/resolver.ts",
+          "to": "src/db/index.ts",
+          "source": "../db"
+        },
+        {
+          "from": "src/wiki/discovery.ts",
+          "to": "src/db/index.ts",
+          "source": "../db"
+        },
+        {
+          "from": "src/wiki/discovery.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../graph/resolver"
+        },
+        {
+          "from": "src/wiki/index.ts",
+          "to": "src/db/index.ts",
+          "source": "../db"
+        },
+        {
+          "from": "src/wiki/index.ts",
+          "to": "src/wiki/discovery.ts",
+          "source": "./discovery"
+        },
+        {
+          "from": "src/wiki/index.ts",
+          "to": "src/wiki/categorization.ts",
+          "source": "./categorization"
+        },
+        {
+          "from": "src/wiki/index.ts",
+          "to": "src/wiki/page-tree.ts",
+          "source": "./page-tree"
+        },
+        {
+          "from": "src/wiki/index.ts",
+          "to": "src/wiki/content-prefetch.ts",
+          "source": "./content-prefetch"
+        },
+        {
+          "from": "src/wiki/index.ts",
+          "to": "src/wiki/page-payload.ts",
+          "source": "./page-payload"
+        },
+        {
+          "from": "src/wiki/index.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/index.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/index.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/index.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/index.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "tests/wiki/discovery.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/wiki/discovery.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/wiki/discovery.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/wiki/discovery.test.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../../src/graph/resolver"
+        },
+        {
+          "from": "tests/wiki/discovery.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/wiki/discovery.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/wiki/discovery.test.ts",
+          "to": "src/wiki/discovery.ts",
+          "source": "../../src/wiki/discovery"
+        },
+        {
+          "from": "tests/wiki/categorization.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/wiki/categorization.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/wiki/categorization.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/wiki/categorization.test.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../../src/indexing/chunker"
+        },
+        {
+          "from": "tests/wiki/categorization.test.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../../src/graph/resolver"
+        },
+        {
+          "from": "tests/wiki/categorization.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/wiki/categorization.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/wiki/categorization.test.ts",
+          "to": "src/wiki/discovery.ts",
+          "source": "../../src/wiki/discovery"
+        },
+        {
+          "from": "tests/wiki/categorization.test.ts",
+          "to": "src/wiki/categorization.ts",
+          "source": "../../src/wiki/categorization"
+        },
+        {
+          "from": "tests/wiki/section-selector.test.ts",
+          "to": "src/wiki/section-selector.ts",
+          "source": "../../src/wiki/section-selector"
+        },
+        {
+          "from": "tests/wiki/section-selector.test.ts",
+          "to": "src/wiki/section-selector.ts",
+          "source": "../../src/wiki/section-selector"
+        },
+        {
+          "from": "tests/wiki/section-selector.test.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../../src/wiki/types"
+        },
+        {
+          "from": "src/wiki/page-payload.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-payload.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-payload.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-payload.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-payload.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-payload.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-payload.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-payload.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-payload.ts",
+          "to": "src/wiki/section-selector.ts",
+          "source": "./section-selector"
+        },
+        {
+          "from": "src/wiki/page-payload.ts",
+          "to": "src/wiki/section-selector.ts",
+          "source": "./section-selector"
+        },
+        {
+          "from": "src/wiki/page-tree.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-tree.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-tree.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-tree.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-tree.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-tree.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-tree.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-tree.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "tests/tools/wiki-tools.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/tools/wiki-tools.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/tools/wiki-tools.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "src/wiki/section-selector.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/section-selector.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/section-selector.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/db/search.ts",
+          "to": "src/search/usages.ts",
+          "source": "../search/usages"
+        },
+        {
+          "from": "src/db/search.ts",
+          "to": "src/search/usages.ts",
+          "source": "../search/usages"
+        },
+        {
+          "from": "src/wiki/types.ts",
+          "to": "src/db/types.ts",
+          "source": "../db/types"
+        },
+        {
+          "from": "src/wiki/categorization.ts",
+          "to": "src/db/index.ts",
+          "source": "../db"
+        },
+        {
+          "from": "src/wiki/categorization.ts",
+          "to": "src/db/types.ts",
+          "source": "../db/types"
+        },
+        {
+          "from": "src/wiki/categorization.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/categorization.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/categorization.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/categorization.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/categorization.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/categorization.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/categorization.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/categorization.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/categorization.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/content-prefetch.ts",
+          "to": "src/db/index.ts",
+          "source": "../db"
+        },
+        {
+          "from": "src/wiki/content-prefetch.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../graph/resolver"
+        },
+        {
+          "from": "src/wiki/content-prefetch.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/content-prefetch.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/content-prefetch.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/content-prefetch.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/content-prefetch.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/content-prefetch.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/tools/index.ts",
+          "source": "./index"
+        },
+        {
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/index.ts",
+          "source": "../wiki"
+        },
+        {
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/index.ts",
+          "source": "../wiki"
+        },
+        {
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../wiki/types"
+        },
+        {
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../wiki/types"
+        },
+        {
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../wiki/types"
+        },
+        {
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../wiki/types"
+        },
+        {
+          "from": "tests/wiki/page-tree.test.ts",
+          "to": "src/wiki/page-tree.ts",
+          "source": "../../src/wiki/page-tree"
+        },
+        {
+          "from": "tests/wiki/page-tree.test.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../../src/wiki/types"
+        },
+        {
+          "from": "tests/wiki/page-tree.test.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../../src/wiki/types"
+        },
+        {
+          "from": "tests/wiki/page-tree.test.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../../src/wiki/types"
+        },
+        {
+          "from": "tests/wiki/page-tree.test.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../../src/wiki/types"
+        },
+        {
+          "from": "tests/wiki/page-tree.test.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../../src/wiki/types"
+        },
+        {
+          "from": "tests/wiki/page-tree.test.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../../src/wiki/types"
+        }
+      ]
+    },
+    "directoryLevel": {
+      "level": "directory",
+      "directories": [
+        {
+          "path": ".claude-plugin/skills/mimirs",
+          "fileCount": 1,
+          "files": [
+            "SKILL.md"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 0
+        },
+        {
+          "path": ".claude-plugin/skills/wiki",
+          "fileCount": 1,
+          "files": [
+            "SKILL.md"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 0
+        },
+        {
+          "path": ".claude/projects/-Users-winci-repos-claude-skills-local-rag/memory",
+          "fileCount": 3,
+          "files": [
+            "MEMORY.md",
+            "feedback_use_bun.md",
+            "project_plugin_cr.md"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 0
+        },
+        {
+          "path": ".",
+          "fileCount": 4,
+          "files": [
+            "BENCHMARKS.md",
+            "CHANGELOG.md",
+            "CLAUDE.md",
+            "README.md"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 0
+        },
+        {
+          "path": "benchmarks",
+          "fileCount": 11,
+          "files": [
+            "ast-truncation-analysis.ts",
+            "collect-files-bench.ts",
+            "count-grouping-sim.ts",
+            "excalidraw-parent-bench.ts",
+            "indexing-bench-v2.ts",
+            "indexing-bench.ts",
+            "large-json.bench.test.ts",
+            "parent-promotion-bench.ts",
+            "quality-bench-worker.ts",
+            "quality-bench.ts",
+            "subchunk-impact.ts"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 7
+        },
+        {
+          "path": "docs",
+          "fileCount": 2,
+          "files": [
+            "configuration.md",
+            "tools.md"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 0
+        },
+        {
+          "path": "hooks/scripts",
+          "fileCount": 3,
+          "files": [
+            "reindex-file.sh",
+            "session-end.sh",
+            "session-start.sh"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 0
+        },
+        {
+          "path": "scripts",
+          "fileCount": 1,
+          "files": [
+            "bump-version.sh"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 0
+        },
+        {
+          "path": "skills/mimirs",
+          "fileCount": 1,
+          "files": [
+            "SKILL.md"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 0
+        },
+        {
+          "path": "skills/wiki",
+          "fileCount": 1,
+          "files": [
+            "SKILL.md"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 0
+        },
+        {
+          "path": "src/cli/commands",
+          "fileCount": 19,
+          "files": [
+            "analytics.ts",
+            "annotations.ts",
+            "benchmark-models.ts",
+            "benchmark.ts",
+            "checkpoint.ts",
+            "cleanup.ts",
+            "conversation.ts",
+            "demo.ts",
+            "doctor.ts",
+            "eval.ts",
+            "history.ts",
+            "index-cmd.ts",
+            "init.ts",
+            "map.ts",
+            "remove.ts",
+            "search-cmd.ts",
+            "serve.ts",
+            "session-context.ts",
+            "status.ts"
+          ],
+          "totalExports": 13,
+          "fanIn": 1,
+          "fanOut": 10
+        },
+        {
+          "path": "src/cli",
+          "fileCount": 3,
+          "files": [
+            "index.ts",
+            "progress.ts",
+            "setup.ts"
+          ],
+          "totalExports": 14,
+          "fanIn": 3,
+          "fanOut": 3
+        },
+        {
+          "path": "src/config",
+          "fileCount": 1,
+          "files": [
+            "index.ts"
+          ],
+          "totalExports": 1,
+          "fanIn": 10,
+          "fanOut": 2
+        },
+        {
+          "path": "src/conversation",
+          "fileCount": 2,
+          "files": [
+            "indexer.ts",
+            "parser.ts"
+          ],
+          "totalExports": 5,
+          "fanIn": 4,
+          "fanOut": 2
+        },
+        {
+          "path": "src/db",
+          "fileCount": 10,
+          "files": [
+            "analytics.ts",
+            "annotations.ts",
+            "checkpoints.ts",
+            "conversation.ts",
+            "files.ts",
+            "git-history.ts",
+            "graph.ts",
+            "index.ts",
+            "search.ts",
+            "types.ts"
+          ],
+          "totalExports": 56,
+          "fanIn": 15,
+          "fanOut": 2
+        },
+        {
+          "path": "src/embeddings",
+          "fileCount": 1,
+          "files": [
+            "embed.ts"
+          ],
+          "totalExports": 8,
+          "fanIn": 17,
+          "fanOut": 0
+        },
+        {
+          "path": "src/git",
+          "fileCount": 1,
+          "files": [
+            "indexer.ts"
+          ],
+          "totalExports": 1,
+          "fanIn": 2,
+          "fanOut": 2
+        },
+        {
+          "path": "src/graph",
+          "fileCount": 1,
+          "files": [
+            "resolver.ts"
+          ],
+          "totalExports": 2,
+          "fanIn": 8,
+          "fanOut": 1
+        },
+        {
+          "path": "src/indexing",
+          "fileCount": 4,
+          "files": [
+            "chunker.ts",
+            "indexer.ts",
+            "parse.ts",
+            "watcher.ts"
+          ],
+          "totalExports": 7,
+          "fanIn": 9,
+          "fanOut": 4
+        },
+        {
+          "path": "src",
+          "fileCount": 2,
+          "files": [
+            "main.ts",
+            "types.ts"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 1
+        },
+        {
+          "path": "src/search",
+          "fileCount": 4,
+          "files": [
+            "benchmark.ts",
+            "eval.ts",
+            "hybrid.ts",
+            "usages.ts"
+          ],
+          "totalExports": 16,
+          "fanIn": 5,
+          "fanOut": 4
+        },
+        {
+          "path": "src/server",
+          "fileCount": 1,
+          "files": [
+            "index.ts"
+          ],
+          "totalExports": 1,
+          "fanIn": 0,
+          "fanOut": 7
+        },
+        {
+          "path": "src/tools",
+          "fileCount": 12,
+          "files": [
+            "analytics-tools.ts",
+            "annotation-tools.ts",
+            "checkpoint-tools.ts",
+            "conversation-tools.ts",
+            "git-history-tools.ts",
+            "git-tools.ts",
+            "graph-tools.ts",
+            "index-tools.ts",
+            "index.ts",
+            "search.ts",
+            "server-info-tools.ts",
+            "wiki-tools.ts"
+          ],
+          "totalExports": 5,
+          "fanIn": 1,
+          "fanOut": 9
+        },
+        {
+          "path": "src/utils",
+          "fileCount": 2,
+          "files": [
+            "dir-guard.ts",
+            "log.ts"
+          ],
+          "totalExports": 3,
+          "fanIn": 8,
+          "fanOut": 0
+        },
+        {
+          "path": "src/wiki",
+          "fileCount": 8,
+          "files": [
+            "categorization.ts",
+            "content-prefetch.ts",
+            "discovery.ts",
+            "index.ts",
+            "page-payload.ts",
+            "page-tree.ts",
+            "section-selector.ts",
+            "types.ts"
+          ],
+          "totalExports": 32,
+          "fanIn": 2,
+          "fanOut": 2
+        },
+        {
+          "path": "src/wiki/exemplars",
+          "fileCount": 6,
+          "files": [
+            "architecture.md",
+            "conventions.md",
+            "data-flows.md",
+            "getting-started.md",
+            "index.md",
+            "testing.md"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 0
+        },
+        {
+          "path": "src/wiki/sections",
+          "fileCount": 17,
+          "files": [
+            "configuration.md",
+            "cross-cutting-inventory.md",
+            "dependency-graph.md",
+            "dependency-table.md",
+            "entry-points.md",
+            "how-it-works-sequence.md",
+            "hub-analysis.md",
+            "internals.md",
+            "key-exports-table.md",
+            "known-issues.md",
+            "module-inventory.md",
+            "overview.md",
+            "per-file-breakdown.md",
+            "public-api.md",
+            "see-also.md",
+            "test-structure.md",
+            "usage-examples.md"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 0
+        },
+        {
+          "path": "tests/cli",
+          "fileCount": 1,
+          "files": [
+            "cli.test.ts"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 1
+        },
+        {
+          "path": "tests/config",
+          "fileCount": 1,
+          "files": [
+            "config.test.ts"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 2
+        },
+        {
+          "path": "tests/conversation",
+          "fileCount": 2,
+          "files": [
+            "conversation-index.test.ts",
+            "conversation.test.ts"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 4
+        },
+        {
+          "path": "tests/db",
+          "fileCount": 1,
+          "files": [
+            "db.test.ts"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 3
+        },
+        {
+          "path": "tests/embeddings",
+          "fileCount": 1,
+          "files": [
+            "embed.test.ts"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 1
+        },
+        {
+          "path": "tests/features",
+          "fileCount": 4,
+          "files": [
+            "annotations.test.ts",
+            "checkpoint.test.ts",
+            "git-context.test.ts",
+            "git-history.test.ts"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 5
+        },
+        {
+          "path": "tests/fixtures",
+          "fileCount": 6,
+          "files": [
+            "frontmatter-only.md",
+            "large.md",
+            "no-frontmatter.md",
+            "sample.md",
+            "sample.ts",
+            "sample.txt"
+          ],
+          "totalExports": 2,
+          "fanIn": 0,
+          "fanOut": 0
+        },
+        {
+          "path": "tests/graph",
+          "fileCount": 1,
+          "files": [
+            "graph.test.ts"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 5
+        },
+        {
+          "path": "tests",
+          "fileCount": 1,
+          "files": [
+            "helpers.ts"
+          ],
+          "totalExports": 3,
+          "fanIn": 11,
+          "fanOut": 0
+        },
+        {
+          "path": "tests/indexing",
+          "fileCount": 5,
+          "files": [
+            "chunker.test.ts",
+            "indexer.test.ts",
+            "line-numbers.test.ts",
+            "parse.test.ts",
+            "watcher.test.ts"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 5
+        },
+        {
+          "path": "tests/search",
+          "fileCount": 9,
+          "files": [
+            "analytics.test.ts",
+            "benchmark.test.ts",
+            "eval.test.ts",
+            "find-usages.test.ts",
+            "fts-special-chars.test.ts",
+            "hybrid-search.test.ts",
+            "read-relevant.test.ts",
+            "search-symbols.test.ts",
+            "search.test.ts"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 7
+        },
+        {
+          "path": "tests/tools",
+          "fileCount": 2,
+          "files": [
+            "server.test.ts",
+            "wiki-tools.test.ts"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 1
+        },
+        {
+          "path": "tests/wiki",
+          "fileCount": 4,
+          "files": [
+            "categorization.test.ts",
+            "discovery.test.ts",
+            "page-tree.test.ts",
+            "section-selector.test.ts"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 6
+        }
+      ],
+      "edges": [
+        {
+          "from": "src",
+          "to": "src/cli",
+          "importCount": 1
+        },
+        {
+          "from": "tests/tools",
+          "to": "tests",
+          "importCount": 6
+        },
+        {
+          "from": "benchmarks",
+          "to": "src/db",
+          "importCount": 8
+        },
+        {
+          "from": "benchmarks",
+          "to": "src/config",
+          "importCount": 14
+        },
+        {
+          "from": "benchmarks",
+          "to": "src/indexing",
+          "importCount": 20
+        },
+        {
+          "from": "benchmarks",
+          "to": "src/search",
+          "importCount": 9
+        },
+        {
+          "from": "benchmarks",
+          "to": "src/graph",
+          "importCount": 4
+        },
+        {
+          "from": "benchmarks",
+          "to": "src/embeddings",
+          "importCount": 14
+        },
+        {
+          "from": "benchmarks",
+          "to": "tests",
+          "importCount": 3
+        },
+        {
+          "from": "tests/cli",
+          "to": "tests",
+          "importCount": 3
+        },
+        {
+          "from": "tests/graph",
+          "to": "src/db",
+          "importCount": 1
+        },
+        {
+          "from": "tests/graph",
+          "to": "src/embeddings",
+          "importCount": 2
+        },
+        {
+          "from": "tests/graph",
+          "to": "src/indexing",
+          "importCount": 1
+        },
+        {
+          "from": "tests/graph",
+          "to": "src/graph",
+          "importCount": 2
+        },
+        {
+          "from": "tests/graph",
+          "to": "tests",
+          "importCount": 3
+        },
+        {
+          "from": "tests/conversation",
+          "to": "src/db",
+          "importCount": 1
+        },
+        {
+          "from": "tests/conversation",
+          "to": "src/embeddings",
+          "importCount": 2
+        },
+        {
+          "from": "tests/conversation",
+          "to": "src/conversation",
+          "importCount": 5
+        },
+        {
+          "from": "tests/conversation",
+          "to": "tests",
+          "importCount": 3
+        },
+        {
+          "from": "src/cli",
+          "to": "src/utils",
+          "importCount": 2
+        },
+        {
+          "from": "src/cli",
+          "to": "src/config",
+          "importCount": 1
+        },
+        {
+          "from": "src/cli",
+          "to": "src/cli/commands",
+          "importCount": 19
+        },
+        {
+          "from": "src/conversation",
+          "to": "src/indexing",
+          "importCount": 1
+        },
+        {
+          "from": "src/conversation",
+          "to": "src/embeddings",
+          "importCount": 1
+        },
+        {
+          "from": "src/tools",
+          "to": "src/embeddings",
+          "importCount": 6
+        },
+        {
+          "from": "src/tools",
+          "to": "src/conversation",
+          "importCount": 1
+        },
+        {
+          "from": "src/tools",
+          "to": "src/search",
+          "importCount": 2
+        },
+        {
+          "from": "src/tools",
+          "to": "src/utils",
+          "importCount": 1
+        },
+        {
+          "from": "src/tools",
+          "to": "src/db",
+          "importCount": 1
+        },
+        {
+          "from": "src/tools",
+          "to": "src/config",
+          "importCount": 2
+        },
+        {
+          "from": "src/tools",
+          "to": "src/indexing",
+          "importCount": 1
+        },
+        {
+          "from": "src/tools",
+          "to": "src/graph",
+          "importCount": 1
+        },
+        {
+          "from": "src/git",
+          "to": "src/embeddings",
+          "importCount": 1
+        },
+        {
+          "from": "src/git",
+          "to": "src/utils",
+          "importCount": 1
+        },
+        {
+          "from": "tests/db",
+          "to": "src/db",
+          "importCount": 1
+        },
+        {
+          "from": "tests/db",
+          "to": "src/embeddings",
+          "importCount": 2
+        },
+        {
+          "from": "tests/db",
+          "to": "tests",
+          "importCount": 2
+        },
+        {
+          "from": "tests/features",
+          "to": "tests",
+          "importCount": 10
+        },
+        {
+          "from": "tests/features",
+          "to": "src/db",
+          "importCount": 3
+        },
+        {
+          "from": "tests/features",
+          "to": "src/embeddings",
+          "importCount": 4
+        },
+        {
+          "from": "tests/features",
+          "to": "src/git",
+          "importCount": 1
+        },
+        {
+          "from": "tests/features",
+          "to": "src/config",
+          "importCount": 2
+        },
+        {
+          "from": "src/indexing",
+          "to": "src/graph",
+          "importCount": 4
+        },
+        {
+          "from": "src/indexing",
+          "to": "src/utils",
+          "importCount": 3
+        },
+        {
+          "from": "src/db",
+          "to": "src/search",
+          "importCount": 4
+        },
+        {
+          "from": "src/db",
+          "to": "src/embeddings",
+          "importCount": 1
+        },
+        {
+          "from": "tests/search",
+          "to": "src/db",
+          "importCount": 9
+        },
+        {
+          "from": "tests/search",
+          "to": "src/embeddings",
+          "importCount": 16
+        },
+        {
+          "from": "tests/search",
+          "to": "tests",
+          "importCount": 20
+        },
+        {
+          "from": "tests/search",
+          "to": "src/search",
+          "importCount": 12
+        },
+        {
+          "from": "tests/search",
+          "to": "src/indexing",
+          "importCount": 2
+        },
+        {
+          "from": "tests/search",
+          "to": "src/config",
+          "importCount": 1
+        },
+        {
+          "from": "tests/search",
+          "to": "src/graph",
+          "importCount": 1
+        },
+        {
+          "from": "src/server",
+          "to": "src/utils",
+          "importCount": 2
+        },
+        {
+          "from": "src/server",
+          "to": "src/db",
+          "importCount": 1
+        },
+        {
+          "from": "src/server",
+          "to": "src/config",
+          "importCount": 1
+        },
+        {
+          "from": "src/server",
+          "to": "src/indexing",
+          "importCount": 2
+        },
+        {
+          "from": "src/server",
+          "to": "src/conversation",
+          "importCount": 3
+        },
+        {
+          "from": "src/server",
+          "to": "src/cli",
+          "importCount": 1
+        },
+        {
+          "from": "src/server",
+          "to": "src/tools",
+          "importCount": 1
+        },
+        {
+          "from": "tests/embeddings",
+          "to": "src/embeddings",
+          "importCount": 5
+        },
+        {
+          "from": "src/search",
+          "to": "src/db",
+          "importCount": 3
+        },
+        {
+          "from": "src/search",
+          "to": "src/config",
+          "importCount": 2
+        },
+        {
+          "from": "src/search",
+          "to": "src/embeddings",
+          "importCount": 1
+        },
+        {
+          "from": "src/search",
+          "to": "src/utils",
+          "importCount": 1
+        },
+        {
+          "from": "src/cli/commands",
+          "to": "src/db",
+          "importCount": 16
+        },
+        {
+          "from": "src/cli/commands",
+          "to": "src/config",
+          "importCount": 13
+        },
+        {
+          "from": "src/cli/commands",
+          "to": "src/git",
+          "importCount": 1
+        },
+        {
+          "from": "src/cli/commands",
+          "to": "src/embeddings",
+          "importCount": 7
+        },
+        {
+          "from": "src/cli/commands",
+          "to": "src/cli",
+          "importCount": 12
+        },
+        {
+          "from": "src/cli/commands",
+          "to": "src/utils",
+          "importCount": 18
+        },
+        {
+          "from": "src/cli/commands",
+          "to": "src/search",
+          "importCount": 13
+        },
+        {
+          "from": "src/cli/commands",
+          "to": "src/indexing",
+          "importCount": 4
+        },
+        {
+          "from": "src/cli/commands",
+          "to": "src/graph",
+          "importCount": 1
+        },
+        {
+          "from": "src/cli/commands",
+          "to": "src/conversation",
+          "importCount": 3
+        },
+        {
+          "from": "tests/indexing",
+          "to": "src/indexing",
+          "importCount": 7
+        },
+        {
+          "from": "tests/indexing",
+          "to": "src/db",
+          "importCount": 3
+        },
+        {
+          "from": "tests/indexing",
+          "to": "src/embeddings",
+          "importCount": 3
+        },
+        {
+          "from": "tests/indexing",
+          "to": "tests",
+          "importCount": 9
+        },
+        {
+          "from": "tests/indexing",
+          "to": "src/config",
+          "importCount": 3
+        },
+        {
+          "from": "src/config",
+          "to": "src/utils",
+          "importCount": 1
+        },
+        {
+          "from": "src/config",
+          "to": "src/embeddings",
+          "importCount": 3
+        },
+        {
+          "from": "src/indexing",
+          "to": "src/embeddings",
+          "importCount": 3
+        },
+        {
+          "from": "src/indexing",
+          "to": "src/db",
+          "importCount": 1
+        },
+        {
+          "from": "tests/config",
+          "to": "src/config",
+          "importCount": 1
+        },
+        {
+          "from": "tests/config",
+          "to": "tests",
+          "importCount": 2
+        },
+        {
+          "from": "src/graph",
+          "to": "src/db",
+          "importCount": 1
+        },
+        {
+          "from": "src/wiki",
+          "to": "src/db",
+          "importCount": 6
+        },
+        {
+          "from": "src/wiki",
+          "to": "src/graph",
+          "importCount": 2
+        },
+        {
+          "from": "tests/wiki",
+          "to": "src/db",
+          "importCount": 2
+        },
+        {
+          "from": "tests/wiki",
+          "to": "src/embeddings",
+          "importCount": 4
+        },
+        {
+          "from": "tests/wiki",
+          "to": "src/graph",
+          "importCount": 2
+        },
+        {
+          "from": "tests/wiki",
+          "to": "tests",
+          "importCount": 4
+        },
+        {
+          "from": "tests/wiki",
+          "to": "src/wiki",
+          "importCount": 13
+        },
+        {
+          "from": "tests/wiki",
+          "to": "src/indexing",
+          "importCount": 1
+        },
+        {
+          "from": "src/tools",
+          "to": "src/wiki",
+          "importCount": 6
+        }
+      ]
+    }
+  },
+  "warnings": []
+}

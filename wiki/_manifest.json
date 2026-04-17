@@ -1,115 +1,309 @@
 {
-  "version": 1,
-  "generatedAt": "2026-04-09T00:00:00.000Z",
-  "lastGitRef": "a228930",
+  "version": 2,
+  "generatedAt": "2026-04-17T21:03:28.289Z",
+  "lastGitRef": "7a897e3",
+  "pageCount": 24,
   "pages": {
-    "index.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": []
+    "wiki/modules/embeddings.md": {
+      "kind": "module",
+      "tier": "module",
+      "title": "embeddings",
+      "depth": "brief",
+      "sourceFiles": [],
+      "relatedPages": [],
+      "order": 0
     },
-    "architecture.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": ["src/main.ts", "src/cli/index.ts", "src/server/index.ts", "src/config/index.ts", "src/db/index.ts"]
+    "wiki/modules/db/index.md": {
+      "kind": "module",
+      "tier": "module",
+      "title": "db",
+      "depth": "full",
+      "sourceFiles": [
+        "src/db/index.ts"
+      ],
+      "relatedPages": [
+        "wiki/modules/db/types.md",
+        "wiki/modules/db/files.md",
+        "wiki/modules/db/git-history.md",
+        "wiki/modules/db/conversation.md",
+        "wiki/modules/db/graph.md"
+      ],
+      "order": 1
     },
-    "data-flow.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": ["src/indexing/indexer.ts", "src/indexing/chunker.ts", "src/search/hybrid.ts", "src/conversation/indexer.ts", "src/conversation/parser.ts", "src/embeddings/embed.ts"]
+    "wiki/modules/tests.md": {
+      "kind": "module",
+      "tier": "module",
+      "title": "tests",
+      "depth": "brief",
+      "sourceFiles": [],
+      "relatedPages": [],
+      "order": 2
     },
-    "api-surface.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": ["src/tools/index.ts", "src/cli/index.ts", "src/config/index.ts"]
+    "wiki/modules/config.md": {
+      "kind": "module",
+      "tier": "module",
+      "title": "config",
+      "depth": "brief",
+      "sourceFiles": [
+        "src/config/index.ts"
+      ],
+      "relatedPages": [],
+      "order": 3
     },
-    "glossary.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": ["src/db/index.ts", "src/search/hybrid.ts", "src/indexing/chunker.ts", "src/config/index.ts"]
+    "wiki/modules/indexing.md": {
+      "kind": "module",
+      "tier": "module",
+      "title": "indexing",
+      "depth": "brief",
+      "sourceFiles": [],
+      "relatedPages": [],
+      "order": 4
     },
-    "modules/cli/index.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": ["src/cli/index.ts", "src/cli/setup.ts", "src/cli/progress.ts"]
+    "wiki/modules/graph.md": {
+      "kind": "module",
+      "tier": "module",
+      "title": "graph",
+      "depth": "brief",
+      "sourceFiles": [],
+      "relatedPages": [],
+      "order": 5
     },
-    "modules/cli/internals.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": ["src/cli/index.ts", "src/cli/setup.ts", "src/cli/progress.ts", "src/cli/commands/init.ts", "src/cli/commands/serve.ts", "src/cli/commands/search-cmd.ts", "src/cli/commands/cleanup.ts"]
+    "wiki/modules/utils.md": {
+      "kind": "module",
+      "tier": "module",
+      "title": "utils",
+      "depth": "brief",
+      "sourceFiles": [],
+      "relatedPages": [],
+      "order": 6
     },
-    "modules/config/index.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": ["src/config/index.ts"]
+    "wiki/modules/search.md": {
+      "kind": "module",
+      "tier": "module",
+      "title": "search",
+      "depth": "brief",
+      "sourceFiles": [],
+      "relatedPages": [],
+      "order": 7
     },
-    "modules/conversation/index.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": ["src/conversation/parser.ts", "src/conversation/indexer.ts"]
+    "wiki/modules/conversation.md": {
+      "kind": "module",
+      "tier": "module",
+      "title": "conversation",
+      "depth": "brief",
+      "sourceFiles": [],
+      "relatedPages": [],
+      "order": 8
     },
-    "modules/db/index.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": ["src/db/index.ts", "src/db/types.ts", "src/db/files.ts", "src/db/search.ts", "src/db/graph.ts", "src/db/conversation.ts", "src/db/checkpoints.ts", "src/db/annotations.ts", "src/db/analytics.ts"]
+    "wiki/modules/cli.md": {
+      "kind": "module",
+      "tier": "module",
+      "title": "cli",
+      "depth": "brief",
+      "sourceFiles": [
+        "src/cli/index.ts"
+      ],
+      "relatedPages": [],
+      "order": 9
     },
-    "modules/db/internals.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": ["src/db/index.ts", "src/db/types.ts", "src/db/files.ts", "src/db/search.ts", "src/db/graph.ts", "src/db/conversation.ts", "src/db/checkpoints.ts", "src/db/annotations.ts", "src/db/analytics.ts"]
+    "wiki/modules/commands.md": {
+      "kind": "module",
+      "tier": "module",
+      "title": "commands",
+      "depth": "full",
+      "sourceFiles": [],
+      "relatedPages": [],
+      "order": 10
     },
-    "modules/embeddings/index.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": ["src/embeddings/embed.ts"]
+    "wiki/modules/tools.md": {
+      "kind": "module",
+      "tier": "module",
+      "title": "tools",
+      "depth": "standard",
+      "sourceFiles": [
+        "src/tools/index.ts"
+      ],
+      "relatedPages": [],
+      "order": 11
     },
-    "modules/graph/index.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": ["src/graph/resolver.ts"]
+    "wiki/modules/wiki.md": {
+      "kind": "module",
+      "tier": "module",
+      "title": "wiki",
+      "depth": "standard",
+      "sourceFiles": [
+        "src/wiki/index.ts"
+      ],
+      "relatedPages": [],
+      "order": 12
     },
-    "modules/indexing/index.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": ["src/indexing/chunker.ts", "src/indexing/indexer.ts", "src/indexing/parse.ts", "src/indexing/watcher.ts"]
+    "wiki/modules/db/types.md": {
+      "kind": "file",
+      "focus": "module-file",
+      "tier": "module",
+      "title": "types",
+      "depth": "standard",
+      "sourceFiles": [
+        "src/db/types.ts"
+      ],
+      "relatedPages": [
+        "wiki/modules/db/index.md",
+        "wiki/modules/db/files.md",
+        "wiki/modules/db/git-history.md",
+        "wiki/modules/db/conversation.md",
+        "wiki/modules/db/graph.md"
+      ],
+      "order": 13
     },
-    "modules/search/index.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": ["src/search/hybrid.ts", "src/search/usages.ts", "src/search/eval.ts", "src/search/benchmark.ts"]
+    "wiki/modules/db/files.md": {
+      "kind": "file",
+      "focus": "module-file",
+      "tier": "module",
+      "title": "files",
+      "depth": "standard",
+      "sourceFiles": [
+        "src/db/files.ts"
+      ],
+      "relatedPages": [
+        "wiki/modules/db/index.md",
+        "wiki/modules/db/types.md",
+        "wiki/modules/db/git-history.md",
+        "wiki/modules/db/conversation.md",
+        "wiki/modules/db/graph.md"
+      ],
+      "order": 14
     },
-    "modules/server/index.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": ["src/server/index.ts"]
+    "wiki/modules/db/git-history.md": {
+      "kind": "file",
+      "focus": "module-file",
+      "tier": "module",
+      "title": "git-history",
+      "depth": "standard",
+      "sourceFiles": [
+        "src/db/git-history.ts"
+      ],
+      "relatedPages": [
+        "wiki/modules/db/index.md",
+        "wiki/modules/db/types.md",
+        "wiki/modules/db/files.md",
+        "wiki/modules/db/conversation.md",
+        "wiki/modules/db/graph.md"
+      ],
+      "order": 15
     },
-    "modules/tools/index.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": ["src/tools/index.ts"]
+    "wiki/modules/db/conversation.md": {
+      "kind": "file",
+      "focus": "module-file",
+      "tier": "module",
+      "title": "conversation",
+      "depth": "standard",
+      "sourceFiles": [
+        "src/db/conversation.ts"
+      ],
+      "relatedPages": [
+        "wiki/modules/db/index.md",
+        "wiki/modules/db/types.md",
+        "wiki/modules/db/files.md",
+        "wiki/modules/db/git-history.md",
+        "wiki/modules/db/graph.md"
+      ],
+      "order": 16
     },
-    "modules/tools/internals.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": ["src/tools/search.ts", "src/tools/graph-tools.ts", "src/tools/index-tools.ts", "src/tools/annotation-tools.ts", "src/tools/checkpoint-tools.ts", "src/tools/conversation-tools.ts", "src/tools/git-tools.ts", "src/tools/analytics-tools.ts", "src/tools/server-info-tools.ts", "src/tools/wiki-tools.ts"]
+    "wiki/modules/db/graph.md": {
+      "kind": "file",
+      "focus": "module-file",
+      "tier": "module",
+      "title": "graph",
+      "depth": "standard",
+      "sourceFiles": [
+        "src/db/graph.ts"
+      ],
+      "relatedPages": [
+        "wiki/modules/db/index.md",
+        "wiki/modules/db/types.md",
+        "wiki/modules/db/files.md",
+        "wiki/modules/db/git-history.md",
+        "wiki/modules/db/conversation.md"
+      ],
+      "order": 17
     },
-    "modules/utils/index.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": ["src/utils/log.ts", "src/utils/dir-guard.ts"]
+    "wiki/architecture.md": {
+      "kind": "aggregate",
+      "focus": "architecture",
+      "tier": "aggregate",
+      "title": "Architecture",
+      "depth": "standard",
+      "sourceFiles": [],
+      "relatedPages": [
+        "wiki/modules/embeddings.md",
+        "wiki/modules/db/index.md",
+        "wiki/modules/tests.md",
+        "wiki/modules/config.md",
+        "wiki/modules/indexing.md",
+        "wiki/modules/graph.md",
+        "wiki/modules/utils.md",
+        "wiki/modules/search.md",
+        "wiki/modules/conversation.md",
+        "wiki/modules/cli.md",
+        "wiki/modules/commands.md",
+        "wiki/modules/tools.md",
+        "wiki/modules/wiki.md",
+        "wiki/data-flows.md"
+      ],
+      "order": 18
     },
-    "entities/rag-db.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": ["src/db/index.ts"]
+    "wiki/data-flows.md": {
+      "kind": "aggregate",
+      "focus": "data-flows",
+      "tier": "aggregate",
+      "title": "Data Flows",
+      "depth": "standard",
+      "sourceFiles": [],
+      "relatedPages": [
+        "wiki/architecture.md"
+      ],
+      "order": 19
     },
-    "entities/hybrid-search.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": ["src/search/hybrid.ts"]
+    "wiki/guides/getting-started.md": {
+      "kind": "aggregate",
+      "focus": "getting-started",
+      "tier": "aggregate",
+      "title": "Getting Started",
+      "depth": "standard",
+      "sourceFiles": [],
+      "relatedPages": [],
+      "order": 20
     },
-    "entities/chunk.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": ["src/indexing/chunker.ts"]
+    "wiki/guides/conventions.md": {
+      "kind": "aggregate",
+      "focus": "conventions",
+      "tier": "aggregate",
+      "title": "Conventions",
+      "depth": "standard",
+      "sourceFiles": [],
+      "relatedPages": [],
+      "order": 21
     },
-    "entities/rag-config.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": ["src/config/index.ts"]
+    "wiki/guides/testing.md": {
+      "kind": "aggregate",
+      "focus": "testing",
+      "tier": "aggregate",
+      "title": "Testing",
+      "depth": "standard",
+      "sourceFiles": [],
+      "relatedPages": [],
+      "order": 22
     },
-    "guides/getting-started.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": ["src/cli/setup.ts", "src/cli/commands/init.ts"]
-    },
-    "guides/conventions.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": []
-    },
-    "guides/testing.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": ["tests/helpers.ts"]
-    },
-    "log.md": {
-      "generatedAt": "2026-04-09T00:00:00.000Z",
-      "sourceFiles": []
+    "wiki/index.md": {
+      "kind": "aggregate",
+      "focus": "index",
+      "tier": "aggregate",
+      "title": "Index",
+      "depth": "standard",
+      "sourceFiles": [],
+      "relatedPages": [],
+      "order": 23
     }
-  }
+  },
+  "warnings": []
 }
