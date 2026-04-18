@@ -1,14 +1,37 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { relative } from "path";
-import { type AnnotationRow } from "../db";
+import { relative, resolve } from "path";
+import { type AnnotationRow, type PathFilter } from "../db";
 import { search, searchChunks } from "../search/hybrid";
 import { type GetDB, resolveProject } from "./index";
+
+/**
+ * Build a PathFilter from tool params, resolving dir paths relative to the
+ * project directory so they match the absolute paths stored in the index.
+ * Returns undefined if no filter fields are populated.
+ */
+function buildFilter(
+  projectDir: string,
+  extensions?: string[],
+  dirs?: string[],
+  excludeDirs?: string[],
+): PathFilter | undefined {
+  const hasAny =
+    (extensions && extensions.length > 0) ||
+    (dirs && dirs.length > 0) ||
+    (excludeDirs && excludeDirs.length > 0);
+  if (!hasAny) return undefined;
+  return {
+    extensions,
+    dirs: dirs?.map((d) => resolve(projectDir, d)),
+    excludeDirs: excludeDirs?.map((d) => resolve(projectDir, d)),
+  };
+}
 
 export function registerSearchTools(server: McpServer, getDB: GetDB) {
   server.tool(
     "search",
-    "Search the full codebase by meaning — finds files that grep misses. Use natural language ('how does auth work') or symbol names. Searches all indexed files semantically + by keyword in <100ms. Returns ranked file paths with snippets. Use read_relevant next to get full content with line ranges.",
+    "Search the full codebase by meaning — finds files that grep misses. Use natural language ('how does auth work') or symbol names. Searches all indexed files semantically + by keyword in <100ms. Returns ranked file paths with snippets. Use read_relevant next to get full content with line ranges. Pass extensions/dirs/excludeDirs to scope the search.",
     {
       query: z.string().min(1).max(2000).describe("The search query (natural language)"),
       directory: z
@@ -24,21 +47,35 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
         .max(1000)
         .optional()
         .describe("Number of results to return (default: from config or 10)"),
+      extensions: z
+        .array(z.string())
+        .optional()
+        .describe("Restrict to these file extensions, e.g. [\".ts\", \".tsx\"]. Leading dot optional."),
+      dirs: z
+        .array(z.string())
+        .optional()
+        .describe("Restrict to these directories (relative to project root or absolute), e.g. [\"src\", \"packages/core\"]."),
+      excludeDirs: z
+        .array(z.string())
+        .optional()
+        .describe("Exclude these directories, e.g. [\"tests\", \"fixtures\"]."),
     },
-    async ({ query, directory, top }) => {
-      const { db: ragDb, config } = await resolveProject(directory, getDB);
+    async ({ query, directory, top, extensions, dirs, excludeDirs }) => {
+      const { projectDir, db: ragDb, config } = await resolveProject(directory, getDB);
+      const filter = buildFilter(projectDir, extensions, dirs, excludeDirs);
 
       const start = performance.now();
-      const results = await search(query, ragDb, top ?? config.searchTopK, 0, config.hybridWeight, config.generated);
+      const results = await search(query, ragDb, top ?? config.searchTopK, 0, config.hybridWeight, config.generated, filter);
       const durationMs = Math.round(performance.now() - start);
       const { totalFiles } = ragDb.getStatus();
 
       if (results.length === 0) {
+        const scopeNote = filter ? " matching the given scope" : "";
         return {
           content: [
             {
               type: "text" as const,
-              text: `No results found across ${totalFiles} indexed files. Has the directory been indexed? Try calling index_files first.`,
+              text: `No results found${scopeNote} across ${totalFiles} indexed files. Has the directory been indexed? Try calling index_files first.`,
             },
           ],
         };
@@ -63,7 +100,7 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
 
   server.tool(
     "read_relevant",
-    "Get the actual content of the most relevant code chunks — individual functions, classes, or sections — with exact line ranges for navigation. Smarter than grep: finds code by meaning, not just string matching. Multiple chunks from the same file can appear. Use this instead of search + Read when you need the content itself.",
+    "Get the actual content of the most relevant code chunks — individual functions, classes, or sections — with exact line ranges for navigation. Smarter than grep: finds code by meaning, not just string matching. Multiple chunks from the same file can appear. Use this instead of search + Read when you need the content itself. Pass extensions/dirs/excludeDirs to scope the search.",
     {
       query: z.string().min(1).max(2000).describe("The search query (natural language)"),
       directory: z
@@ -85,9 +122,22 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
         .max(1)
         .optional()
         .describe("Min relevance score to include (default: 0.3)"),
+      extensions: z
+        .array(z.string())
+        .optional()
+        .describe("Restrict to these file extensions, e.g. [\".ts\", \".tsx\"]. Leading dot optional."),
+      dirs: z
+        .array(z.string())
+        .optional()
+        .describe("Restrict to these directories (relative to project root or absolute)."),
+      excludeDirs: z
+        .array(z.string())
+        .optional()
+        .describe("Exclude these directories."),
     },
-    async ({ query, directory, top, threshold }) => {
+    async ({ query, directory, top, threshold, extensions, dirs, excludeDirs }) => {
       const { projectDir, db: ragDb, config } = await resolveProject(directory, getDB);
+      const filter = buildFilter(projectDir, extensions, dirs, excludeDirs);
 
       const start = performance.now();
       const results = await searchChunks(
@@ -97,16 +147,18 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
         threshold ?? 0.3,
         config.hybridWeight,
         config.generated,
+        filter,
       );
       const durationMs = Math.round(performance.now() - start);
       const { totalFiles } = ragDb.getStatus();
 
       if (results.length === 0) {
+        const scopeNote = filter ? " matching the given scope" : "";
         return {
           content: [
             {
               type: "text" as const,
-              text: `No relevant chunks found across ${totalFiles} indexed files. Has the directory been indexed? Try calling index_files first.`,
+              text: `No relevant chunks found${scopeNote} across ${totalFiles} indexed files. Has the directory been indexed? Try calling index_files first.`,
             },
           ],
         };

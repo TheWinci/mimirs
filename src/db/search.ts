@@ -1,9 +1,75 @@
 import { Database } from "bun:sqlite";
 import { dirname, basename } from "path";
-import { type SearchResult, type ChunkSearchResult, type SymbolResult, type UsageResult } from "./types";
+import { type SearchResult, type ChunkSearchResult, type SymbolResult, type UsageResult, type PathFilter } from "./types";
 import { escapeRegex, sanitizeFTS } from "../search/usages";
 
-export function vectorSearch(db: Database, queryEmbedding: Float32Array, topK: number = 5): SearchResult[] {
+/**
+ * Build parametrized SQL fragments for a PathFilter. Caller concatenates
+ * returned clauses with AND. Returns empty arrays when no filter is active.
+ *
+ * Extensions are matched against the file path suffix. Dir filters are
+ * path-prefix matches — callers should pass absolute paths (or paths already
+ * resolved relative to project root) because that's what's stored in the
+ * files table. A missing leading dot on an extension is tolerated.
+ */
+function buildPathFilter(filter?: PathFilter): { clauses: string[]; params: string[]; active: boolean } {
+  const clauses: string[] = [];
+  const params: string[] = [];
+  let active = false;
+
+  if (!filter) return { clauses, params, active };
+
+  if (filter.extensions && filter.extensions.length > 0) {
+    active = true;
+    const extClauses = filter.extensions.map(() => "f.path LIKE ?");
+    clauses.push(`(${extClauses.join(" OR ")})`);
+    for (const ext of filter.extensions) {
+      const normalized = ext.startsWith(".") ? ext : `.${ext}`;
+      params.push(`%${normalized}`);
+    }
+  }
+
+  if (filter.dirs && filter.dirs.length > 0) {
+    active = true;
+    const dirClauses = filter.dirs.map(() => "f.path LIKE ?");
+    clauses.push(`(${dirClauses.join(" OR ")})`);
+    for (const dir of filter.dirs) {
+      params.push(`${dir.replace(/\/$/, "")}/%`);
+    }
+  }
+
+  if (filter.excludeDirs && filter.excludeDirs.length > 0) {
+    active = true;
+    for (const dir of filter.excludeDirs) {
+      clauses.push("f.path NOT LIKE ?");
+      params.push(`${dir.replace(/\/$/, "")}/%`);
+    }
+  }
+
+  return { clauses, params, active };
+}
+
+/** How much to over-fetch from the inner vec/FTS query when a filter is active. */
+const FILTER_OVERFETCH = 5;
+
+export function vectorSearch(
+  db: Database,
+  queryEmbedding: Float32Array,
+  topK: number = 5,
+  filter?: PathFilter,
+): SearchResult[] {
+  const { clauses, params: filterParams, active } = buildPathFilter(filter);
+  const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
+  const innerLimit = active ? topK * FILTER_OVERFETCH : topK;
+
+  const sql = `SELECT v.chunk_id, v.distance, c.snippet, c.chunk_index, c.entity_name, c.chunk_type, f.path
+     FROM (SELECT chunk_id, distance FROM vec_chunks WHERE embedding MATCH ? ORDER BY distance LIMIT ?) v
+     JOIN chunks c ON c.id = v.chunk_id
+     JOIN files f ON f.id = c.file_id
+     ${whereClause}
+     ORDER BY v.distance
+     LIMIT ?`;
+
   return db
     .query<
       {
@@ -15,14 +81,9 @@ export function vectorSearch(db: Database, queryEmbedding: Float32Array, topK: n
         chunk_type: string | null;
         path: string;
       },
-      [Uint8Array, number]
-    >(
-      `SELECT v.chunk_id, v.distance, c.snippet, c.chunk_index, c.entity_name, c.chunk_type, f.path
-       FROM (SELECT chunk_id, distance FROM vec_chunks WHERE embedding MATCH ? ORDER BY distance LIMIT ?) v
-       JOIN chunks c ON c.id = v.chunk_id
-       JOIN files f ON f.id = c.file_id`
-    )
-    .all(new Uint8Array(queryEmbedding.buffer), topK)
+      (Uint8Array | number | string)[]
+    >(sql)
+    .all(new Uint8Array(queryEmbedding.buffer), innerLimit, ...filterParams, topK)
     .map((row) => ({
       path: row.path,
       score: 1 / (1 + row.distance),
@@ -33,7 +94,24 @@ export function vectorSearch(db: Database, queryEmbedding: Float32Array, topK: n
     }));
 }
 
-export function textSearch(db: Database, query: string, topK: number = 5): SearchResult[] {
+export function textSearch(
+  db: Database,
+  query: string,
+  topK: number = 5,
+  filter?: PathFilter,
+): SearchResult[] {
+  const { clauses, params: filterParams, active } = buildPathFilter(filter);
+  const extraWhere = clauses.length > 0 ? ` AND ${clauses.join(" AND ")}` : "";
+  const fetchLimit = active ? topK * FILTER_OVERFETCH : topK;
+
+  const sql = `SELECT c.snippet, c.chunk_index, c.entity_name, c.chunk_type, f.path, rank
+     FROM fts_chunks fts
+     JOIN chunks c ON c.id = fts.rowid
+     JOIN files f ON f.id = c.file_id
+     WHERE fts_chunks MATCH ?${extraWhere}
+     ORDER BY rank
+     LIMIT ?`;
+
   return db
     .query<
       {
@@ -44,17 +122,10 @@ export function textSearch(db: Database, query: string, topK: number = 5): Searc
         rank: number;
         path: string;
       },
-      [string, number]
-    >(
-      `SELECT c.snippet, c.chunk_index, c.entity_name, c.chunk_type, f.path, rank
-       FROM fts_chunks fts
-       JOIN chunks c ON c.id = fts.rowid
-       JOIN files f ON f.id = c.file_id
-       WHERE fts_chunks MATCH ?
-       ORDER BY rank
-       LIMIT ?`
-    )
-    .all(sanitizeFTS(query), topK)
+      (string | number)[]
+    >(sql)
+    .all(sanitizeFTS(query), ...filterParams, fetchLimit)
+    .slice(0, topK)
     .map((row) => ({
       path: row.path,
       score: 1 / (1 + Math.abs(row.rank)),
@@ -65,7 +136,25 @@ export function textSearch(db: Database, query: string, topK: number = 5): Searc
     }));
 }
 
-export function vectorSearchChunks(db: Database, queryEmbedding: Float32Array, topK: number = 8): ChunkSearchResult[] {
+export function vectorSearchChunks(
+  db: Database,
+  queryEmbedding: Float32Array,
+  topK: number = 8,
+  filter?: PathFilter,
+): ChunkSearchResult[] {
+  const { clauses, params: filterParams, active } = buildPathFilter(filter);
+  const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
+  const innerLimit = active ? topK * FILTER_OVERFETCH : topK;
+
+  const sql = `SELECT v.chunk_id, v.distance, c.snippet, c.chunk_index, c.entity_name, c.chunk_type,
+            c.start_line, c.end_line, c.parent_id, f.path
+     FROM (SELECT chunk_id, distance FROM vec_chunks WHERE embedding MATCH ? ORDER BY distance LIMIT ?) v
+     JOIN chunks c ON c.id = v.chunk_id
+     JOIN files f ON f.id = c.file_id
+     ${whereClause}
+     ORDER BY v.distance
+     LIMIT ?`;
+
   return db
     .query<
       {
@@ -80,15 +169,9 @@ export function vectorSearchChunks(db: Database, queryEmbedding: Float32Array, t
         parent_id: number | null;
         path: string;
       },
-      [Uint8Array, number]
-    >(
-      `SELECT v.chunk_id, v.distance, c.snippet, c.chunk_index, c.entity_name, c.chunk_type,
-              c.start_line, c.end_line, c.parent_id, f.path
-       FROM (SELECT chunk_id, distance FROM vec_chunks WHERE embedding MATCH ? ORDER BY distance LIMIT ?) v
-       JOIN chunks c ON c.id = v.chunk_id
-       JOIN files f ON f.id = c.file_id`
-    )
-    .all(new Uint8Array(queryEmbedding.buffer), topK)
+      (Uint8Array | number | string)[]
+    >(sql)
+    .all(new Uint8Array(queryEmbedding.buffer), innerLimit, ...filterParams, topK)
     .map((row) => ({
       path: row.path,
       score: 1 / (1 + row.distance),
@@ -102,7 +185,25 @@ export function vectorSearchChunks(db: Database, queryEmbedding: Float32Array, t
     }));
 }
 
-export function textSearchChunks(db: Database, query: string, topK: number = 8): ChunkSearchResult[] {
+export function textSearchChunks(
+  db: Database,
+  query: string,
+  topK: number = 8,
+  filter?: PathFilter,
+): ChunkSearchResult[] {
+  const { clauses, params: filterParams, active } = buildPathFilter(filter);
+  const extraWhere = clauses.length > 0 ? ` AND ${clauses.join(" AND ")}` : "";
+  const fetchLimit = active ? topK * FILTER_OVERFETCH : topK;
+
+  const sql = `SELECT c.snippet, c.chunk_index, c.entity_name, c.chunk_type, c.start_line, c.end_line,
+            c.parent_id, f.path, rank
+     FROM fts_chunks fts
+     JOIN chunks c ON c.id = fts.rowid
+     JOIN files f ON f.id = c.file_id
+     WHERE fts_chunks MATCH ?${extraWhere}
+     ORDER BY rank
+     LIMIT ?`;
+
   return db
     .query<
       {
@@ -116,18 +217,10 @@ export function textSearchChunks(db: Database, query: string, topK: number = 8):
         rank: number;
         path: string;
       },
-      [string, number]
-    >(
-      `SELECT c.snippet, c.chunk_index, c.entity_name, c.chunk_type, c.start_line, c.end_line,
-              c.parent_id, f.path, rank
-       FROM fts_chunks fts
-       JOIN chunks c ON c.id = fts.rowid
-       JOIN files f ON f.id = c.file_id
-       WHERE fts_chunks MATCH ?
-       ORDER BY rank
-       LIMIT ?`
-    )
-    .all(sanitizeFTS(query), topK)
+      (string | number)[]
+    >(sql)
+    .all(sanitizeFTS(query), ...filterParams, fetchLimit)
+    .slice(0, topK)
     .map((row) => ({
       path: row.path,
       score: 1 / (1 + Math.abs(row.rank)),

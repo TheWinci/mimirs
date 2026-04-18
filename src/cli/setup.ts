@@ -13,12 +13,15 @@ This project has a local RAG index (mimirs). Use these MCP tools:
 
 - **\`search\`**: Discover which files are relevant to a topic. Returns file paths
   with snippet previews — use this when you need to know *where* something is.
+  Supports optional \`extensions\`, \`dirs\`, and \`excludeDirs\` filters to scope
+  results (e.g. restrict to \`.ts\` files, or under \`src/\`).
 - **\`read_relevant\`**: Get the actual content of relevant semantic chunks —
   individual functions, classes, or markdown sections — ranked by relevance.
   Results include exact line ranges (\`src/db.ts:42-67\`) so you can navigate
   directly to the edit location. Use this instead of \`search\` + \`Read\` when
   you need the content itself. Two chunks from the same file can both appear
-  (no file deduplication).
+  (no file deduplication). Accepts the same \`extensions\`/\`dirs\`/\`excludeDirs\`
+  filters as \`search\`.
 - **\`project_map\`**: When you need to understand how files relate to each other,
   generate a dependency graph. Use \`focus\` to zoom into a specific file's
   neighborhood. This is faster than reading import statements across many files.

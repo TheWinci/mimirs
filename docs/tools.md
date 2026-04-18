@@ -4,8 +4,8 @@ These tools are available to any MCP client (Claude Code, Cursor, Windsurf, VS C
 
 | Tool | What it does |
 |---|---|
-| `search` | Semantic search over indexed files — returns ranked paths, scores, and 400-char snippets |
-| `read_relevant` | Chunk-level retrieval — returns top-N individual semantic chunks ranked by relevance, with entity names and full content. No file deduplication — two chunks from the same file can both appear |
+| `search` | Semantic search over indexed files — returns ranked paths, scores, and 400-char snippets. Supports `extensions`, `dirs`, `excludeDirs` scope filters |
+| `read_relevant` | Chunk-level retrieval — returns top-N individual semantic chunks ranked by relevance, with entity names and full content. No file deduplication — two chunks from the same file can both appear. Same scope filters as `search` |
 | `index_files` | Index files in a directory — skips unchanged files, prunes deleted ones |
 | `index_status` | Show file count, chunk count, last indexed time |
 | `remove_file` | Remove a specific file from the index |
