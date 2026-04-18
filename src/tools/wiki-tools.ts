@@ -1,16 +1,21 @@
 import { z } from "zod";
-import { join, relative, dirname } from "path";
+import { join, relative, dirname, resolve } from "path";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "fs";
 import { execSync } from "child_process";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { type GetDB, resolveProject } from "./index";
+import { findGitRoot, runGit } from "./git-tools";
 import { runWikiPlanning, getPagePayload } from "../wiki";
+import { classifyStaleness, type StalenessReport } from "../wiki/staleness";
 import type {
   PageManifest,
   ContentCache,
   ClassifiedInventory,
+  DiscoveryResult,
   PagePayload,
+  WikiPlanResult,
 } from "../wiki/types";
+import type { RagDB } from "../db";
 
 const WRITING_RULES = `## Writing Rules
 
@@ -48,7 +53,7 @@ const WORKFLOW_TIPS = `## Context Management
 export function registerWikiTools(server: McpServer, getDB: GetDB) {
   server.tool(
     "generate_wiki",
-    "Generate a structured markdown wiki. Modes: (1) No page arg → runs discovery + planning, writes JSON artifacts, returns page list. (2) page: N → returns lightweight summary with candidate sections, exemplar path (aggregate pages), link map, semantic queries, and a data manifest listing available sections. (3) page: N, section: 'exports' → returns full data for that section. Sections: exports, dependencies, dependents, usages, neighborhood, overview. Use section: 'library:<name>' to fetch a section-library example. (4) finalize: true → validation instructions. (5) resume: true → checks which pages exist on disk and returns remaining work.",
+    "Generate a structured markdown wiki. Modes: (1) No page arg → runs discovery + planning, writes JSON artifacts, returns page list. (2) page: N → returns lightweight summary with candidate sections, exemplar path (aggregate pages), link map, semantic queries, and a data manifest listing available sections. (3) page: N, section: 'exports' → returns full data for that section. Sections: exports, dependencies, dependents, usages, neighborhood, overview. Use section: 'library:<name>' to fetch a section-library example. (4) finalize: true → validation instructions. (5) resume: true → checks which pages exist on disk and returns remaining work. (6) incremental: true → diffs the working tree against the manifest's lastGitRef, refreshes artifacts, and returns only pages whose sources changed.",
     {
       directory: z
         .string()
@@ -72,8 +77,12 @@ export function registerWikiTools(server: McpServer, getDB: GetDB) {
         .boolean()
         .optional()
         .describe("Check which pages are already written and return remaining work"),
+      incremental: z
+        .boolean()
+        .optional()
+        .describe("Re-plan against the stored lastGitRef; regenerate only pages whose source files changed. Requires an existing manifest."),
     },
-    async ({ directory, page, section, finalize, resume }) => {
+    async ({ directory, page, section, finalize, resume, incremental }) => {
       const { db: ragDb, projectDir } = await resolveProject(directory, getDB);
       const wikiDir = join(projectDir, "wiki");
 
@@ -82,7 +91,7 @@ export function registerWikiTools(server: McpServer, getDB: GetDB) {
         return {
           content: [{
             type: "text" as const,
-            text: buildFinalizeInstructions(wikiDir),
+            text: buildFinalizeInstructions(),
           }],
         };
       }
@@ -95,6 +104,12 @@ export function registerWikiTools(server: McpServer, getDB: GetDB) {
             text: buildResumeResponse(wikiDir, projectDir),
           }],
         };
+      }
+
+      // ── Incremental mode ──
+      if (incremental) {
+        const text = await buildIncrementalResponse(ragDb, projectDir, wikiDir);
+        return { content: [{ type: "text" as const, text }] };
       }
 
       // ── Page mode ──
@@ -680,7 +695,160 @@ function buildResumeResponse(wikiDir: string, projectDir: string): string {
   return text;
 }
 
-function buildFinalizeInstructions(wikiDir: string): string {
+async function buildIncrementalResponse(
+  ragDb: RagDB,
+  projectDir: string,
+  wikiDir: string,
+): Promise<string> {
+  const manifestPath = join(wikiDir, "_manifest.json");
+  if (!existsSync(manifestPath)) {
+    return "No manifest found. Call `generate_wiki()` first to run a full planning pass, then re-run with `incremental: true` on subsequent updates.";
+  }
+
+  const gitRoot = await findGitRoot(resolve(projectDir));
+  if (!gitRoot) {
+    return "Not a git repository — incremental mode requires git. Re-run `generate_wiki()` without `incremental` for a full regen.";
+  }
+
+  const oldManifest: PageManifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+  const sinceRef = oldManifest.lastGitRef;
+
+  const currentHead = await runGit(["rev-parse", "--short", "HEAD"], gitRoot);
+  if (!currentHead) {
+    return "Could not read current HEAD. Is this a fresh repo with no commits?";
+  }
+
+  // Verify old ref is reachable before diffing
+  const sinceReachable = await runGit(["rev-parse", "--verify", `${sinceRef}^{commit}`], gitRoot);
+  if (!sinceReachable) {
+    return `Manifest's lastGitRef \`${sinceRef}\` is not reachable from this checkout (force-pushed, rebased, or shallow clone). Re-run \`generate_wiki()\` without \`incremental\` for a full regen.`;
+  }
+
+  const changedFiles = await getChangedFiles(gitRoot, sinceRef);
+
+  if (changedFiles.size === 0 && currentHead === sinceRef) {
+    return `# Wiki Up To Date\n\nNo file changes since \`${sinceRef}\`. Nothing to regenerate.`;
+  }
+
+  const status = ragDb.getStatus();
+  if (status.totalFiles === 0) {
+    return "The index is empty — run `index_files()` first, then re-run incremental.";
+  }
+
+  // Re-run full planning against the fresh DB state
+  const result = runWikiPlanning(ragDb, projectDir, currentHead);
+
+  // Build entry-point set from fresh discovery for aggregate staleness checks
+  const newEntryPoints = new Set(
+    result.discovery.graphData.fileLevel.nodes
+      .filter((n) => n.isEntryPoint)
+      .map((n) => n.path),
+  );
+
+  const report = classifyStaleness(
+    oldManifest,
+    result.manifest,
+    result.classified,
+    newEntryPoints,
+    changedFiles,
+  );
+
+  const dirty = report.stale.length + report.added.length;
+  const shouldFallBack = dirty > result.manifest.pageCount * 0.5;
+
+  // Always persist the fresh artifacts so page: N calls see the new manifest
+  writeArtifacts(wikiDir, result);
+
+  if (shouldFallBack) {
+    return buildInitResponse(result.manifest, [
+      ...result.warnings,
+      `Fell back to full init: ${dirty}/${result.manifest.pageCount} pages would need regeneration (>50% threshold).`,
+    ]);
+  }
+
+  return renderIncrementalResponse(sinceRef, currentHead, changedFiles.size, report);
+}
+
+async function getChangedFiles(gitRoot: string, sinceRef: string): Promise<Set<string>> {
+  // `git diff --name-only <ref>` compares the working tree (tracked files,
+  // staged + unstaged) against the ref. That's committed + uncommitted in
+  // one call, which is what we want for incremental staleness.
+  const out = await runGit(["diff", "--name-only", sinceRef], gitRoot);
+  if (out === null) return new Set();
+  return new Set(out.split("\n").map((s) => s.trim()).filter(Boolean));
+}
+
+function writeArtifacts(wikiDir: string, result: WikiPlanResult): void {
+  mkdirSync(wikiDir, { recursive: true });
+  writeFileSync(join(wikiDir, "_discovery.json"), JSON.stringify(result.discovery, null, 2));
+  writeFileSync(join(wikiDir, "_classified.json"), JSON.stringify(result.classified, null, 2));
+  writeFileSync(join(wikiDir, "_manifest.json"), JSON.stringify(result.manifest, null, 2));
+  writeFileSync(join(wikiDir, "_content.json"), JSON.stringify(result.content, null, 2));
+}
+
+function renderIncrementalResponse(
+  sinceRef: string,
+  newRef: string,
+  changedFileCount: number,
+  report: StalenessReport,
+): string {
+  const { stale, added, removed } = report;
+  let text = `# Wiki Incremental Update\n\n`;
+  text += `${stale.length} stale, ${added.length} new, ${removed.length} removed since \`${sinceRef}\`..\`${newRef}\` (${changedFileCount} files changed).\n\n`;
+
+  if (stale.length === 0 && added.length === 0 && removed.length === 0) {
+    text += `Changed files did not invalidate any wiki page. Artifacts refreshed; nothing to regenerate.\n`;
+    return text;
+  }
+
+  const byOrder = (a: { order: number }, b: { order: number }) => a.order - b.order;
+
+  if (stale.length > 0) {
+    text += `## Regenerate these (call \`generate_wiki(page: N)\` for each)\n\n`;
+    for (const d of [...stale].sort(byOrder)) {
+      const kindLabel = d.page.focus ?? d.page.kind;
+      text += `- page **${d.order}** — \`${d.wikiPath}\` — ${d.page.title} (${kindLabel}, ${d.page.depth})\n`;
+      text += `  trigger: ${d.triggers.join(", ")}\n`;
+    }
+    text += `\n`;
+  }
+
+  if (added.length > 0) {
+    text += `## New pages\n\n`;
+    for (const d of [...added].sort(byOrder)) {
+      const kindLabel = d.page.focus ?? d.page.kind;
+      text += `- page **${d.order}** — \`${d.wikiPath}\` — ${d.page.title} (${kindLabel}, ${d.page.depth})\n`;
+    }
+    text += `\n`;
+  }
+
+  if (removed.length > 0) {
+    text += `## Delete these files\n\n`;
+    for (const r of removed) {
+      text += `- \`${r.wikiPath}\`\n`;
+    }
+    text += `\n`;
+  }
+
+  text += `${WRITING_RULES}\n\n`;
+
+  text += `## Instructions\n\n`;
+  if (stale.length > 0 || added.length > 0) {
+    text += `1. For each page index listed above: call \`generate_wiki(page: N)\`, apply the writing rules, and write the file. Batch 3–5 pages in parallel.\n`;
+  }
+  if (removed.length > 0) {
+    const nextStep = stale.length > 0 || added.length > 0 ? `2. ` : `1. `;
+    text += `${nextStep}Delete the files under "Delete these files" (they were removed from the manifest).\n`;
+  }
+  const finalStep = (stale.length > 0 || added.length > 0 ? 1 : 0) + (removed.length > 0 ? 1 : 0) + 1;
+  text += `${finalStep}. Call \`generate_wiki(finalize: true)\` once all pages are written.\n`;
+
+  text += `\n${WORKFLOW_TIPS}\n`;
+
+  return text;
+}
+
+function buildFinalizeInstructions(): string {
   return `# Finalization
 
 Run these steps to complete the wiki:
