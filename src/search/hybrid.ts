@@ -1,7 +1,40 @@
 import { embed } from "../embeddings/embed";
-import { RagDB, type SearchResult, type ChunkSearchResult } from "../db";
+import { RagDB, type SearchResult, type ChunkSearchResult, type PathFilter } from "../db";
 import { log } from "../utils/log";
 import { basename, extname } from "path";
+
+/**
+ * Match a path against a PathFilter — used in-memory to filter results that
+ * bypassed SQL (e.g. symbol-expanded hits). Mirrors buildPathFilter in db/search.ts.
+ */
+function matchesFilter(path: string, filter?: PathFilter): boolean {
+  if (!filter) return true;
+
+  if (filter.extensions && filter.extensions.length > 0) {
+    const ok = filter.extensions.some((ext) => {
+      const normalized = ext.startsWith(".") ? ext : `.${ext}`;
+      return path.endsWith(normalized);
+    });
+    if (!ok) return false;
+  }
+
+  if (filter.dirs && filter.dirs.length > 0) {
+    const ok = filter.dirs.some((dir) => {
+      const normalized = dir.replace(/\/$/, "") + "/";
+      return path.startsWith(normalized);
+    });
+    if (!ok) return false;
+  }
+
+  if (filter.excludeDirs && filter.excludeDirs.length > 0) {
+    for (const dir of filter.excludeDirs) {
+      const normalized = dir.replace(/\/$/, "") + "/";
+      if (path.startsWith(normalized)) return false;
+    }
+  }
+
+  return true;
+}
 
 export interface DedupedResult {
   path: string;
@@ -284,17 +317,18 @@ export async function search(
   threshold: number = 0,
   hybridWeight: number = DEFAULT_HYBRID_WEIGHT,
   generatedPatterns: string[] = [],
+  filter?: PathFilter,
 ): Promise<DedupedResult[]> {
   const start = performance.now();
   const queryEmbedding = await embed(query);
 
   // Fetch more than topK to allow deduplication
-  const vectorResults = db.search(queryEmbedding, topK * 4);
+  const vectorResults = db.search(queryEmbedding, topK * 4, filter);
 
   // BM25 text search for keyword matching
   let textResults: typeof vectorResults = [];
   try {
-    textResults = db.textSearch(query, topK * 4);
+    textResults = db.textSearch(query, topK * 4, filter);
   } catch (err) {
     log.debug(`FTS query failed, falling back to vector-only: ${err instanceof Error ? err.message : err}`, "search");
   }
@@ -331,7 +365,9 @@ export async function search(
     for (const id of identifiers) {
       const symbols = db.searchSymbols(id, true, undefined, 5);
       for (const s of symbols) {
-        symbolHits.push({ path: s.path, snippet: s.snippet });
+        if (matchesFilter(s.path, filter)) {
+          symbolHits.push({ path: s.path, snippet: s.snippet });
+        }
       }
     }
     mergeSymbolResults(byFile, symbolHits);
@@ -438,15 +474,16 @@ export async function searchChunks(
   threshold: number = 0.3,
   hybridWeight: number = DEFAULT_HYBRID_WEIGHT,
   generatedPatterns: string[] = [],
+  filter?: PathFilter,
 ): Promise<ChunkResult[]> {
   const start = performance.now();
   const queryEmbedding = await embed(query);
 
-  const vectorResults = db.searchChunks(queryEmbedding, topK * 4);
+  const vectorResults = db.searchChunks(queryEmbedding, topK * 4, filter);
 
   let textResults: ChunkSearchResult[] = [];
   try {
-    textResults = db.textSearchChunks(query, topK * 4);
+    textResults = db.textSearchChunks(query, topK * 4, filter);
   } catch (err) {
     log.debug(`FTS chunk query failed, falling back to vector-only: ${err instanceof Error ? err.message : err}`, "search");
   }

@@ -111,3 +111,9 @@ export interface ConversationSearchResult {
   filesReferenced: string[];
   score: number;
 }
+
+export interface PathFilter {
+  extensions?: string[];
+  dirs?: string[];
+  excludeDirs?: string[];
+}

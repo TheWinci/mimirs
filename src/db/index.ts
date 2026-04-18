@@ -29,7 +29,10 @@ export type {
   ConversationSearchResult,
   GitCommitRow,
   GitCommitSearchResult,
+  PathFilter,
 } from "./types";
+
+import type { PathFilter } from "./types";
 
 // macOS ships with Apple's SQLite which doesn't support extensions.
 // Point bun:sqlite at a vanilla build that supports loadable extensions.
@@ -466,17 +469,17 @@ export class RagDB {
 
   // ── Search operations ─────────────────────────────────────────
 
-  search(queryEmbedding: Float32Array, topK?: number) {
-    return searchOps.vectorSearch(this.db, queryEmbedding, topK);
+  search(queryEmbedding: Float32Array, topK?: number, filter?: PathFilter) {
+    return searchOps.vectorSearch(this.db, queryEmbedding, topK, filter);
   }
-  textSearch(query: string, topK?: number) {
-    return searchOps.textSearch(this.db, query, topK);
+  textSearch(query: string, topK?: number, filter?: PathFilter) {
+    return searchOps.textSearch(this.db, query, topK, filter);
   }
-  searchChunks(queryEmbedding: Float32Array, topK?: number) {
-    return searchOps.vectorSearchChunks(this.db, queryEmbedding, topK);
+  searchChunks(queryEmbedding: Float32Array, topK?: number, filter?: PathFilter) {
+    return searchOps.vectorSearchChunks(this.db, queryEmbedding, topK, filter);
   }
-  textSearchChunks(query: string, topK?: number) {
-    return searchOps.textSearchChunks(this.db, query, topK);
+  textSearchChunks(query: string, topK?: number, filter?: PathFilter) {
+    return searchOps.textSearchChunks(this.db, query, topK, filter);
   }
   searchSymbols(query?: string, exact?: boolean, type?: string, topK?: number) {
     return searchOps.searchSymbols(this.db, query, exact, type, topK);
