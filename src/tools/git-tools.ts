@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { resolve } from "path";
 import { type GetDB, resolveProject } from "./index";
 
-async function runGit(args: string[], cwd: string): Promise<string | null> {
+export async function runGit(args: string[], cwd: string): Promise<string | null> {
   try {
     const proc = Bun.spawn(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe" });
     const output = await new Response(proc.stdout).text();
@@ -14,7 +14,7 @@ async function runGit(args: string[], cwd: string): Promise<string | null> {
   }
 }
 
-async function findGitRoot(dir: string): Promise<string | null> {
+export async function findGitRoot(dir: string): Promise<string | null> {
   return runGit(["rev-parse", "--show-toplevel"], dir);
 }
 
