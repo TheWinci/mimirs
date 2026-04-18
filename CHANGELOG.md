@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - [1.1.2] - 2026-04-17 to 2026-04-18
+
+### Added
+- **Scoped search filters**: `extensions`, `dirs`, `excludeDirs` on `search` and `read_relevant` tools, plus CLI flags `--ext`, `--in`, `--exclude`. Filters apply in SQL before ranking so scoped top-K isn't starved; extension matching accepts values with or without the leading dot
+- **Incremental wiki update**: `src/wiki/staleness.ts` detects stale pages from git diff and regenerates only affected sections
+- **Deterministic wiki generation**: `wiki-tools.ts` split into focused modules under `src/wiki/` (categorization, content-prefetch, discovery, page-tree, page-payload, section-selector) with exemplar and section templates
+
+## [1.0.3] - [1.0.9] - 2026-04-10 to 2026-04-13
+
+### Added
+- **Git history indexing**: `search_commits` and `file_history` MCP tools backed by a new git indexer (`src/git/indexer.ts`, `src/db/git-history.ts`) and `mimirs history index` CLI command
+- Symbol-aware graph resolver (`src/graph/resolver.ts`) feeding richer `search` and `project_map` results in preparation for wiki generation
+- Live current-file and embedding progress display during `mimirs index`
+
+### Changed
+- Relaxed or removed overly conservative caps on arguments to checkpoint, conversation, git-history, graph, and search tools
+- CLI indexing progress trimmed: total chunk count removed
+
+### Fixed
+- Config pattern matching: exclude/include suffix patterns now match at any path depth, not just the project root
+- Indexer skips obfuscated files detected via heuristics
+- Assorted TypeScript type errors
+- `init` command output cleaned up
+
+## [1.0.1] - [1.0.2] - 2026-04-08
+
+### Added
+- `delete_annotation` MCP tool for removing stale annotations
+
+### Changed
+- Docs: mimirs logo, wiki screenshot, and Mimir origin story in README; benchmarks refreshed
+
 ## [1.0.0] - 2026-04-08
 
 ### Changed
