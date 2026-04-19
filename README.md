@@ -11,9 +11,9 @@
 
 Your agent starts every session blind — guessing filenames, grepping for keywords, burning context on irrelevant files, and forgetting everything you discussed yesterday.
 
-On a real project, that costs **380K tokens per prompt and 12-second response times**.
+On one real project, a typical prompt was burning **380K tokens and ~12 seconds end-to-end**.
 
-After indexing with mimirs: **91K tokens, 3 seconds**. A 76% reduction — depending on your model and usage, that's hundreds to thousands in monthly API savings.
+After indexing with mimirs: **91K tokens, ~3 seconds** — a 76% drop on that codebase. Your numbers will vary with repo size, query, and model.
 
 
 <div align="center">
@@ -66,7 +66,7 @@ The plugin adds **SessionStart** (context summary), **PostToolUse** (auto-reinde
 
 ## Search quality
 
-93–98% recall. Benchmarked on four real codebases across three languages (120 queries total) — from 97 files to 8,553 — with known expected results per query. Full methodology in [BENCHMARKS.md](BENCHMARKS.md).
+90–98% Recall@10. Benchmarked on four real codebases across three languages (120 queries total) — from 97 files to 8,553 — with known expected results per query. Full methodology in [BENCHMARKS.md](BENCHMARKS.md).
 
 | Codebase | Language | Files | Queries | Recall@10 | MRR | Zero-miss |
 |---|---|---|---|---|---|---|
@@ -83,11 +83,18 @@ Kubernetes excludes test files and demotes generated files. With `searchTopK: 15
 |---|---|---|---|---|
 | Setup | One command | Nothing | Nothing | API keys, accounts |
 | Token cost | ~91K/prompt | ~380K/prompt | Entire codebase | Varies |
-| Search quality | 93–98% Recall@10 | Depends on keywords | N/A (everything loaded) | Varies |
+| Search quality | 90–98% Recall@10 | Depends on keywords | N/A (everything loaded) | Varies |
 | Code understanding | AST-aware (24 langs) | Line-level | None | Usually line-level |
 | Cross-session memory | Conversations + checkpoints | None | None | Some |
 | Privacy | Fully local | Local | Local | Data leaves your machine |
 | Price | Free | Free | High token bills | $10-50/mo + tokens |
+
+## Why not an existing tool?
+
+- **Continue.dev's `@codebase`** — closest overlap (local RAG, open source), but retrieval lives inside the editor extension. Mimirs is a standalone MCP server with explicit tools (`search`, `read_relevant`, `project_map`, `search_conversation`, `annotate`) the agent can plan around, plus conversation tailing and a wiki generator built in.
+- **Aider's repo-map** — static tree-sitter summary of the repo, no embeddings. Clever and lightweight, but a summary isn't retrieval — mimirs ranks chunks per query with vector + BM25 and boosts by graph centrality.
+- **Sourcegraph Cody / OpenCtx** — excellent at code search, but indexing leans on cloud infra and an account. Mimirs is one `bunx` away and never leaves your machine.
+- **llama-index / LangChain / roll-your-own** — those are libraries. Mimirs is batteries-included: AST-aware chunking, hybrid retrieval, file watcher, conversation tail, and annotations already wired together.
 
 ## How it works
 
@@ -117,6 +124,7 @@ Also indexes: Markdown, JSON, XML, SQL, GraphQL, Protobuf, Terraform, Dockerfile
 
 ## Documentation
 
+- [Example tool outputs](docs/examples.md) — what your agent actually receives over MCP
 - [MCP tools, CLI & analytics](docs/tools.md)
 - [Configuration & examples](docs/configuration.md)
 - [Benchmarks](BENCHMARKS.md)
