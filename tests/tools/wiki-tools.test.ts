@@ -97,6 +97,7 @@ describe("generate_wiki", () => {
     expect(existsSync(join(tempDir, "wiki", "_content.json"))).toBe(true);
     expect(existsSync(join(tempDir, "wiki", "_classified.json"))).toBe(true);
     expect(existsSync(join(tempDir, "wiki", "_discovery.json"))).toBe(true);
+    expect(existsSync(join(tempDir, "wiki", "_update-log.md"))).toBe(true);
   });
 
   test("page mode returns lightweight summary with sections", async () => {
