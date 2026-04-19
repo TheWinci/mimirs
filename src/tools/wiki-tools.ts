@@ -7,6 +7,7 @@ import { type GetDB, resolveProject } from "./index";
 import { findGitRoot, runGit } from "./git-tools";
 import { runWikiPlanning, getPagePayload } from "../wiki";
 import { classifyStaleness, type StalenessReport } from "../wiki/staleness";
+import { appendInitLog, appendIncrementalLog } from "../wiki/update-log";
 import type {
   PageManifest,
   ContentCache,
@@ -164,6 +165,8 @@ export function registerWikiTools(server: McpServer, getDB: GetDB) {
         join(wikiDir, "_content.json"),
         JSON.stringify(result.content, null, 2),
       );
+
+      appendInitLog(wikiDir, gitRef, result.manifest);
 
       return {
         content: [{
@@ -760,11 +763,14 @@ async function buildIncrementalResponse(
   writeArtifacts(wikiDir, result);
 
   if (shouldFallBack) {
+    appendInitLog(wikiDir, currentHead, result.manifest);
     return buildInitResponse(result.manifest, [
       ...result.warnings,
       `Fell back to full init: ${dirty}/${result.manifest.pageCount} pages would need regeneration (>50% threshold).`,
     ]);
   }
+
+  appendIncrementalLog(wikiDir, sinceRef, currentHead, changedFiles.size, report);
 
   return renderIncrementalResponse(sinceRef, currentHead, changedFiles.size, report);
 }
@@ -833,15 +839,28 @@ function renderIncrementalResponse(
   text += `${WRITING_RULES}\n\n`;
 
   text += `## Instructions\n\n`;
+  const steps: string[] = [];
   if (stale.length > 0 || added.length > 0) {
-    text += `1. For each page index listed above: call \`generate_wiki(page: N)\`, apply the writing rules, and write the file. Batch 3–5 pages in parallel.\n`;
+    steps.push(
+      `For each page index listed above: call \`generate_wiki(page: N)\`, apply the writing rules, and write the file. Batch 3–5 pages in parallel.`,
+    );
   }
   if (removed.length > 0) {
-    const nextStep = stale.length > 0 || added.length > 0 ? `2. ` : `1. `;
-    text += `${nextStep}Delete the files under "Delete these files" (they were removed from the manifest).\n`;
+    steps.push(
+      `Delete the files under "Delete these files" (they were removed from the manifest).`,
+    );
   }
-  const finalStep = (stale.length > 0 || added.length > 0 ? 1 : 0) + (removed.length > 0 ? 1 : 0) + 1;
-  text += `${finalStep}. Call \`generate_wiki(finalize: true)\` once all pages are written.\n`;
+  if (stale.length > 0 || added.length > 0) {
+    steps.push(
+      `Append a \`### Narrative\` section to the end of \`wiki/_update-log.md\` under the current update block. One bullet per page you changed, formatted like \`- <backtick>wiki/path.md<backtick>: <one sentence naming what substantively changed — new export, removed API, refactored flow>\` (use literal backticks around the path). Skip cosmetic-only changes (whitespace, renames that don't shift semantics). Keep each bullet a single sentence.`,
+    );
+  }
+  steps.push(
+    `Call \`generate_wiki(finalize: true)\` once all pages are written.`,
+  );
+  steps.forEach((s, i) => {
+    text += `${i + 1}. ${s}\n`;
+  });
 
   text += `\n${WORKFLOW_TIPS}\n`;
 
