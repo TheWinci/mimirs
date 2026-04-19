@@ -1,17 +1,17 @@
 {
-  "name": "local-rag",
+  "name": "mimirs",
   "owner": {
     "name": "TheWinci",
     "url": "https://github.com/TheWinci"
   },
   "plugins": [
     {
-      "name": "local-rag",
+      "name": "mimirs",
       "source": {
         "source": "github",
-        "repo": "TheWinci/local-rag"
+        "repo": "TheWinci/mimirs"
       },
-      "description": "Semantic search for your codebase and conversation history — zero config, local-first, with gap analysis"
+      "description": "Persistent project memory for AI coding agents — semantic search, AST-aware chunking, dependency graphs, conversation history, annotations, and wiki generation"
     }
   ]
 }
