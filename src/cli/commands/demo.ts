@@ -1,14 +1,15 @@
-import { resolve } from "path";
+import { resolve, relative } from "path";
 import { RagDB } from "../../db";
 import { loadConfig } from "../../config";
 import { indexDirectory } from "../../indexing/indexer";
 import { search, searchChunks } from "../../search/hybrid";
-import { cliProgress } from "../progress";
+import { cliProgress, createQuietProgress } from "../progress";
 import { cli } from "../../utils/log";
 
 const CYAN = "\x1b[36m";
 const GREEN = "\x1b[32m";
 const YELLOW = "\x1b[33m";
+const MAGENTA = "\x1b[35m";
 const DIM = "\x1b[2m";
 const BOLD = "\x1b[1m";
 const RESET = "\x1b[0m";
@@ -21,43 +22,64 @@ function pause(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function renderBlock(text: string, indent: string, maxLines: number, wrap: number): string[] {
+  const lines = text.split("\n");
+  const shown = lines
+    .slice(0, maxLines)
+    .map((l) => indent + (l.length > wrap ? l.slice(0, wrap - 1) + "…" : l));
+  if (lines.length > maxLines) {
+    shown.push(`${indent}${DIM}… (+${lines.length - maxLines} more lines)${RESET}`);
+  }
+  return shown;
+}
+
 export async function demoCommand(args: string[]) {
   const dir = resolve(args[1] && !args[1].startsWith("--") ? args[1] : ".");
 
   cli.log(`${BOLD}mimirs demo${RESET}`);
   cli.log(`${DIM}Running against: ${dir}${RESET}`);
 
-  // Step 1: Index
   header("1. Index your project");
   cli.log("Indexing files with AST-aware chunking...\n");
 
   const db = new RagDB(dir);
   const config = await loadConfig(dir);
-  const result = await indexDirectory(dir, db, config, cliProgress);
+
+  let quietProgress: ReturnType<typeof createQuietProgress> | null = null;
+  const progress = (msg: string, opts?: { transient?: boolean }) => {
+    const foundMatch = msg.match(/^Found (\d+) files to index$/);
+    if (foundMatch) quietProgress = createQuietProgress(parseInt(foundMatch[1], 10));
+    if (quietProgress) quietProgress(msg, opts);
+    else cliProgress(msg, opts);
+  };
+
+  const result = await indexDirectory(dir, db, config, progress);
   cli.log(
     `\n${GREEN}Done:${RESET} ${result.indexed} indexed, ${result.skipped} skipped, ${result.pruned} pruned`
   );
   await pause(500);
 
-  // Step 2: Semantic search
-  header("2. Semantic search");
-  const demoQuery = "how does search work";
+  const demoQuery = "AST-aware chunking with tree-sitter";
+
+  header("2. search — ranked files for a query");
   cli.log(`${DIM}> search "${demoQuery}"${RESET}\n`);
 
-  const searchResults = await search(demoQuery, db, 3, 0, config.hybridWeight, config.generated);
+  const searchResults = (await search(demoQuery, db, 3, 0, config.hybridWeight, config.generated)).slice(0, 3);
   if (searchResults.length > 0) {
     for (const r of searchResults) {
-      cli.log(`  ${YELLOW}${r.score.toFixed(4)}${RESET}  ${r.path}`);
-      const preview = r.snippets[0]?.slice(0, 100).replace(/\n/g, " ");
-      cli.log(`  ${DIM}${preview}...${RESET}\n`);
+      cli.log(`  ${YELLOW}${r.score.toFixed(4)}${RESET}  ${relative(dir, r.path)}`);
+      const snippet = r.snippets[0] ?? "";
+      for (const line of renderBlock(snippet, "    ", 3, 96)) {
+        cli.log(`${DIM}${line}${RESET}`);
+      }
+      cli.log();
     }
   } else {
     cli.log("  No results — try a query related to your project.");
   }
   await pause(500);
 
-  // Step 3: Chunk-level retrieval
-  header("3. Chunk-level retrieval (read_relevant)");
+  header("3. read_relevant — ranked chunks with exact line ranges");
   cli.log(`${DIM}> read_relevant "${demoQuery}"${RESET}\n`);
 
   const chunks = await searchChunks(demoQuery, db, 2, 0.3, config.hybridWeight, config.generated);
@@ -65,11 +87,9 @@ export async function demoCommand(args: string[]) {
     for (const r of chunks) {
       const lineRange = r.startLine != null && r.endLine != null ? `:${r.startLine}-${r.endLine}` : "";
       const entity = r.entityName ? `  ${CYAN}${r.entityName}${RESET}` : "";
-      cli.log(`  ${YELLOW}[${r.score.toFixed(2)}]${RESET} ${r.path}${lineRange}${entity}`);
-      // Show first 3 lines of content
-      const lines = r.content.split("\n").slice(0, 3);
-      for (const line of lines) {
-        cli.log(`  ${DIM}${line}${RESET}`);
+      cli.log(`  ${YELLOW}[${r.score.toFixed(2)}]${RESET} ${relative(dir, r.path)}${lineRange}${entity}`);
+      for (const line of renderBlock(r.content, "    ", 18, 96)) {
+        cli.log(`${DIM}${line}${RESET}`);
       }
       cli.log();
     }
@@ -78,43 +98,29 @@ export async function demoCommand(args: string[]) {
   }
   await pause(500);
 
-  // Step 4: Symbol search
-  header("4. Symbol search (find_usages)");
-  const symbols = db.searchSymbols("search", false, undefined, 3);
-  if (symbols.length > 0) {
-    cli.log(`${DIM}> search_symbols "search"${RESET}\n`);
-    for (const s of symbols) {
-      cli.log(`  ${s.path}  ${CYAN}${s.symbolName}${RESET} (${s.symbolType})`);
+  header("4. search_symbols — most-referenced symbols in the codebase");
+  const listing = db.searchSymbols(undefined, false, undefined, 200);
+  const topSymbols = listing
+    .filter((s) => !s.isReexport && s.referenceCount > 0)
+    .sort((a, b) => b.referenceCount - a.referenceCount)
+    .slice(0, 5);
+
+  if (topSymbols.length > 0) {
+    cli.log(`${DIM}> search_symbols   # listing mode, ranked by import count${RESET}\n`);
+    for (const s of topSymbols) {
+      const refs = `${MAGENTA}${s.referenceCount}${RESET} importers across ${s.referenceModuleCount} module${s.referenceModuleCount === 1 ? "" : "s"}`;
+      cli.log(`  ${CYAN}${s.symbolName}${RESET} ${DIM}(${s.symbolType})${RESET}  ${refs}`);
+      cli.log(`    ${DIM}${relative(dir, s.path)}${RESET}\n`);
     }
   } else {
-    cli.log("  No exported symbols found matching 'search'.");
+    cli.log("  No exported symbols indexed yet.");
   }
   await pause(500);
 
-  // Step 5: Project map
-  header("5. Project map");
-  cli.log(
-    `${DIM}The project_map tool generates a Mermaid dependency graph\n` +
-    `showing how files import from each other. Run:${RESET}\n\n` +
-    `  mimirs map ${dir}\n`
-  );
-
-  // Step 6: Unique features summary
-  header("6. What no other tool does");
-  cli.log(`  ${GREEN}search_conversation${RESET}  Search past AI session history`);
-  cli.log(`  ${GREEN}create_checkpoint${RESET}    Mark decisions, milestones, blockers`);
-  cli.log(`  ${GREEN}annotate${RESET}             Attach notes to files/symbols (surface in search)`);
-  cli.log(`  ${GREEN}find_usages${RESET}          Find all call sites before refactoring`);
-  cli.log(`  ${GREEN}project_map${RESET}          Mermaid dependency graph`);
-  cli.log(`  ${GREEN}git_context${RESET}          Uncommitted changes + index status`);
-  cli.log(`  ${GREEN}search_analytics${RESET}     Find documentation gaps`);
-  cli.log(`  ${GREEN}write_relevant${RESET}       Find best insertion point for new code`);
-
-  cli.log(`\n${BOLD}Done.${RESET} Add to your editor with:\n`);
-  cli.log(`  ${DIM}# Start the MCP server${RESET}`);
-  cli.log(`  bunx mimirs serve\n`);
-  cli.log(`  ${DIM}# Then add to your editor's MCP config (Claude Code, Cursor, Windsurf, VS Code):${RESET}`);
-  cli.log(`  { "mcpServers": { "mimirs": { "command": "bunx", "args": ["mimirs", "serve"] } } }\n`);
+  header("Done");
+  cli.log(`${BOLD}Add mimirs to your editor:${RESET}`);
+  cli.log(`  bunx mimirs init --ide claude   ${DIM}# or: cursor, windsurf, copilot, jetbrains, all${RESET}`);
+  cli.log(`\n${DIM}Docs & more tools: https://github.com/TheWinci/mimirs${RESET}`);
 
   db.close();
 }
