@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "generatedAt": "2026-04-17T21:03:28.289Z",
-  "lastGitRef": "7a897e3",
-  "pageCount": 24,
+  "generatedAt": "2026-04-19T06:30:07.610Z",
+  "lastGitRef": "faaf91f",
+  "pageCount": 28,
   "pages": {
     "wiki/modules/embeddings.md": {
       "kind": "module",
@@ -110,7 +110,7 @@
       "kind": "module",
       "tier": "module",
       "title": "commands",
-      "depth": "full",
+      "depth": "standard",
       "sourceFiles": [],
       "relatedPages": [],
       "order": 10
@@ -126,15 +126,20 @@
       "relatedPages": [],
       "order": 11
     },
-    "wiki/modules/wiki.md": {
+    "wiki/modules/wiki/index.md": {
       "kind": "module",
       "tier": "module",
       "title": "wiki",
-      "depth": "standard",
+      "depth": "full",
       "sourceFiles": [
         "src/wiki/index.ts"
       ],
-      "relatedPages": [],
+      "relatedPages": [
+        "wiki/modules/wiki/types.md",
+        "wiki/modules/wiki/section-selector.md",
+        "wiki/modules/wiki/staleness.md",
+        "wiki/modules/wiki/discovery.md"
+      ],
       "order": 12
     },
     "wiki/modules/db/types.md": {
@@ -227,6 +232,74 @@
       ],
       "order": 17
     },
+    "wiki/modules/wiki/types.md": {
+      "kind": "file",
+      "focus": "module-file",
+      "tier": "module",
+      "title": "types",
+      "depth": "standard",
+      "sourceFiles": [
+        "src/wiki/types.ts"
+      ],
+      "relatedPages": [
+        "wiki/modules/wiki/index.md",
+        "wiki/modules/wiki/section-selector.md",
+        "wiki/modules/wiki/staleness.md",
+        "wiki/modules/wiki/discovery.md"
+      ],
+      "order": 18
+    },
+    "wiki/modules/wiki/section-selector.md": {
+      "kind": "file",
+      "focus": "module-file",
+      "tier": "module",
+      "title": "section-selector",
+      "depth": "standard",
+      "sourceFiles": [
+        "src/wiki/section-selector.ts"
+      ],
+      "relatedPages": [
+        "wiki/modules/wiki/index.md",
+        "wiki/modules/wiki/types.md",
+        "wiki/modules/wiki/staleness.md",
+        "wiki/modules/wiki/discovery.md"
+      ],
+      "order": 19
+    },
+    "wiki/modules/wiki/staleness.md": {
+      "kind": "file",
+      "focus": "module-file",
+      "tier": "module",
+      "title": "staleness",
+      "depth": "standard",
+      "sourceFiles": [
+        "src/wiki/staleness.ts"
+      ],
+      "relatedPages": [
+        "wiki/modules/wiki/index.md",
+        "wiki/modules/wiki/types.md",
+        "wiki/modules/wiki/section-selector.md",
+        "wiki/modules/wiki/discovery.md"
+      ],
+      "order": 20
+    },
+    "wiki/modules/wiki/discovery.md": {
+      "kind": "file",
+      "focus": "module-file",
+      "tier": "module",
+      "title": "discovery",
+      "depth": "standard",
+      "sourceFiles": [
+        "src/wiki/discovery.ts"
+      ],
+      "relatedPages": [
+        "wiki/modules/wiki/index.md",
+        "wiki/modules/wiki/types.md",
+        "wiki/modules/wiki/section-selector.md",
+        "wiki/modules/wiki/staleness.md"
+      ],
+      "order": 21
+    },
     "wiki/architecture.md": {
       "kind": "aggregate",
       "focus": "architecture",
@@ -247,10 +320,10 @@
         "wiki/modules/cli.md",
         "wiki/modules/commands.md",
         "wiki/modules/tools.md",
-        "wiki/modules/wiki.md",
+        "wiki/modules/wiki/index.md",
         "wiki/data-flows.md"
       ],
-      "order": 18
+      "order": 22
     },
     "wiki/data-flows.md": {
       "kind": "aggregate",
@@ -262,7 +335,7 @@
       "relatedPages": [
         "wiki/architecture.md"
       ],
-      "order": 19
+      "order": 23
     },
     "wiki/guides/getting-started.md": {
       "kind": "aggregate",
@@ -272,7 +345,7 @@
       "depth": "standard",
       "sourceFiles": [],
       "relatedPages": [],
-      "order": 20
+      "order": 24
     },
     "wiki/guides/conventions.md": {
       "kind": "aggregate",
@@ -282,7 +355,7 @@
       "depth": "standard",
       "sourceFiles": [],
       "relatedPages": [],
-      "order": 21
+      "order": 25
     },
     "wiki/guides/testing.md": {
       "kind": "aggregate",
@@ -292,7 +365,7 @@
       "depth": "standard",
       "sourceFiles": [],
       "relatedPages": [],
-      "order": 22
+      "order": 26
     },
     "wiki/index.md": {
       "kind": "aggregate",
@@ -302,7 +375,7 @@
       "depth": "standard",
       "sourceFiles": [],
       "relatedPages": [],
-      "order": 23
+      "order": 27
     }
   },
   "warnings": []

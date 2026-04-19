@@ -1,6 +1,6 @@
 # tests
 
-A single-file helper module (`tests/helpers.ts`) that 26 test files in the suite import. It exports three functions — `createTempDir`, `writeFixture`, `cleanupTempDir` — which together realise the "real SQLite in a tempdir" pattern the project prefers over mocking. There is no test runner logic here: this is purely the fixture-scaffolding layer that lets integration tests create an isolated `.mimirs` per test, write fixture sources into it, then tear it down cleanly.
+A single-file helper module (`tests/helpers.ts`) that 27 test files in the suite import. It exports three functions — `createTempDir`, `writeFixture`, `cleanupTempDir` — which together realise the "real SQLite in a tempdir" pattern the project prefers over mocking. There is no test-runner logic here: this is purely the fixture-scaffolding layer that lets integration tests create an isolated `.mimirs` per test, write fixture sources into it, then tear it down cleanly.
 
 ## Public API
 
@@ -28,12 +28,12 @@ flowchart LR
     node_path["node:path"]
   end
   self["tests/helpers.ts"]
-  subgraph Downstream["Depended on by (26 test files)"]
-    search_tests["tests/search/* (9 files)"]
+  subgraph Downstream["Depended on by (27 test files)"]
+    search_tests["tests/search/* (10 files)"]
     feature_tests["tests/features/* (4 files)"]
     index_tests["tests/indexing/* (3 files)"]
     db_tests["tests/db/db.test.ts"]
-    wiki_tests["tests/wiki/* (3 files)"]
+    wiki_tests["tests/wiki/* + tests/tools/wiki-tools.test.ts"]
     other_tests["tests/cli, tests/config, tests/conversation, tests/tools, tests/graph, benchmarks"]
   end
 

@@ -1,11 +1,11 @@
 # graph
 
-A single file (`src/graph/resolver.ts`) that turns the raw `file_imports` rows emitted during indexing into a real dependency graph. The module exposes two narrow helpers (`buildIdToPathMap` and the `GraphOptions` shape used by `project_map`) but its centre of gravity is `resolveImports(db, projectDir)`, the second pass the indexer runs after every file is upserted. Fan-in is 14: the indexer, the watcher, the `project_map` CLI + MCP tool, wiki discovery, and several benchmarks.
+A single file (`src/graph/resolver.ts`) that turns the raw `file_imports` rows emitted during indexing into a real dependency graph. The module exposes two narrow helpers (`buildIdToPathMap` and the `GraphOptions` shape used by `project_map`) but its centre of gravity is `resolveImports(db, projectDir)`, the second pass the indexer runs after every file is upserted. Fan-in is 14: the indexer, the watcher, the `project_map` CLI + MCP tool, wiki discovery, and several benchmarks all depend on it.
 
 ## Public API
 
 ```ts
-interface GraphOptions {
+export interface GraphOptions {
   zoom?: "file" | "directory";
   focus?: string;
   maxNodes?: number;
@@ -15,10 +15,10 @@ interface GraphOptions {
   projectDir: string;
 }
 
-buildIdToPathMap(pathToId: Map<string, number>): Map<number, string>
+export function buildIdToPathMap(pathToId: Map<string, number>): Map<number, string>
 ```
 
-The heavyweight functions (`resolveImports`, `resolveImportsForFile`, `generateProjectMap`) aren't in the top-level export summary but are the real interface. `resolveImports` runs the full two-pass fix-up on every unresolved row; `resolveImportsForFile(db, fileId, projectDir)` is the incremental variant the watcher calls after re-indexing a single file, with optional prebuilt `pathToId` / `idToPath` maps to avoid repeated table scans.
+The heavyweight functions (`resolveImports`, `resolveImportsForFile`, `generateProjectMap`, `buildPathToIdMap`) aren't in the top-level export summary but are the real interface. `resolveImports` runs the full two-pass fix-up on every unresolved row; `resolveImportsForFile(db, fileId, projectDir)` is the incremental variant the watcher calls after re-indexing a single file, with optional prebuilt `pathToId` / `idToPath` maps to avoid repeated table scans.
 
 ## How it works
 
@@ -88,13 +88,14 @@ flowchart LR
 
 - `projectDir` — resolver works in absolute paths; the caller passes `projectDir` so `tsconfig.json` can be loaded and so bun-chunk can compute project-relative resolutions.
 - `RESOLVE_EXTENSIONS` — internal constant `[".ts", ".tsx", ".js", ".jsx"]`. The DB fallback is TypeScript/JavaScript-only; other languages rely entirely on bun-chunk.
-- `GraphOptions.maxNodes` / `maxHops` — tuning knobs for the `project_map` tool's subgraph extraction, not for the resolver itself.
+- `GraphOptions.maxNodes` (default 50) / `maxHops` (default 2) — tuning knobs for the `project_map` tool's subgraph extraction, not for the resolver itself. `generateProjectMap` auto-switches to directory view when `graph.nodes.length > maxNodes`.
 
 ## Known issues
 
 - **DB fallback is JS/TS-only.** If bun-chunk doesn't resolve a Python / Rust / Go import, the fallback does not retry with language-specific conventions — the import just stays `NULL`.
-- **Re-indexing a renamed file leaves stale resolutions.** `resolveImports` only touches `NULL` rows; if a file is renamed, imports from other files that were previously resolved to the old id are not re-pointed. The watcher's `resolveImportsForFile` helps when the renaming file's imports are re-written, but incoming edges need a fresh resolver pass.
+- **Re-indexing a renamed file leaves stale resolutions.** `resolveImports` only touches `NULL` rows; if a file is renamed, imports from other files that were previously resolved to the old id are not re-pointed. The watcher's `resolveImportsForFile` helps when the renaming file's own imports are re-written, but incoming edges need a fresh `resolveImports` pass.
 - **`tsconfig.json` is loaded once per `resolveImports` call.** Changing `tsconfig.json` mid-run requires restarting the indexer; the loader doesn't re-read the file per import.
+- **`maxNodes` triggers silent view swap.** When a `project_map` query crosses the threshold, zoom flips from `file` to `directory` without a warning — callers that expected file-level output get a directory summary instead.
 
 ## See also
 

@@ -1,6 +1,6 @@
 # indexing
 
-The pipeline that turns files on disk into embedded chunks in SQLite. Four files: `indexer.ts` orchestrates the walk, `parse.ts` reads + extracts frontmatter, `chunker.ts` produces AST-aware chunks via `bun-chunk`, and `watcher.ts` keeps the index in sync with edits. The module is the largest write-path in the system; every CLI `index` invocation, every MCP `index_files` call, and every session-start hook that refreshes the index runs through `indexDirectory` here.
+The pipeline that turns files on disk into embedded chunks in SQLite. Four files: `indexer.ts` orchestrates the walk, `parse.ts` reads + extracts frontmatter, `chunker.ts` produces AST-aware chunks via `bun-chunk`, and `watcher.ts` keeps the index in sync with edits. This is the largest write-path in the system; every CLI `index` invocation, every MCP `index_files` call, and every session-start hook that refreshes the index runs through `indexDirectory` here.
 
 ## How it works
 
