@@ -25,7 +25,7 @@ These tools are available to any MCP client (Claude Code, Cursor, Windsurf, VS C
 | `depends_on` | List all files that a given file imports (its dependencies) |
 | `depended_on_by` | List all files that import a given file (reverse dependencies) |
 | `write_relevant` | Find the best insertion point for new content — returns semantically appropriate files and anchors |
-| `generate_wiki` | Generate or update a structured markdown wiki for the codebase — returns step-by-step instructions that the agent follows using other mimirs tools. Supports incremental updates |
+| `generate_wiki` | Generate or update a structured markdown wiki for the codebase — returns step-by-step instructions that the agent follows using other mimirs tools. Supports incremental updates. Run `index_files` first: planning reads the semantic index, not the filesystem, so stale index entries produce stale pages or silently skip new/renamed files |
 
 ## CLI
 
