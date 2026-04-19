@@ -811,7 +811,8 @@ function renderIncrementalResponse(
   text += `${stale.length} stale, ${added.length} new, ${removed.length} removed since \`${sinceRef}\`..\`${newRef}\` (${changedFileCount} files changed).\n\n`;
 
   if (stale.length === 0 && added.length === 0 && removed.length === 0) {
-    text += `Changed files did not invalidate any wiki page. Artifacts refreshed; nothing to regenerate.\n`;
+    text += `Changed files did not invalidate any wiki page. Artifacts refreshed; nothing to regenerate.\n\n`;
+    text += INDEX_FRESHNESS_NOTE + "\n";
     return text;
   }
 
@@ -871,9 +872,14 @@ function renderIncrementalResponse(
   });
 
   text += `\n${WORKFLOW_TIPS}\n`;
+  text += `\n${INDEX_FRESHNESS_NOTE}\n`;
 
   return text;
 }
+
+const INDEX_FRESHNESS_NOTE =
+  `> **Note:** incremental planning reads the code index, not the filesystem directly. ` +
+  `If any change you expected to show up in the wiki is missing (or a regenerated page still reflects old code), run \`index_files()\` and call \`generate_wiki(incremental: true)\` again.`;
 
 function buildFinalizeInstructions(): string {
   return `# Finalization
