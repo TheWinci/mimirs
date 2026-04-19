@@ -124,6 +124,14 @@ export function registerWikiTools(server: McpServer, getDB: GetDB) {
       }
 
       // ── Init mode ──
+      // If a manifest already exists, route to incremental instead of re-planning.
+      // A bare `generate_wiki()` call used to silently overwrite `lastGitRef`,
+      // clobbering the incremental baseline for any commits since the last init.
+      if (existsSync(join(wikiDir, "_manifest.json"))) {
+        const text = await buildIncrementalResponse(ragDb, projectDir, wikiDir);
+        return { content: [{ type: "text" as const, text }] };
+      }
+
       const status = ragDb.getStatus();
       if (status.totalFiles === 0) {
         return {
