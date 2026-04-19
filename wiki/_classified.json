@@ -6,7 +6,7 @@
       "file": "src/db/index.ts",
       "tier": "bridge",
       "scope": "cross-cutting",
-      "referenceCount": 74,
+      "referenceCount": 82,
       "referenceModuleCount": 15,
       "referenceModules": [
         "benchmarks",
@@ -24,7 +24,7 @@
       "hasChildren": true,
       "childCount": 78,
       "isReexport": false,
-      "snippet": "export class RagDB {\n\n  private db: Database;\n\n  constructor(projectDir: string, customRagDir?: string) {\n    loadCustomSQLite();\n\n    const ragDir = customRagDir\n      ? resolve(customRagDir)\n      : process.env.RAG_DB_DIR\n        ? resolve(process.env.RAG_DB_DIR)\n        : join(projectDir, \".mimirs\");\n\n    try {\n      mkdirSync(ragDir, { recursive: true });\n    } catch (err: unknown) {\n      const code = err instanceof Error ? (err as NodeJS.ErrnoException).code : undefined;\n      if (code === \"EROFS\" || code === \"EACCES\") {\n        const where = process.env.RAG_DB_DIR\n          ? `RAG_DB_DIR path \"${ragDir}\"`\n          : `project directory \"${projectDir}\"`;\n        throw new Error(\n          `mimirs: cannot write to ${where} (${code}).\\n` +\n          `Set RAG_DB_DIR to a writable directory in your MCP server config:\\n` +\n          `  \"env\": { \"RAG_DB_DIR\": \"/tmp/my-project-rag\", \"RAG_PROJECT_DIR\": \"...\" }`\n        );\n      }\n      throw err;\n    }\n\n    this.db = new Database(join(ragDir, \"index.db\"));\n    this.db.exec(\"PRAGMA journal_mode=WAL\");\n    this.db.exec(\"PRAGMA busy_timeout = 5000\");\n    sqliteVec.load(this.db);\n    this.initSchema();\n  }\n\n  private initSchema() {\n    this.db.exec(`\n      CREATE TABLE IF NOT EXISTS files (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        path TEXT UNIQUE NOT NULL,\n        hash TEXT NOT NULL,\n        indexed_at TEXT NOT NULL\n      );\n\n      CREATE TABLE IF NOT EXISTS chunks (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,\n        chunk_index INTEGER NOT NULL,\n        snippet TEXT NOT NULL,\n        entity_name TEXT,\n        chunk_type TEXT,\n        start_line INTEGER,\n        end_line INTEGER,\n        content_hash TEXT\n      );\n\n      CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(\n        chunk_id INTEGER PRIMARY KEY,\n        embedding FLOAT[${getEmbeddingDim()}]\n      );\n\n      CREATE VIRTUAL TABLE IF NOT EXISTS fts_chunks USING fts5(\n        snippet,\n        content='chunks',\n        content_rowid='id'\n      );\n\n      CREATE TRIGGER IF NOT EXISTS chunks_ai AFTER INSERT ON chunks BEGIN\n        INSERT INTO fts_chunks(rowid, snippet) VALUES (new.id, new.snippet);\n      END;\n      CREATE TRIGGER IF NOT EXISTS chunks_ad AFTER DELETE ON chunks BEGIN\n        INSERT INTO fts_chunks(fts_chunks, rowid, snippet) VALUES ('delete', old.id, old.snippet);\n      END;\n      CREATE TRIGGER IF NOT EXISTS chunks_au AFTER UPDATE ON chunks BEGIN\n        INSERT INTO fts_chunks(fts_chunks, rowid, snippet) VALUES ('delete', old.id, old.snippet);\n        INSERT INTO fts_chunks(rowid, snippet) VALUES (new.id, new.snippet);\n      END;\n\n      CREATE TABLE IF NOT EXISTS file_imports (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,\n        source TEXT NOT NULL,\n        names TEXT NOT NULL,\n        resolved_file_id INTEGER REFERENCES files(id) ON DELETE SET NULL,\n        is_default INTEGER DEFAULT 0,\n        is_namespace INTEGER DEFAULT 0\n      );\n\n      CREATE TABLE IF NOT EXISTS file_exports (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,\n        name TEXT NOT NULL,\n        type TEXT NOT NULL,\n        is_default INTEGER DEFAULT 0,\n        is_reexport INTEGER DEFAULT 0,\n\n        reexport_source TEXT\n      );\n\n      CREATE INDEX IF NOT EXISTS idx_file_imports_file ON file_imports(file_id);\n      CREATE INDEX IF NOT EXISTS idx_file_imports_resolved ON file_imports(resolved_file_id);\n      CREATE INDEX IF NOT EXISTS idx_file_exports_file ON file_exports(file_id);\n      CREATE INDEX IF NOT EXISTS idx_file_exports_name ON file_exports(name);\n\n      CREATE TABLE IF NOT EXISTS conversation_sessions (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        session_id TEXT UNIQUE NOT NULL,\n        jsonl_path TEXT NOT NULL,\n        started_at TEXT NOT NULL,\n        ended_at TEXT,\n        turn_count INTEGER DEFAULT 0,\n        total_tokens INTEGER DEFAULT 0,\n        indexed_at TEXT NOT NULL,\n        file_mtime REAL NOT NULL,\n        read_offset INTEGER DEFAULT 0\n      );\n\n      CREATE TABLE IF NOT EXISTS conversation_turns (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        session_id TEXT NOT NULL,\n        turn_index INTEGER NOT NULL,\n        timestamp TEXT NOT NULL,\n        user_text TEXT,\n        assistant_text TEXT,\n        tools_used TEXT,\n        files_referenced TEXT,\n        token_cost INTEGER DEFAULT 0,\n        summary TEXT,\n        UNIQUE(session_id, turn_index)\n      );\n\n      CREATE TABLE IF NOT EXISTS conversation_chunks (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        turn_id INTEGER NOT NULL REFERENCES conversation_turns(id) ON DELETE CASCADE,\n        chunk_index INTEGER NOT NULL,\n        snippet TEXT NOT NULL\n      );\n\n      CREATE VIRTUAL TABLE IF NOT EXISTS vec_conversation USING vec0(\n        chunk_id INTEGER PRIMARY KEY,\n        embedding FLOAT[${getEmbeddingDim()}]\n      );\n\n      CREATE VIRTUAL TABLE IF NOT EXISTS fts_conversation USING fts5(\n        snippet,\n        content='conversation_chunks',\n        content_rowid='id'\n      );\n\n      CREATE TRIGGER IF NOT EXISTS conv_chunks_ai AFTER INSERT ON conversation_chunks BEGIN\n        INSERT INTO fts_conversation(rowid, snippet) VALUES (new.id, new.snippet);\n      END;\n      CREATE TRIGGER IF NOT EXISTS conv_chunks_ad AFTER DELETE ON conversation_chunks BEGIN\n        INSERT INTO fts_conversation(fts_conversation, rowid, snippet) VALUES ('delete', old.id, old.snippet);\n      END;\n      CREATE TRIGGER IF NOT EXISTS conv_chunks_au AFTER UPDATE ON conversation_chunks BEGIN\n\n        INSERT INTO fts_conversation(fts_conversation, rowid, snippet) VALUES ('delete', old.id, old.snippet);\n        INSERT INTO fts_conversation(rowid, snippet) VALUES (new.id, new.snippet);\n      END;\n\n      CREATE INDEX IF NOT EXISTS idx_conv_turns_session ON conversation_turns(session_id);\n\n      CREATE TABLE IF NOT EXISTS conversation_checkpoints (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        session_id TEXT NOT NULL,\n        turn_index INTEGER NOT NULL,\n        timestamp TEXT NOT NULL,\n        type TEXT NOT NULL,\n        title TEXT NOT NULL,\n        summary TEXT NOT NULL,\n        files_involved TEXT,\n        tags TEXT,\n        embedding BLOB\n      );\n\n      CREATE INDEX IF NOT EXISTS idx_checkpoints_session ON conversation_checkpoints(session_id);\n      CREATE INDEX IF NOT EXISTS idx_checkpoints_type ON conversation_checkpoints(type);\n\n      CREATE VIRTUAL TABLE IF NOT EXISTS vec_checkpoints USING vec0(\n        checkpoint_id INTEGER PRIMARY KEY,\n        embedding FLOAT[${getEmbeddingDim()}]\n      );\n\n      CREATE TABLE IF NOT EXISTS query_log (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        query TEXT NOT NULL,\n        result_count INTEGER NOT NULL,\n        top_score REAL,\n        top_path TEXT,\n        duration_ms INTEGER NOT NULL,\n        created_at TEXT NOT NULL\n      );\n\n      CREATE TABLE IF NOT EXISTS git_commits (\n        id          INTEGER PRIMARY KEY AUTOINCREMENT,\n        hash        TEXT UNIQUE NOT NULL,\n        short_hash  TEXT NOT NULL,\n        message     TEXT NOT NULL,\n        author_name TEXT NOT NULL,\n        author_email TEXT NOT NULL,\n        date        TEXT NOT NULL,\n        files_changed TEXT NOT NULL,\n        insertions  INTEGER DEFAULT 0,\n        deletions   INTEGER DEFAULT 0,\n        is_merge    INTEGER DEFAULT 0,\n        refs        TEXT,\n        diff_summary TEXT,\n        indexed_at  TEXT NOT NULL\n      );\n\n      CREATE TABLE IF NOT EXISTS git_commit_files (\n        commit_id   INTEGER NOT NULL REFERENCES git_commits(id) ON DELETE CASCADE,\n        file_path   TEXT NOT NULL,\n        insertions  INTEGER DEFAULT 0,\n        deletions   INTEGER DEFAULT 0,\n        PRIMARY KEY (commit_id, file_path)\n\n      );\n      CREATE INDEX IF NOT EXISTS idx_gcf_path ON git_commit_files(file_path);\n\n      CREATE VIRTUAL TABLE IF NOT EXISTS vec_git_commits USING vec0(\n        commit_id INTEGER PRIMARY KEY,\n        embedding FLOAT[${getEmbeddingDim()}]\n      );\n\n      CREATE VIRTUAL TABLE IF NOT EXISTS fts_git_commits USING fts5(\n        message,\n        diff_summary,\n        content='git_commits',\n        content_rowid='id'\n      );\n\n      CREATE TRIGGER IF NOT EXISTS git_commits_ai AFTER INSERT ON git_commits BEGIN\n        INSERT INTO fts_git_commits(rowid, message, diff_summary)\n        VALUES (new.id, new.message, new.diff_summary);\n      END;\n      CREATE TRIGGER IF NOT EXISTS git_commits_ad AFTER DELETE ON git_commits BEGIN\n        INSERT INTO fts_git_commits(fts_git_commits, rowid, message, diff_summary)\n        VALUES ('delete', old.id, old.message, old.diff_summary);\n      END;\n    `);\n\n    this.db.exec(`\n      CREATE TABLE IF NOT EXISTS annotations (\n        id          INTEGER PRIMARY KEY AUTOINCREMENT,\n        path        TEXT NOT NULL,\n        symbol_name TEXT,\n        note        TEXT NOT NULL,\n        author      TEXT,\n        created_at  TEXT NOT NULL,\n        updated_at  TEXT NOT NULL\n      );\n      CREATE INDEX IF NOT EXISTS idx_ann_path ON annotations(path);\n\n      CREATE VIRTUAL TABLE IF NOT EXISTS fts_annotations USING fts5(\n        note,\n        content='annotations',\n        content_rowid='id'\n      );\n\n      CREATE VIRTUAL TABLE IF NOT EXISTS vec_annotations USING vec0(\n        annotation_id INTEGER PRIMARY KEY,\n        embedding FLOAT[${getEmbeddingDim()}]\n      );\n    `);\n\n    this.migrateChunksEntityColumns();\n    this.migrateParentChunkColumns();\n    this.migrateGraphColumns();\n  }\n\n  private migrateChunksEntityColumns() {\n    const cols = this.db\n      .query<{ name: string }, []>(\"PRAGMA table_info(chunks)\")\n      .all()\n      .map((c) => c.name);\n\n    if (!cols.includes(\"entity_name\")) {\n      this.db.exec(\"ALTER TABLE chunks ADD COLUMN entity_name TEXT\");\n    }\n    if (!cols.includes(\"chunk_type\")) {\n      this.db.exec(\"ALTER TABLE chunks ADD COLUMN chunk_type TEXT\");\n    }\n    if (!cols.includes(\"start_line\")) {\n      this.db.exec(\"ALTER TABLE chunks ADD COLUMN start_line INTEGER\");\n    }\n    if (!cols.includes(\"end_line\")) {\n      this.db.exec(\"ALTER TABLE chunks ADD COLUMN end_line INTEGER\");\n    }\n    if (!cols.includes(\"content_hash\")) {\n      this.db.exec(\"ALTER TABLE chunks ADD COLUMN content_hash TEXT\");\n    }\n  }\n\n  private migrateParentChunkColumns() {\n    const cols = this.db\n      .query<{ name: string }, []>(\"PRAGMA table_info(chunks)\")\n      .all()\n      .map((c) => c.name);\n\n    if (!cols.includes(\"parent_id\")) {\n      this.db.exec(\"ALTER TABLE chunks ADD COLUMN parent_id INTEGER REFERENCES chunks(id) ON DELETE CASCADE\");\n    }\n  }\n\n  private migrateGraphColumns() {\n    const importCols = this.db\n      .query<{ name: string }, []>(\"PRAGMA table_info(file_imports)\")\n      .all()\n      .map((c) => c.name);\n\n    if (!importCols.includes(\"is_default\")) {\n      this.db.exec(\"ALTER TABLE file_imports ADD COLUMN is_default INTEGER DEFAULT 0\");\n    }\n    if (!importCols.includes(\"is_namespace\")) {\n      this.db.exec(\"ALTER TABLE file_imports ADD COLUMN is_namespace INTEGER DEFAULT 0\");\n    }\n\n    const exportCols = this.db\n      .query<{ name: string }, []>(\"PRAGMA table_info(file_exports)\")\n      .all()\n      .map((c) => c.name);\n\n    if (!exportCols.includes(\"is_default\")) {\n      this.db.exec(\"ALTER TABLE file_exports ADD COLUMN is_default INTEGER DEFAULT 0\");\n    }\n    if (!exportCols.includes(\"is_reexport\")) {\n      this.db.exec(\"ALTER TABLE file_exports ADD COLUMN is_reexport INTEGER DEFAULT 0\");\n    }\n    if (!exportCols.includes(\"reexport_source\")) {\n      this.db.exec(\"ALTER TABLE file_exports ADD COLUMN reexport_source TEXT\");\n    }\n  }\n\n\n  // ── File operations ───────────────────────────────────────────\n\n\n  getFileByPath(path: string) {\n    return fileOps.getFileByPath(this.db, path);\n  }\n\n  upsertFileStart(path: string, hash: string) {\n    return fileOps.upsertFileStart(this.db, path, hash);\n  }\n\n  updateFileHash(fileId: number, hash: string) {\n    fileOps.updateFileHash(this.db, fileId, hash);\n  }\n\n  insertChunkBatch(fileId: number, chunks: EmbeddedChunk[], startIndex: number) {\n    fileOps.insertChunkBatch(this.db, fileId, chunks, startIndex);\n  }\n\n  insertChunkReturningId(fileId: number, chunk: EmbeddedChunk, chunkIndex: number) {\n    return fileOps.insertChunkReturningId(this.db, fileId, chunk, chunkIndex);\n  }\n\n  getChunkById(chunkId: number) {\n    return fileOps.getChunkById(this.db, chunkId);\n  }\n\n  upsertFile(path: string, hash: string, chunks: EmbeddedChunk[]) {\n    fileOps.upsertFile(this.db, path, hash, chunks);\n  }\n\n  removeFile(path: string) {\n    return fileOps.removeFile(this.db, path);\n  }\n\n  pruneDeleted(existingPaths: Set<string>) {\n    return fileOps.pruneDeleted(this.db, existingPaths);\n  }\n\n  getAllFilePaths() {\n    return fileOps.getAllFilePaths(this.db);\n  }\n\n  getChunkHashes(fileId: number) {\n    return fileOps.getChunkHashes(this.db, fileId);\n  }\n\n  deleteStaleChunks(fileId: number, keepHashes: Set<string>) {\n    return fileOps.deleteStaleChunks(this.db, fileId, keepHashes);\n  }\n\n  updateChunkPositions(\n    fileId: number,\n    updates: { contentHash: string; chunkIndex: number; startLine: number | null; endLine: number | null }[]\n  ) {\n    fileOps.updateChunkPositions(this.db, fileId, updates);\n  }\n\n  getStatus() {\n    return fileOps.getStatus(this.db);\n  }\n\n\n  // ── Search operations ─────────────────────────────────────────\n\n\n  search(queryEmbedding: Float32Array, topK?: number) {\n    return searchOps.vectorSearch(this.db, queryEmbedding, topK);\n  }\n\n  textSearch(query: string, topK?: number) {\n    return searchOps.textSearch(this.db, query, topK);\n  }\n\n  searchChunks(queryEmbedding: Float32Array, topK?: number) {\n    return searchOps.vectorSearchChunks(this.db, queryEmbedding, topK);\n  }\n\n  textSearchChunks(query: string, topK?: number) {\n    return searchOps.textSearchChunks(this.db, query, topK);\n  }\n\n  searchSymbols(query?: string, exact?: boolean, type?: string, topK?: number) {\n    return searchOps.searchSymbols(this.db, query, exact, type, topK);\n  }\n\n  findUsages(symbolName: string, exact: boolean, top: number) {\n    return searchOps.findUsages(this.db, symbolName, exact, top);\n  }\n\n\n  // ── Graph operations ──────────────────────────────────────────\n\n\n  upsertFileGraph(\n    fileId: number,\n    imports: { name: string; source: string; isDefault?: boolean; isNamespace?: boolean }[],\n    exports: { name: string; type: string; isDefault?: boolean; isReExport?: boolean; reExportSource?: string }[]\n  ) {\n    graphOps.upsertFileGraph(this.db, fileId, imports, exports);\n  }\n\n  resolveImport(importId: number, resolvedFileId: number) {\n    graphOps.resolveImport(this.db, importId, resolvedFileId);\n  }\n\n  getUnresolvedImports() {\n    return graphOps.getUnresolvedImports(this.db);\n  }\n\n  getGraph() {\n    return graphOps.getGraph(this.db);\n  }\n\n  getSubgraph(fileIds: number[], maxHops?: number) {\n    return graphOps.getSubgraph(this.db, fileIds, maxHops);\n  }\n\n  getImportsForFile(fileId: number) {\n    return graphOps.getImportsForFile(this.db, fileId);\n  }\n\n  getImportersOf(fileId: number) {\n    return graphOps.getImportersOf(this.db, fileId);\n  }\n\n  getDependsOn(fileId: number) {\n    return graphOps.getDependsOn(this.db, fileId);\n  }\n\n  getDependedOnBy(fileId: number) {\n    return graphOps.getDependedOnBy(this.db, fileId);\n  }\n\n\n  // ── Conversation operations ───────────────────────────────────\n\n\n  upsertSession(\n    sessionId: string, jsonlPath: string, startedAt: string,\n    mtime: number, readOffset: number\n  ) {\n    conversationOps.upsertSession(this.db, sessionId, jsonlPath, startedAt, mtime, readOffset);\n  }\n\n  getSession(sessionId: string) {\n    return conversationOps.getSession(this.db, sessionId);\n  }\n\n  updateSessionStats(\n    sessionId: string, turnCount: number, totalTokens: number, readOffset: number\n  ) {\n    conversationOps.updateSessionStats(this.db, sessionId, turnCount, totalTokens, readOffset);\n  }\n\n  insertTurn(\n    sessionId: string, turnIndex: number, timestamp: string,\n    userText: string, assistantText: string, toolsUsed: string[],\n    filesReferenced: string[], tokenCost: number, summary: string,\n    chunks: { snippet: string; embedding: Float32Array }[]\n  ) {\n    return conversationOps.insertTurn(\n      this.db, sessionId, turnIndex, timestamp, userText,\n      assistantText, toolsUsed, filesReferenced, tokenCost, summary, chunks\n    );\n  }\n\n  getTurnCount(sessionId: string) {\n    return conversationOps.getTurnCount(this.db, sessionId);\n  }\n\n  searchConversation(queryEmbedding: Float32Array, topK?: number, sessionId?: string) {\n    return conversationOps.searchConversation(this.db, queryEmbedding, topK, sessionId);\n  }\n\n  textSearchConversation(query: string, topK?: number, sessionId?: string) {\n    return conversationOps.textSearchConversation(this.db, query, topK, sessionId);\n  }\n\n\n  // ── Checkpoint operations ─────────────────────────────────────\n\n\n  createCheckpoint(\n    sessionId: string, turnIndex: number, timestamp: string,\n    type: string, title: string, summary: string,\n    filesInvolved: string[], tags: string[], embedding: Float32Array\n  ) {\n    return checkpointOps.createCheckpoint(\n      this.db, sessionId, turnIndex, timestamp, type, title,\n      summary, filesInvolved, tags, embedding\n    );\n  }\n\n  listCheckpoints(sessionId?: string, type?: string, limit?: number) {\n    return checkpointOps.listCheckpoints(this.db, sessionId, type, limit);\n  }\n\n  searchCheckpoints(queryEmbedding: Float32Array, topK?: number, type?: string) {\n    return checkpointOps.searchCheckpoints(this.db, queryEmbedding, topK, type);\n  }\n\n  getCheckpoint(id: number) {\n    return checkpointOps.getCheckpoint(this.db, id);\n  }\n\n\n  // ── Annotation operations ─────────────────────────────────────\n\n\n  upsertAnnotation(\n    path: string, note: string, embedding: Float32Array,\n    symbolName?: string | null, author?: string | null\n  ) {\n    return annotationOps.upsertAnnotation(this.db, path, note, embedding, symbolName, author);\n  }\n\n  getAnnotations(path?: string, symbolName?: string | null) {\n    return annotationOps.getAnnotations(this.db, path, symbolName);\n  }\n\n  searchAnnotations(queryEmbedding: Float32Array, topK?: number) {\n    return annotationOps.searchAnnotations(this.db, queryEmbedding, topK);\n  }\n\n  deleteAnnotation(id: number) {\n    return annotationOps.deleteAnnotation(this.db, id);\n  }\n\n\n  // ── Git history operations ────────────────────────────────────\n\n\n  insertCommitBatch(commits: gitHistoryOps.GitCommitInsert[]) {\n    gitHistoryOps.insertCommitBatch(this.db, commits);\n  }\n\n  getLastIndexedCommit() {\n    return gitHistoryOps.getLastIndexedCommit(this.db);\n  }\n\n  hasCommit(hash: string) {\n    return gitHistoryOps.hasCommit(this.db, hash);\n  }\n\n  searchGitCommits(queryEmbedding: Float32Array, topK?: number, author?: string, since?: string, until?: string, path?: string) {\n    return gitHistoryOps.searchGitCommits(this.db, queryEmbedding, topK, author, since, until, path);\n  }\n\n  textSearchGitCommits(query: string, topK?: number, author?: string, since?: string, until?: string, path?: string) {\n    return gitHistoryOps.textSearchGitCommits(this.db, query, topK, author, since, until, path);\n  }\n\n  getFileHistory(filePath: string, topK?: number, since?: string) {\n    return gitHistoryOps.getFileHistory(this.db, filePath, topK, since);\n  }\n\n  getAllCommitHashes() {\n    return gitHistoryOps.getAllCommitHashes(this.db);\n  }\n\n  purgeOrphanedCommits(reachableHashes: Set<string>) {\n    return gitHistoryOps.purgeOrphanedCommits(this.db, reachableHashes);\n  }\n\n  clearGitHistory() {\n    gitHistoryOps.clearGitHistory(this.db);\n  }\n\n  getGitHistoryStatus() {\n    return gitHistoryOps.getGitHistoryStatus(this.db);\n  }\n\n\n  // ── Analytics operations ──────────────────────────────────────\n\n\n  logQuery(\n    query: string, resultCount: number,\n    topScore: number | null, topPath: string | null, durationMs: number\n  ) {\n    analyticsOps.logQuery(this.db, query, resultCount, topScore, topPath, durationMs);\n  }\n\n  getAnalytics(days?: number) {\n    return analyticsOps.getAnalytics(this.db, days);\n  }\n\n  getAnalyticsTrend(days?: number) {\n    return analyticsOps.getAnalyticsTrend(this.db, days);\n  }\n\n\n  // ── Lifecycle ─────────────────────────────────────────────────\n\n\n  close() {\n    this.db.close();\n  }\n\n}"
+      "snippet": "export class RagDB {\n\n  private db: Database;\n\n  constructor(projectDir: string, customRagDir?: string) {\n    loadCustomSQLite();\n\n    const ragDir = customRagDir\n      ? resolve(customRagDir)\n      : process.env.RAG_DB_DIR\n        ? resolve(process.env.RAG_DB_DIR)\n        : join(projectDir, \".mimirs\");\n\n    try {\n      mkdirSync(ragDir, { recursive: true });\n    } catch (err: unknown) {\n      const code = err instanceof Error ? (err as NodeJS.ErrnoException).code : undefined;\n      if (code === \"EROFS\" || code === \"EACCES\") {\n        const where = process.env.RAG_DB_DIR\n          ? `RAG_DB_DIR path \"${ragDir}\"`\n          : `project directory \"${projectDir}\"`;\n        throw new Error(\n          `mimirs: cannot write to ${where} (${code}).\\n` +\n          `Set RAG_DB_DIR to a writable directory in your MCP server config:\\n` +\n          `  \"env\": { \"RAG_DB_DIR\": \"/tmp/my-project-rag\", \"RAG_PROJECT_DIR\": \"...\" }`\n        );\n      }\n      throw err;\n    }\n\n    this.db = new Database(join(ragDir, \"index.db\"));\n    this.db.exec(\"PRAGMA journal_mode=WAL\");\n    this.db.exec(\"PRAGMA busy_timeout = 5000\");\n    sqliteVec.load(this.db);\n    this.initSchema();\n  }\n\n  private initSchema() {\n    this.db.exec(`\n      CREATE TABLE IF NOT EXISTS files (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        path TEXT UNIQUE NOT NULL,\n        hash TEXT NOT NULL,\n        indexed_at TEXT NOT NULL\n      );\n\n      CREATE TABLE IF NOT EXISTS chunks (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,\n        chunk_index INTEGER NOT NULL,\n        snippet TEXT NOT NULL,\n        entity_name TEXT,\n        chunk_type TEXT,\n        start_line INTEGER,\n        end_line INTEGER,\n        content_hash TEXT\n      );\n\n      CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(\n        chunk_id INTEGER PRIMARY KEY,\n        embedding FLOAT[${getEmbeddingDim()}]\n      );\n\n      CREATE VIRTUAL TABLE IF NOT EXISTS fts_chunks USING fts5(\n        snippet,\n        content='chunks',\n        content_rowid='id'\n      );\n\n      CREATE TRIGGER IF NOT EXISTS chunks_ai AFTER INSERT ON chunks BEGIN\n        INSERT INTO fts_chunks(rowid, snippet) VALUES (new.id, new.snippet);\n      END;\n      CREATE TRIGGER IF NOT EXISTS chunks_ad AFTER DELETE ON chunks BEGIN\n        INSERT INTO fts_chunks(fts_chunks, rowid, snippet) VALUES ('delete', old.id, old.snippet);\n      END;\n      CREATE TRIGGER IF NOT EXISTS chunks_au AFTER UPDATE ON chunks BEGIN\n        INSERT INTO fts_chunks(fts_chunks, rowid, snippet) VALUES ('delete', old.id, old.snippet);\n        INSERT INTO fts_chunks(rowid, snippet) VALUES (new.id, new.snippet);\n      END;\n\n      CREATE TABLE IF NOT EXISTS file_imports (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,\n        source TEXT NOT NULL,\n        names TEXT NOT NULL,\n        resolved_file_id INTEGER REFERENCES files(id) ON DELETE SET NULL,\n        is_default INTEGER DEFAULT 0,\n        is_namespace INTEGER DEFAULT 0\n      );\n\n      CREATE TABLE IF NOT EXISTS file_exports (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,\n        name TEXT NOT NULL,\n        type TEXT NOT NULL,\n        is_default INTEGER DEFAULT 0,\n        is_reexport INTEGER DEFAULT 0,\n\n        reexport_source TEXT\n      );\n\n      CREATE INDEX IF NOT EXISTS idx_file_imports_file ON file_imports(file_id);\n      CREATE INDEX IF NOT EXISTS idx_file_imports_resolved ON file_imports(resolved_file_id);\n      CREATE INDEX IF NOT EXISTS idx_file_exports_file ON file_exports(file_id);\n      CREATE INDEX IF NOT EXISTS idx_file_exports_name ON file_exports(name);\n\n      CREATE TABLE IF NOT EXISTS conversation_sessions (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        session_id TEXT UNIQUE NOT NULL,\n        jsonl_path TEXT NOT NULL,\n        started_at TEXT NOT NULL,\n        ended_at TEXT,\n        turn_count INTEGER DEFAULT 0,\n        total_tokens INTEGER DEFAULT 0,\n        indexed_at TEXT NOT NULL,\n        file_mtime REAL NOT NULL,\n        read_offset INTEGER DEFAULT 0\n      );\n\n      CREATE TABLE IF NOT EXISTS conversation_turns (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        session_id TEXT NOT NULL,\n        turn_index INTEGER NOT NULL,\n        timestamp TEXT NOT NULL,\n        user_text TEXT,\n        assistant_text TEXT,\n        tools_used TEXT,\n        files_referenced TEXT,\n        token_cost INTEGER DEFAULT 0,\n        summary TEXT,\n        UNIQUE(session_id, turn_index)\n      );\n\n      CREATE TABLE IF NOT EXISTS conversation_chunks (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        turn_id INTEGER NOT NULL REFERENCES conversation_turns(id) ON DELETE CASCADE,\n        chunk_index INTEGER NOT NULL,\n        snippet TEXT NOT NULL\n      );\n\n      CREATE VIRTUAL TABLE IF NOT EXISTS vec_conversation USING vec0(\n        chunk_id INTEGER PRIMARY KEY,\n        embedding FLOAT[${getEmbeddingDim()}]\n      );\n\n      CREATE VIRTUAL TABLE IF NOT EXISTS fts_conversation USING fts5(\n        snippet,\n        content='conversation_chunks',\n        content_rowid='id'\n      );\n\n      CREATE TRIGGER IF NOT EXISTS conv_chunks_ai AFTER INSERT ON conversation_chunks BEGIN\n        INSERT INTO fts_conversation(rowid, snippet) VALUES (new.id, new.snippet);\n      END;\n      CREATE TRIGGER IF NOT EXISTS conv_chunks_ad AFTER DELETE ON conversation_chunks BEGIN\n        INSERT INTO fts_conversation(fts_conversation, rowid, snippet) VALUES ('delete', old.id, old.snippet);\n      END;\n      CREATE TRIGGER IF NOT EXISTS conv_chunks_au AFTER UPDATE ON conversation_chunks BEGIN\n\n        INSERT INTO fts_conversation(fts_conversation, rowid, snippet) VALUES ('delete', old.id, old.snippet);\n        INSERT INTO fts_conversation(rowid, snippet) VALUES (new.id, new.snippet);\n      END;\n\n      CREATE INDEX IF NOT EXISTS idx_conv_turns_session ON conversation_turns(session_id);\n\n      CREATE TABLE IF NOT EXISTS conversation_checkpoints (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        session_id TEXT NOT NULL,\n        turn_index INTEGER NOT NULL,\n        timestamp TEXT NOT NULL,\n        type TEXT NOT NULL,\n        title TEXT NOT NULL,\n        summary TEXT NOT NULL,\n        files_involved TEXT,\n        tags TEXT,\n        embedding BLOB\n      );\n\n      CREATE INDEX IF NOT EXISTS idx_checkpoints_session ON conversation_checkpoints(session_id);\n      CREATE INDEX IF NOT EXISTS idx_checkpoints_type ON conversation_checkpoints(type);\n\n      CREATE VIRTUAL TABLE IF NOT EXISTS vec_checkpoints USING vec0(\n        checkpoint_id INTEGER PRIMARY KEY,\n        embedding FLOAT[${getEmbeddingDim()}]\n      );\n\n      CREATE TABLE IF NOT EXISTS query_log (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        query TEXT NOT NULL,\n        result_count INTEGER NOT NULL,\n        top_score REAL,\n        top_path TEXT,\n        duration_ms INTEGER NOT NULL,\n        created_at TEXT NOT NULL\n      );\n\n      CREATE TABLE IF NOT EXISTS git_commits (\n        id          INTEGER PRIMARY KEY AUTOINCREMENT,\n        hash        TEXT UNIQUE NOT NULL,\n        short_hash  TEXT NOT NULL,\n        message     TEXT NOT NULL,\n        author_name TEXT NOT NULL,\n        author_email TEXT NOT NULL,\n        date        TEXT NOT NULL,\n        files_changed TEXT NOT NULL,\n        insertions  INTEGER DEFAULT 0,\n        deletions   INTEGER DEFAULT 0,\n        is_merge    INTEGER DEFAULT 0,\n        refs        TEXT,\n        diff_summary TEXT,\n        indexed_at  TEXT NOT NULL\n      );\n\n      CREATE TABLE IF NOT EXISTS git_commit_files (\n        commit_id   INTEGER NOT NULL REFERENCES git_commits(id) ON DELETE CASCADE,\n        file_path   TEXT NOT NULL,\n        insertions  INTEGER DEFAULT 0,\n        deletions   INTEGER DEFAULT 0,\n        PRIMARY KEY (commit_id, file_path)\n\n      );\n      CREATE INDEX IF NOT EXISTS idx_gcf_path ON git_commit_files(file_path);\n\n      CREATE VIRTUAL TABLE IF NOT EXISTS vec_git_commits USING vec0(\n        commit_id INTEGER PRIMARY KEY,\n        embedding FLOAT[${getEmbeddingDim()}]\n      );\n\n      CREATE VIRTUAL TABLE IF NOT EXISTS fts_git_commits USING fts5(\n        message,\n        diff_summary,\n        content='git_commits',\n        content_rowid='id'\n      );\n\n      CREATE TRIGGER IF NOT EXISTS git_commits_ai AFTER INSERT ON git_commits BEGIN\n        INSERT INTO fts_git_commits(rowid, message, diff_summary)\n        VALUES (new.id, new.message, new.diff_summary);\n      END;\n      CREATE TRIGGER IF NOT EXISTS git_commits_ad AFTER DELETE ON git_commits BEGIN\n        INSERT INTO fts_git_commits(fts_git_commits, rowid, message, diff_summary)\n        VALUES ('delete', old.id, old.message, old.diff_summary);\n      END;\n    `);\n\n    this.db.exec(`\n      CREATE TABLE IF NOT EXISTS annotations (\n        id          INTEGER PRIMARY KEY AUTOINCREMENT,\n        path        TEXT NOT NULL,\n        symbol_name TEXT,\n        note        TEXT NOT NULL,\n        author      TEXT,\n        created_at  TEXT NOT NULL,\n        updated_at  TEXT NOT NULL\n      );\n      CREATE INDEX IF NOT EXISTS idx_ann_path ON annotations(path);\n\n      CREATE VIRTUAL TABLE IF NOT EXISTS fts_annotations USING fts5(\n        note,\n        content='annotations',\n        content_rowid='id'\n      );\n\n      CREATE VIRTUAL TABLE IF NOT EXISTS vec_annotations USING vec0(\n        annotation_id INTEGER PRIMARY KEY,\n        embedding FLOAT[${getEmbeddingDim()}]\n      );\n    `);\n\n    this.migrateChunksEntityColumns();\n    this.migrateParentChunkColumns();\n    this.migrateGraphColumns();\n  }\n\n  private migrateChunksEntityColumns() {\n    const cols = this.db\n      .query<{ name: string }, []>(\"PRAGMA table_info(chunks)\")\n      .all()\n      .map((c) => c.name);\n\n    if (!cols.includes(\"entity_name\")) {\n      this.db.exec(\"ALTER TABLE chunks ADD COLUMN entity_name TEXT\");\n    }\n    if (!cols.includes(\"chunk_type\")) {\n      this.db.exec(\"ALTER TABLE chunks ADD COLUMN chunk_type TEXT\");\n    }\n    if (!cols.includes(\"start_line\")) {\n      this.db.exec(\"ALTER TABLE chunks ADD COLUMN start_line INTEGER\");\n    }\n    if (!cols.includes(\"end_line\")) {\n      this.db.exec(\"ALTER TABLE chunks ADD COLUMN end_line INTEGER\");\n    }\n    if (!cols.includes(\"content_hash\")) {\n      this.db.exec(\"ALTER TABLE chunks ADD COLUMN content_hash TEXT\");\n    }\n  }\n\n  private migrateParentChunkColumns() {\n    const cols = this.db\n      .query<{ name: string }, []>(\"PRAGMA table_info(chunks)\")\n      .all()\n      .map((c) => c.name);\n\n    if (!cols.includes(\"parent_id\")) {\n      this.db.exec(\"ALTER TABLE chunks ADD COLUMN parent_id INTEGER REFERENCES chunks(id) ON DELETE CASCADE\");\n    }\n  }\n\n  private migrateGraphColumns() {\n    const importCols = this.db\n      .query<{ name: string }, []>(\"PRAGMA table_info(file_imports)\")\n      .all()\n      .map((c) => c.name);\n\n    if (!importCols.includes(\"is_default\")) {\n      this.db.exec(\"ALTER TABLE file_imports ADD COLUMN is_default INTEGER DEFAULT 0\");\n    }\n    if (!importCols.includes(\"is_namespace\")) {\n      this.db.exec(\"ALTER TABLE file_imports ADD COLUMN is_namespace INTEGER DEFAULT 0\");\n    }\n\n    const exportCols = this.db\n      .query<{ name: string }, []>(\"PRAGMA table_info(file_exports)\")\n      .all()\n      .map((c) => c.name);\n\n    if (!exportCols.includes(\"is_default\")) {\n      this.db.exec(\"ALTER TABLE file_exports ADD COLUMN is_default INTEGER DEFAULT 0\");\n    }\n    if (!exportCols.includes(\"is_reexport\")) {\n      this.db.exec(\"ALTER TABLE file_exports ADD COLUMN is_reexport INTEGER DEFAULT 0\");\n    }\n    if (!exportCols.includes(\"reexport_source\")) {\n      this.db.exec(\"ALTER TABLE file_exports ADD COLUMN reexport_source TEXT\");\n    }\n  }\n\n\n  // ── File operations ───────────────────────────────────────────\n\n\n  getFileByPath(path: string) {\n    return fileOps.getFileByPath(this.db, path);\n  }\n\n  upsertFileStart(path: string, hash: string) {\n    return fileOps.upsertFileStart(this.db, path, hash);\n  }\n\n  updateFileHash(fileId: number, hash: string) {\n    fileOps.updateFileHash(this.db, fileId, hash);\n  }\n\n  insertChunkBatch(fileId: number, chunks: EmbeddedChunk[], startIndex: number) {\n    fileOps.insertChunkBatch(this.db, fileId, chunks, startIndex);\n  }\n\n  insertChunkReturningId(fileId: number, chunk: EmbeddedChunk, chunkIndex: number) {\n    return fileOps.insertChunkReturningId(this.db, fileId, chunk, chunkIndex);\n  }\n\n  getChunkById(chunkId: number) {\n    return fileOps.getChunkById(this.db, chunkId);\n  }\n\n  upsertFile(path: string, hash: string, chunks: EmbeddedChunk[]) {\n    fileOps.upsertFile(this.db, path, hash, chunks);\n  }\n\n  removeFile(path: string) {\n    return fileOps.removeFile(this.db, path);\n  }\n\n  pruneDeleted(existingPaths: Set<string>) {\n    return fileOps.pruneDeleted(this.db, existingPaths);\n  }\n\n  getAllFilePaths() {\n    return fileOps.getAllFilePaths(this.db);\n  }\n\n  getChunkHashes(fileId: number) {\n    return fileOps.getChunkHashes(this.db, fileId);\n  }\n\n  deleteStaleChunks(fileId: number, keepHashes: Set<string>) {\n    return fileOps.deleteStaleChunks(this.db, fileId, keepHashes);\n  }\n\n  updateChunkPositions(\n    fileId: number,\n    updates: { contentHash: string; chunkIndex: number; startLine: number | null; endLine: number | null }[]\n  ) {\n    fileOps.updateChunkPositions(this.db, fileId, updates);\n  }\n\n  getStatus() {\n    return fileOps.getStatus(this.db);\n  }\n\n\n  // ── Search operations ─────────────────────────────────────────\n\n\n  search(queryEmbedding: Float32Array, topK?: number, filter?: PathFilter) {\n    return searchOps.vectorSearch(this.db, queryEmbedding, topK, filter);\n  }\n\n  textSearch(query: string, topK?: number, filter?: PathFilter) {\n    return searchOps.textSearch(this.db, query, topK, filter);\n  }\n\n  searchChunks(queryEmbedding: Float32Array, topK?: number, filter?: PathFilter) {\n    return searchOps.vectorSearchChunks(this.db, queryEmbedding, topK, filter);\n  }\n\n  textSearchChunks(query: string, topK?: number, filter?: PathFilter) {\n    return searchOps.textSearchChunks(this.db, query, topK, filter);\n  }\n\n  searchSymbols(query?: string, exact?: boolean, type?: string, topK?: number) {\n    return searchOps.searchSymbols(this.db, query, exact, type, topK);\n  }\n\n  findUsages(symbolName: string, exact: boolean, top: number) {\n    return searchOps.findUsages(this.db, symbolName, exact, top);\n  }\n\n\n  // ── Graph operations ──────────────────────────────────────────\n\n\n  upsertFileGraph(\n    fileId: number,\n    imports: { name: string; source: string; isDefault?: boolean; isNamespace?: boolean }[],\n    exports: { name: string; type: string; isDefault?: boolean; isReExport?: boolean; reExportSource?: string }[]\n  ) {\n    graphOps.upsertFileGraph(this.db, fileId, imports, exports);\n  }\n\n  resolveImport(importId: number, resolvedFileId: number) {\n    graphOps.resolveImport(this.db, importId, resolvedFileId);\n  }\n\n  getUnresolvedImports() {\n    return graphOps.getUnresolvedImports(this.db);\n  }\n\n  getGraph() {\n    return graphOps.getGraph(this.db);\n  }\n\n  getSubgraph(fileIds: number[], maxHops?: number) {\n    return graphOps.getSubgraph(this.db, fileIds, maxHops);\n  }\n\n  getImportsForFile(fileId: number) {\n    return graphOps.getImportsForFile(this.db, fileId);\n  }\n\n  getImportersOf(fileId: number) {\n    return graphOps.getImportersOf(this.db, fileId);\n  }\n\n  getDependsOn(fileId: number) {\n    return graphOps.getDependsOn(this.db, fileId);\n  }\n\n  getDependedOnBy(fileId: number) {\n    return graphOps.getDependedOnBy(this.db, fileId);\n  }\n\n\n  // ── Conversation operations ───────────────────────────────────\n\n\n  upsertSession(\n    sessionId: string, jsonlPath: string, startedAt: string,\n    mtime: number, readOffset: number\n  ) {\n    conversationOps.upsertSession(this.db, sessionId, jsonlPath, startedAt, mtime, readOffset);\n  }\n\n  getSession(sessionId: string) {\n    return conversationOps.getSession(this.db, sessionId);\n  }\n\n  updateSessionStats(\n    sessionId: string, turnCount: number, totalTokens: number, readOffset: number\n  ) {\n    conversationOps.updateSessionStats(this.db, sessionId, turnCount, totalTokens, readOffset);\n  }\n\n  insertTurn(\n    sessionId: string, turnIndex: number, timestamp: string,\n    userText: string, assistantText: string, toolsUsed: string[],\n    filesReferenced: string[], tokenCost: number, summary: string,\n    chunks: { snippet: string; embedding: Float32Array }[]\n  ) {\n    return conversationOps.insertTurn(\n      this.db, sessionId, turnIndex, timestamp, userText,\n      assistantText, toolsUsed, filesReferenced, tokenCost, summary, chunks\n    );\n  }\n\n  getTurnCount(sessionId: string) {\n    return conversationOps.getTurnCount(this.db, sessionId);\n  }\n\n  searchConversation(queryEmbedding: Float32Array, topK?: number, sessionId?: string) {\n    return conversationOps.searchConversation(this.db, queryEmbedding, topK, sessionId);\n  }\n\n  textSearchConversation(query: string, topK?: number, sessionId?: string) {\n    return conversationOps.textSearchConversation(this.db, query, topK, sessionId);\n  }\n\n\n  // ── Checkpoint operations ─────────────────────────────────────\n\n\n  createCheckpoint(\n    sessionId: string, turnIndex: number, timestamp: string,\n    type: string, title: string, summary: string,\n    filesInvolved: string[], tags: string[], embedding: Float32Array\n  ) {\n    return checkpointOps.createCheckpoint(\n      this.db, sessionId, turnIndex, timestamp, type, title,\n      summary, filesInvolved, tags, embedding\n    );\n  }\n\n  listCheckpoints(sessionId?: string, type?: string, limit?: number) {\n    return checkpointOps.listCheckpoints(this.db, sessionId, type, limit);\n  }\n\n  searchCheckpoints(queryEmbedding: Float32Array, topK?: number, type?: string) {\n    return checkpointOps.searchCheckpoints(this.db, queryEmbedding, topK, type);\n  }\n\n  getCheckpoint(id: number) {\n    return checkpointOps.getCheckpoint(this.db, id);\n  }\n\n\n  // ── Annotation operations ─────────────────────────────────────\n\n\n  upsertAnnotation(\n    path: string, note: string, embedding: Float32Array,\n    symbolName?: string | null, author?: string | null\n  ) {\n    return annotationOps.upsertAnnotation(this.db, path, note, embedding, symbolName, author);\n  }\n\n  getAnnotations(path?: string, symbolName?: string | null) {\n    return annotationOps.getAnnotations(this.db, path, symbolName);\n  }\n\n  searchAnnotations(queryEmbedding: Float32Array, topK?: number) {\n    return annotationOps.searchAnnotations(this.db, queryEmbedding, topK);\n  }\n\n  deleteAnnotation(id: number) {\n    return annotationOps.deleteAnnotation(this.db, id);\n  }\n\n\n  // ── Git history operations ────────────────────────────────────\n\n\n  insertCommitBatch(commits: gitHistoryOps.GitCommitInsert[]) {\n    gitHistoryOps.insertCommitBatch(this.db, commits);\n  }\n\n  getLastIndexedCommit() {\n    return gitHistoryOps.getLastIndexedCommit(this.db);\n  }\n\n  hasCommit(hash: string) {\n    return gitHistoryOps.hasCommit(this.db, hash);\n  }\n\n  searchGitCommits(queryEmbedding: Float32Array, topK?: number, author?: string, since?: string, until?: string, path?: string) {\n    return gitHistoryOps.searchGitCommits(this.db, queryEmbedding, topK, author, since, until, path);\n  }\n\n  textSearchGitCommits(query: string, topK?: number, author?: string, since?: string, until?: string, path?: string) {\n    return gitHistoryOps.textSearchGitCommits(this.db, query, topK, author, since, until, path);\n  }\n\n  getFileHistory(filePath: string, topK?: number, since?: string) {\n    return gitHistoryOps.getFileHistory(this.db, filePath, topK, since);\n  }\n\n  getAllCommitHashes() {\n    return gitHistoryOps.getAllCommitHashes(this.db);\n  }\n\n  purgeOrphanedCommits(reachableHashes: Set<string>) {\n    return gitHistoryOps.purgeOrphanedCommits(this.db, reachableHashes);\n  }\n\n  clearGitHistory() {\n    gitHistoryOps.clearGitHistory(this.db);\n  }\n\n  getGitHistoryStatus() {\n    return gitHistoryOps.getGitHistoryStatus(this.db);\n  }\n\n\n  // ── Analytics operations ──────────────────────────────────────\n\n\n  logQuery(\n    query: string, resultCount: number,\n    topScore: number | null, topPath: string | null, durationMs: number\n  ) {\n    analyticsOps.logQuery(this.db, query, resultCount, topScore, topPath, durationMs);\n  }\n\n  getAnalytics(days?: number) {\n    return analyticsOps.getAnalytics(this.db, days);\n  }\n\n  getAnalyticsTrend(days?: number) {\n    return analyticsOps.getAnalyticsTrend(this.db, days);\n  }\n\n\n  // ── Lifecycle ─────────────────────────────────────────────────\n\n\n  close() {\n    this.db.close();\n  }\n\n}"
     },
     {
       "name": "AnnotationRow",
@@ -186,7 +186,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "shared",
-      "referenceCount": 8,
+      "referenceCount": 9,
       "referenceModuleCount": 2,
       "referenceModules": [
         "wiki"
@@ -202,7 +202,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "cross-cutting",
-      "referenceCount": 21,
+      "referenceCount": 23,
       "referenceModuleCount": 3,
       "referenceModules": [
         "tools",
@@ -219,7 +219,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "shared",
-      "referenceCount": 11,
+      "referenceCount": 12,
       "referenceModuleCount": 2,
       "referenceModules": [
         "wiki"
@@ -335,9 +335,11 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "local",
-      "referenceCount": 2,
-      "referenceModuleCount": 0,
-      "referenceModules": [],
+      "referenceCount": 3,
+      "referenceModuleCount": 1,
+      "referenceModules": [
+        "wiki"
+      ],
       "hasChildren": false,
       "childCount": 0,
       "isReexport": false,
@@ -349,7 +351,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "local",
-      "referenceCount": 5,
+      "referenceCount": 6,
       "referenceModuleCount": 1,
       "referenceModules": [
         "wiki"
@@ -364,10 +366,11 @@
       "type": "interface",
       "file": "src/wiki/types.ts",
       "tier": "entity",
-      "scope": "shared",
-      "referenceCount": 16,
-      "referenceModuleCount": 2,
+      "scope": "cross-cutting",
+      "referenceCount": 18,
+      "referenceModuleCount": 3,
       "referenceModules": [
+        "tools",
         "wiki"
       ],
       "hasChildren": false,
@@ -423,9 +426,11 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "local",
-      "referenceCount": 2,
-      "referenceModuleCount": 0,
-      "referenceModules": [],
+      "referenceCount": 3,
+      "referenceModuleCount": 1,
+      "referenceModules": [
+        "wiki"
+      ],
       "hasChildren": false,
       "childCount": 0,
       "isReexport": false,
@@ -437,9 +442,11 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "local",
-      "referenceCount": 2,
-      "referenceModuleCount": 0,
-      "referenceModules": [],
+      "referenceCount": 3,
+      "referenceModuleCount": 1,
+      "referenceModules": [
+        "wiki"
+      ],
       "hasChildren": false,
       "childCount": 0,
       "isReexport": false,
@@ -451,7 +458,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "shared",
-      "referenceCount": 7,
+      "referenceCount": 8,
       "referenceModuleCount": 2,
       "referenceModules": [
         "wiki"
@@ -566,9 +573,9 @@
       "type": "interface",
       "file": "src/wiki/types.ts",
       "tier": "entity",
-      "scope": "local",
-      "referenceCount": 6,
-      "referenceModuleCount": 1,
+      "scope": "shared",
+      "referenceCount": 8,
+      "referenceModuleCount": 2,
       "referenceModules": [
         "wiki"
       ],
@@ -594,13 +601,27 @@
       "snippet": "export interface PageContentCache {\n  // Structural data (from graph/DB queries)\n  exports?: { name: string; type: string; signature: string }[];\n  dependencies?: string[];\n  dependents?: string[];\n  fanIn?: number;\n  fanOut?: number;\n  usageSites?: { path: string; line: number }[];\n  neighborhood?: object;\n\n  // Semantic data (pre-extracted)\n  overview?: string;\n  relevantChunks?: string[];\n\n  // Children\n  children?: string[];\n  files?: string[];\n  inlineChildren?: ClassifiedSymbol[];\n\n  // Cross-cutting page data\n  modules?: { name: string; fileCount: number; exportCount: number; fanIn: number; fanOut: number; entryFile: string | null }[];\n  hubs?: { path: string; fanIn: number; fanOut: number; bridges: string[] }[];\n  entryPoints?: { path: string; exports: { name: string; type: string }[] }[];\n  crossCuttingSymbols?: { name: string; type: string; file: string; referenceModuleCount: number; referenceModules: string[] }[];\n  testFiles?: string[];\n}"
     },
     {
+      "name": "PageDelta",
+      "type": "interface",
+      "file": "src/wiki/staleness.ts",
+      "tier": "entity",
+      "scope": "local",
+      "referenceCount": 0,
+      "referenceModuleCount": 0,
+      "referenceModules": [],
+      "hasChildren": false,
+      "childCount": 0,
+      "isReexport": false,
+      "snippet": "export interface PageDelta {\n  wikiPath: string;\n  order: number;\n  page: ManifestPage;\n  /** Files that caused this page to be marked stale. Empty for \"new\" pages. */\n  triggers: string[];\n}"
+    },
+    {
       "name": "PageManifest",
       "type": "interface",
       "file": "src/wiki/types.ts",
       "tier": "entity",
-      "scope": "shared",
-      "referenceCount": 13,
-      "referenceModuleCount": 2,
+      "scope": "cross-cutting",
+      "referenceCount": 16,
+      "referenceModuleCount": 3,
       "referenceModules": [
         "tools",
         "wiki"
@@ -654,6 +675,22 @@
       "childCount": 0,
       "isReexport": false,
       "snippet": "export interface ParsedTurn {\n  turnIndex: number;\n  timestamp: string;\n  sessionId: string;\n  userText: string;\n  assistantText: string;\n  toolResults: ToolResultInfo[];\n  toolsUsed: string[];\n  filesReferenced: string[];\n  tokenCost: number;\n  summary: string; // first 200 chars of assistant text\n}"
+    },
+    {
+      "name": "PathFilter",
+      "type": "interface",
+      "file": "src/db/types.ts",
+      "tier": "entity",
+      "scope": "local",
+      "referenceCount": 1,
+      "referenceModuleCount": 1,
+      "referenceModules": [
+        "db"
+      ],
+      "hasChildren": false,
+      "childCount": 0,
+      "isReexport": false,
+      "snippet": "export interface PathFilter {\n  extensions?: string[];\n  dirs?: string[];\n  excludeDirs?: string[];\n}"
     },
     {
       "name": "SearchResult",
@@ -726,6 +763,22 @@
       "childCount": 0,
       "isReexport": false,
       "snippet": "export interface SetupResult {\n  actions: string[];\n  unknownIdes: string[];\n}"
+    },
+    {
+      "name": "StalenessReport",
+      "type": "interface",
+      "file": "src/wiki/staleness.ts",
+      "tier": "entity",
+      "scope": "local",
+      "referenceCount": 1,
+      "referenceModuleCount": 1,
+      "referenceModules": [
+        "wiki"
+      ],
+      "hasChildren": false,
+      "childCount": 0,
+      "isReexport": false,
+      "snippet": "export interface StalenessReport {\n  stale: PageDelta[];\n  added: PageDelta[];\n  removed: { wikiPath: string; page: ManifestPage }[];\n}"
     },
     {
       "name": "StoredChunk",
@@ -834,10 +887,11 @@
       "type": "interface",
       "file": "src/wiki/types.ts",
       "tier": "entity",
-      "scope": "local",
-      "referenceCount": 3,
-      "referenceModuleCount": 1,
+      "scope": "shared",
+      "referenceCount": 4,
+      "referenceModuleCount": 2,
       "referenceModules": [
+        "tools",
         "wiki"
       ],
       "hasChildren": false,
@@ -1033,6 +1087,38 @@
       "snippet": "export async function annotationsCommand(args: string[], getFlag: (flag: string) => string | undefined) {\n  const dir = resolve(args[1] && !args[1].startsWith(\"--\") ? args[1] : getFlag(\"--dir\") || \".\");\n  const filterPath = getFlag(\"--path\");\n  const db = new RagDB(dir);\n  const annotations = db.getAnnotations(filterPath);\n\n  if (annotations.length === 0) {\n    cli.log(filterPath ? `No annotations for ${filterPath}.` : \"No annotations found.\");\n    db.close();\n    return;\n  }\n\n  for (const a of annotations) {\n    const target = a.symbolName ? `${a.path}  •  ${a.symbolName}` : a.path;\n    const authorStr = a.author ? ` [${a.author}]` : \"\";\n    cli.log(`#${a.id}  ${target}${authorStr}`);\n    cli.log(`  ${a.note}`);\n    cli.log(`  (${a.updatedAt})`);\n    cli.log();\n  }\n\n  db.close();\n}"
     },
     {
+      "name": "appendIncrementalLog",
+      "type": "function",
+      "file": "src/wiki/update-log.ts",
+      "tier": "entity",
+      "scope": "local",
+      "referenceCount": 1,
+      "referenceModuleCount": 1,
+      "referenceModules": [
+        "tools"
+      ],
+      "hasChildren": false,
+      "childCount": 0,
+      "isReexport": false,
+      "snippet": "export function appendIncrementalLog(\n  wikiDir: string,\n  sinceRef: string,\n  newRef: string,\n  changedFileCount: number,\n  report: StalenessReport,\n): void {\n  const { stale, added, removed } = report;\n  const byOrder = (a: { order: number }, b: { order: number }) =>\n    a.order - b.order;\n\n  let entry =\n    `## ${isoStamp()} — Incremental update (\\`${sinceRef}\\` → \\`${newRef}\\`)\\n\\n` +\n    `${changedFileCount} file${plural(changedFileCount)} changed. ` +\n    `${stale.length} regenerated, ${added.length} added, ${removed.length} removed.\\n`;\n\n  if (stale.length === 0 && added.length === 0 && removed.length === 0) {\n    entry += `\\nNo wiki pages invalidated by the changed files.\\n`;\n    append(wikiDir, entry);\n    return;\n  }\n\n  if (stale.length > 0) {\n    entry += `\\n### Regenerated\\n\\n`;\n    for (const d of [...stale].sort(byOrder)) {\n      const kind = d.page.focus ?? d.page.kind;\n      entry += `- \\`${d.wikiPath}\\` — ${d.page.title} (${kind}, ${d.page.depth})\\n`;\n      entry += `  - trigger: ${d.triggers.map((t) => `\\`${t}\\``).join(\", \")}\\n`;\n    }\n  }\n\n  if (added.length > 0) {\n    entry += `\\n### Added\\n\\n`;\n    for (const d of [...added].sort(byOrder)) {\n      const kind = d.page.focus ?? d.page.kind;\n      entry += `- \\`${d.wikiPath}\\` — ${d.page.title} (${kind}, ${d.page.depth})\\n`;\n    }\n  }\n\n  if (removed.length > 0) {\n    entry += `\\n### Removed\\n\\n`;\n    for (const r of removed) {\n      entry += `- \\`${r.wikiPath}\\` — ${r.page.title}\\n`;\n    }\n  }\n\n  append(wikiDir, entry);\n}"
+    },
+    {
+      "name": "appendInitLog",
+      "type": "function",
+      "file": "src/wiki/update-log.ts",
+      "tier": "entity",
+      "scope": "local",
+      "referenceCount": 1,
+      "referenceModuleCount": 1,
+      "referenceModules": [
+        "tools"
+      ],
+      "hasChildren": false,
+      "childCount": 0,
+      "isReexport": false,
+      "snippet": "export function appendInitLog(\n  wikiDir: string,\n  gitRef: string,\n  manifest: PageManifest,\n): void {\n  const counts: Record<string, number> = {};\n  for (const p of Object.values(manifest.pages)) {\n    counts[p.tier] = (counts[p.tier] ?? 0) + 1;\n  }\n  const breakdown = Object.entries(counts)\n    .sort(([a], [b]) => a.localeCompare(b))\n    .map(([tier, count]) => `${count} ${tier}`)\n    .join(\", \");\n\n  const entry =\n    `## ${isoStamp()} — Full initialization (\\`${gitRef}\\`)\\n\\n` +\n    `${manifest.pageCount} pages generated` +\n    (breakdown ? ` (${breakdown}).\\n` : `.\\n`);\n\n  append(wikiDir, entry);\n}"
+    },
+    {
       "name": "benchmarkCommand",
       "type": "function",
       "file": "src/cli/commands/benchmark.ts",
@@ -1086,7 +1172,7 @@
       "file": "tests/helpers.ts",
       "tier": "entity",
       "scope": "cross-cutting",
-      "referenceCount": 33,
+      "referenceCount": 36,
       "referenceModuleCount": 11,
       "referenceModules": [
         "benchmarks",
@@ -1172,7 +1258,7 @@
       "file": "tests/helpers.ts",
       "tier": "entity",
       "scope": "cross-cutting",
-      "referenceCount": 33,
+      "referenceCount": 36,
       "referenceModuleCount": 11,
       "referenceModules": [
         "benchmarks",
@@ -1226,7 +1312,7 @@
       "file": "src/embeddings/embed.ts",
       "tier": "entity",
       "scope": "cross-cutting",
-      "referenceCount": 30,
+      "referenceCount": 34,
       "referenceModuleCount": 11,
       "referenceModules": [
         "benchmarks",
@@ -1355,6 +1441,22 @@
       "snippet": "export async function evalCommand(args: string[], getFlag: (flag: string) => string | undefined) {\n  const file = args[1];\n  if (!file) {\n    cli.error(\"Usage: mimirs eval <file> [--dir D] [--top N] [--out F]\");\n    process.exit(1);\n  }\n\n  const dir = resolve(getFlag(\"--dir\") || \".\");\n  const outPath = getFlag(\"--out\");\n  const db = new RagDB(dir);\n  const config = await loadConfig(dir);\n  const top = parseInt(getFlag(\"--top\") || String(config.benchmarkTopK), 10);\n\n  const tasks = await loadEvalTasks(resolve(file));\n  cli.log(`Running A/B eval with ${tasks.length} tasks against ${dir}...\\n`);\n\n  const summary = await runEval(tasks, db, dir, top);\n  cli.log(formatEvalReport(summary));\n\n  if (outPath) {\n    await saveEvalTraces(summary.traces, resolve(outPath));\n    cli.log(`\\nTraces saved to ${outPath}`);\n  }\n\n  db.close();\n}"
     },
     {
+      "name": "findGitRoot",
+      "type": "function",
+      "file": "src/tools/git-tools.ts",
+      "tier": "entity",
+      "scope": "local",
+      "referenceCount": 2,
+      "referenceModuleCount": 1,
+      "referenceModules": [
+        "tools"
+      ],
+      "hasChildren": false,
+      "childCount": 0,
+      "isReexport": false,
+      "snippet": "export async function findGitRoot(dir: string): Promise<string | null> {\n  return runGit([\"rev-parse\", \"--show-toplevel\"], dir);\n}"
+    },
+    {
       "name": "formatBenchmarkReport",
       "type": "function",
       "file": "src/search/benchmark.ts",
@@ -1465,7 +1567,7 @@
       "file": "src/embeddings/embed.ts",
       "tier": "entity",
       "scope": "cross-cutting",
-      "referenceCount": 27,
+      "referenceCount": 30,
       "referenceModuleCount": 9,
       "referenceModules": [
         "benchmarks",
@@ -1927,7 +2029,7 @@
       "hasChildren": false,
       "childCount": 0,
       "isReexport": false,
-      "snippet": "export async function readCommand(args: string[], getFlag: (flag: string) => string | undefined) {\n  const query = args[1];\n  if (!query) {\n    cli.error(\"Usage: mimirs read <query> [--top N] [--threshold T] [--dir D]\");\n    process.exit(1);\n  }\n\n  const dir = resolve(getFlag(\"--dir\") || \".\");\n  const db = new RagDB(dir);\n  const config = await loadConfig(dir);\n  applyEmbeddingConfig(config);\n  const top = parseInt(getFlag(\"--top\") || \"8\", 10);\n  const threshold = parseFloat(getFlag(\"--threshold\") || \"0.3\");\n\n  const results = await searchChunks(query, db, top, threshold, config.hybridWeight, config.generated);\n\n  if (results.length === 0) {\n    cli.log(\"No relevant chunks found. Has the directory been indexed?\");\n  } else {\n    for (const r of results) {\n      const entity = r.entityName ? `  •  ${r.entityName}` : \"\";\n      cli.log(`[${r.score.toFixed(2)}] ${r.path}${entity}`);\n      cli.log(r.content);\n      cli.log(\"\\n---\\n\");\n    }\n  }\n  db.close();\n}"
+      "snippet": "export async function readCommand(args: string[], getFlag: (flag: string) => string | undefined) {\n  const query = args[1];\n  if (!query) {\n    cli.error(\"Usage: mimirs read <query> [--top N] [--threshold T] [--dir D] [--ext ...] [--in ...] [--exclude ...]\");\n    process.exit(1);\n  }\n\n  const dir = resolve(getFlag(\"--dir\") || \".\");\n  const db = new RagDB(dir);\n  const config = await loadConfig(dir);\n  applyEmbeddingConfig(config);\n  const top = parseInt(getFlag(\"--top\") || \"8\", 10);\n  const threshold = parseFloat(getFlag(\"--threshold\") || \"0.3\");\n  const filter = buildCliFilter(dir, getFlag);\n\n  const results = await searchChunks(query, db, top, threshold, config.hybridWeight, config.generated, filter);\n\n  if (results.length === 0) {\n    cli.log(\"No relevant chunks found. Has the directory been indexed?\");\n  } else {\n    for (const r of results) {\n      const entity = r.entityName ? `  •  ${r.entityName}` : \"\";\n      cli.log(`[${r.score.toFixed(2)}] ${r.path}${entity}`);\n      cli.log(r.content);\n      cli.log(\"\\n---\\n\");\n    }\n  }\n  db.close();\n}"
     },
     {
       "name": "registerAllTools",
@@ -2041,6 +2143,22 @@
       "snippet": "export async function runEval(\n  tasks: EvalTask[],\n  db: RagDB,\n  projectDir: string,\n  topK: number = 5\n): Promise<EvalSummary> {\n  const traces: EvalTrace[] = [];\n\n  for (const task of tasks) {\n    const withRag = await runEvalTask(task, db, projectDir, \"with-rag\", topK);\n    const withoutRag = await runEvalTask(task, db, projectDir, \"without-rag\", topK);\n    traces.push(withRag, withoutRag);\n  }\n\n  const withRagTraces = traces.filter((t) => t.condition === \"with-rag\");\n  const withoutRagTraces = traces.filter((t) => t.condition === \"without-rag\");\n\n  function computeStats(traceSet: EvalTrace[], tasks: EvalTask[]) {\n    const n = traceSet.length || 1;\n    const avgSearchResults = traceSet.reduce((s, t) => s + t.searchResults.length, 0) / n;\n    const avgFilesReferenced = traceSet.reduce((s, t) => s + t.filesReferenced.length, 0) / n;\n    const avgDurationMs = traceSet.reduce((s, t) => s + t.durationMs, 0) / n;\n\n    // File hit rate: % of tasks with expectedFiles where at least one was found\n    let hits = 0;\n    let withExpected = 0;\n    for (let i = 0; i < tasks.length; i++) {\n      if (tasks[i].expectedFiles && tasks[i].expectedFiles!.length > 0) {\n        withExpected++;\n        const expected = tasks[i].expectedFiles!;\n        const found = traceSet[i].filesReferenced;\n        const hasHit = expected.some((e) =>\n          found.some((f) => f === e || f.endsWith(e) || e.endsWith(f))\n        );\n        if (hasHit) hits++;\n      }\n    }\n    const fileHitRate = withExpected > 0 ? hits / withExpected : 0;\n\n    return { avgSearchResults, avgFilesReferenced, avgDurationMs, fileHitRate };\n  }\n\n  return {\n    totalTasks: tasks.length,\n    withRag: computeStats(withRagTraces, tasks),\n    withoutRag: computeStats(withoutRagTraces, tasks),\n    traces,\n  };\n}"
     },
     {
+      "name": "runGit",
+      "type": "function",
+      "file": "src/tools/git-tools.ts",
+      "tier": "entity",
+      "scope": "local",
+      "referenceCount": 2,
+      "referenceModuleCount": 1,
+      "referenceModules": [
+        "tools"
+      ],
+      "hasChildren": false,
+      "childCount": 0,
+      "isReexport": false,
+      "snippet": "export async function runGit(args: string[], cwd: string): Promise<string | null> {\n  try {\n    const proc = Bun.spawn([\"git\", ...args], { cwd, stdout: \"pipe\", stderr: \"pipe\" });\n    const output = await new Response(proc.stdout).text();\n    const exitCode = await proc.exited;\n    return exitCode === 0 ? output.trim() : null;\n  } catch {\n    return null;\n  }\n}"
+    },
+    {
       "name": "runQuery",
       "type": "function",
       "file": "tests/fixtures/sample.ts",
@@ -2128,7 +2246,7 @@
       "hasChildren": false,
       "childCount": 0,
       "isReexport": false,
-      "snippet": "export async function searchCommand(args: string[], getFlag: (flag: string) => string | undefined) {\n  const query = args[1];\n  if (!query) {\n    cli.error(\"Usage: mimirs search <query> [--top N]\");\n    process.exit(1);\n  }\n\n  const dir = resolve(getFlag(\"--dir\") || \".\");\n  const db = new RagDB(dir);\n  const config = await loadConfig(dir);\n  applyEmbeddingConfig(config);\n  const top = parseInt(getFlag(\"--top\") || String(config.searchTopK), 10);\n\n  const results = await search(query, db, top, 0, config.hybridWeight, config.generated);\n\n  if (results.length === 0) {\n    cli.log(\"No results found. Has the directory been indexed?\");\n  } else {\n    for (const r of results) {\n      cli.log(`${r.score.toFixed(4)}  ${r.path}`);\n      const preview = r.snippets[0]?.slice(0, 120).replace(/\\n/g, \" \");\n      cli.log(`         ${preview}...`);\n      cli.log();\n    }\n  }\n  db.close();\n}"
+      "snippet": "export async function searchCommand(args: string[], getFlag: (flag: string) => string | undefined) {\n  const query = args[1];\n  if (!query) {\n    cli.error(\"Usage: mimirs search <query> [--top N] [--ext .ts,.tsx] [--in src,packages/core] [--exclude tests]\");\n    process.exit(1);\n  }\n\n  const dir = resolve(getFlag(\"--dir\") || \".\");\n  const db = new RagDB(dir);\n  const config = await loadConfig(dir);\n  applyEmbeddingConfig(config);\n  const top = parseInt(getFlag(\"--top\") || String(config.searchTopK), 10);\n  const filter = buildCliFilter(dir, getFlag);\n\n  const results = await search(query, db, top, 0, config.hybridWeight, config.generated, filter);\n\n  if (results.length === 0) {\n    cli.log(\"No results found. Has the directory been indexed?\");\n  } else {\n    for (const r of results) {\n      cli.log(`${r.score.toFixed(4)}  ${r.path}`);\n      const preview = r.snippets[0]?.slice(0, 120).replace(/\\n/g, \" \");\n      cli.log(`         ${preview}...`);\n      cli.log();\n    }\n  }\n  db.close();\n}"
     },
     {
       "name": "searchConversation",
@@ -2231,7 +2349,7 @@
       "hasChildren": false,
       "childCount": 0,
       "isReexport": false,
-      "snippet": "export function textSearch(db: Database, query: string, topK: number = 5): SearchResult[] {\n  return db\n    .query<\n      {\n        snippet: string;\n        chunk_index: number;\n        entity_name: string | null;\n        chunk_type: string | null;\n        rank: number;\n        path: string;\n      },\n      [string, number]\n    >(\n      `SELECT c.snippet, c.chunk_index, c.entity_name, c.chunk_type, f.path, rank\n       FROM fts_chunks fts\n       JOIN chunks c ON c.id = fts.rowid\n       JOIN files f ON f.id = c.file_id\n       WHERE fts_chunks MATCH ?\n       ORDER BY rank\n       LIMIT ?`\n    )\n    .all(sanitizeFTS(query), topK)\n    .map((row) => ({\n      path: row.path,\n      score: 1 / (1 + Math.abs(row.rank)),\n      snippet: row.snippet,\n      chunkIndex: row.chunk_index,\n      entityName: row.entity_name,\n      chunkType: row.chunk_type,\n    }));\n}"
+      "snippet": "export function textSearch(\n  db: Database,\n  query: string,\n  topK: number = 5,\n  filter?: PathFilter,\n): SearchResult[] {\n  const { clauses, params: filterParams, active } = buildPathFilter(filter);\n  const extraWhere = clauses.length > 0 ? ` AND ${clauses.join(\" AND \")}` : \"\";\n  const fetchLimit = active ? topK * FILTER_OVERFETCH : topK;\n\n  const sql = `SELECT c.snippet, c.chunk_index, c.entity_name, c.chunk_type, f.path, rank\n     FROM fts_chunks fts\n     JOIN chunks c ON c.id = fts.rowid\n     JOIN files f ON f.id = c.file_id\n     WHERE fts_chunks MATCH ?${extraWhere}\n     ORDER BY rank\n     LIMIT ?`;\n\n  return db\n    .query<\n      {\n        snippet: string;\n        chunk_index: number;\n        entity_name: string | null;\n        chunk_type: string | null;\n        rank: number;\n        path: string;\n      },\n      (string | number)[]\n    >(sql)\n    .all(sanitizeFTS(query), ...filterParams, fetchLimit)\n    .slice(0, topK)\n    .map((row) => ({\n      path: row.path,\n      score: 1 / (1 + Math.abs(row.rank)),\n      snippet: row.snippet,\n      chunkIndex: row.chunk_index,\n      entityName: row.entity_name,\n      chunkType: row.chunk_type,\n    }));\n}"
     },
     {
       "name": "textSearchChunks",
@@ -2245,7 +2363,7 @@
       "hasChildren": false,
       "childCount": 0,
       "isReexport": false,
-      "snippet": "export function textSearchChunks(db: Database, query: string, topK: number = 8): ChunkSearchResult[] {\n  return db\n    .query<\n      {\n        snippet: string;\n        chunk_index: number;\n        entity_name: string | null;\n        chunk_type: string | null;\n        start_line: number | null;\n        end_line: number | null;\n        parent_id: number | null;\n        rank: number;\n        path: string;\n      },\n      [string, number]\n    >(\n      `SELECT c.snippet, c.chunk_index, c.entity_name, c.chunk_type, c.start_line, c.end_line,\n              c.parent_id, f.path, rank\n       FROM fts_chunks fts\n       JOIN chunks c ON c.id = fts.rowid\n       JOIN files f ON f.id = c.file_id\n       WHERE fts_chunks MATCH ?\n       ORDER BY rank\n       LIMIT ?`\n    )\n    .all(sanitizeFTS(query), topK)\n    .map((row) => ({\n      path: row.path,\n      score: 1 / (1 + Math.abs(row.rank)),\n      content: row.snippet,\n      chunkIndex: row.chunk_index,\n      entityName: row.entity_name,\n      chunkType: row.chunk_type,\n      startLine: row.start_line,\n      endLine: row.end_line,\n      parentId: row.parent_id,\n    }));\n}"
+      "snippet": "export function textSearchChunks(\n  db: Database,\n  query: string,\n  topK: number = 8,\n  filter?: PathFilter,\n): ChunkSearchResult[] {\n  const { clauses, params: filterParams, active } = buildPathFilter(filter);\n  const extraWhere = clauses.length > 0 ? ` AND ${clauses.join(\" AND \")}` : \"\";\n  const fetchLimit = active ? topK * FILTER_OVERFETCH : topK;\n\n  const sql = `SELECT c.snippet, c.chunk_index, c.entity_name, c.chunk_type, c.start_line, c.end_line,\n            c.parent_id, f.path, rank\n     FROM fts_chunks fts\n     JOIN chunks c ON c.id = fts.rowid\n     JOIN files f ON f.id = c.file_id\n     WHERE fts_chunks MATCH ?${extraWhere}\n     ORDER BY rank\n     LIMIT ?`;\n\n  return db\n    .query<\n      {\n        snippet: string;\n        chunk_index: number;\n        entity_name: string | null;\n        chunk_type: string | null;\n        start_line: number | null;\n        end_line: number | null;\n        parent_id: number | null;\n        rank: number;\n        path: string;\n      },\n      (string | number)[]\n    >(sql)\n    .all(sanitizeFTS(query), ...filterParams, fetchLimit)\n    .slice(0, topK)\n    .map((row) => ({\n      path: row.path,\n      score: 1 / (1 + Math.abs(row.rank)),\n      content: row.snippet,\n      chunkIndex: row.chunk_index,\n      entityName: row.entity_name,\n      chunkType: row.chunk_type,\n      startLine: row.start_line,\n      endLine: row.end_line,\n      parentId: row.parent_id,\n    }));\n}"
     },
     {
       "name": "textSearchConversation",
@@ -2371,7 +2489,7 @@
       "hasChildren": false,
       "childCount": 0,
       "isReexport": false,
-      "snippet": "export function vectorSearch(db: Database, queryEmbedding: Float32Array, topK: number = 5): SearchResult[] {\n  return db\n    .query<\n      {\n        chunk_id: number;\n        distance: number;\n        snippet: string;\n        chunk_index: number;\n        entity_name: string | null;\n        chunk_type: string | null;\n        path: string;\n      },\n      [Uint8Array, number]\n    >(\n      `SELECT v.chunk_id, v.distance, c.snippet, c.chunk_index, c.entity_name, c.chunk_type, f.path\n       FROM (SELECT chunk_id, distance FROM vec_chunks WHERE embedding MATCH ? ORDER BY distance LIMIT ?) v\n       JOIN chunks c ON c.id = v.chunk_id\n       JOIN files f ON f.id = c.file_id`\n    )\n    .all(new Uint8Array(queryEmbedding.buffer), topK)\n    .map((row) => ({\n      path: row.path,\n      score: 1 / (1 + row.distance),\n      snippet: row.snippet,\n      chunkIndex: row.chunk_index,\n      entityName: row.entity_name,\n      chunkType: row.chunk_type,\n    }));\n}"
+      "snippet": "export function vectorSearch(\n  db: Database,\n  queryEmbedding: Float32Array,\n  topK: number = 5,\n  filter?: PathFilter,\n): SearchResult[] {\n  const { clauses, params: filterParams, active } = buildPathFilter(filter);\n  const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(\" AND \")}` : \"\";\n  const innerLimit = active ? topK * FILTER_OVERFETCH : topK;\n\n  const sql = `SELECT v.chunk_id, v.distance, c.snippet, c.chunk_index, c.entity_name, c.chunk_type, f.path\n     FROM (SELECT chunk_id, distance FROM vec_chunks WHERE embedding MATCH ? ORDER BY distance LIMIT ?) v\n     JOIN chunks c ON c.id = v.chunk_id\n     JOIN files f ON f.id = c.file_id\n     ${whereClause}\n     ORDER BY v.distance\n     LIMIT ?`;\n\n  return db\n    .query<\n      {\n        chunk_id: number;\n        distance: number;\n        snippet: string;\n        chunk_index: number;\n        entity_name: string | null;\n        chunk_type: string | null;\n        path: string;\n      },\n      (Uint8Array | number | string)[]\n    >(sql)\n    .all(new Uint8Array(queryEmbedding.buffer), innerLimit, ...filterParams, topK)\n    .map((row) => ({\n      path: row.path,\n      score: 1 / (1 + row.distance),\n      snippet: row.snippet,\n      chunkIndex: row.chunk_index,\n      entityName: row.entity_name,\n      chunkType: row.chunk_type,\n    }));\n}"
     },
     {
       "name": "vectorSearchChunks",
@@ -2385,7 +2503,7 @@
       "hasChildren": false,
       "childCount": 0,
       "isReexport": false,
-      "snippet": "export function vectorSearchChunks(db: Database, queryEmbedding: Float32Array, topK: number = 8): ChunkSearchResult[] {\n  return db\n    .query<\n      {\n        chunk_id: number;\n        distance: number;\n        snippet: string;\n        chunk_index: number;\n        entity_name: string | null;\n        chunk_type: string | null;\n        start_line: number | null;\n        end_line: number | null;\n        parent_id: number | null;\n        path: string;\n      },\n      [Uint8Array, number]\n    >(\n      `SELECT v.chunk_id, v.distance, c.snippet, c.chunk_index, c.entity_name, c.chunk_type,\n              c.start_line, c.end_line, c.parent_id, f.path\n       FROM (SELECT chunk_id, distance FROM vec_chunks WHERE embedding MATCH ? ORDER BY distance LIMIT ?) v\n       JOIN chunks c ON c.id = v.chunk_id\n       JOIN files f ON f.id = c.file_id`\n    )\n    .all(new Uint8Array(queryEmbedding.buffer), topK)\n    .map((row) => ({\n      path: row.path,\n      score: 1 / (1 + row.distance),\n      content: row.snippet,\n      chunkIndex: row.chunk_index,\n      entityName: row.entity_name,\n      chunkType: row.chunk_type,\n      startLine: row.start_line,\n      endLine: row.end_line,\n      parentId: row.parent_id,\n    }));\n}"
+      "snippet": "export function vectorSearchChunks(\n  db: Database,\n  queryEmbedding: Float32Array,\n  topK: number = 8,\n  filter?: PathFilter,\n): ChunkSearchResult[] {\n  const { clauses, params: filterParams, active } = buildPathFilter(filter);\n  const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(\" AND \")}` : \"\";\n  const innerLimit = active ? topK * FILTER_OVERFETCH : topK;\n\n  const sql = `SELECT v.chunk_id, v.distance, c.snippet, c.chunk_index, c.entity_name, c.chunk_type,\n            c.start_line, c.end_line, c.parent_id, f.path\n     FROM (SELECT chunk_id, distance FROM vec_chunks WHERE embedding MATCH ? ORDER BY distance LIMIT ?) v\n     JOIN chunks c ON c.id = v.chunk_id\n     JOIN files f ON f.id = c.file_id\n     ${whereClause}\n     ORDER BY v.distance\n     LIMIT ?`;\n\n  return db\n    .query<\n      {\n        chunk_id: number;\n        distance: number;\n        snippet: string;\n        chunk_index: number;\n        entity_name: string | null;\n        chunk_type: string | null;\n        start_line: number | null;\n        end_line: number | null;\n        parent_id: number | null;\n        path: string;\n      },\n      (Uint8Array | number | string)[]\n    >(sql)\n    .all(new Uint8Array(queryEmbedding.buffer), innerLimit, ...filterParams, topK)\n    .map((row) => ({\n      path: row.path,\n      score: 1 / (1 + row.distance),\n      content: row.snippet,\n      chunkIndex: row.chunk_index,\n      entityName: row.entity_name,\n      chunkType: row.chunk_type,\n      startLine: row.start_line,\n      endLine: row.end_line,\n      parentId: row.parent_id,\n    }));\n}"
     },
     {
       "name": "writeFixture",
@@ -2393,7 +2511,7 @@
       "file": "tests/helpers.ts",
       "tier": "entity",
       "scope": "cross-cutting",
-      "referenceCount": 13,
+      "referenceCount": 15,
       "referenceModuleCount": 8,
       "referenceModules": [
         "benchmarks",
@@ -2994,8 +3112,8 @@
     },
     {
       "path": "src/db/index.ts",
-      "fanIn": 55,
-      "fanOut": 9,
+      "fanIn": 57,
+      "fanOut": 10,
       "isHub": true,
       "hubPath": "A",
       "bridges": [
@@ -3018,7 +3136,7 @@
     },
     {
       "path": "src/db/types.ts",
-      "fanIn": 2,
+      "fanIn": 3,
       "fanOut": 0,
       "isHub": false,
       "bridges": [],
@@ -3029,6 +3147,7 @@
         "ConversationSearchResult",
         "GitCommitRow",
         "GitCommitSearchResult",
+        "PathFilter",
         "SearchResult",
         "StoredChunk",
         "StoredFile",
@@ -3038,7 +3157,7 @@
     },
     {
       "path": "src/embeddings/embed.ts",
-      "fanIn": 75,
+      "fanIn": 77,
       "fanOut": 0,
       "isHub": true,
       "hubPath": "B",
@@ -3164,7 +3283,7 @@
     },
     {
       "path": "src/search/hybrid.ts",
-      "fanIn": 18,
+      "fanIn": 20,
       "fanOut": 3,
       "isHub": true,
       "hubPath": "B",
@@ -3238,11 +3357,14 @@
     },
     {
       "path": "src/tools/git-tools.ts",
-      "fanIn": 1,
+      "fanIn": 3,
       "fanOut": 1,
       "isHub": false,
       "bridges": [],
-      "entities": []
+      "entities": [
+        "findGitRoot",
+        "runGit"
+      ]
     },
     {
       "path": "src/tools/graph-tools.ts",
@@ -3294,7 +3416,7 @@
     {
       "path": "src/tools/wiki-tools.ts",
       "fanIn": 1,
-      "fanOut": 7,
+      "fanOut": 15,
       "isHub": false,
       "bridges": [],
       "entities": []
@@ -3345,7 +3467,7 @@
     {
       "path": "src/wiki/discovery.ts",
       "fanIn": 3,
-      "fanOut": 2,
+      "fanOut": 8,
       "isHub": false,
       "bridges": [],
       "entities": []
@@ -3570,8 +3692,19 @@
       "entities": []
     },
     {
+      "path": "src/wiki/staleness.ts",
+      "fanIn": 3,
+      "fanOut": 3,
+      "isHub": false,
+      "bridges": [],
+      "entities": [
+        "PageDelta",
+        "StalenessReport"
+      ]
+    },
+    {
       "path": "src/wiki/types.ts",
-      "fanIn": 50,
+      "fanIn": 67,
       "fanOut": 1,
       "isHub": true,
       "hubPath": "B",
@@ -3602,6 +3735,17 @@
         "PageDepth",
         "Scope",
         "SymbolTier"
+      ]
+    },
+    {
+      "path": "src/wiki/update-log.ts",
+      "fanIn": 2,
+      "fanOut": 2,
+      "isHub": false,
+      "bridges": [],
+      "entities": [
+        "appendIncrementalLog",
+        "appendInitLog"
       ]
     },
     {
@@ -3745,7 +3889,7 @@
     },
     {
       "path": "tests/helpers.ts",
-      "fanIn": 65,
+      "fanIn": 67,
       "fanOut": 0,
       "isHub": true,
       "hubPath": "B",
@@ -3853,6 +3997,14 @@
       "entities": []
     },
     {
+      "path": "tests/search/scoped-search.test.ts",
+      "fanIn": 0,
+      "fanOut": 7,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
       "path": "tests/search/search-symbols.test.ts",
       "fanIn": 0,
       "fanOut": 7,
@@ -3912,6 +4064,14 @@
       "path": "tests/wiki/section-selector.test.ts",
       "fanIn": 0,
       "fanOut": 3,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "tests/wiki/staleness.test.ts",
+      "fanIn": 0,
+      "fanOut": 6,
       "isHub": false,
       "bridges": [],
       "entities": []
@@ -4054,7 +4214,7 @@
         "src/db/types.ts"
       ],
       "qualifiesAsModulePage": true,
-      "reason": "value 96 (fanIn=15, exports=56, files=10)",
+      "reason": "value 97 (fanIn=15, exports=57, files=10)",
       "hubs": [
         "src/db/index.ts"
       ],
@@ -4062,12 +4222,12 @@
         "getSubgraph",
         "RagDB"
       ],
-      "entityCount": 54,
+      "entityCount": 55,
       "fileCount": 10,
-      "exportCount": 56,
+      "exportCount": 57,
       "fanIn": 15,
       "fanOut": 2,
-      "value": 96
+      "value": 97
     },
     {
       "name": "embeddings",
@@ -4219,17 +4379,17 @@
         "src/tools/wiki-tools.ts"
       ],
       "qualifiesAsModulePage": true,
-      "reason": "value 19 (fanIn=1, exports=5, files=12)",
+      "reason": "value 21 (fanIn=1, exports=7, files=12)",
       "hubs": [
         "src/tools/index.ts"
       ],
       "bridges": [],
-      "entityCount": 5,
+      "entityCount": 7,
       "fileCount": 12,
-      "exportCount": 5,
+      "exportCount": 7,
       "fanIn": 1,
       "fanOut": 9,
-      "value": 19
+      "value": 21
     },
     {
       "name": "utils",
@@ -4264,20 +4424,22 @@
         "src/wiki/page-payload.ts",
         "src/wiki/page-tree.ts",
         "src/wiki/section-selector.ts",
-        "src/wiki/types.ts"
+        "src/wiki/staleness.ts",
+        "src/wiki/types.ts",
+        "src/wiki/update-log.ts"
       ],
       "qualifiesAsModulePage": true,
-      "reason": "value 44 (fanIn=2, exports=32, files=8)",
+      "reason": "value 50 (fanIn=2, exports=36, files=10)",
       "hubs": [
         "src/wiki/types.ts"
       ],
       "bridges": [],
-      "entityCount": 27,
-      "fileCount": 8,
-      "exportCount": 32,
+      "entityCount": 31,
+      "fileCount": 10,
+      "exportCount": 36,
       "fanIn": 2,
       "fanOut": 2,
-      "value": 44
+      "value": 50
     },
     {
       "name": "exemplars",

@@ -1,6 +1,6 @@
 # db
 
-The `db` module is the persistence boundary of mimirs. Every other module — indexer, search, conversation, graph, tools, CLI — reaches the SQLite store through the `RagDB` facade exported from `src/db/index.ts`. The class holds a single `bun:sqlite` connection with `sqlite-vec` loaded, runs schema migrations on open, and forwards work into ten topic files (`files.ts`, `search.ts`, `graph.ts`, `conversation.ts`, `checkpoints.ts`, `annotations.ts`, `analytics.ts`, `git-history.ts`, `types.ts` for row shapes, plus `index.ts` itself). No code outside this module opens `Database` directly; the facade is the rule.
+The `db` module is the persistence boundary of mimirs. Every other module — indexer, search, conversation, graph, tools, CLI — reaches the SQLite store through the `RagDB` facade exported from `src/db/index.ts`. The class holds a single `bun:sqlite` connection with `sqlite-vec` loaded, runs schema migrations on open, and forwards work into nine topic files (`files.ts`, `search.ts`, `graph.ts`, `conversation.ts`, `checkpoints.ts`, `annotations.ts`, `analytics.ts`, `git-history.ts`) plus `types.ts` for row shapes and `index.ts` itself. No code outside this module opens `Database` directly; the facade is the rule.
 
 ## How it works
 
@@ -21,27 +21,27 @@ sequenceDiagram
   note over sqlite: "FTS5 triggers keep fts_chunks in sync on<br/>INSERT / UPDATE / DELETE of chunks rows."
 ```
 
-1. **Open** — `new RagDB(projectDir)` calls `loadCustomSQLite()` (points bun at Homebrew SQLite on macOS), creates `.mimirs/` (or `RAG_DB_DIR`), opens `index.db`, sets `journal_mode=WAL`, `busy_timeout=5000`, loads `sqlite-vec`, and runs `initSchema()`.
+1. **Open** — `new RagDB(projectDir)` calls `loadCustomSQLite()` (points bun at Homebrew SQLite on macOS, tries common paths on Linux, defaults to bun's built-in elsewhere), creates `.mimirs/` (or `RAG_DB_DIR`), opens `index.db`, sets `journal_mode=WAL` and `busy_timeout=5000`, loads `sqlite-vec`, and runs `initSchema()` plus three idempotent ALTER-TABLE migrations (`migrateChunksEntityColumns`, `migrateParentChunkColumns`, `migrateGraphColumns`).
 2. **Route** — every instance method on `RagDB` forwards into one of the per-concern files. The facade itself holds no SQL; each sub-file's function takes the raw `Database` parameter, which makes them trivially unit-testable against an in-memory DB.
-3. **Persist** — writes go through triggers: inserting a chunks row fires an FTS insert; updating it fires a delete + insert on FTS. Only `vec_chunks` rows are written explicitly with the embedding bytes — FTS and the core table stay in lockstep automatically.
+3. **Persist** — writes go through triggers: inserting a `chunks` row fires an FTS insert; updating it fires a delete + insert on FTS. Only `vec_chunks` rows are written explicitly with the embedding bytes — FTS and the core table stay in lockstep automatically.
 
 ## Per-file breakdown
 
 ### `index.ts` — `RagDB` facade
 
-The class. Constructor takes `projectDir` and an optional `customRagDir`; resolution precedence is `customRagDir → RAG_DB_DIR → <projectDir>/.mimirs`. `initSchema()` runs the full CREATE-IF-NOT-EXISTS block — files, chunks, `vec_chunks(FLOAT[dim])`, `fts_chunks`, FTS sync triggers, `file_imports` / `file_exports`, conversation tables, checkpoints, `vec_checkpoints`, `query_log`, `git_commits` / `git_commit_files`, `vec_git_commits`, and `fts_git_commits`. The embedding dimension is read lazily from `getEmbeddingDim()` so `configureEmbedder(modelId, dim)` calls before schema init produce the right `vec0` column width.
+The class. Constructor takes `projectDir` and an optional `customRagDir`; resolution precedence is `customRagDir → RAG_DB_DIR → <projectDir>/.mimirs`. `initSchema()` runs the full CREATE-IF-NOT-EXISTS block — `files`, `chunks`, `vec_chunks(FLOAT[dim])`, `fts_chunks`, FTS sync triggers, `file_imports` / `file_exports`, conversation tables, checkpoints, `vec_checkpoints`, `query_log`, `git_commits` / `git_commit_files`, `vec_git_commits`, `fts_git_commits`, and annotations (`fts_annotations` / `vec_annotations`). The embedding dimension is read lazily from `getEmbeddingDim()` so `configureEmbedder(modelId, dim)` calls before schema init produce the right `vec0` column width. The `RagDB` class re-exports all row-shape types from `types.ts` so consumers can `import { StoredFile, SearchResult, PathFilter, ... } from "../db"`.
 
 ### `files.ts` — file rows and chunks
 
-Owns `getFileByPath`, `getAllFilePaths`, `upsertFileStart`, `upsertFile`, `insertChunkBatch`, `removeFile`, `pruneDeleted`, `getStatus`. `upsertFileStart` returns the file id as the streaming path — the indexer calls it first, then `insertChunkBatch(fileId, chunks, startIndex)` in transactional batches. `pruneDeleted(existingPaths)` drops rows whose path is no longer on disk; cascaded deletes clean up `chunks`, `vec_chunks`, and both `file_*` graph tables.
+Owns `getFileByPath`, `getAllFilePaths`, `upsertFileStart`, `upsertFile`, `insertChunkBatch`, `insertChunkReturningId`, `getChunkById`, `updateFileHash`, `removeFile`, `pruneDeleted`, `getStatus`, plus the incremental-indexing helpers `getChunkHashes`, `deleteStaleChunks`, and `updateChunkPositions`. `upsertFileStart` returns the file id as the streaming path — the indexer calls it first, then `insertChunkBatch(fileId, chunks, startIndex)` in transactional batches. `pruneDeleted(existingPaths)` drops rows whose path is no longer on disk; cascaded deletes clean up `chunks`, `vec_chunks`, and both `file_*` graph tables.
 
 ### `search.ts` — vector + BM25 + symbols
 
-Exposes `vectorSearch`, `vectorSearchChunks`, `textSearch`, `textSearchChunks`, `searchSymbols`, and `findUsages`. Vector searches run `SELECT * FROM vec_chunks WHERE embedding MATCH ?` with `k = topK`; text searches run FTS5 `MATCH` against `fts_chunks`. Chunk-level variants do not dedupe by file; file-level variants aggregate to one row per path. `searchSymbols` walks the `chunks` + `file_exports` tables to answer "what is the type/declaration of this name" without re-embedding; `findUsages` is the grep-adjacent fallback that returns line-anchored snippets.
+Exposes `vectorSearch`, `vectorSearchChunks`, `textSearch`, `textSearchChunks`, `searchSymbols`, and `findUsages`. All four search variants accept an optional `PathFilter` (`{ extensions?, dirs?, excludeDirs? }`) for scoped queries. Vector searches run `SELECT * FROM vec_chunks WHERE embedding MATCH ?` with `k = topK`; text searches run FTS5 `MATCH` against `fts_chunks`. Chunk-level variants do not dedupe by file; file-level variants aggregate to one row per path. `searchSymbols` walks the `chunks` + `file_exports` tables to answer "what is the type/declaration of this name" without re-embedding, returning reference-module counts. `findUsages` is the grep-adjacent fallback that returns line-anchored snippets.
 
 ### `graph.ts` — imports / exports / resolution
 
-Owns `upsertFileGraph` (bulk-writes `file_imports` and `file_exports` for a file), `getGraph`, `getSubgraph(fileIds, maxHops)`, `getImportersOf`, `getImportsForFile`, plus the two-pass resolver's helpers `getUnresolvedImports` and `resolveImport(importId, resolvedFileId)`. Unresolved imports are inserted with `resolved_file_id = NULL` during the first walk; the resolver then runs after all files are indexed and patches the ids.
+Owns `upsertFileGraph` (bulk-writes `file_imports` and `file_exports` for a file), `getGraph`, `getSubgraph(fileIds, maxHops)`, `getImportersOf`, `getImportsForFile`, `getDependsOn`, `getDependedOnBy`, plus the two-pass resolver's helpers `getUnresolvedImports` and `resolveImport(importId, resolvedFileId)`. Unresolved imports are inserted with `resolved_file_id = NULL` during the first walk; the resolver then runs after all files are indexed and patches the ids.
 
 ### `conversation.ts` — JSONL sessions and turns
 
@@ -53,7 +53,7 @@ Owns `upsertFileGraph` (bulk-writes `file_imports` and `file_exports` for a file
 
 ### `annotations.ts` — inline notes
 
-`getAnnotations(path?, symbolName?)`, `deleteAnnotation(id)`, `searchAnnotations(queryEmbedding, topK)`. Writes happen through the `annotate` MCP tool, which inserts on `annotations` (defined in the schema). Read-side is what surfaces `[NOTE]` blocks inline in `read_relevant` output.
+`upsertAnnotation`, `getAnnotations(path?, symbolName?)`, `deleteAnnotation(id)`, `searchAnnotations(queryEmbedding, topK)`. Writes happen through the `annotate` MCP tool, which inserts on `annotations` (with FTS5 and vec0 companion tables). Read-side is what surfaces `[NOTE]` blocks inline in `read_relevant` output.
 
 ### `analytics.ts` — query log
 
@@ -61,11 +61,11 @@ Owns `upsertFileGraph` (bulk-writes `file_imports` and `file_exports` for a file
 
 ### `git-history.ts` — commits
 
-`GitCommitInsert` is the write-side shape; `insertCommitBatch(commits)` uses `INSERT OR IGNORE` on the unique `hash` column so re-runs are idempotent. `getLastIndexedCommit` anchors the next `git log` range; `hasCommit(hash)` is the fast-path dedupe. `searchGitCommits` / `textSearchGitCommits` query `vec_git_commits` / `fts_git_commits` with optional `author`, `since`, `until`, `path` filters. `getFileHistory(filePath, topK, since?)` is the file-scoped query backing the `file_history` tool.
+`GitCommitInsert` is the write-side shape; `insertCommitBatch(commits)` uses `INSERT OR IGNORE` on the unique `hash` column so re-runs are idempotent. `getLastIndexedCommit` anchors the next `git log` range; `hasCommit(hash)` is the fast-path dedupe. `searchGitCommits` / `textSearchGitCommits` query `vec_git_commits` / `fts_git_commits` with optional `author`, `since`, `until`, `path` filters. `getFileHistory(filePath, topK, since?)` is the file-scoped query backing the `file_history` tool. `purgeOrphanedCommits(reachableHashes)` drops commits removed by a force-push or rebase.
 
 ### `types.ts` — row shapes
 
-Eleven interfaces re-exported through `index.ts`: `StoredFile`, `StoredChunk`, `SearchResult`, `ChunkSearchResult`, `UsageResult`, `SymbolResult`, `AnnotationRow`, `CheckpointRow`, `ConversationSearchResult`, `GitCommitRow`, `GitCommitSearchResult`. Having them in one file is what makes the `import { ... } from "../db"` idiom work across the codebase.
+Re-exported through `index.ts`: `StoredFile`, `StoredChunk`, `SearchResult`, `ChunkSearchResult`, `UsageResult`, `SymbolResult`, `AnnotationRow`, `CheckpointRow`, `ConversationSearchResult`, `GitCommitRow`, `GitCommitSearchResult`, and `PathFilter`. Having them in one file is what makes the `import { ... } from "../db"` idiom work across the codebase.
 
 ## Dependencies and Dependents
 
@@ -105,10 +105,11 @@ flowchart LR
 
 ## Internals
 
-- **`sqlite-vec` requires a vanilla SQLite build.** On macOS, `loadCustomSQLite()` calls `Database.setCustomSQLite()` with the Homebrew path (`/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib` or the Intel equivalent) and throws a specific `brew install sqlite` error otherwise. On Linux, a list of common distro paths is tried; if none match, the loader falls through and lets `sqlite-vec.load()` raise its own error. Windows uses bun's bundled SQLite.
-- **Every embedding column sizes itself from `getEmbeddingDim()`.** `vec_chunks`, `vec_conversation`, `vec_checkpoints`, and `vec_git_commits` all use `FLOAT[${getEmbeddingDim()}]` at schema-init time. Switching models requires dropping the db — existing vec rows would be dimensionally wrong.
+- **`sqlite-vec` requires a vanilla SQLite build.** On macOS, `loadCustomSQLite()` calls `Database.setCustomSQLite()` with the Homebrew path (`/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib` or the Intel equivalent) and throws a specific `brew install sqlite` error otherwise. On Linux, a list of common distro paths (Debian/Ubuntu x86_64, arm64, RHEL/Fedora, Arch/Alpine) is tried; if none match, the loader falls through and lets `sqlite-vec.load()` raise its own error. Windows uses bun's bundled SQLite.
+- **Every embedding column sizes itself from `getEmbeddingDim()`.** `vec_chunks`, `vec_conversation`, `vec_checkpoints`, `vec_git_commits`, and `vec_annotations` all use `FLOAT[${getEmbeddingDim()}]` at schema-init time. Switching models requires dropping the db — existing vec rows would be dimensionally wrong.
 - **FTS stays in sync via triggers.** Three triggers per FTS-backed table (`*_ai` / `*_ad` / `*_au`) forward every chunk insert/delete/update to the FTS5 virtual table. No code path writes to FTS directly.
 - **`WAL` + `busy_timeout=5000`.** Journal mode is WAL so the indexer can write while a search reads; the 5-second busy timeout accommodates the rare lock contention during bulk upserts.
+- **Idempotent column migrations.** Three `migrate*` methods run `PRAGMA table_info` and `ALTER TABLE ... ADD COLUMN` for columns added since older db versions (`entity_name`, `chunk_type`, `start_line`, `end_line`, `content_hash`, `parent_id`, `is_default`, `is_namespace`, `is_reexport`, `reexport_source`). Safe to re-run — pre-existing columns are skipped.
 - **Unresolved imports linger.** `upsertFileGraph` always inserts imports with `resolved_file_id = NULL`. `src/graph/resolver.ts` runs after the walk and patches them via `resolveImport`, avoiding a file-ordering dependency.
 
 ## Configuration

@@ -1,6 +1,6 @@
 # embeddings
 
-The embeddings module is the ONNX boundary of the project: one file (`src/embeddings/embed.ts`) wraps the `@huggingface/transformers` feature-extraction pipeline and exposes a narrow API — `embed`, `embedBatch`, `mergeEmbeddings`, plus singleton accessors for the pipeline and tokenizer. The default model is `Xenova/all-MiniLM-L6-v2` producing 384-dim L2-normalized vectors; oversized texts are split into overlapping 256-token windows and merged back into a single vector so every chunk, no matter its length, ends up on the same unit sphere. The module has fan-in 17 — indexer, search, conversation indexer, git indexer, benchmarks, and most tests depend on it.
+The embeddings module is the ONNX boundary of the project: one file (`src/embeddings/embed.ts`) wraps the `@huggingface/transformers` feature-extraction pipeline and exposes a narrow public API — `embed`, `embedBatch`, `mergeEmbeddings`, plus singleton accessors for the pipeline (`getEmbedder`) and tokenizer (`getTokenizer`). The default model is `Xenova/all-MiniLM-L6-v2` producing 384-dim L2-normalized vectors; texts longer than the 256-token window are split into overlapping windows (32-token overlap) and merged back into a single vector so every chunk lands on the same unit sphere. Fan-in is 17 — indexer, search, conversation indexer, git indexer, config, benchmarks, and most tests depend on this module.
 
 ## Public API
 
@@ -12,7 +12,7 @@ getTokenizer(): Promise<PreTrainedTokenizer>
 mergeEmbeddings(embeddings: Float32Array[]): Float32Array
 ```
 
-`embed` is the single-string path used by query-time search; `embedBatch` is the high-throughput path the indexer uses during the initial walk. `embedBatchMerged` (exported from the file but not re-exported elsewhere) is the variant that handles texts longer than the model's 256-token window by tokenizing, splitting into overlapping windows, embedding each, and averaging + renormalizing the result. `mergeEmbeddings` is the pure function at the heart of that merge — mean across the window set, then unit-normalize.
+`embed` is the single-string path used at query time. `embedBatch` is the high-throughput path the indexer uses — one call produces N contiguous vectors sliced out of a single Float32Array. `embedBatchMerged` (exported from the file but filtered out of the key-exports surface) is the oversized-text variant: it tokenizes, windows texts that exceed `MODEL_MAX_TOKENS = 256` using `MERGE_WINDOW_OVERLAP = 32`, runs one `embedBatch` over the flat list, then reassembles. `mergeEmbeddings` is the pure function at its heart — mean across the window set, then unit-normalize.
 
 ## Dependencies and Dependents
 
@@ -28,7 +28,7 @@ flowchart LR
     search["search"]
     conversation["conversation"]
     git["git/indexer"]
-    db["db (re-exports)"]
+    db["db (getEmbeddingDim)"]
     tests["tests + benchmarks"]
   end
 
@@ -44,13 +44,13 @@ flowchart LR
 
 ## Configuration
 
-The module reads no runtime flags directly, but `src/config/index.ts` calls `configureEmbedder(modelId, dim)` whenever a project config overrides the default model. That function resets the singleton if either the model id or the dimension changes, so switching models mid-process is safe — the next `getEmbedder` call re-initializes the pipeline. The cache directory is pinned at `~/.cache/mimirs/models` via `env.cacheDir` so models survive `bunx` temp-dir cleanup between invocations.
+The module reads no runtime flags directly; configuration flows through `config.applyEmbeddingConfig` which calls `configureEmbedder(modelId, dim)`. That function resets the pipeline and tokenizer singletons only if either value actually changed, so the same config re-apply is a no-op. The cache directory is pinned at `~/.cache/mimirs/models` via `env.cacheDir` so models survive `bunx` temp-dir cleanup between invocations. Thread count defaults to `max(2, cores/3)` — tune via the `threads` argument or the `indexThreads` config field.
 
 ## Known issues
 
-- **First use downloads ~23 MB of model weights.** `getEmbedder` will fetch the MiniLM ONNX archive on first run; if the machine is offline, indexing aborts with a specific error instead of retrying per file.
-- **Corrupted cache recovery is one-shot.** The pipeline loader catches "Protobuf parsing failed" and "Load model" errors, deletes the cached model directory, and retries exactly once. A second failure propagates.
-- **Thread count defaults to `max(2, cores/3)`.** On low-core machines this reserves headroom for the rest of the indexer; tune with the `threads` argument when calling directly.
+- **First use downloads ~23 MB of model weights.** `getEmbedder` fetches the MiniLM ONNX archive on the first call of the process; offline machines get a specific load error instead of a silent retry per file.
+- **Corrupted cache recovery is one-shot.** The loader catches "Protobuf parsing failed" and "Load model" errors, deletes the cached model directory, and retries exactly once. A second failure propagates.
+- **Model switches require a DB reset.** Changing `embeddingModel` / `embeddingDim` mid-lifetime works for the singleton, but existing `vec_chunks` / `vec_conversation` / `vec_checkpoints` / `vec_git_commits` rows are dimensionally frozen at schema creation — drop `.mimirs/index.db` and re-index.
 
 ## See also
 

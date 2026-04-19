@@ -58,7 +58,7 @@ Every field in `RagConfigSchema` with its default:
 | `include` | 60+ glob patterns covering 24 AST-aware languages + Markdown + build files + scripts + schema languages | Which files the indexer walks |
 | `exclude` | `node_modules`, `.git`, `dist`, `build`, `.env*`, `.mimirs`, `coverage`, language-specific caches, IDE dirs | Walk-time exclusions |
 | `generated` | `[]` | Glob patterns whose matches get ×0.75 score demotion in search |
-| `chunkSize` | `512` | Soft target char count for paragraph-fallback chunker |
+| `chunkSize` | `512` | Soft target char count for paragraph-fallback chunker (min 64) |
 | `chunkOverlap` | `50` | Character overlap between paragraph-fallback chunks |
 | `hybridWeight` | `0.7` | 70% vector / 30% BM25 in hybrid ranking |
 | `searchTopK` | `10` | Default file-level search result count |
@@ -77,7 +77,7 @@ Every field in `RagConfigSchema` with its default:
 
 - **No validation-error propagation.** `loadConfig` returns defaults on validation failure and logs a warning through `log.warn`. Unusual schema errors may therefore be masked; check the log before assuming the config was honoured.
 - **Self-healing writes only once.** The default file is only written when missing. If a field is added to the schema in a later mimirs version, existing `config.json` files keep their old shape and the new field just takes its default — there is no migration.
-- **CSS is included in source but disabled.** The config comments out `*.css` / `*.scss` / `*.less` because class names add noise to code search. Reinstate them manually if the project is CSS-heavy.
+- **CSS is included in source but disabled.** The default `include` list comments out `*.css` / `*.scss` / `*.less` because class names add noise to code search. Reinstate them manually if the project is CSS-heavy.
 
 ## See also
 

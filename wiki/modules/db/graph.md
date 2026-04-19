@@ -4,28 +4,94 @@ The SQL side of the dependency graph. Holds `file_imports` and `file_exports` wr
 
 **Source:** `src/db/graph.ts`
 
-## Key exports
+## Public API
 
-| Function | Shape | Purpose |
-|---|---|---|
-| `upsertFileGraph(db, fileId, imports, exports)` | `→ void` | One transaction: clears prior `file_imports` + `file_exports` for the file, inserts the new rows. Always writes imports with `resolved_file_id = NULL` — the resolver patches these in a second pass |
-| `resolveImport(db, importId, resolvedFileId)` | `→ void` | The patch: set one `file_imports.resolved_file_id`. Called from the resolver's bun-chunk and DB fallback paths |
-| `getUnresolvedImports(db)` | `→ { id, fileId, filePath, source }[]` | Returns every row where `resolved_file_id IS NULL` — the resolver's workset |
-| `getGraph(db)` | `→ { nodes[], edges[] }` | Full typed graph: every file as a node, every resolved import as a directed edge. Used by `generateProjectMap` at `--zoom file` |
-| `getSubgraph(db, fileIds, maxHops)` | `→ { nodes[], edges[] }` | BFS-bounded extract: seed with `fileIds`, expand both incoming and outgoing edges up to `maxHops` |
-| `getImportsForFile(db, fileId)` | `→ { id, source, resolvedFileId }[]` | Raw forward edges — resolved or not, including the import-string source |
-| `getImportersOf(db, fileId)` | `→ number[]` | Reverse edges as file ids — every file whose `resolved_file_id = fileId`. Powers the hybrid-search graph boost |
-| `getDependsOn(db, fileId)` | `→ { path, source }[]` | Forward dependencies as paths (join-on-resolved). Powers the `depends_on` MCP tool |
-| `getDependedOnBy(db, fileId)` | `→ { path, source }[]` | Reverse dependencies as paths. Powers the `depended_on_by` MCP tool |
+```ts
+function upsertFileGraph(
+  db: Database,
+  fileId: number,
+  imports: {
+    name: string;
+    source: string;
+    isDefault?: boolean;
+    isNamespace?: boolean;
+  }[],
+  exports: {
+    name: string;
+    type: string;
+    isDefault?: boolean;
+    isReExport?: boolean;
+    reExportSource?: string;
+  }[]
+): void;
 
-## Usage examples
+function resolveImport(
+  db: Database,
+  importId: number,
+  resolvedFileId: number
+): void;
+
+function getUnresolvedImports(
+  db: Database
+): { id: number; fileId: number; filePath: string; source: string }[];
+
+function getGraph(db: Database): {
+  nodes: { id: number; path: string; exports: { name: string; type: string }[] }[];
+  edges: {
+    fromId: number;
+    fromPath: string;
+    toId: number;
+    toPath: string;
+    source: string;
+  }[];
+};
+
+function getSubgraph(
+  db: Database,
+  fileIds: number[],
+  maxHops?: number
+): {
+  nodes: { id: number; path: string; exports: { name: string; type: string }[] }[];
+  edges: {
+    fromId: number;
+    fromPath: string;
+    toId: number;
+    toPath: string;
+    source: string;
+  }[];
+};
+
+function getImportsForFile(
+  db: Database,
+  fileId: number
+): { id: number; source: string; resolvedFileId: number | null }[];
+
+function getImportersOf(db: Database, fileId: number): number[];
+
+function getDependsOn(
+  db: Database,
+  fileId: number
+): { path: string; source: string }[];
+
+function getDependedOnBy(
+  db: Database,
+  fileId: number
+): { path: string; source: string }[];
+```
+
+## Row shapes touched
+
+- **`file_imports(id, file_id, source, names, is_default, is_namespace, resolved_file_id)`** — one row per import statement. `source` is the raw import string (e.g. `"./db"` or `"bun:sqlite"`); `resolved_file_id` is `NULL` until the resolver patches it via `resolveImport`. Nullable target is the key design choice — unresolved imports to external packages just never become edges.
+- **`file_exports(id, file_id, name, type, is_default, is_reexport, reexport_source)`** — one row per declared export. `type` is the syntactic kind (`function`, `class`, `interface`, `const`, etc.); `reexport_source` is non-null only for `export { x } from "./y"` forms.
+
+## Usage
 
 Writing during indexing — paired with `upsertFile`:
 
 ```ts
 // src/indexing/indexer.ts
 upsertFileGraph(db, fileId, result.imports, result.exports);
-// (resolved_file_id is NULL for every import — resolver runs later)
+// Every import is inserted with resolved_file_id = NULL — resolver runs later.
 ```
 
 The resolver's two-pass pattern — read unresolved, patch, move on:
@@ -57,16 +123,17 @@ const boost = 0.05 * Math.log2(importerIds.length + 1);
 |---|---|---|
 | Imports | `bun:sqlite` | `Database` parameter from the facade |
 
-`graph.ts` is a pure-SQL leaf — no `./types` import; the caller-facing `types.ts` has no row shape specifically for graph because callers consume `getGraph`'s inline shape directly.
+`graph.ts` is a pure-SQL leaf — no `./types` import. Callers consume `getGraph`'s inline object shape directly rather than a named interface in `types.ts`.
 
 ## Internals
 
-- **`upsertFileGraph` deletes + re-inserts.** Kept simple because rewrites are rare (once per `indexDirectory` per file). A merge-on-conflict approach would add complexity for no measurable win.
-- **Batch-load exports pattern.** `getGraph` reads every `file_exports` row in one query and bucket-sorts by `file_id` client-side instead of running one `WHERE file_id = ?` per file. At ~160 files and ~600 exports the difference is negligible; at ~5000+ files it's the difference between a hang and a snappy response.
-- **Edges only materialise when resolved.** `getGraph`'s edge query joins `file_imports` to `files` twice (`f1` source, `f2` target) with `WHERE resolved_file_id IS NOT NULL`. Unresolved imports (external packages, broken paths) simply don't appear as edges — by design, since every edge would otherwise need a nullable target.
-- **`getSubgraph` is BFS by id, not by path.** Seed ids come in pre-resolved; the expansion walks `getImportersOf` + outgoing edges up to `maxHops`. Max node cap is applied by the caller (`generateProjectMap`), not here.
-- **Two getter shapes for the same edge data.** `getImportersOf` returns bare ids (hot path in hybrid search, no join needed); `getDependedOnBy` joins to `files.path` for the MCP tools that present human output. Same for `getImportsForFile` vs `getDependsOn`.
-- **No FTS or vec integration.** Graph tables are pure relational. The search module's graph boost fetches `getImportersOf` at query time rather than precomputing a score column — cheap given the small row counts and adjusted weights.
+- **`upsertFileGraph` deletes + re-inserts.** Inside a single transaction, it clears prior `file_imports` + `file_exports` for the file and writes the new rows. Simpler than merge-on-conflict and cheap because rewrites happen at most once per `indexDirectory` per file.
+- **Imports are inserted with `resolved_file_id = NULL`.** By design — `upsertFileGraph` can run before target files are indexed. `src/graph/resolver.ts` runs after the full walk and patches the ids, keeping the write path file-order-independent.
+- **Batch-load exports pattern.** `getGraph` reads every `file_exports` row in one query and bucket-sorts by `file_id` client-side rather than running one `WHERE file_id = ?` per file. At ~5000+ files this is the difference between a hang and a snappy response.
+- **Edges only materialise when resolved.** `getGraph`'s edge query joins `file_imports` to `files` twice (`f1` source, `f2` target) with `WHERE resolved_file_id IS NOT NULL`. Unresolved imports (external packages, broken paths) never appear as edges.
+- **`getSubgraph` is BFS by SQL per hop.** Seed ids come in pre-resolved; each hop queries `file_imports` in both directions (`file_id IN (...) OR resolved_file_id IN (...)`). Frontier expansion is batched at `BATCH_LIMIT = 499` to stay below SQLite's 999-parameter limit (each query uses 2× frontier). Node-cap enforcement is the caller's job (`generateProjectMap`), not this function's.
+- **Two getter shapes for the same edge data.** `getImportersOf` returns bare ids (hot path in hybrid search, no join needed); `getDependedOnBy` joins to `files.path` for the MCP tools that present human output. Same for `getImportsForFile` (bare) vs `getDependsOn` (joined).
+- **No FTS or vec integration.** Graph tables are pure relational. The search module's graph boost fetches `getImportersOf` at query time rather than precomputing a score column — cheap given the small row counts.
 
 ## See also
 

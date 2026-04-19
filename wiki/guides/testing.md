@@ -4,7 +4,7 @@ mimirs uses Bun's built-in test runner — no separate framework, no transpile s
 
 ## Structure
 
-Mirrored layout: a file at `src/<module>/<file>.ts` is tested by `tests/<module>/<file>.test.ts`. Feature-level and cross-module concerns land under `tests/features/`. There's no co-location (`*.test.ts` next to source) — Bun's runner picks up files under `tests/` when pointed there.
+Mirrored layout: a file at `src/<module>/<file>.ts` is tested by `tests/<module>/<file>.test.ts`. Feature-level and cross-module concerns land under `tests/features/`. There is no co-location (no `*.test.ts` next to source) — Bun's runner picks up files under `tests/` when pointed there.
 
 | Directory | What's tested | Type |
 |-----------|---------------|------|
@@ -16,11 +16,11 @@ Mirrored layout: a file at `src/<module>/<file>.ts` is tested by `tests/<module>
 | `tests/features/` | Annotations, checkpoints, git-context, git-history end-to-end | Integration |
 | `tests/graph/` | Two-pass resolver, `getGraph`, `getSubgraph`, `getImportersOf` | Integration |
 | `tests/indexing/` | Walk, AST chunker, parse, watcher debounce, line-number assignment | Integration |
-| `tests/search/` | Hybrid scoring, analytics, benchmark/eval harnesses, symbol search, FTS edge-cases | Integration |
+| `tests/search/` | Hybrid scoring, analytics, benchmark/eval harnesses, symbol search, FTS edge-cases, scoped filters | Integration |
 | `tests/tools/` | MCP server registration, `generate_wiki` tool surface | Integration |
-| `tests/wiki/` | 4-phase pipeline: discovery, categorization, page-tree, section-selector | Unit (no DB; pure data) |
-| `tests/fixtures/` | Shared input files (`sample.ts`, `large.md`, `frontmatter-only.md`) | Fixtures |
-| `benchmarks/` | Indexing throughput, chunker strategies, parent-grouping — **not** part of default runs | Benchmark |
+| `tests/wiki/` | 4-phase pipeline: discovery, categorization, page-tree, section-selector, staleness | Unit (no DB; pure data) |
+| `tests/fixtures/` | Shared input files (`sample.ts`, `large.md`, `frontmatter-only.md`, `sample.txt`) | Fixtures |
+| `benchmarks/` | Indexing throughput, chunker strategies, parent grouping — **not** part of default runs | Benchmark |
 
 ## Running Tests
 
@@ -38,13 +38,13 @@ bun test tests/features/
 bun run test
 ```
 
-The `bun run test` script wraps `bun test tests/` and suppresses exit code `133`, a known Bun crash on Apple Silicon during process cleanup (upstream: `github.com/oven-sh/bun/issues/19917`). If tests pass but the process exits 133, the script treats it as success and prints a note.
+Always scope runs to a specific file or directory unless you are intentionally running the full suite. `bun run test` wraps `bun test tests/` and suppresses exit code `133`, a known Bun crash on Apple Silicon during process cleanup (upstream: `github.com/oven-sh/bun/issues/19917`). If tests pass but the process exits 133, the script treats it as success and prints a note.
 
 ## Test Patterns
 
 ### Temp-directory fixtures
 
-Every integration test starts with `createTempDir()` and ends with `cleanupTempDir(dir)` — there is no shared global DB. `writeFixture(dir, relativePath, content)` drops a file into the temp dir at a given path, creating parent directories as needed. `tests/helpers.ts` has fan-in 65 because almost every suite uses it.
+Every integration test starts with `createTempDir()` and ends with `cleanupTempDir(dir)` — there is no shared global DB. `writeFixture(dir, relativePath, content)` drops a file into the temp dir at a given path, creating parent directories as needed. `tests/helpers.ts` is imported by almost every integration suite in the project.
 
 ```ts
 // tests/indexing/indexer.test.ts — canonical shape
@@ -65,11 +65,11 @@ test("indexes a single file", async () => {
 
 ### Real DB, not mocks
 
-Integration tests open a real `RagDB` against a real on-disk SQLite file in the temp dir, with `sqlite-vec` and FTS5 loaded. The upside is tests catch schema-init issues, trigger mis-wiring, and vec-dim mismatches that a mocked DB would silently accept. The cost is ~50-200 ms per suite for schema creation, which Bun's parallel runner absorbs.
+Integration tests open a real `RagDB` against a real on-disk SQLite file in the temp dir, with `sqlite-vec` and FTS5 loaded. The upside is tests catch schema-init issues, trigger mis-wiring, and vec-dim mismatches that a mocked DB would silently accept. The cost is ~50–200 ms per suite for schema creation, which Bun's parallel runner absorbs.
 
 ### Real embedder where it matters
 
-`tests/embeddings/`, `tests/search/`, and `tests/conversation/` load the actual MiniLM-L6-v2 model (one-time cost per process, cached by `@huggingface/transformers`). Tests that only need the DB surface use deterministic stand-in vectors. The test for `getEmbeddingDim()` asserts `384` — the invariant that prevents schema/model drift.
+`tests/embeddings/`, `tests/search/`, and `tests/conversation/` load the actual MiniLM-L6-v2 model (one-time cost per process, cached by `@huggingface/transformers`). Tests that only need the DB surface use deterministic stand-in vectors. The test for `getEmbeddingDim()` asserts `384` — the invariant that prevents schema-vs-model drift.
 
 ## Test Categories
 
@@ -81,9 +81,13 @@ Live under `tests/wiki/`, `tests/config/`, `tests/cli/` — anything that operat
 
 Everything else: any suite that opens `RagDB`, walks a directory, runs an embedder, or drives the MCP server. They need a temp dir and the `sqlite-vec` extension (so they fail fast if the macOS SQLite setup is wrong). This is by design — see [Conventions](conventions.md) for the "real DB, not mocks" rationale.
 
+### Benchmarks
+
+`benchmarks/` contains indexing throughput, chunker comparison, parent-promotion, and large-JSON harnesses. They are slow and noisy and are excluded from scoped test runs. Invoke only via `bun run bench` or `bun run test` when a release matters.
+
 ## Coverage
 
-mimirs doesn't ship a coverage tool in `package.json`. Bun supports `--coverage` natively, so on-demand coverage is:
+mimirs does not ship a coverage tool in `package.json`. Bun supports `--coverage` natively, so on-demand coverage is:
 
 ```sh
 bun test --coverage tests/search/
