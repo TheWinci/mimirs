@@ -189,6 +189,7 @@ export class RagDB {
       CREATE INDEX IF NOT EXISTS idx_file_imports_resolved ON file_imports(resolved_file_id);
       CREATE INDEX IF NOT EXISTS idx_file_exports_file ON file_exports(file_id);
       CREATE INDEX IF NOT EXISTS idx_file_exports_name ON file_exports(name);
+      CREATE INDEX IF NOT EXISTS idx_chunks_file ON chunks(file_id);
 
       CREATE TABLE IF NOT EXISTS conversation_sessions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -388,6 +389,9 @@ export class RagDB {
     if (!cols.includes("parent_id")) {
       this.db.exec("ALTER TABLE chunks ADD COLUMN parent_id INTEGER REFERENCES chunks(id) ON DELETE CASCADE");
     }
+    // Created here (not in initSchema) because parent_id is added via ALTER TABLE
+    // for existing DBs, so this is the earliest point it's guaranteed to exist.
+    this.db.exec("CREATE INDEX IF NOT EXISTS idx_chunks_parent ON chunks(parent_id)");
   }
 
   private migrateGraphColumns() {
