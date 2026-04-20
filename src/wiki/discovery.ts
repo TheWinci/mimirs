@@ -251,22 +251,38 @@ function flatProjectFallback(
   const modules: DiscoveryModule[] = [];
   const assigned = new Set<string>();
 
+  // Pre-build undirected adjacency once. The previous implementation scanned
+  // the full edge list on every BFS pop — O(nodes × edges) per fallback run,
+  // which becomes a hang on large projects the moment this branch triggers.
+  const adjacency = new Map<string, string[]>();
+  for (const edge of fileGraph.edges) {
+    let a = adjacency.get(edge.from);
+    if (!a) { a = []; adjacency.set(edge.from, a); }
+    a.push(edge.to);
+    let b = adjacency.get(edge.to);
+    if (!b) { b = []; adjacency.set(edge.to, b); }
+    b.push(edge.from);
+  }
+
   // Sort nodes by fanIn descending
   const sorted = [...fileGraph.nodes].sort((a, b) => b.fanIn - a.fanIn);
 
   for (const seed of sorted) {
     if (assigned.has(seed.path)) continue;
 
-    // BFS: collect all files connected to this seed
+    // BFS with an index pointer — Array.shift() is O(n) in V8, and the queue
+    // can grow to the size of the component on large projects.
     const group = new Set<string>([seed.path]);
-    const queue = [seed.path];
+    const queue: string[] = [seed.path];
+    let head = 0;
     assigned.add(seed.path);
 
-    while (queue.length > 0) {
-      const current = queue.shift()!;
-      for (const edge of fileGraph.edges) {
-        const neighbor = edge.from === current ? edge.to : edge.to === current ? edge.from : null;
-        if (neighbor && !assigned.has(neighbor) && pathToNode.has(neighbor)) {
+    while (head < queue.length) {
+      const current = queue[head++];
+      const neighbors = adjacency.get(current);
+      if (!neighbors) continue;
+      for (const neighbor of neighbors) {
+        if (!assigned.has(neighbor) && pathToNode.has(neighbor)) {
           group.add(neighbor);
           assigned.add(neighbor);
           queue.push(neighbor);
