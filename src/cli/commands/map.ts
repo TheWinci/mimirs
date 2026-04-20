@@ -8,13 +8,11 @@ export async function mapCommand(args: string[], getFlag: (flag: string) => stri
   const db = new RagDB(dir);
   const focus = getFlag("--focus");
   const zoom = (getFlag("--zoom") || "file") as "file" | "directory";
-  const max = parseInt(getFlag("--max") || "50", 10);
 
   const map = generateProjectMap(db, {
     projectDir: dir,
     focus: focus ?? undefined,
     zoom,
-    maxNodes: max,
   });
 
   cli.log(map);

@@ -21,25 +21,18 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
         .enum(["file", "directory"])
         .optional()
         .describe("Zoom level: 'file' (default) or 'directory' for large projects"),
-      maxNodes: z
-        .number()
-        .int()
-        .min(1)
-        .optional()
-        .describe("Max nodes in graph (default: 50, auto-switches to directory view if exceeded). No upper limit."),
       format: z
         .enum(["text", "json"])
         .optional()
         .describe("Output format: 'text' (default) for readable output, 'json' for structured data with fan-in/fan-out metrics and all exports."),
     },
-    async ({ directory, focus, zoom, maxNodes, format }) => {
+    async ({ directory, focus, zoom, format }) => {
       const { projectDir, db: ragDb } = await resolveProject(directory, getDB);
 
       const map = generateProjectMap(ragDb, {
         projectDir,
         focus,
         zoom: zoom ?? "file",
-        maxNodes: maxNodes ?? 50,
         format: format ?? "text",
       });
 
