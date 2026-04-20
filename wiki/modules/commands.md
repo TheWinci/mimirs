@@ -75,9 +75,9 @@ One file, one call to `db.removeFile(path)`. Cascaded deletes handle the chunks 
 
 Prints the query log rollup — top queries, zero-result rate, 90th percentile latency. Powered by `db.getAnalytics(days)` and `getAnalyticsTrend(days)`.
 
-### `map.ts` — `mimirs map [dir] [--focus F] [--zoom L] [--max N]`
+### `map.ts` — `mimirs map [dir] [--focus F] [--zoom L]`
 
-Wraps `generateProjectMap` from the graph module. `--focus` restricts the subgraph to a file's neighborhood; `--zoom` toggles file-level vs directory-level collapsing; `--max N` caps node count.
+Wraps `generateProjectMap` from the graph module. `--focus` restricts the subgraph to a file's neighborhood; `--zoom` toggles file-level vs directory-level collapsing. No node-count cap — the prior `--max N` auto-switch to directory view was removed; callers needing a trimmed graph use `--focus` + `--zoom`.
 
 ### `benchmark.ts` / `benchmark-models.ts` — recall@K harnesses
 
@@ -109,7 +109,7 @@ Wrapper over the git indexer. `index` takes `--since REF` for incremental reinde
 
 ### `demo.ts` — `mimirs demo`
 
-Interactive guided walk-through that runs `search`, `read`, `project_map` on a canned query so new users see what each command prints. Imports many domain modules directly.
+Four-step walk-through so new users see what each tool prints. (1) Indexes the directory, routing progress through a lazily-built `createQuietProgress` the moment the indexer emits `Found N files to index`. (2) Runs `search` for `"AST-aware chunking with tree-sitter"` and prints the top 3 hits with a 3-line snippet preview via the file-local `renderBlock(text, indent, maxLines, wrap)` helper. (3) Runs `searchChunks` with `threshold: 0.3` and prints up to 2 chunks with `path:startLine-endLine` plus entity name. (4) Calls `db.searchSymbols(undefined, false, undefined, 200)` in listing mode, filters out re-exports and zero-reference symbols, and prints the top 5 by `referenceCount`. The demo is a self-contained showcase — it does not call the MCP tools layer.
 
 ### `doctor.ts` — `mimirs doctor`
 
@@ -170,7 +170,7 @@ Fan-out: 10 upstream modules (`db`, `config`, `embeddings`, `indexing`, `search`
 - `--verbose` / `-v` — per-file output in `index` and `history index`.
 - `--yes` / `-y` — skip confirmation in `init` and `cleanup`.
 - `--patterns glob1,glob2` — override `config.include` for one `index` run.
-- `--top N`, `--threshold T`, `--author A`, `--since S`, `--until U`, `--days N`, `--out F`, `--focus F`, `--zoom file|directory`, `--max N`, `--tags t1,t2`, `--files f1,f2`, `--ide I1,I2` — per-command.
+- `--top N`, `--threshold T`, `--author A`, `--since S`, `--until U`, `--days N`, `--out F`, `--focus F`, `--zoom file|directory`, `--tags t1,t2`, `--files f1,f2`, `--ide I1,I2` — per-command.
 - `process.env.RAG_PROJECT_DIR` — read by `doctor` and `serve`.
 
 ## Known issues

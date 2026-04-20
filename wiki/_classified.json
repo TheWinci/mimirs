@@ -6,7 +6,7 @@
       "file": "src/db/index.ts",
       "tier": "bridge",
       "scope": "cross-cutting",
-      "referenceCount": 82,
+      "referenceCount": 57,
       "referenceModuleCount": 15,
       "referenceModules": [
         "benchmarks",
@@ -186,7 +186,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "shared",
-      "referenceCount": 9,
+      "referenceCount": 3,
       "referenceModuleCount": 2,
       "referenceModules": [
         "wiki"
@@ -202,7 +202,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "cross-cutting",
-      "referenceCount": 23,
+      "referenceCount": 9,
       "referenceModuleCount": 3,
       "referenceModules": [
         "tools",
@@ -219,7 +219,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "shared",
-      "referenceCount": 12,
+      "referenceCount": 4,
       "referenceModuleCount": 2,
       "referenceModules": [
         "wiki"
@@ -235,7 +235,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "shared",
-      "referenceCount": 9,
+      "referenceCount": 3,
       "referenceModuleCount": 2,
       "referenceModules": [
         "wiki"
@@ -335,7 +335,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "local",
-      "referenceCount": 3,
+      "referenceCount": 1,
       "referenceModuleCount": 1,
       "referenceModules": [
         "wiki"
@@ -351,7 +351,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "local",
-      "referenceCount": 6,
+      "referenceCount": 2,
       "referenceModuleCount": 1,
       "referenceModules": [
         "wiki"
@@ -367,7 +367,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "cross-cutting",
-      "referenceCount": 18,
+      "referenceCount": 6,
       "referenceModuleCount": 3,
       "referenceModules": [
         "tools",
@@ -426,7 +426,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "local",
-      "referenceCount": 3,
+      "referenceCount": 1,
       "referenceModuleCount": 1,
       "referenceModules": [
         "wiki"
@@ -442,7 +442,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "local",
-      "referenceCount": 3,
+      "referenceCount": 1,
       "referenceModuleCount": 1,
       "referenceModules": [
         "wiki"
@@ -458,7 +458,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "shared",
-      "referenceCount": 8,
+      "referenceCount": 3,
       "referenceModuleCount": 2,
       "referenceModules": [
         "wiki"
@@ -536,7 +536,7 @@
       "hasChildren": false,
       "childCount": 0,
       "isReexport": false,
-      "snippet": "export interface GraphOptions {\n  zoom?: \"file\" | \"directory\";\n  focus?: string;\n  maxNodes?: number;\n  maxHops?: number;\n  showExternals?: boolean;\n  format?: \"text\" | \"json\";\n  projectDir: string;\n}"
+      "snippet": "export interface GraphOptions {\n  zoom?: \"file\" | \"directory\";\n  focus?: string;\n  maxHops?: number;\n  showExternals?: boolean;\n  format?: \"text\" | \"json\";\n  projectDir: string;\n}"
     },
     {
       "name": "IndexResult",
@@ -574,7 +574,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "shared",
-      "referenceCount": 8,
+      "referenceCount": 4,
       "referenceModuleCount": 2,
       "referenceModules": [
         "wiki"
@@ -590,7 +590,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "shared",
-      "referenceCount": 6,
+      "referenceCount": 4,
       "referenceModuleCount": 2,
       "referenceModules": [
         "wiki"
@@ -620,7 +620,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "cross-cutting",
-      "referenceCount": 16,
+      "referenceCount": 8,
       "referenceModuleCount": 3,
       "referenceModules": [
         "tools",
@@ -637,7 +637,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "shared",
-      "referenceCount": 5,
+      "referenceCount": 3,
       "referenceModuleCount": 2,
       "referenceModules": [
         "tools",
@@ -726,7 +726,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "local",
-      "referenceCount": 2,
+      "referenceCount": 1,
       "referenceModuleCount": 1,
       "referenceModules": [
         "wiki"
@@ -814,7 +814,7 @@
       "file": "src/db/types.ts",
       "tier": "entity",
       "scope": "local",
-      "referenceCount": 8,
+      "referenceCount": 2,
       "referenceModuleCount": 1,
       "referenceModules": [
         "wiki"
@@ -830,7 +830,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "local",
-      "referenceCount": 2,
+      "referenceCount": 1,
       "referenceModuleCount": 1,
       "referenceModules": [
         "wiki"
@@ -888,7 +888,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "shared",
-      "referenceCount": 4,
+      "referenceCount": 2,
       "referenceModuleCount": 2,
       "referenceModules": [
         "tools",
@@ -919,7 +919,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "shared",
-      "referenceCount": 7,
+      "referenceCount": 4,
       "referenceModuleCount": 2,
       "referenceModules": [
         "tools",
@@ -950,7 +950,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "local",
-      "referenceCount": 3,
+      "referenceCount": 1,
       "referenceModuleCount": 1,
       "referenceModules": [
         "wiki"
@@ -980,7 +980,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "local",
-      "referenceCount": 3,
+      "referenceCount": 1,
       "referenceModuleCount": 1,
       "referenceModules": [
         "wiki"
@@ -1014,7 +1014,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "local",
-      "referenceCount": 3,
+      "referenceCount": 1,
       "referenceModuleCount": 1,
       "referenceModules": [
         "wiki"
@@ -1030,7 +1030,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "local",
-      "referenceCount": 3,
+      "referenceCount": 1,
       "referenceModuleCount": 1,
       "referenceModules": [
         "wiki"
@@ -1172,7 +1172,7 @@
       "file": "tests/helpers.ts",
       "tier": "entity",
       "scope": "cross-cutting",
-      "referenceCount": 36,
+      "referenceCount": 27,
       "referenceModuleCount": 11,
       "referenceModules": [
         "benchmarks",
@@ -1258,7 +1258,7 @@
       "file": "tests/helpers.ts",
       "tier": "entity",
       "scope": "cross-cutting",
-      "referenceCount": 36,
+      "referenceCount": 27,
       "referenceModuleCount": 11,
       "referenceModules": [
         "benchmarks",
@@ -1312,7 +1312,7 @@
       "file": "src/embeddings/embed.ts",
       "tier": "entity",
       "scope": "cross-cutting",
-      "referenceCount": 34,
+      "referenceCount": 25,
       "referenceModuleCount": 11,
       "referenceModules": [
         "benchmarks",
@@ -1446,7 +1446,7 @@
       "file": "src/tools/git-tools.ts",
       "tier": "entity",
       "scope": "local",
-      "referenceCount": 2,
+      "referenceCount": 1,
       "referenceModuleCount": 1,
       "referenceModules": [
         "tools"
@@ -1567,7 +1567,7 @@
       "file": "src/embeddings/embed.ts",
       "tier": "entity",
       "scope": "cross-cutting",
-      "referenceCount": 30,
+      "referenceCount": 22,
       "referenceModuleCount": 9,
       "referenceModules": [
         "benchmarks",
@@ -1934,7 +1934,7 @@
       "hasChildren": false,
       "childCount": 0,
       "isReexport": false,
-      "snippet": "export async function mapCommand(args: string[], getFlag: (flag: string) => string | undefined) {\n  const dir = resolve(args[1] && !args[1].startsWith(\"--\") ? args[1] : \".\");\n  const db = new RagDB(dir);\n  const focus = getFlag(\"--focus\");\n  const zoom = (getFlag(\"--zoom\") || \"file\") as \"file\" | \"directory\";\n  const max = parseInt(getFlag(\"--max\") || \"50\", 10);\n\n  const map = generateProjectMap(db, {\n    projectDir: dir,\n    focus: focus ?? undefined,\n    zoom,\n    maxNodes: max,\n  });\n\n  cli.log(map);\n  db.close();\n}"
+      "snippet": "export async function mapCommand(args: string[], getFlag: (flag: string) => string | undefined) {\n  const dir = resolve(args[1] && !args[1].startsWith(\"--\") ? args[1] : \".\");\n  const db = new RagDB(dir);\n  const focus = getFlag(\"--focus\");\n  const zoom = (getFlag(\"--zoom\") || \"file\") as \"file\" | \"directory\";\n\n  const map = generateProjectMap(db, {\n    projectDir: dir,\n    focus: focus ?? undefined,\n    zoom,\n  });\n\n  cli.log(map);\n  db.close();\n}"
     },
     {
       "name": "mcpConfigSnippet",
@@ -2148,7 +2148,7 @@
       "file": "src/tools/git-tools.ts",
       "tier": "entity",
       "scope": "local",
-      "referenceCount": 2,
+      "referenceCount": 1,
       "referenceModuleCount": 1,
       "referenceModules": [
         "tools"
@@ -2511,7 +2511,7 @@
       "file": "tests/helpers.ts",
       "tier": "entity",
       "scope": "cross-cutting",
-      "referenceCount": 15,
+      "referenceCount": 13,
       "referenceModuleCount": 8,
       "referenceModules": [
         "benchmarks",
@@ -2699,6 +2699,14 @@
       "entities": []
     },
     {
+      "path": "docs/examples.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
       "path": "docs/tools.md",
       "fanIn": 0,
       "fanOut": 0,
@@ -2731,7 +2739,31 @@
       "entities": []
     },
     {
+      "path": "plans/bun-to-node-evaluation.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "plans/competitors-research.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
       "path": "scripts/bump-version.sh",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "scripts/record.sh",
       "fanIn": 0,
       "fanOut": 0,
       "isHub": false,
@@ -2821,7 +2853,7 @@
     {
       "path": "src/cli/commands/demo.ts",
       "fanIn": 1,
-      "fanOut": 7,
+      "fanOut": 8,
       "isHub": false,
       "bridges": [],
       "entities": []
@@ -2941,7 +2973,7 @@
     },
     {
       "path": "src/cli/progress.ts",
-      "fanIn": 7,
+      "fanIn": 8,
       "fanOut": 1,
       "isHub": true,
       "hubPath": "B",
@@ -4075,6 +4107,238 @@
       "isHub": false,
       "bridges": [],
       "entities": []
+    },
+    {
+      "path": "wiki/_update-log.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/architecture.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/data-flows.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/guides/conventions.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/guides/getting-started.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/guides/testing.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/index.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/modules/cli.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/modules/commands.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/modules/config.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/modules/conversation.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/modules/db/conversation.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/modules/db/files.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/modules/db/git-history.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/modules/db/graph.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/modules/db/index.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/modules/db/types.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/modules/embeddings.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/modules/graph.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/modules/indexing.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/modules/search.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/modules/tests.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/modules/tools.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/modules/utils.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/modules/wiki/discovery.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/modules/wiki/index.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/modules/wiki/section-selector.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/modules/wiki/staleness.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/modules/wiki/types.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "isHub": false,
+      "bridges": [],
+      "entities": []
     }
   ],
   "modules": [
@@ -4483,6 +4747,72 @@
       "fanIn": 11,
       "fanOut": 0,
       "value": 26
+    },
+    {
+      "name": "wiki",
+      "path": "wiki",
+      "entryFile": "wiki/index.md",
+      "files": [
+        "wiki/_update-log.md",
+        "wiki/architecture.md",
+        "wiki/data-flows.md",
+        "wiki/index.md"
+      ],
+      "qualifiesAsModulePage": false,
+      "reason": "value 4 < 8, no structural override",
+      "hubs": [],
+      "bridges": [],
+      "entityCount": 0,
+      "fileCount": 4,
+      "exportCount": 0,
+      "fanIn": 0,
+      "fanOut": 0,
+      "value": 4
+    },
+    {
+      "name": "db",
+      "path": "wiki/modules/db",
+      "entryFile": "wiki/modules/db/index.md",
+      "files": [
+        "wiki/modules/db/conversation.md",
+        "wiki/modules/db/files.md",
+        "wiki/modules/db/git-history.md",
+        "wiki/modules/db/graph.md",
+        "wiki/modules/db/index.md",
+        "wiki/modules/db/types.md"
+      ],
+      "qualifiesAsModulePage": false,
+      "reason": "value 6 < 8, no structural override",
+      "hubs": [],
+      "bridges": [],
+      "entityCount": 0,
+      "fileCount": 6,
+      "exportCount": 0,
+      "fanIn": 0,
+      "fanOut": 0,
+      "value": 6
+    },
+    {
+      "name": "wiki",
+      "path": "wiki/modules/wiki",
+      "entryFile": "wiki/modules/wiki/index.md",
+      "files": [
+        "wiki/modules/wiki/discovery.md",
+        "wiki/modules/wiki/index.md",
+        "wiki/modules/wiki/section-selector.md",
+        "wiki/modules/wiki/staleness.md",
+        "wiki/modules/wiki/types.md"
+      ],
+      "qualifiesAsModulePage": false,
+      "reason": "value 5 < 8, no structural override",
+      "hubs": [],
+      "bridges": [],
+      "entityCount": 0,
+      "fileCount": 5,
+      "exportCount": 0,
+      "fanIn": 0,
+      "fanOut": 0,
+      "value": 5
     }
   ],
   "warnings": []

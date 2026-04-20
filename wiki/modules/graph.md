@@ -8,7 +8,6 @@ A single file (`src/graph/resolver.ts`) that turns the raw `file_imports` rows e
 export interface GraphOptions {
   zoom?: "file" | "directory";
   focus?: string;
-  maxNodes?: number;
   maxHops?: number;
   showExternals?: boolean;
   format?: "text" | "json";
@@ -18,7 +17,7 @@ export interface GraphOptions {
 export function buildIdToPathMap(pathToId: Map<string, number>): Map<number, string>
 ```
 
-The heavyweight functions (`resolveImports`, `resolveImportsForFile`, `generateProjectMap`, `buildPathToIdMap`) aren't in the top-level export summary but are the real interface. `resolveImports` runs the full two-pass fix-up on every unresolved row; `resolveImportsForFile(db, fileId, projectDir)` is the incremental variant the watcher calls after re-indexing a single file, with optional prebuilt `pathToId` / `idToPath` maps to avoid repeated table scans.
+The heavyweight functions (`resolveImports`, `resolveImportsForFile`, `generateProjectMap`, `buildPathToIdMap`) aren't in the top-level export summary but are the real interface. `resolveImports` runs the full two-pass fix-up on every unresolved row; `resolveImportsForFile(db, fileId, projectDir)` is the incremental variant the watcher calls after re-indexing a single file, with optional prebuilt `pathToId` / `idToPath` maps to avoid repeated table scans. `generateProjectMap` honours the caller-requested `zoom` directly — there is no node-count cap or auto-switch to directory view anymore.
 
 ## How it works
 
@@ -88,14 +87,14 @@ flowchart LR
 
 - `projectDir` — resolver works in absolute paths; the caller passes `projectDir` so `tsconfig.json` can be loaded and so bun-chunk can compute project-relative resolutions.
 - `RESOLVE_EXTENSIONS` — internal constant `[".ts", ".tsx", ".js", ".jsx"]`. The DB fallback is TypeScript/JavaScript-only; other languages rely entirely on bun-chunk.
-- `GraphOptions.maxNodes` (default 50) / `maxHops` (default 2) — tuning knobs for the `project_map` tool's subgraph extraction, not for the resolver itself. `generateProjectMap` auto-switches to directory view when `graph.nodes.length > maxNodes`.
+- `GraphOptions.maxHops` (default 2) — subgraph-extraction depth from `focus` for the `project_map` tool. No `maxNodes` cap exists; `generateProjectMap` renders whatever the graph produces at the requested `zoom`.
 
 ## Known issues
 
 - **DB fallback is JS/TS-only.** If bun-chunk doesn't resolve a Python / Rust / Go import, the fallback does not retry with language-specific conventions — the import just stays `NULL`.
 - **Re-indexing a renamed file leaves stale resolutions.** `resolveImports` only touches `NULL` rows; if a file is renamed, imports from other files that were previously resolved to the old id are not re-pointed. The watcher's `resolveImportsForFile` helps when the renaming file's own imports are re-written, but incoming edges need a fresh `resolveImports` pass.
 - **`tsconfig.json` is loaded once per `resolveImports` call.** Changing `tsconfig.json` mid-run requires restarting the indexer; the loader doesn't re-read the file per import.
-- **`maxNodes` triggers silent view swap.** When a `project_map` query crosses the threshold, zoom flips from `file` to `directory` without a warning — callers that expected file-level output get a directory summary instead.
+- **No node-count cap on `project_map`.** Large projects render the full graph; callers that need a bounded view pass `focus` + `maxHops` or switch to `zoom: "directory"` explicitly. Prior `maxNodes` auto-switch to directory view was removed — output is now exactly what the caller asks for.
 
 ## See also
 

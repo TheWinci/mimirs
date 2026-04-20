@@ -67,7 +67,7 @@ sequenceDiagram
 
 ### Phase 1: Discovery (`discovery.ts`)
 
-`runDiscovery` calls `db.getStatus()` then `generateProjectMap` twice — once file-level and once directory-level — sized by `computeMaxNodes(fileCount, level)` (`sqrt(n) * 12 + 30` for files, `sqrt(n) * 8 + 20` for directories). Empty index returns a stub with a `"Index is empty"` warning. Directories become `DiscoveryModule` entries when they hit any of three heuristics: an entry file matching `ENTRY_FILE_PATTERN = /^(index|main|mod|lib|__init__)\./`, external consumers (`fanIn > 0`), or internal cohesion (`>= 2 intra-directory edges` and `totalExports > 0`). Fewer than three detected modules plus a directory of `>= 10` files triggers `flatProjectFallback`, which BFS-clusters the file graph. Monorepo detection runs against `WORKSPACE_ROOTS = ["package.json", "Cargo.toml", "go.mod", "pyproject.toml"]` at depth `<= 2`; any root with `>= 2` siblings promotes unclaimed files to a top-level module. `nestModules` then rolls children under deeper-path parents so the manifest keeps a tree.
+`runDiscovery` calls `db.getStatus()` then `generateProjectMap` twice — once file-level, once directory-level — both without a node cap (the resolver no longer auto-switches views, so discovery now sees the full graph on every project). A JSON-parse failure is caught and replaced with an empty graph plus a warning rather than aborting. Empty index returns a stub with a `"Index is empty"` warning. Directories become `DiscoveryModule` entries when they hit any of three heuristics: an entry file matching `ENTRY_FILE_PATTERN = /^(index|main|mod|lib|__init__)\./`, external consumers (`fanIn > 0`), or internal cohesion (`>= 2 intra-directory edges` and `totalExports > 0`). Fewer than three detected modules plus a directory of `>= 10` files triggers `flatProjectFallback`, which BFS-clusters the file graph. Monorepo detection runs against `WORKSPACE_ROOTS = ["package.json", "Cargo.toml", "go.mod", "pyproject.toml"]` at depth `<= 2`; any root with `>= 2` siblings promotes unclaimed files to a top-level module. `nestModules` then rolls children under deeper-path parents so the manifest keeps a tree.
 
 ### Phase 2: Categorization (`categorization.ts`)
 
@@ -103,7 +103,7 @@ Owns `runWikiPlanning` (sequences discovery → categorization → page-tree →
 
 ### `discovery.ts` — Phase 1
 
-The two constants (`ENTRY_FILE_PATTERN`, `WORKSPACE_ROOTS`) and `computeMaxNodes` live at the top. Exported `runDiscovery` only; the helpers (`detectDirectoryModules`, `buildModuleFromDir`, `buildModuleFromFiles`, `flatProjectFallback`, `detectWorkspaceRoots`, `nestModules`) are file-local. Any graph-parse failure (truncated JSON from `generateProjectMap`) is caught and replaced with an empty graph plus a warning — discovery never throws.
+Two constants (`ENTRY_FILE_PATTERN`, `WORKSPACE_ROOTS`) live at the top. Exported `runDiscovery` only; the helpers (`detectDirectoryModules`, `buildModuleFromDir`, `buildModuleFromFiles`, `flatProjectFallback`, `detectWorkspaceRoots`, `nestModules`) are file-local. Any graph-parse failure (malformed JSON from `generateProjectMap`) is caught and replaced with an empty graph plus a warning — discovery never throws.
 
 ### `categorization.ts` — Phase 2
 

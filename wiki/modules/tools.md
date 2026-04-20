@@ -87,7 +87,7 @@ Wraps `indexDirectory` and `db.removeFile`. Threads `writeStatus` down so the ID
 
 ### `graph-tools.ts` — `project_map`, `depends_on`, `depended_on_by`, `impact_analysis`, `diff_context`
 
-Wraps `generateProjectMap` from `graph/resolver`. `depends_on` / `depended_on_by` are the file-level forward / reverse edge queries; they call `db.getImportsForFile` / `db.getImportersOf` directly. `impact_analysis` computes direct callers, transitive dependents, co-change history, and test coverage for a symbol or file. `diff_context` is the PR-review helper.
+Wraps `generateProjectMap` from `graph/resolver`. `project_map` accepts `directory`, `focus`, `zoom` (`file` | `directory`), and `format` (`text` | `json`) — there is no `maxNodes` option; large graphs render fully and callers who want a trimmed view pass `focus` (plus the resolver's `maxHops` default of 2) or switch to `zoom: "directory"`. `depends_on` / `depended_on_by` are the file-level forward / reverse edge queries; they call `db.getImportsForFile` / `db.getImportersOf` directly. `impact_analysis` computes direct callers, transitive dependents, co-change history, and test coverage for a symbol or file. `diff_context` is the PR-review helper.
 
 ### `conversation-tools.ts` — `search_conversation`
 
@@ -119,7 +119,7 @@ Returns metadata about the running MCP server: index size, connected DBs (when `
 
 ### `wiki-tools.ts` — `generate_wiki`
 
-The four-phase wiki generator. `init` produces the `_discovery.json` / `_classified.json` / `_manifest.json` / `_content.json` artifacts via `runWikiPlanning`; `page: N` returns the payload for one page (candidate sections, exemplar path for aggregates, link map, semantic queries) via `getPagePayload`; `section: '<name>'` / `'library:<name>'` fetches specific data blobs; `finalize: true` runs the linking pass + validation; `resume: true` checks which pages are already on disk; `incremental: true` diffs the working tree against `lastGitRef` via `classifyStaleness`. The file also owns `WRITING_RULES` — the prose the agent reads about how to write wiki content.
+The four-phase wiki generator. `init` produces the `_discovery.json` / `_classified.json` / `_manifest.json` / `_content.json` artifacts via `runWikiPlanning`; `page: N` returns the payload for one page (candidate sections, exemplar path for aggregates, link map, semantic queries) via `getPagePayload`; `section: '<name>'` / `'library:<name>'` fetches specific data blobs; `finalize: true` runs the linking pass + validation; `resume: true` checks which pages are already on disk; `incremental: true` diffs the working tree against `lastGitRef` via `classifyStaleness`. The file also owns `WRITING_RULES` — the prose the agent reads about how to write wiki content. Incremental responses (both the "nothing to regenerate" path and the normal stale/new/removed listing) append `INDEX_FRESHNESS_NOTE`, a reminder that the planner reads the code index — if an expected change is missing, re-run `index_files()` and then `generate_wiki(incremental: true)` again.
 
 ## Dependencies and Dependents
 
