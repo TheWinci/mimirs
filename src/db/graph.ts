@@ -174,11 +174,16 @@ export function getSubgraph(db: Database, fileIds: number[], maxHops: number = 2
     exports: exportsByFile.get(f.id) || [],
   }));
 
-  // Edge query needs ids twice (file_id IN + resolved_file_id IN), so use half the batch limit
-  const EDGE_BATCH = Math.floor(BATCH_LIMIT / 2);
+  // Previously this batched `idList` and used the SAME batch for both
+  // `file_id IN (…) AND resolved_file_id IN (…)`, which silently dropped any
+  // edge whose endpoints fell into different batches. For subgraphs larger than
+  // the batch size that meant a neighborhood graph with random missing edges.
+  // Now: batch by `file_id` alone (one IN clause → full BATCH_LIMIT available),
+  // then filter `resolved_file_id` in JS against the visited set.
+  const visitedSet = visited;
   const edges: { fromId: number; fromPath: string; toId: number; toPath: string; source: string }[] = [];
-  for (let i = 0; i < idList.length; i += EDGE_BATCH) {
-    const batch = idList.slice(i, i + EDGE_BATCH);
+  for (let i = 0; i < idList.length; i += BATCH_LIMIT) {
+    const batch = idList.slice(i, i + BATCH_LIMIT);
     const ph = batch.map(() => "?").join(",");
     const rows = db
       .query<
@@ -190,10 +195,11 @@ export function getSubgraph(db: Database, fileIds: number[], maxHops: number = 2
          JOIN files f1 ON f1.id = fi.file_id
          JOIN files f2 ON f2.id = fi.resolved_file_id
          WHERE fi.resolved_file_id IS NOT NULL
-         AND fi.file_id IN (${ph}) AND fi.resolved_file_id IN (${ph})`
+         AND fi.file_id IN (${ph})`
       )
-      .all(...batch, ...batch);
+      .all(...batch);
     for (const r of rows) {
+      if (!visitedSet.has(r.resolved_file_id)) continue;
       edges.push({
         fromId: r.file_id,
         fromPath: r.from_path,
