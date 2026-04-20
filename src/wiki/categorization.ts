@@ -194,6 +194,7 @@ function classifyModules(
 
   return allModules.map((mod) => {
     const moduleFiles = mod.files;
+    const moduleFileSet = new Set(moduleFiles);
 
     // Count hubs in this module
     const hubs = moduleFiles.filter((f) => hubFiles.has(f));
@@ -210,9 +211,15 @@ function classifyModules(
     const byValue = value >= MIN_MODULE_VALUE;
 
     // Structural overrides (only with fileCount >= 2 to avoid single-file "modules")
-    const crossCuttingCount = symbols.filter(
-      (s) => s.scope === "cross-cutting" && moduleFiles.some((f) => f === s.file)
-    ).length;
+    // Use Set.has instead of Array.some to keep this O(symbols) per module
+    // instead of O(symbols * files) — matters on large projects.
+    let crossCuttingCount = 0;
+    let entityCount = 0;
+    for (const s of symbols) {
+      if (!moduleFileSet.has(s.file)) continue;
+      if (s.scope === "cross-cutting") crossCuttingCount++;
+      if (s.tier === "entity") entityCount++;
+    }
     const byCrossCutting = moduleFiles.length >= 2 && crossCuttingCount >= 1;
     const byEntryFanIn = moduleFiles.length >= 2 && mod.entryFile !== null && mod.fanIn >= 3;
 
@@ -238,9 +245,7 @@ function classifyModules(
       reason,
       hubs,
       bridges,
-      entityCount: symbols.filter(
-        (s) => s.tier === "entity" && moduleFiles.some((f) => f === s.file)
-      ).length,
+      entityCount,
       fileCount: moduleFiles.length,
       exportCount: mod.exports.length,
       fanIn: mod.fanIn,
