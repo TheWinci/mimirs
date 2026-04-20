@@ -139,7 +139,6 @@ function prefetchModule(
         projectDir,
         focus: entryFile,
         format: "json",
-        maxNodes: 50,
       });
       neighborhood = JSON.parse(json);
     } catch {
@@ -208,7 +207,6 @@ function prefetchModuleFile(
       projectDir,
       focus: file,
       format: "json",
-      maxNodes: 50,
     });
     neighborhood = JSON.parse(json);
   } catch {

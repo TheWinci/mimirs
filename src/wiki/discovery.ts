@@ -13,11 +13,6 @@ import type {
 const ENTRY_FILE_PATTERN = /^(index|main|mod|lib|__init__)\./;
 const WORKSPACE_ROOTS = ["package.json", "Cargo.toml", "go.mod", "pyproject.toml"];
 
-function computeMaxNodes(fileCount: number, level: "file" | "directory"): number {
-  if (level === "directory") return Math.round(Math.sqrt(fileCount) * 8 + 20);
-  return Math.round(Math.sqrt(fileCount) * 12 + 30);
-}
-
 /**
  * Phase 1: Discover the project's structure from the graph index.
  * Returns module inventory + raw graph data for subsequent phases.
@@ -41,11 +36,9 @@ export function runDiscovery(db: RagDB, projectDir: string): DiscoveryResult {
   }
 
   // Get file-level graph
-  const fileMaxNodes = computeMaxNodes(status.totalFiles, "file");
   const fileGraphJson = generateProjectMap(db, {
     projectDir,
     format: "json",
-    maxNodes: fileMaxNodes,
   });
   let fileGraph: FileLevelGraph;
   try {
@@ -56,12 +49,10 @@ export function runDiscovery(db: RagDB, projectDir: string): DiscoveryResult {
   }
 
   // Get directory-level graph
-  const dirMaxNodes = computeMaxNodes(status.totalFiles, "directory");
   const dirGraphJson = generateProjectMap(db, {
     projectDir,
     format: "json",
     zoom: "directory",
-    maxNodes: dirMaxNodes,
   });
   let dirGraph: DirectoryLevelGraph;
   try {

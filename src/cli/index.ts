@@ -46,7 +46,6 @@ Usage:
                   [--top N] [--out F]
   mimirs map [dir] [--focus F]      Generate project dependency graph
                 [--zoom file|directory]     (Mermaid format)
-                [--max N]
   mimirs conversation search <query> Search conversation history
                 [--dir D] [--top N]
   mimirs conversation sessions      List indexed sessions

@@ -53,17 +53,6 @@ This creates the MCP server config, editor rules, `.mimirs/config.json`, and `.g
 bunx mimirs demo
 ```
 
-### Claude Code plugin
-
-For deeper integration, mimirs is also available as a Claude Code plugin. In a Claude Code session:
-
-```
-/plugin marketplace add https://github.com/TheWinci/mimirs.git
-/plugin install mimirs
-```
-
-The plugin adds **SessionStart** (context summary), **PostToolUse** (auto-reindex on edit), and **SessionEnd** (auto-checkpoint) hooks. No `CLAUDE.md` instructions needed — the plugin's built-in skill handles tool usage.
-
 ## Search quality
 
 90–98% Recall@10. Benchmarked on four real codebases across three languages (120 queries total) — from 97 files to 8,553 — with known expected results per query. Full methodology in [BENCHMARKS.md](BENCHMARKS.md).

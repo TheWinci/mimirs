@@ -153,7 +153,6 @@ function tryResolvePath(basePath: string, pathToId: Map<string, number>): number
 export interface GraphOptions {
   zoom?: "file" | "directory";
   focus?: string;
-  maxNodes?: number;
   maxHops?: number;
   showExternals?: boolean;
   format?: "text" | "json";
@@ -186,7 +185,6 @@ export function generateProjectMap(
   const {
     zoom = "file",
     focus,
-    maxNodes = 50,
     maxHops = 2,
     format = "text",
     projectDir,
@@ -212,17 +210,14 @@ export function generateProjectMap(
     return "No files indexed or no dependencies found.";
   }
 
-  // Auto-switch to directory view if too many nodes
-  const effectiveZoom = graph.nodes.length > maxNodes ? "directory" : zoom;
-
   if (format === "json") {
-    if (effectiveZoom === "directory") {
+    if (zoom === "directory") {
       return generateDirectoryMapJson(graph, projectDir);
     }
     return generateFileMapJson(graph, projectDir);
   }
 
-  if (effectiveZoom === "directory") {
+  if (zoom === "directory") {
     return generateDirectoryMap(graph, projectDir);
   }
 
