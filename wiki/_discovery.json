@@ -1,7 +1,7 @@
 {
-  "fileCount": 164,
-  "chunkCount": 1875,
-  "lastIndexed": "2026-04-19T06:25:31.933Z",
+  "fileCount": 197,
+  "chunkCount": 2441,
+  "lastIndexed": "2026-04-20T12:43:19.172Z",
   "modules": [
     {
       "name": "src",
@@ -464,6 +464,56 @@
       "fanIn": 11,
       "fanOut": 0,
       "internalEdges": 0
+    },
+    {
+      "name": "wiki",
+      "path": "wiki",
+      "entryFile": "wiki/index.md",
+      "files": [
+        "wiki/_update-log.md",
+        "wiki/architecture.md",
+        "wiki/data-flows.md",
+        "wiki/index.md"
+      ],
+      "exports": [],
+      "fanIn": 0,
+      "fanOut": 0,
+      "internalEdges": 0,
+      "children": [
+        {
+          "name": "db",
+          "path": "wiki/modules/db",
+          "entryFile": "wiki/modules/db/index.md",
+          "files": [
+            "wiki/modules/db/conversation.md",
+            "wiki/modules/db/files.md",
+            "wiki/modules/db/git-history.md",
+            "wiki/modules/db/graph.md",
+            "wiki/modules/db/index.md",
+            "wiki/modules/db/types.md"
+          ],
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "internalEdges": 0
+        },
+        {
+          "name": "wiki",
+          "path": "wiki/modules/wiki",
+          "entryFile": "wiki/modules/wiki/index.md",
+          "files": [
+            "wiki/modules/wiki/discovery.md",
+            "wiki/modules/wiki/index.md",
+            "wiki/modules/wiki/section-selector.md",
+            "wiki/modules/wiki/staleness.md",
+            "wiki/modules/wiki/types.md"
+          ],
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "internalEdges": 0
+        }
+      ]
     }
   ],
   "graphData": {
@@ -618,6 +668,13 @@
           "isEntryPoint": true
         },
         {
+          "path": "docs/examples.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
           "path": "docs/tools.md",
           "exports": [],
           "fanIn": 0,
@@ -646,7 +703,28 @@
           "isEntryPoint": true
         },
         {
+          "path": "plans/bun-to-node-evaluation.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "plans/competitors-research.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
           "path": "scripts/bump-version.sh",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "scripts/record.sh",
           "exports": [],
           "fanIn": 0,
           "fanOut": 0,
@@ -739,7 +817,7 @@
           "path": "src/cli/commands/demo.ts",
           "exports": [],
           "fanIn": 1,
-          "fanOut": 7,
+          "fanOut": 8,
           "isEntryPoint": false
         },
         {
@@ -878,7 +956,7 @@
               "type": "function"
             }
           ],
-          "fanIn": 7,
+          "fanIn": 8,
           "fanOut": 1,
           "isEntryPoint": false
         },
@@ -2372,16 +2450,844 @@
           "fanIn": 0,
           "fanOut": 6,
           "isEntryPoint": true
+        },
+        {
+          "path": "wiki/_update-log.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/architecture.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/data-flows.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/guides/conventions.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/guides/getting-started.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/guides/testing.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/index.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/modules/cli.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/modules/commands.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/modules/config.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/modules/conversation.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/modules/db/conversation.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/modules/db/files.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/modules/db/git-history.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/modules/db/graph.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/modules/db/index.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/modules/db/types.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/modules/embeddings.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/modules/graph.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/modules/indexing.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/modules/search.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/modules/tests.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/modules/tools.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/modules/utils.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/modules/wiki/discovery.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/modules/wiki/index.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/modules/wiki/section-selector.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/modules/wiki/staleness.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/modules/wiki/types.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
         }
       ],
       "edges": [
+        {
+          "from": "benchmarks/subchunk-impact.ts",
+          "to": "src/db/index.ts",
+          "source": "../src/db"
+        },
+        {
+          "from": "benchmarks/subchunk-impact.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/subchunk-impact.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/subchunk-impact.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../src/indexing/indexer"
+        },
+        {
+          "from": "benchmarks/subchunk-impact.ts",
+          "to": "src/search/benchmark.ts",
+          "source": "../src/search/benchmark"
+        },
+        {
+          "from": "benchmarks/subchunk-impact.ts",
+          "to": "src/search/benchmark.ts",
+          "source": "../src/search/benchmark"
+        },
+        {
+          "from": "benchmarks/subchunk-impact.ts",
+          "to": "src/search/benchmark.ts",
+          "source": "../src/search/benchmark"
+        },
+        {
+          "from": "benchmarks/subchunk-impact.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../src/indexing/chunker"
+        },
+        {
+          "from": "benchmarks/subchunk-impact.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../src/indexing/chunker"
+        },
+        {
+          "from": "benchmarks/subchunk-impact.ts",
+          "to": "src/indexing/parse.ts",
+          "source": "../src/indexing/parse"
+        },
+        {
+          "from": "benchmarks/subchunk-impact.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../src/graph/resolver"
+        },
+        {
+          "from": "benchmarks/indexing-bench-v2.ts",
+          "to": "src/db/index.ts",
+          "source": "../src/db"
+        },
+        {
+          "from": "benchmarks/indexing-bench-v2.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/indexing-bench-v2.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/indexing-bench-v2.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/indexing-bench-v2.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/indexing-bench-v2.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../src/indexing/chunker"
+        },
+        {
+          "from": "benchmarks/indexing-bench-v2.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../src/indexing/chunker"
+        },
+        {
+          "from": "benchmarks/indexing-bench-v2.ts",
+          "to": "src/indexing/parse.ts",
+          "source": "../src/indexing/parse"
+        },
+        {
+          "from": "benchmarks/indexing-bench-v2.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../src/graph/resolver"
+        },
+        {
+          "from": "benchmarks/parent-promotion-bench.ts",
+          "to": "src/db/index.ts",
+          "source": "../src/db"
+        },
+        {
+          "from": "benchmarks/parent-promotion-bench.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/parent-promotion-bench.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/parent-promotion-bench.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../src/search/hybrid"
+        },
+        {
+          "from": "benchmarks/large-json.bench.test.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../src/indexing/indexer"
+        },
+        {
+          "from": "benchmarks/large-json.bench.test.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../src/indexing/indexer"
+        },
+        {
+          "from": "benchmarks/large-json.bench.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../src/db"
+        },
+        {
+          "from": "benchmarks/large-json.bench.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/large-json.bench.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../tests/helpers"
+        },
+        {
+          "from": "benchmarks/large-json.bench.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../tests/helpers"
+        },
+        {
+          "from": "benchmarks/large-json.bench.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../tests/helpers"
+        },
+        {
+          "from": "benchmarks/large-json.bench.test.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/excalidraw-parent-bench.ts",
+          "to": "src/db/index.ts",
+          "source": "../src/db"
+        },
+        {
+          "from": "benchmarks/excalidraw-parent-bench.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/excalidraw-parent-bench.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/excalidraw-parent-bench.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../src/indexing/indexer"
+        },
+        {
+          "from": "benchmarks/excalidraw-parent-bench.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../src/search/hybrid"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/db/index.ts",
+          "source": "../src/db"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../src/indexing/indexer"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../src/indexing/chunker"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../src/indexing/chunker"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/indexing/parse.ts",
+          "source": "../src/indexing/parse"
+        },
+        {
+          "from": "benchmarks/indexing-bench.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../src/graph/resolver"
+        },
+        {
+          "from": "benchmarks/ast-truncation-analysis.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../src/indexing/chunker"
+        },
+        {
+          "from": "benchmarks/ast-truncation-analysis.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../src/indexing/chunker"
+        },
+        {
+          "from": "benchmarks/ast-truncation-analysis.ts",
+          "to": "src/indexing/parse.ts",
+          "source": "../src/indexing/parse"
+        },
+        {
+          "from": "benchmarks/ast-truncation-analysis.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/ast-truncation-analysis.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/ast-truncation-analysis.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/ast-truncation-analysis.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/quality-bench-worker.ts",
+          "to": "src/db/index.ts",
+          "source": "../src/db"
+        },
+        {
+          "from": "benchmarks/quality-bench-worker.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/quality-bench-worker.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/quality-bench-worker.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../src/embeddings/embed"
+        },
+        {
+          "from": "benchmarks/quality-bench-worker.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../src/indexing/chunker"
+        },
+        {
+          "from": "benchmarks/quality-bench-worker.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../src/indexing/chunker"
+        },
+        {
+          "from": "benchmarks/quality-bench-worker.ts",
+          "to": "src/indexing/parse.ts",
+          "source": "../src/indexing/parse"
+        },
+        {
+          "from": "benchmarks/quality-bench-worker.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../src/graph/resolver"
+        },
+        {
+          "from": "benchmarks/quality-bench-worker.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../src/search/hybrid"
+        },
+        {
+          "from": "benchmarks/quality-bench-worker.ts",
+          "to": "src/search/benchmark.ts",
+          "source": "../src/search/benchmark"
+        },
+        {
+          "from": "benchmarks/quality-bench-worker.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../src/search/hybrid"
+        },
+        {
+          "from": "benchmarks/count-grouping-sim.ts",
+          "to": "src/db/index.ts",
+          "source": "../src/db"
+        },
+        {
+          "from": "benchmarks/count-grouping-sim.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/count-grouping-sim.ts",
+          "to": "src/config/index.ts",
+          "source": "../src/config"
+        },
+        {
+          "from": "benchmarks/count-grouping-sim.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../src/search/hybrid"
+        },
         {
           "from": "src/main.ts",
           "to": "src/cli/index.ts",
           "source": "./cli"
         },
         {
-          "from": "tests/tools/server.test.ts",
+          "from": "src/cli/progress.ts",
+          "to": "src/utils/log.ts",
+          "source": "../utils/log"
+        },
+        {
+          "from": "src/cli/setup.ts",
+          "to": "src/config/index.ts",
+          "source": "../config"
+        },
+        {
+          "from": "src/wiki/staleness.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/staleness.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/staleness.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/section-selector.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/section-selector.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/section-selector.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-payload.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-payload.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-payload.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-payload.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-payload.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-payload.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-payload.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-payload.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-payload.ts",
+          "to": "src/wiki/section-selector.ts",
+          "source": "./section-selector"
+        },
+        {
+          "from": "src/wiki/page-payload.ts",
+          "to": "src/wiki/section-selector.ts",
+          "source": "./section-selector"
+        },
+        {
+          "from": "src/wiki/page-tree.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-tree.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-tree.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-tree.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-tree.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-tree.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-tree.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/page-tree.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/types.ts",
+          "to": "src/db/types.ts",
+          "source": "../db/types"
+        },
+        {
+          "from": "src/wiki/categorization.ts",
+          "to": "src/db/index.ts",
+          "source": "../db"
+        },
+        {
+          "from": "src/wiki/categorization.ts",
+          "to": "src/db/types.ts",
+          "source": "../db/types"
+        },
+        {
+          "from": "src/wiki/categorization.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/categorization.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/categorization.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/categorization.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/categorization.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/categorization.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/categorization.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/categorization.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/categorization.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/index.ts",
+          "to": "src/db/index.ts",
+          "source": "../db"
+        },
+        {
+          "from": "src/wiki/index.ts",
+          "to": "src/wiki/discovery.ts",
+          "source": "./discovery"
+        },
+        {
+          "from": "src/wiki/index.ts",
+          "to": "src/wiki/categorization.ts",
+          "source": "./categorization"
+        },
+        {
+          "from": "src/wiki/index.ts",
+          "to": "src/wiki/page-tree.ts",
+          "source": "./page-tree"
+        },
+        {
+          "from": "src/wiki/index.ts",
+          "to": "src/wiki/content-prefetch.ts",
+          "source": "./content-prefetch"
+        },
+        {
+          "from": "src/wiki/index.ts",
+          "to": "src/wiki/page-payload.ts",
+          "source": "./page-payload"
+        },
+        {
+          "from": "src/wiki/index.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/index.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/index.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/index.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/index.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/update-log.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/update-log.ts",
+          "to": "src/wiki/staleness.ts",
+          "source": "./staleness"
+        },
+        {
+          "from": "tests/tools/wiki-tools.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/tools/wiki-tools.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/tools/wiki-tools.test.ts",
           "to": "tests/helpers.ts",
           "source": "../helpers"
         },
@@ -2396,424 +3302,279 @@
           "source": "../helpers"
         },
         {
-          "from": "benchmarks/subchunk-impact.ts",
-          "to": "src/db/index.ts",
-          "source": "../src/db"
+          "from": "tests/tools/server.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
         },
         {
-          "from": "benchmarks/subchunk-impact.ts",
-          "to": "src/config/index.ts",
-          "source": "../src/config"
-        },
-        {
-          "from": "benchmarks/subchunk-impact.ts",
-          "to": "src/config/index.ts",
-          "source": "../src/config"
-        },
-        {
-          "from": "benchmarks/subchunk-impact.ts",
-          "to": "src/indexing/indexer.ts",
-          "source": "../src/indexing/indexer"
-        },
-        {
-          "from": "benchmarks/subchunk-impact.ts",
-          "to": "src/search/benchmark.ts",
-          "source": "../src/search/benchmark"
-        },
-        {
-          "from": "benchmarks/subchunk-impact.ts",
-          "to": "src/search/benchmark.ts",
-          "source": "../src/search/benchmark"
-        },
-        {
-          "from": "benchmarks/subchunk-impact.ts",
-          "to": "src/search/benchmark.ts",
-          "source": "../src/search/benchmark"
-        },
-        {
-          "from": "benchmarks/subchunk-impact.ts",
-          "to": "src/indexing/chunker.ts",
-          "source": "../src/indexing/chunker"
-        },
-        {
-          "from": "benchmarks/subchunk-impact.ts",
-          "to": "src/indexing/chunker.ts",
-          "source": "../src/indexing/chunker"
-        },
-        {
-          "from": "benchmarks/subchunk-impact.ts",
-          "to": "src/indexing/parse.ts",
-          "source": "../src/indexing/parse"
-        },
-        {
-          "from": "benchmarks/subchunk-impact.ts",
-          "to": "src/graph/resolver.ts",
-          "source": "../src/graph/resolver"
-        },
-        {
-          "from": "benchmarks/indexing-bench-v2.ts",
-          "to": "src/db/index.ts",
-          "source": "../src/db"
-        },
-        {
-          "from": "benchmarks/indexing-bench-v2.ts",
-          "to": "src/config/index.ts",
-          "source": "../src/config"
-        },
-        {
-          "from": "benchmarks/indexing-bench-v2.ts",
+          "from": "src/tools/checkpoint-tools.ts",
           "to": "src/embeddings/embed.ts",
-          "source": "../src/embeddings/embed"
+          "source": "../embeddings/embed"
         },
         {
-          "from": "benchmarks/indexing-bench-v2.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../src/embeddings/embed"
+          "from": "src/tools/checkpoint-tools.ts",
+          "to": "src/conversation/parser.ts",
+          "source": "../conversation/parser"
         },
         {
-          "from": "benchmarks/indexing-bench-v2.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../src/embeddings/embed"
+          "from": "src/tools/checkpoint-tools.ts",
+          "to": "src/tools/index.ts",
+          "source": "./index"
         },
         {
-          "from": "benchmarks/indexing-bench-v2.ts",
-          "to": "src/indexing/chunker.ts",
-          "source": "../src/indexing/chunker"
-        },
-        {
-          "from": "benchmarks/indexing-bench-v2.ts",
-          "to": "src/indexing/chunker.ts",
-          "source": "../src/indexing/chunker"
-        },
-        {
-          "from": "benchmarks/indexing-bench-v2.ts",
-          "to": "src/indexing/parse.ts",
-          "source": "../src/indexing/parse"
-        },
-        {
-          "from": "benchmarks/indexing-bench-v2.ts",
-          "to": "src/graph/resolver.ts",
-          "source": "../src/graph/resolver"
-        },
-        {
-          "from": "benchmarks/parent-promotion-bench.ts",
-          "to": "src/db/index.ts",
-          "source": "../src/db"
-        },
-        {
-          "from": "benchmarks/parent-promotion-bench.ts",
-          "to": "src/config/index.ts",
-          "source": "../src/config"
-        },
-        {
-          "from": "benchmarks/parent-promotion-bench.ts",
-          "to": "src/config/index.ts",
-          "source": "../src/config"
-        },
-        {
-          "from": "benchmarks/parent-promotion-bench.ts",
+          "from": "src/tools/search.ts",
           "to": "src/search/hybrid.ts",
-          "source": "../src/search/hybrid"
+          "source": "../search/hybrid"
         },
         {
-          "from": "benchmarks/large-json.bench.test.ts",
-          "to": "src/indexing/indexer.ts",
-          "source": "../src/indexing/indexer"
-        },
-        {
-          "from": "benchmarks/large-json.bench.test.ts",
-          "to": "src/indexing/indexer.ts",
-          "source": "../src/indexing/indexer"
-        },
-        {
-          "from": "benchmarks/large-json.bench.test.ts",
-          "to": "src/db/index.ts",
-          "source": "../src/db"
-        },
-        {
-          "from": "benchmarks/large-json.bench.test.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../src/embeddings/embed"
-        },
-        {
-          "from": "benchmarks/large-json.bench.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../tests/helpers"
-        },
-        {
-          "from": "benchmarks/large-json.bench.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../tests/helpers"
-        },
-        {
-          "from": "benchmarks/large-json.bench.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../tests/helpers"
-        },
-        {
-          "from": "benchmarks/large-json.bench.test.ts",
-          "to": "src/config/index.ts",
-          "source": "../src/config"
-        },
-        {
-          "from": "benchmarks/excalidraw-parent-bench.ts",
-          "to": "src/db/index.ts",
-          "source": "../src/db"
-        },
-        {
-          "from": "benchmarks/excalidraw-parent-bench.ts",
-          "to": "src/config/index.ts",
-          "source": "../src/config"
-        },
-        {
-          "from": "benchmarks/excalidraw-parent-bench.ts",
-          "to": "src/config/index.ts",
-          "source": "../src/config"
-        },
-        {
-          "from": "benchmarks/excalidraw-parent-bench.ts",
-          "to": "src/indexing/indexer.ts",
-          "source": "../src/indexing/indexer"
-        },
-        {
-          "from": "benchmarks/excalidraw-parent-bench.ts",
+          "from": "src/tools/search.ts",
           "to": "src/search/hybrid.ts",
-          "source": "../src/search/hybrid"
+          "source": "../search/hybrid"
         },
         {
-          "from": "benchmarks/indexing-bench.ts",
+          "from": "src/tools/search.ts",
+          "to": "src/tools/index.ts",
+          "source": "./index"
+        },
+        {
+          "from": "src/tools/git-tools.ts",
+          "to": "src/tools/index.ts",
+          "source": "./index"
+        },
+        {
+          "from": "src/tools/conversation-tools.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/tools/conversation-tools.ts",
+          "to": "src/utils/log.ts",
+          "source": "../utils/log"
+        },
+        {
+          "from": "src/tools/conversation-tools.ts",
+          "to": "src/tools/index.ts",
+          "source": "./index"
+        },
+        {
+          "from": "src/tools/analytics-tools.ts",
+          "to": "src/tools/index.ts",
+          "source": "./index"
+        },
+        {
+          "from": "src/tools/git-history-tools.ts",
+          "to": "src/tools/index.ts",
+          "source": "./index"
+        },
+        {
+          "from": "src/tools/git-history-tools.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/tools/index.ts",
           "to": "src/db/index.ts",
-          "source": "../src/db"
+          "source": "../db"
         },
         {
-          "from": "benchmarks/indexing-bench.ts",
+          "from": "src/tools/index.ts",
           "to": "src/config/index.ts",
-          "source": "../src/config"
+          "source": "../config"
         },
         {
-          "from": "benchmarks/indexing-bench.ts",
+          "from": "src/tools/index.ts",
+          "to": "src/config/index.ts",
+          "source": "../config"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/tools/search.ts",
+          "source": "./search"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/tools/index-tools.ts",
+          "source": "./index-tools"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/tools/graph-tools.ts",
+          "source": "./graph-tools"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/tools/conversation-tools.ts",
+          "source": "./conversation-tools"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/tools/checkpoint-tools.ts",
+          "source": "./checkpoint-tools"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/tools/annotation-tools.ts",
+          "source": "./annotation-tools"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/tools/analytics-tools.ts",
+          "source": "./analytics-tools"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/tools/git-tools.ts",
+          "source": "./git-tools"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/tools/git-history-tools.ts",
+          "source": "./git-history-tools"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/tools/server-info-tools.ts",
+          "source": "./server-info-tools"
+        },
+        {
+          "from": "src/tools/index.ts",
+          "to": "src/tools/wiki-tools.ts",
+          "source": "./wiki-tools"
+        },
+        {
+          "from": "src/tools/annotation-tools.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/tools/annotation-tools.ts",
+          "to": "src/tools/index.ts",
+          "source": "./index"
+        },
+        {
+          "from": "src/tools/server-info-tools.ts",
+          "to": "src/tools/index.ts",
+          "source": "./index"
+        },
+        {
+          "from": "src/tools/server-info-tools.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/tools/server-info-tools.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/tools/index-tools.ts",
           "to": "src/indexing/indexer.ts",
-          "source": "../src/indexing/indexer"
+          "source": "../indexing/indexer"
         },
         {
-          "from": "benchmarks/indexing-bench.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../src/embeddings/embed"
+          "from": "src/tools/index-tools.ts",
+          "to": "src/tools/index.ts",
+          "source": "./index"
         },
         {
-          "from": "benchmarks/indexing-bench.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../src/embeddings/embed"
+          "from": "src/conversation/indexer.ts",
+          "to": "src/conversation/parser.ts",
+          "source": "./parser"
         },
         {
-          "from": "benchmarks/indexing-bench.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../src/embeddings/embed"
+          "from": "src/conversation/indexer.ts",
+          "to": "src/conversation/parser.ts",
+          "source": "./parser"
         },
         {
-          "from": "benchmarks/indexing-bench.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../src/embeddings/embed"
+          "from": "src/conversation/indexer.ts",
+          "to": "src/conversation/parser.ts",
+          "source": "./parser"
         },
         {
-          "from": "benchmarks/indexing-bench.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../src/embeddings/embed"
-        },
-        {
-          "from": "benchmarks/indexing-bench.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../src/embeddings/embed"
-        },
-        {
-          "from": "benchmarks/indexing-bench.ts",
+          "from": "src/conversation/indexer.ts",
           "to": "src/indexing/chunker.ts",
-          "source": "../src/indexing/chunker"
+          "source": "../indexing/chunker"
         },
         {
-          "from": "benchmarks/indexing-bench.ts",
-          "to": "src/indexing/chunker.ts",
-          "source": "../src/indexing/chunker"
-        },
-        {
-          "from": "benchmarks/indexing-bench.ts",
-          "to": "src/indexing/parse.ts",
-          "source": "../src/indexing/parse"
-        },
-        {
-          "from": "benchmarks/indexing-bench.ts",
-          "to": "src/graph/resolver.ts",
-          "source": "../src/graph/resolver"
-        },
-        {
-          "from": "benchmarks/ast-truncation-analysis.ts",
-          "to": "src/indexing/chunker.ts",
-          "source": "../src/indexing/chunker"
-        },
-        {
-          "from": "benchmarks/ast-truncation-analysis.ts",
-          "to": "src/indexing/chunker.ts",
-          "source": "../src/indexing/chunker"
-        },
-        {
-          "from": "benchmarks/ast-truncation-analysis.ts",
-          "to": "src/indexing/parse.ts",
-          "source": "../src/indexing/parse"
-        },
-        {
-          "from": "benchmarks/ast-truncation-analysis.ts",
-          "to": "src/config/index.ts",
-          "source": "../src/config"
-        },
-        {
-          "from": "benchmarks/ast-truncation-analysis.ts",
-          "to": "src/config/index.ts",
-          "source": "../src/config"
-        },
-        {
-          "from": "benchmarks/ast-truncation-analysis.ts",
+          "from": "src/conversation/indexer.ts",
           "to": "src/embeddings/embed.ts",
-          "source": "../src/embeddings/embed"
+          "source": "../embeddings/embed"
         },
         {
-          "from": "benchmarks/ast-truncation-analysis.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../src/embeddings/embed"
+          "from": "src/server/index.ts",
+          "to": "src/utils/dir-guard.ts",
+          "source": "../utils/dir-guard"
         },
         {
-          "from": "benchmarks/quality-bench-worker.ts",
+          "from": "src/server/index.ts",
           "to": "src/db/index.ts",
-          "source": "../src/db"
+          "source": "../db"
         },
         {
-          "from": "benchmarks/quality-bench-worker.ts",
+          "from": "src/server/index.ts",
           "to": "src/config/index.ts",
-          "source": "../src/config"
+          "source": "../config"
         },
         {
-          "from": "benchmarks/quality-bench-worker.ts",
+          "from": "src/server/index.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../indexing/indexer"
+        },
+        {
+          "from": "src/server/index.ts",
+          "to": "src/indexing/watcher.ts",
+          "source": "../indexing/watcher"
+        },
+        {
+          "from": "src/server/index.ts",
+          "to": "src/conversation/parser.ts",
+          "source": "../conversation/parser"
+        },
+        {
+          "from": "src/server/index.ts",
+          "to": "src/conversation/indexer.ts",
+          "source": "../conversation/indexer"
+        },
+        {
+          "from": "src/server/index.ts",
+          "to": "src/conversation/indexer.ts",
+          "source": "../conversation/indexer"
+        },
+        {
+          "from": "src/server/index.ts",
+          "to": "src/cli/setup.ts",
+          "source": "../cli/setup"
+        },
+        {
+          "from": "src/server/index.ts",
+          "to": "src/tools/index.ts",
+          "source": "../tools"
+        },
+        {
+          "from": "src/server/index.ts",
+          "to": "src/utils/log.ts",
+          "source": "../utils/log"
+        },
+        {
+          "from": "src/config/index.ts",
+          "to": "src/utils/log.ts",
+          "source": "../utils/log"
+        },
+        {
+          "from": "src/config/index.ts",
           "to": "src/embeddings/embed.ts",
-          "source": "../src/embeddings/embed"
+          "source": "../embeddings/embed"
         },
         {
-          "from": "benchmarks/quality-bench-worker.ts",
+          "from": "src/config/index.ts",
           "to": "src/embeddings/embed.ts",
-          "source": "../src/embeddings/embed"
+          "source": "../embeddings/embed"
         },
         {
-          "from": "benchmarks/quality-bench-worker.ts",
-          "to": "src/indexing/chunker.ts",
-          "source": "../src/indexing/chunker"
-        },
-        {
-          "from": "benchmarks/quality-bench-worker.ts",
-          "to": "src/indexing/chunker.ts",
-          "source": "../src/indexing/chunker"
-        },
-        {
-          "from": "benchmarks/quality-bench-worker.ts",
-          "to": "src/indexing/parse.ts",
-          "source": "../src/indexing/parse"
-        },
-        {
-          "from": "benchmarks/quality-bench-worker.ts",
-          "to": "src/graph/resolver.ts",
-          "source": "../src/graph/resolver"
-        },
-        {
-          "from": "benchmarks/quality-bench-worker.ts",
-          "to": "src/search/hybrid.ts",
-          "source": "../src/search/hybrid"
-        },
-        {
-          "from": "benchmarks/quality-bench-worker.ts",
-          "to": "src/search/benchmark.ts",
-          "source": "../src/search/benchmark"
-        },
-        {
-          "from": "benchmarks/quality-bench-worker.ts",
-          "to": "src/search/hybrid.ts",
-          "source": "../src/search/hybrid"
-        },
-        {
-          "from": "benchmarks/count-grouping-sim.ts",
-          "to": "src/db/index.ts",
-          "source": "../src/db"
-        },
-        {
-          "from": "benchmarks/count-grouping-sim.ts",
-          "to": "src/config/index.ts",
-          "source": "../src/config"
-        },
-        {
-          "from": "benchmarks/count-grouping-sim.ts",
-          "to": "src/config/index.ts",
-          "source": "../src/config"
-        },
-        {
-          "from": "benchmarks/count-grouping-sim.ts",
-          "to": "src/search/hybrid.ts",
-          "source": "../src/search/hybrid"
-        },
-        {
-          "from": "tests/cli/cli.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../helpers"
-        },
-        {
-          "from": "tests/cli/cli.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../helpers"
-        },
-        {
-          "from": "tests/cli/cli.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../helpers"
-        },
-        {
-          "from": "tests/graph/graph.test.ts",
-          "to": "src/db/index.ts",
-          "source": "../../src/db"
-        },
-        {
-          "from": "tests/graph/graph.test.ts",
+          "from": "src/config/index.ts",
           "to": "src/embeddings/embed.ts",
-          "source": "../../src/embeddings/embed"
-        },
-        {
-          "from": "tests/graph/graph.test.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../../src/embeddings/embed"
-        },
-        {
-          "from": "tests/graph/graph.test.ts",
-          "to": "src/indexing/chunker.ts",
-          "source": "../../src/indexing/chunker"
-        },
-        {
-          "from": "tests/graph/graph.test.ts",
-          "to": "src/graph/resolver.ts",
-          "source": "../../src/graph/resolver"
-        },
-        {
-          "from": "tests/graph/graph.test.ts",
-          "to": "src/graph/resolver.ts",
-          "source": "../../src/graph/resolver"
-        },
-        {
-          "from": "tests/graph/graph.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../helpers"
-        },
-        {
-          "from": "tests/graph/graph.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../helpers"
-        },
-        {
-          "from": "tests/graph/graph.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../helpers"
+          "source": "../embeddings/embed"
         },
         {
           "from": "tests/conversation/conversation-index.test.ts",
@@ -2871,126 +3632,6 @@
           "source": "../../src/conversation/parser"
         },
         {
-          "from": "src/cli/progress.ts",
-          "to": "src/utils/log.ts",
-          "source": "../utils/log"
-        },
-        {
-          "from": "src/conversation/indexer.ts",
-          "to": "src/conversation/parser.ts",
-          "source": "./parser"
-        },
-        {
-          "from": "src/conversation/indexer.ts",
-          "to": "src/conversation/parser.ts",
-          "source": "./parser"
-        },
-        {
-          "from": "src/conversation/indexer.ts",
-          "to": "src/conversation/parser.ts",
-          "source": "./parser"
-        },
-        {
-          "from": "src/conversation/indexer.ts",
-          "to": "src/indexing/chunker.ts",
-          "source": "../indexing/chunker"
-        },
-        {
-          "from": "src/conversation/indexer.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../embeddings/embed"
-        },
-        {
-          "from": "src/tools/checkpoint-tools.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../embeddings/embed"
-        },
-        {
-          "from": "src/tools/checkpoint-tools.ts",
-          "to": "src/conversation/parser.ts",
-          "source": "../conversation/parser"
-        },
-        {
-          "from": "src/tools/checkpoint-tools.ts",
-          "to": "src/tools/index.ts",
-          "source": "./index"
-        },
-        {
-          "from": "src/tools/conversation-tools.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../embeddings/embed"
-        },
-        {
-          "from": "src/tools/conversation-tools.ts",
-          "to": "src/utils/log.ts",
-          "source": "../utils/log"
-        },
-        {
-          "from": "src/tools/conversation-tools.ts",
-          "to": "src/tools/index.ts",
-          "source": "./index"
-        },
-        {
-          "from": "src/tools/analytics-tools.ts",
-          "to": "src/tools/index.ts",
-          "source": "./index"
-        },
-        {
-          "from": "src/tools/git-history-tools.ts",
-          "to": "src/tools/index.ts",
-          "source": "./index"
-        },
-        {
-          "from": "src/tools/git-history-tools.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../embeddings/embed"
-        },
-        {
-          "from": "src/tools/annotation-tools.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../embeddings/embed"
-        },
-        {
-          "from": "src/tools/annotation-tools.ts",
-          "to": "src/tools/index.ts",
-          "source": "./index"
-        },
-        {
-          "from": "src/tools/server-info-tools.ts",
-          "to": "src/tools/index.ts",
-          "source": "./index"
-        },
-        {
-          "from": "src/tools/server-info-tools.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../embeddings/embed"
-        },
-        {
-          "from": "src/tools/server-info-tools.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../embeddings/embed"
-        },
-        {
-          "from": "src/tools/index-tools.ts",
-          "to": "src/indexing/indexer.ts",
-          "source": "../indexing/indexer"
-        },
-        {
-          "from": "src/tools/index-tools.ts",
-          "to": "src/tools/index.ts",
-          "source": "./index"
-        },
-        {
-          "from": "src/tools/graph-tools.ts",
-          "to": "src/graph/resolver.ts",
-          "source": "../graph/resolver"
-        },
-        {
-          "from": "src/tools/graph-tools.ts",
-          "to": "src/tools/index.ts",
-          "source": "./index"
-        },
-        {
           "from": "src/git/indexer.ts",
           "to": "src/embeddings/embed.ts",
           "source": "../embeddings/embed"
@@ -3001,27 +3642,177 @@
           "source": "../utils/log"
         },
         {
-          "from": "tests/db/db.test.ts",
+          "from": "tests/wiki/categorization.test.ts",
           "to": "src/db/index.ts",
           "source": "../../src/db"
         },
         {
-          "from": "tests/db/db.test.ts",
+          "from": "tests/wiki/categorization.test.ts",
           "to": "src/embeddings/embed.ts",
           "source": "../../src/embeddings/embed"
         },
         {
-          "from": "tests/db/db.test.ts",
+          "from": "tests/wiki/categorization.test.ts",
           "to": "src/embeddings/embed.ts",
           "source": "../../src/embeddings/embed"
         },
         {
-          "from": "tests/db/db.test.ts",
+          "from": "tests/wiki/categorization.test.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../../src/indexing/chunker"
+        },
+        {
+          "from": "tests/wiki/categorization.test.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../../src/graph/resolver"
+        },
+        {
+          "from": "tests/wiki/categorization.test.ts",
           "to": "tests/helpers.ts",
           "source": "../helpers"
         },
         {
-          "from": "tests/db/db.test.ts",
+          "from": "tests/wiki/categorization.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/wiki/categorization.test.ts",
+          "to": "src/wiki/discovery.ts",
+          "source": "../../src/wiki/discovery"
+        },
+        {
+          "from": "tests/wiki/categorization.test.ts",
+          "to": "src/wiki/categorization.ts",
+          "source": "../../src/wiki/categorization"
+        },
+        {
+          "from": "tests/wiki/page-tree.test.ts",
+          "to": "src/wiki/page-tree.ts",
+          "source": "../../src/wiki/page-tree"
+        },
+        {
+          "from": "tests/wiki/page-tree.test.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../../src/wiki/types"
+        },
+        {
+          "from": "tests/wiki/page-tree.test.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../../src/wiki/types"
+        },
+        {
+          "from": "tests/wiki/page-tree.test.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../../src/wiki/types"
+        },
+        {
+          "from": "tests/wiki/page-tree.test.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../../src/wiki/types"
+        },
+        {
+          "from": "tests/wiki/page-tree.test.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../../src/wiki/types"
+        },
+        {
+          "from": "tests/wiki/page-tree.test.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../../src/wiki/types"
+        },
+        {
+          "from": "tests/wiki/section-selector.test.ts",
+          "to": "src/wiki/section-selector.ts",
+          "source": "../../src/wiki/section-selector"
+        },
+        {
+          "from": "tests/wiki/section-selector.test.ts",
+          "to": "src/wiki/section-selector.ts",
+          "source": "../../src/wiki/section-selector"
+        },
+        {
+          "from": "tests/wiki/section-selector.test.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../../src/wiki/types"
+        },
+        {
+          "from": "tests/wiki/discovery.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/wiki/discovery.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/wiki/discovery.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/wiki/discovery.test.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../../src/graph/resolver"
+        },
+        {
+          "from": "tests/wiki/discovery.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/wiki/discovery.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/wiki/discovery.test.ts",
+          "to": "src/wiki/discovery.ts",
+          "source": "../../src/wiki/discovery"
+        },
+        {
+          "from": "tests/wiki/staleness.test.ts",
+          "to": "src/wiki/staleness.ts",
+          "source": "../../src/wiki/staleness"
+        },
+        {
+          "from": "tests/wiki/staleness.test.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../../src/wiki/types"
+        },
+        {
+          "from": "tests/wiki/staleness.test.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../../src/wiki/types"
+        },
+        {
+          "from": "tests/wiki/staleness.test.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../../src/wiki/types"
+        },
+        {
+          "from": "tests/wiki/staleness.test.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../../src/wiki/types"
+        },
+        {
+          "from": "tests/wiki/staleness.test.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../../src/wiki/types"
+        },
+        {
+          "from": "tests/config/config.test.ts",
+          "to": "src/config/index.ts",
+          "source": "../../src/config"
+        },
+        {
+          "from": "tests/config/config.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/config/config.test.ts",
           "to": "tests/helpers.ts",
           "source": "../helpers"
         },
@@ -3146,9 +3937,139 @@
           "source": "../graph/resolver"
         },
         {
+          "from": "src/indexing/indexer.ts",
+          "to": "src/indexing/parse.ts",
+          "source": "./parse"
+        },
+        {
+          "from": "src/indexing/indexer.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/indexing/indexer.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/indexing/indexer.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/indexing/indexer.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "./chunker"
+        },
+        {
+          "from": "src/indexing/indexer.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "./chunker"
+        },
+        {
+          "from": "src/indexing/indexer.ts",
+          "to": "src/db/index.ts",
+          "source": "../db"
+        },
+        {
+          "from": "src/indexing/indexer.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../graph/resolver"
+        },
+        {
+          "from": "src/indexing/indexer.ts",
+          "to": "src/utils/log.ts",
+          "source": "../utils/log"
+        },
+        {
+          "from": "src/indexing/indexer.ts",
+          "to": "src/utils/dir-guard.ts",
+          "source": "../utils/dir-guard"
+        },
+        {
           "from": "src/indexing/chunker.ts",
           "to": "src/utils/log.ts",
           "source": "../utils/log"
+        },
+        {
+          "from": "tests/embeddings/embed.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/embeddings/embed.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/embeddings/embed.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/embeddings/embed.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/embeddings/embed.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/graph/graph.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/graph/graph.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/graph/graph.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/graph/graph.test.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../../src/indexing/chunker"
+        },
+        {
+          "from": "tests/graph/graph.test.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../../src/graph/resolver"
+        },
+        {
+          "from": "tests/graph/graph.test.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../../src/graph/resolver"
+        },
+        {
+          "from": "tests/graph/graph.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/graph/graph.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/graph/graph.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "src/db/search.ts",
+          "to": "src/search/usages.ts",
+          "source": "../search/usages"
+        },
+        {
+          "from": "src/db/search.ts",
+          "to": "src/search/usages.ts",
+          "source": "../search/usages"
         },
         {
           "from": "src/db/git-history.ts",
@@ -3159,6 +4080,251 @@
           "from": "src/db/conversation.ts",
           "to": "src/search/usages.ts",
           "source": "../search/usages"
+        },
+        {
+          "from": "src/db/index.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/db/index.ts",
+          "to": "src/db/files.ts",
+          "source": "./files"
+        },
+        {
+          "from": "src/db/index.ts",
+          "to": "src/db/search.ts",
+          "source": "./search"
+        },
+        {
+          "from": "src/db/index.ts",
+          "to": "src/db/graph.ts",
+          "source": "./graph"
+        },
+        {
+          "from": "src/db/index.ts",
+          "to": "src/db/conversation.ts",
+          "source": "./conversation"
+        },
+        {
+          "from": "src/db/index.ts",
+          "to": "src/db/checkpoints.ts",
+          "source": "./checkpoints"
+        },
+        {
+          "from": "src/db/index.ts",
+          "to": "src/db/annotations.ts",
+          "source": "./annotations"
+        },
+        {
+          "from": "src/db/index.ts",
+          "to": "src/db/analytics.ts",
+          "source": "./analytics"
+        },
+        {
+          "from": "src/db/index.ts",
+          "to": "src/db/git-history.ts",
+          "source": "./git-history"
+        },
+        {
+          "from": "src/db/index.ts",
+          "to": "src/db/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "tests/indexing/indexer.test.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../../src/indexing/indexer"
+        },
+        {
+          "from": "tests/indexing/indexer.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/indexing/indexer.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/indexing/indexer.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/indexing/indexer.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/indexing/indexer.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/indexing/indexer.test.ts",
+          "to": "src/config/index.ts",
+          "source": "../../src/config"
+        },
+        {
+          "from": "tests/indexing/watcher.test.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../../src/indexing/indexer"
+        },
+        {
+          "from": "tests/indexing/watcher.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/indexing/watcher.test.ts",
+          "to": "src/config/index.ts",
+          "source": "../../src/config"
+        },
+        {
+          "from": "tests/indexing/watcher.test.ts",
+          "to": "src/indexing/watcher.ts",
+          "source": "../../src/indexing/watcher"
+        },
+        {
+          "from": "tests/indexing/watcher.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/indexing/watcher.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/indexing/watcher.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/indexing/watcher.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/indexing/parse.test.ts",
+          "to": "src/indexing/parse.ts",
+          "source": "../../src/indexing/parse"
+        },
+        {
+          "from": "tests/indexing/chunker.test.ts",
+          "to": "src/indexing/chunker.ts",
+          "source": "../../src/indexing/chunker"
+        },
+        {
+          "from": "tests/indexing/line-numbers.test.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../../src/indexing/indexer"
+        },
+        {
+          "from": "tests/indexing/line-numbers.test.ts",
+          "to": "src/indexing/indexer.ts",
+          "source": "../../src/indexing/indexer"
+        },
+        {
+          "from": "tests/indexing/line-numbers.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/indexing/line-numbers.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/indexing/line-numbers.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/indexing/line-numbers.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/indexing/line-numbers.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/indexing/line-numbers.test.ts",
+          "to": "src/config/index.ts",
+          "source": "../../src/config"
+        },
+        {
+          "from": "src/search/eval.ts",
+          "to": "src/db/index.ts",
+          "source": "../db"
+        },
+        {
+          "from": "src/search/eval.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "./hybrid"
+        },
+        {
+          "from": "src/search/eval.ts",
+          "to": "src/config/index.ts",
+          "source": "../config"
+        },
+        {
+          "from": "src/search/hybrid.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../embeddings/embed"
+        },
+        {
+          "from": "src/search/hybrid.ts",
+          "to": "src/db/index.ts",
+          "source": "../db"
+        },
+        {
+          "from": "src/search/hybrid.ts",
+          "to": "src/utils/log.ts",
+          "source": "../utils/log"
+        },
+        {
+          "from": "src/search/benchmark.ts",
+          "to": "src/db/index.ts",
+          "source": "../db"
+        },
+        {
+          "from": "src/search/benchmark.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "./hybrid"
+        },
+        {
+          "from": "src/search/benchmark.ts",
+          "to": "src/config/index.ts",
+          "source": "../config"
+        },
+        {
+          "from": "tests/db/db.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/db/db.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/db/db.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/db/db.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/db/db.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
         },
         {
           "from": "tests/search/find-usages.test.ts",
@@ -3212,6 +4378,41 @@
         },
         {
           "from": "tests/search/read-relevant.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/search/scoped-search.test.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../../src/search/hybrid"
+        },
+        {
+          "from": "tests/search/scoped-search.test.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../../src/search/hybrid"
+        },
+        {
+          "from": "tests/search/scoped-search.test.ts",
+          "to": "src/db/index.ts",
+          "source": "../../src/db"
+        },
+        {
+          "from": "tests/search/scoped-search.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/search/scoped-search.test.ts",
+          "to": "src/embeddings/embed.ts",
+          "source": "../../src/embeddings/embed"
+        },
+        {
+          "from": "tests/search/scoped-search.test.ts",
+          "to": "tests/helpers.ts",
+          "source": "../helpers"
+        },
+        {
+          "from": "tests/search/scoped-search.test.ts",
           "to": "tests/helpers.ts",
           "source": "../helpers"
         },
@@ -3466,116 +4667,6 @@
           "source": "../helpers"
         },
         {
-          "from": "src/server/index.ts",
-          "to": "src/utils/dir-guard.ts",
-          "source": "../utils/dir-guard"
-        },
-        {
-          "from": "src/server/index.ts",
-          "to": "src/db/index.ts",
-          "source": "../db"
-        },
-        {
-          "from": "src/server/index.ts",
-          "to": "src/config/index.ts",
-          "source": "../config"
-        },
-        {
-          "from": "src/server/index.ts",
-          "to": "src/indexing/indexer.ts",
-          "source": "../indexing/indexer"
-        },
-        {
-          "from": "src/server/index.ts",
-          "to": "src/indexing/watcher.ts",
-          "source": "../indexing/watcher"
-        },
-        {
-          "from": "src/server/index.ts",
-          "to": "src/conversation/parser.ts",
-          "source": "../conversation/parser"
-        },
-        {
-          "from": "src/server/index.ts",
-          "to": "src/conversation/indexer.ts",
-          "source": "../conversation/indexer"
-        },
-        {
-          "from": "src/server/index.ts",
-          "to": "src/conversation/indexer.ts",
-          "source": "../conversation/indexer"
-        },
-        {
-          "from": "src/server/index.ts",
-          "to": "src/cli/setup.ts",
-          "source": "../cli/setup"
-        },
-        {
-          "from": "src/server/index.ts",
-          "to": "src/tools/index.ts",
-          "source": "../tools"
-        },
-        {
-          "from": "src/server/index.ts",
-          "to": "src/utils/log.ts",
-          "source": "../utils/log"
-        },
-        {
-          "from": "tests/embeddings/embed.test.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../../src/embeddings/embed"
-        },
-        {
-          "from": "tests/embeddings/embed.test.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../../src/embeddings/embed"
-        },
-        {
-          "from": "tests/embeddings/embed.test.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../../src/embeddings/embed"
-        },
-        {
-          "from": "tests/embeddings/embed.test.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../../src/embeddings/embed"
-        },
-        {
-          "from": "tests/embeddings/embed.test.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../../src/embeddings/embed"
-        },
-        {
-          "from": "src/search/eval.ts",
-          "to": "src/db/index.ts",
-          "source": "../db"
-        },
-        {
-          "from": "src/search/eval.ts",
-          "to": "src/search/hybrid.ts",
-          "source": "./hybrid"
-        },
-        {
-          "from": "src/search/eval.ts",
-          "to": "src/config/index.ts",
-          "source": "../config"
-        },
-        {
-          "from": "src/search/benchmark.ts",
-          "to": "src/db/index.ts",
-          "source": "../db"
-        },
-        {
-          "from": "src/search/benchmark.ts",
-          "to": "src/search/hybrid.ts",
-          "source": "./hybrid"
-        },
-        {
-          "from": "src/search/benchmark.ts",
-          "to": "src/config/index.ts",
-          "source": "../config"
-        },
-        {
           "from": "src/cli/commands/history.ts",
           "to": "src/db/index.ts",
           "source": "../../db"
@@ -3622,6 +4713,36 @@
         },
         {
           "from": "src/cli/commands/status.ts",
+          "to": "src/utils/log.ts",
+          "source": "../../utils/log"
+        },
+        {
+          "from": "src/cli/commands/search-cmd.ts",
+          "to": "src/db/index.ts",
+          "source": "../../db"
+        },
+        {
+          "from": "src/cli/commands/search-cmd.ts",
+          "to": "src/config/index.ts",
+          "source": "../../config"
+        },
+        {
+          "from": "src/cli/commands/search-cmd.ts",
+          "to": "src/config/index.ts",
+          "source": "../../config"
+        },
+        {
+          "from": "src/cli/commands/search-cmd.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../../search/hybrid"
+        },
+        {
+          "from": "src/cli/commands/search-cmd.ts",
+          "to": "src/search/hybrid.ts",
+          "source": "../../search/hybrid"
+        },
+        {
+          "from": "src/cli/commands/search-cmd.ts",
           "to": "src/utils/log.ts",
           "source": "../../utils/log"
         },
@@ -3722,6 +4843,11 @@
         },
         {
           "from": "src/cli/commands/demo.ts",
+          "to": "src/cli/progress.ts",
+          "source": "../progress"
+        },
+        {
+          "from": "src/cli/commands/demo.ts",
           "to": "src/utils/log.ts",
           "source": "../../utils/log"
         },
@@ -3822,21 +4948,6 @@
         },
         {
           "from": "src/cli/commands/analytics.ts",
-          "to": "src/utils/log.ts",
-          "source": "../../utils/log"
-        },
-        {
-          "from": "src/cli/commands/map.ts",
-          "to": "src/db/index.ts",
-          "source": "../../db"
-        },
-        {
-          "from": "src/cli/commands/map.ts",
-          "to": "src/graph/resolver.ts",
-          "source": "../../graph/resolver"
-        },
-        {
-          "from": "src/cli/commands/map.ts",
           "to": "src/utils/log.ts",
           "source": "../../utils/log"
         },
@@ -3986,214 +5097,94 @@
           "source": "../../utils/log"
         },
         {
-          "from": "tests/indexing/indexer.test.ts",
-          "to": "src/indexing/indexer.ts",
-          "source": "../../src/indexing/indexer"
-        },
-        {
-          "from": "tests/indexing/indexer.test.ts",
-          "to": "src/db/index.ts",
-          "source": "../../src/db"
-        },
-        {
-          "from": "tests/indexing/indexer.test.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../../src/embeddings/embed"
-        },
-        {
-          "from": "tests/indexing/indexer.test.ts",
+          "from": "tests/cli/cli.test.ts",
           "to": "tests/helpers.ts",
           "source": "../helpers"
         },
         {
-          "from": "tests/indexing/indexer.test.ts",
+          "from": "tests/cli/cli.test.ts",
           "to": "tests/helpers.ts",
           "source": "../helpers"
         },
         {
-          "from": "tests/indexing/indexer.test.ts",
+          "from": "tests/cli/cli.test.ts",
           "to": "tests/helpers.ts",
           "source": "../helpers"
         },
         {
-          "from": "tests/indexing/indexer.test.ts",
-          "to": "src/config/index.ts",
-          "source": "../../src/config"
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/tools/index.ts",
+          "source": "./index"
         },
         {
-          "from": "tests/indexing/watcher.test.ts",
-          "to": "src/indexing/indexer.ts",
-          "source": "../../src/indexing/indexer"
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/tools/git-tools.ts",
+          "source": "./git-tools"
         },
         {
-          "from": "tests/indexing/watcher.test.ts",
-          "to": "src/db/index.ts",
-          "source": "../../src/db"
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/tools/git-tools.ts",
+          "source": "./git-tools"
         },
         {
-          "from": "tests/indexing/watcher.test.ts",
-          "to": "src/config/index.ts",
-          "source": "../../src/config"
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/index.ts",
+          "source": "../wiki"
         },
         {
-          "from": "tests/indexing/watcher.test.ts",
-          "to": "src/indexing/watcher.ts",
-          "source": "../../src/indexing/watcher"
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/index.ts",
+          "source": "../wiki"
         },
         {
-          "from": "tests/indexing/watcher.test.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../../src/embeddings/embed"
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/staleness.ts",
+          "source": "../wiki/staleness"
         },
         {
-          "from": "tests/indexing/watcher.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../helpers"
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/update-log.ts",
+          "source": "../wiki/update-log"
         },
         {
-          "from": "tests/indexing/watcher.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../helpers"
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/update-log.ts",
+          "source": "../wiki/update-log"
         },
         {
-          "from": "tests/indexing/watcher.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../helpers"
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../wiki/types"
         },
         {
-          "from": "tests/indexing/parse.test.ts",
-          "to": "src/indexing/parse.ts",
-          "source": "../../src/indexing/parse"
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../wiki/types"
         },
         {
-          "from": "tests/indexing/chunker.test.ts",
-          "to": "src/indexing/chunker.ts",
-          "source": "../../src/indexing/chunker"
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../wiki/types"
         },
         {
-          "from": "tests/indexing/line-numbers.test.ts",
-          "to": "src/indexing/indexer.ts",
-          "source": "../../src/indexing/indexer"
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../wiki/types"
         },
         {
-          "from": "tests/indexing/line-numbers.test.ts",
-          "to": "src/indexing/indexer.ts",
-          "source": "../../src/indexing/indexer"
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../wiki/types"
         },
         {
-          "from": "tests/indexing/line-numbers.test.ts",
-          "to": "src/db/index.ts",
-          "source": "../../src/db"
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../wiki/types"
         },
         {
-          "from": "tests/indexing/line-numbers.test.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../../src/embeddings/embed"
-        },
-        {
-          "from": "tests/indexing/line-numbers.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../helpers"
-        },
-        {
-          "from": "tests/indexing/line-numbers.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../helpers"
-        },
-        {
-          "from": "tests/indexing/line-numbers.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../helpers"
-        },
-        {
-          "from": "tests/indexing/line-numbers.test.ts",
-          "to": "src/config/index.ts",
-          "source": "../../src/config"
-        },
-        {
-          "from": "src/config/index.ts",
-          "to": "src/utils/log.ts",
-          "source": "../utils/log"
-        },
-        {
-          "from": "src/config/index.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../embeddings/embed"
-        },
-        {
-          "from": "src/config/index.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../embeddings/embed"
-        },
-        {
-          "from": "src/config/index.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../embeddings/embed"
-        },
-        {
-          "from": "src/indexing/indexer.ts",
-          "to": "src/indexing/parse.ts",
-          "source": "./parse"
-        },
-        {
-          "from": "src/indexing/indexer.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../embeddings/embed"
-        },
-        {
-          "from": "src/indexing/indexer.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../embeddings/embed"
-        },
-        {
-          "from": "src/indexing/indexer.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../embeddings/embed"
-        },
-        {
-          "from": "src/indexing/indexer.ts",
-          "to": "src/indexing/chunker.ts",
-          "source": "./chunker"
-        },
-        {
-          "from": "src/indexing/indexer.ts",
-          "to": "src/indexing/chunker.ts",
-          "source": "./chunker"
-        },
-        {
-          "from": "src/indexing/indexer.ts",
+          "from": "src/tools/wiki-tools.ts",
           "to": "src/db/index.ts",
           "source": "../db"
-        },
-        {
-          "from": "src/indexing/indexer.ts",
-          "to": "src/graph/resolver.ts",
-          "source": "../graph/resolver"
-        },
-        {
-          "from": "src/indexing/indexer.ts",
-          "to": "src/utils/log.ts",
-          "source": "../utils/log"
-        },
-        {
-          "from": "src/indexing/indexer.ts",
-          "to": "src/utils/dir-guard.ts",
-          "source": "../utils/dir-guard"
-        },
-        {
-          "from": "tests/config/config.test.ts",
-          "to": "src/config/index.ts",
-          "source": "../../src/config"
-        },
-        {
-          "from": "tests/config/config.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../helpers"
-        },
-        {
-          "from": "tests/config/config.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../helpers"
         },
         {
           "from": "src/graph/resolver.ts",
@@ -4201,6 +5192,16 @@
           "source": "../db"
         },
         {
+          "from": "src/tools/graph-tools.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../graph/resolver"
+        },
+        {
+          "from": "src/tools/graph-tools.ts",
+          "to": "src/tools/index.ts",
+          "source": "./index"
+        },
+        {
           "from": "src/wiki/discovery.ts",
           "to": "src/db/index.ts",
           "source": "../db"
@@ -4237,321 +5238,6 @@
         },
         {
           "from": "src/wiki/discovery.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/index.ts",
-          "to": "src/db/index.ts",
-          "source": "../db"
-        },
-        {
-          "from": "src/wiki/index.ts",
-          "to": "src/wiki/discovery.ts",
-          "source": "./discovery"
-        },
-        {
-          "from": "src/wiki/index.ts",
-          "to": "src/wiki/categorization.ts",
-          "source": "./categorization"
-        },
-        {
-          "from": "src/wiki/index.ts",
-          "to": "src/wiki/page-tree.ts",
-          "source": "./page-tree"
-        },
-        {
-          "from": "src/wiki/index.ts",
-          "to": "src/wiki/content-prefetch.ts",
-          "source": "./content-prefetch"
-        },
-        {
-          "from": "src/wiki/index.ts",
-          "to": "src/wiki/page-payload.ts",
-          "source": "./page-payload"
-        },
-        {
-          "from": "src/wiki/index.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/index.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/index.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/index.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/index.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "tests/wiki/discovery.test.ts",
-          "to": "src/db/index.ts",
-          "source": "../../src/db"
-        },
-        {
-          "from": "tests/wiki/discovery.test.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../../src/embeddings/embed"
-        },
-        {
-          "from": "tests/wiki/discovery.test.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../../src/embeddings/embed"
-        },
-        {
-          "from": "tests/wiki/discovery.test.ts",
-          "to": "src/graph/resolver.ts",
-          "source": "../../src/graph/resolver"
-        },
-        {
-          "from": "tests/wiki/discovery.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../helpers"
-        },
-        {
-          "from": "tests/wiki/discovery.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../helpers"
-        },
-        {
-          "from": "tests/wiki/discovery.test.ts",
-          "to": "src/wiki/discovery.ts",
-          "source": "../../src/wiki/discovery"
-        },
-        {
-          "from": "tests/wiki/categorization.test.ts",
-          "to": "src/db/index.ts",
-          "source": "../../src/db"
-        },
-        {
-          "from": "tests/wiki/categorization.test.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../../src/embeddings/embed"
-        },
-        {
-          "from": "tests/wiki/categorization.test.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../../src/embeddings/embed"
-        },
-        {
-          "from": "tests/wiki/categorization.test.ts",
-          "to": "src/indexing/chunker.ts",
-          "source": "../../src/indexing/chunker"
-        },
-        {
-          "from": "tests/wiki/categorization.test.ts",
-          "to": "src/graph/resolver.ts",
-          "source": "../../src/graph/resolver"
-        },
-        {
-          "from": "tests/wiki/categorization.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../helpers"
-        },
-        {
-          "from": "tests/wiki/categorization.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../helpers"
-        },
-        {
-          "from": "tests/wiki/categorization.test.ts",
-          "to": "src/wiki/discovery.ts",
-          "source": "../../src/wiki/discovery"
-        },
-        {
-          "from": "tests/wiki/categorization.test.ts",
-          "to": "src/wiki/categorization.ts",
-          "source": "../../src/wiki/categorization"
-        },
-        {
-          "from": "tests/wiki/section-selector.test.ts",
-          "to": "src/wiki/section-selector.ts",
-          "source": "../../src/wiki/section-selector"
-        },
-        {
-          "from": "tests/wiki/section-selector.test.ts",
-          "to": "src/wiki/section-selector.ts",
-          "source": "../../src/wiki/section-selector"
-        },
-        {
-          "from": "tests/wiki/section-selector.test.ts",
-          "to": "src/wiki/types.ts",
-          "source": "../../src/wiki/types"
-        },
-        {
-          "from": "src/wiki/page-payload.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/page-payload.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/page-payload.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/page-payload.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/page-payload.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/page-payload.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/page-payload.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/page-payload.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/page-payload.ts",
-          "to": "src/wiki/section-selector.ts",
-          "source": "./section-selector"
-        },
-        {
-          "from": "src/wiki/page-payload.ts",
-          "to": "src/wiki/section-selector.ts",
-          "source": "./section-selector"
-        },
-        {
-          "from": "src/wiki/page-tree.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/page-tree.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/page-tree.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/page-tree.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/page-tree.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/page-tree.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/page-tree.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/page-tree.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/section-selector.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/section-selector.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/section-selector.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/types.ts",
-          "to": "src/db/types.ts",
-          "source": "../db/types"
-        },
-        {
-          "from": "src/wiki/categorization.ts",
-          "to": "src/db/index.ts",
-          "source": "../db"
-        },
-        {
-          "from": "src/wiki/categorization.ts",
-          "to": "src/db/types.ts",
-          "source": "../db/types"
-        },
-        {
-          "from": "src/wiki/categorization.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/categorization.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/categorization.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/categorization.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/categorization.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/categorization.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/categorization.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/categorization.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/categorization.ts",
           "to": "src/wiki/types.ts",
           "source": "./types"
         },
@@ -4596,244 +5282,19 @@
           "source": "./types"
         },
         {
-          "from": "tests/wiki/page-tree.test.ts",
-          "to": "src/wiki/page-tree.ts",
-          "source": "../../src/wiki/page-tree"
-        },
-        {
-          "from": "tests/wiki/page-tree.test.ts",
-          "to": "src/wiki/types.ts",
-          "source": "../../src/wiki/types"
-        },
-        {
-          "from": "tests/wiki/page-tree.test.ts",
-          "to": "src/wiki/types.ts",
-          "source": "../../src/wiki/types"
-        },
-        {
-          "from": "tests/wiki/page-tree.test.ts",
-          "to": "src/wiki/types.ts",
-          "source": "../../src/wiki/types"
-        },
-        {
-          "from": "tests/wiki/page-tree.test.ts",
-          "to": "src/wiki/types.ts",
-          "source": "../../src/wiki/types"
-        },
-        {
-          "from": "tests/wiki/page-tree.test.ts",
-          "to": "src/wiki/types.ts",
-          "source": "../../src/wiki/types"
-        },
-        {
-          "from": "tests/wiki/page-tree.test.ts",
-          "to": "src/wiki/types.ts",
-          "source": "../../src/wiki/types"
-        },
-        {
-          "from": "src/tools/git-tools.ts",
-          "to": "src/tools/index.ts",
-          "source": "./index"
-        },
-        {
-          "from": "src/wiki/staleness.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/staleness.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/staleness.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "tests/wiki/staleness.test.ts",
-          "to": "src/wiki/staleness.ts",
-          "source": "../../src/wiki/staleness"
-        },
-        {
-          "from": "tests/wiki/staleness.test.ts",
-          "to": "src/wiki/types.ts",
-          "source": "../../src/wiki/types"
-        },
-        {
-          "from": "tests/wiki/staleness.test.ts",
-          "to": "src/wiki/types.ts",
-          "source": "../../src/wiki/types"
-        },
-        {
-          "from": "tests/wiki/staleness.test.ts",
-          "to": "src/wiki/types.ts",
-          "source": "../../src/wiki/types"
-        },
-        {
-          "from": "tests/wiki/staleness.test.ts",
-          "to": "src/wiki/types.ts",
-          "source": "../../src/wiki/types"
-        },
-        {
-          "from": "tests/wiki/staleness.test.ts",
-          "to": "src/wiki/types.ts",
-          "source": "../../src/wiki/types"
-        },
-        {
-          "from": "src/db/search.ts",
-          "to": "src/search/usages.ts",
-          "source": "../search/usages"
-        },
-        {
-          "from": "src/db/search.ts",
-          "to": "src/search/usages.ts",
-          "source": "../search/usages"
-        },
-        {
-          "from": "src/db/index.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../embeddings/embed"
-        },
-        {
-          "from": "src/db/index.ts",
-          "to": "src/db/files.ts",
-          "source": "./files"
-        },
-        {
-          "from": "src/db/index.ts",
-          "to": "src/db/search.ts",
-          "source": "./search"
-        },
-        {
-          "from": "src/db/index.ts",
-          "to": "src/db/graph.ts",
-          "source": "./graph"
-        },
-        {
-          "from": "src/db/index.ts",
-          "to": "src/db/conversation.ts",
-          "source": "./conversation"
-        },
-        {
-          "from": "src/db/index.ts",
-          "to": "src/db/checkpoints.ts",
-          "source": "./checkpoints"
-        },
-        {
-          "from": "src/db/index.ts",
-          "to": "src/db/annotations.ts",
-          "source": "./annotations"
-        },
-        {
-          "from": "src/db/index.ts",
-          "to": "src/db/analytics.ts",
-          "source": "./analytics"
-        },
-        {
-          "from": "src/db/index.ts",
-          "to": "src/db/git-history.ts",
-          "source": "./git-history"
-        },
-        {
-          "from": "src/db/index.ts",
-          "to": "src/db/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/search/hybrid.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../embeddings/embed"
-        },
-        {
-          "from": "src/search/hybrid.ts",
-          "to": "src/db/index.ts",
-          "source": "../db"
-        },
-        {
-          "from": "src/search/hybrid.ts",
-          "to": "src/utils/log.ts",
-          "source": "../utils/log"
-        },
-        {
-          "from": "src/tools/search.ts",
-          "to": "src/search/hybrid.ts",
-          "source": "../search/hybrid"
-        },
-        {
-          "from": "src/tools/search.ts",
-          "to": "src/search/hybrid.ts",
-          "source": "../search/hybrid"
-        },
-        {
-          "from": "src/tools/search.ts",
-          "to": "src/tools/index.ts",
-          "source": "./index"
-        },
-        {
-          "from": "src/cli/commands/search-cmd.ts",
+          "from": "src/cli/commands/map.ts",
           "to": "src/db/index.ts",
           "source": "../../db"
         },
         {
-          "from": "src/cli/commands/search-cmd.ts",
-          "to": "src/config/index.ts",
-          "source": "../../config"
+          "from": "src/cli/commands/map.ts",
+          "to": "src/graph/resolver.ts",
+          "source": "../../graph/resolver"
         },
         {
-          "from": "src/cli/commands/search-cmd.ts",
-          "to": "src/config/index.ts",
-          "source": "../../config"
-        },
-        {
-          "from": "src/cli/commands/search-cmd.ts",
-          "to": "src/search/hybrid.ts",
-          "source": "../../search/hybrid"
-        },
-        {
-          "from": "src/cli/commands/search-cmd.ts",
-          "to": "src/search/hybrid.ts",
-          "source": "../../search/hybrid"
-        },
-        {
-          "from": "src/cli/commands/search-cmd.ts",
+          "from": "src/cli/commands/map.ts",
           "to": "src/utils/log.ts",
           "source": "../../utils/log"
-        },
-        {
-          "from": "tests/search/scoped-search.test.ts",
-          "to": "src/search/hybrid.ts",
-          "source": "../../src/search/hybrid"
-        },
-        {
-          "from": "tests/search/scoped-search.test.ts",
-          "to": "src/search/hybrid.ts",
-          "source": "../../src/search/hybrid"
-        },
-        {
-          "from": "tests/search/scoped-search.test.ts",
-          "to": "src/db/index.ts",
-          "source": "../../src/db"
-        },
-        {
-          "from": "tests/search/scoped-search.test.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../../src/embeddings/embed"
-        },
-        {
-          "from": "tests/search/scoped-search.test.ts",
-          "to": "src/embeddings/embed.ts",
-          "source": "../../src/embeddings/embed"
-        },
-        {
-          "from": "tests/search/scoped-search.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../helpers"
-        },
-        {
-          "from": "tests/search/scoped-search.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../helpers"
         },
         {
           "from": "src/cli/index.ts",
@@ -4934,181 +5395,6 @@
           "from": "src/cli/index.ts",
           "to": "src/utils/log.ts",
           "source": "../utils/log"
-        },
-        {
-          "from": "src/cli/setup.ts",
-          "to": "src/config/index.ts",
-          "source": "../config"
-        },
-        {
-          "from": "src/tools/index.ts",
-          "to": "src/db/index.ts",
-          "source": "../db"
-        },
-        {
-          "from": "src/tools/index.ts",
-          "to": "src/config/index.ts",
-          "source": "../config"
-        },
-        {
-          "from": "src/tools/index.ts",
-          "to": "src/config/index.ts",
-          "source": "../config"
-        },
-        {
-          "from": "src/tools/index.ts",
-          "to": "src/tools/search.ts",
-          "source": "./search"
-        },
-        {
-          "from": "src/tools/index.ts",
-          "to": "src/tools/index-tools.ts",
-          "source": "./index-tools"
-        },
-        {
-          "from": "src/tools/index.ts",
-          "to": "src/tools/graph-tools.ts",
-          "source": "./graph-tools"
-        },
-        {
-          "from": "src/tools/index.ts",
-          "to": "src/tools/conversation-tools.ts",
-          "source": "./conversation-tools"
-        },
-        {
-          "from": "src/tools/index.ts",
-          "to": "src/tools/checkpoint-tools.ts",
-          "source": "./checkpoint-tools"
-        },
-        {
-          "from": "src/tools/index.ts",
-          "to": "src/tools/annotation-tools.ts",
-          "source": "./annotation-tools"
-        },
-        {
-          "from": "src/tools/index.ts",
-          "to": "src/tools/analytics-tools.ts",
-          "source": "./analytics-tools"
-        },
-        {
-          "from": "src/tools/index.ts",
-          "to": "src/tools/git-tools.ts",
-          "source": "./git-tools"
-        },
-        {
-          "from": "src/tools/index.ts",
-          "to": "src/tools/git-history-tools.ts",
-          "source": "./git-history-tools"
-        },
-        {
-          "from": "src/tools/index.ts",
-          "to": "src/tools/server-info-tools.ts",
-          "source": "./server-info-tools"
-        },
-        {
-          "from": "src/tools/index.ts",
-          "to": "src/tools/wiki-tools.ts",
-          "source": "./wiki-tools"
-        },
-        {
-          "from": "src/wiki/update-log.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/update-log.ts",
-          "to": "src/wiki/staleness.ts",
-          "source": "./staleness"
-        },
-        {
-          "from": "tests/tools/wiki-tools.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../helpers"
-        },
-        {
-          "from": "tests/tools/wiki-tools.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../helpers"
-        },
-        {
-          "from": "tests/tools/wiki-tools.test.ts",
-          "to": "tests/helpers.ts",
-          "source": "../helpers"
-        },
-        {
-          "from": "src/tools/wiki-tools.ts",
-          "to": "src/tools/index.ts",
-          "source": "./index"
-        },
-        {
-          "from": "src/tools/wiki-tools.ts",
-          "to": "src/tools/git-tools.ts",
-          "source": "./git-tools"
-        },
-        {
-          "from": "src/tools/wiki-tools.ts",
-          "to": "src/tools/git-tools.ts",
-          "source": "./git-tools"
-        },
-        {
-          "from": "src/tools/wiki-tools.ts",
-          "to": "src/wiki/index.ts",
-          "source": "../wiki"
-        },
-        {
-          "from": "src/tools/wiki-tools.ts",
-          "to": "src/wiki/index.ts",
-          "source": "../wiki"
-        },
-        {
-          "from": "src/tools/wiki-tools.ts",
-          "to": "src/wiki/staleness.ts",
-          "source": "../wiki/staleness"
-        },
-        {
-          "from": "src/tools/wiki-tools.ts",
-          "to": "src/wiki/update-log.ts",
-          "source": "../wiki/update-log"
-        },
-        {
-          "from": "src/tools/wiki-tools.ts",
-          "to": "src/wiki/update-log.ts",
-          "source": "../wiki/update-log"
-        },
-        {
-          "from": "src/tools/wiki-tools.ts",
-          "to": "src/wiki/types.ts",
-          "source": "../wiki/types"
-        },
-        {
-          "from": "src/tools/wiki-tools.ts",
-          "to": "src/wiki/types.ts",
-          "source": "../wiki/types"
-        },
-        {
-          "from": "src/tools/wiki-tools.ts",
-          "to": "src/wiki/types.ts",
-          "source": "../wiki/types"
-        },
-        {
-          "from": "src/tools/wiki-tools.ts",
-          "to": "src/wiki/types.ts",
-          "source": "../wiki/types"
-        },
-        {
-          "from": "src/tools/wiki-tools.ts",
-          "to": "src/wiki/types.ts",
-          "source": "../wiki/types"
-        },
-        {
-          "from": "src/tools/wiki-tools.ts",
-          "to": "src/wiki/types.ts",
-          "source": "../wiki/types"
-        },
-        {
-          "from": "src/tools/wiki-tools.ts",
-          "to": "src/db/index.ts",
-          "source": "../db"
         }
       ]
     },
@@ -5182,9 +5468,10 @@
         },
         {
           "path": "docs",
-          "fileCount": 2,
+          "fileCount": 3,
           "files": [
             "configuration.md",
+            "examples.md",
             "tools.md"
           ],
           "totalExports": 0,
@@ -5204,10 +5491,22 @@
           "fanOut": 0
         },
         {
-          "path": "scripts",
-          "fileCount": 1,
+          "path": "plans",
+          "fileCount": 2,
           "files": [
-            "bump-version.sh"
+            "bun-to-node-evaluation.md",
+            "competitors-research.md"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 0
+        },
+        {
+          "path": "scripts",
+          "fileCount": 2,
+          "files": [
+            "bump-version.sh",
+            "record.sh"
           ],
           "totalExports": 0,
           "fanIn": 0,
@@ -5638,19 +5937,83 @@
           "totalExports": 0,
           "fanIn": 0,
           "fanOut": 6
+        },
+        {
+          "path": "wiki",
+          "fileCount": 4,
+          "files": [
+            "_update-log.md",
+            "architecture.md",
+            "data-flows.md",
+            "index.md"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 0
+        },
+        {
+          "path": "wiki/guides",
+          "fileCount": 3,
+          "files": [
+            "conventions.md",
+            "getting-started.md",
+            "testing.md"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 0
+        },
+        {
+          "path": "wiki/modules",
+          "fileCount": 11,
+          "files": [
+            "cli.md",
+            "commands.md",
+            "config.md",
+            "conversation.md",
+            "embeddings.md",
+            "graph.md",
+            "indexing.md",
+            "search.md",
+            "tests.md",
+            "tools.md",
+            "utils.md"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 0
+        },
+        {
+          "path": "wiki/modules/db",
+          "fileCount": 6,
+          "files": [
+            "conversation.md",
+            "files.md",
+            "git-history.md",
+            "graph.md",
+            "index.md",
+            "types.md"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 0
+        },
+        {
+          "path": "wiki/modules/wiki",
+          "fileCount": 5,
+          "files": [
+            "discovery.md",
+            "index.md",
+            "section-selector.md",
+            "staleness.md",
+            "types.md"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 0
         }
       ],
       "edges": [
-        {
-          "from": "src",
-          "to": "src/cli",
-          "importCount": 1
-        },
-        {
-          "from": "tests/tools",
-          "to": "tests",
-          "importCount": 6
-        },
         {
           "from": "benchmarks",
           "to": "src/db",
@@ -5687,54 +6050,9 @@
           "importCount": 3
         },
         {
-          "from": "tests/cli",
-          "to": "tests",
-          "importCount": 3
-        },
-        {
-          "from": "tests/graph",
-          "to": "src/db",
+          "from": "src",
+          "to": "src/cli",
           "importCount": 1
-        },
-        {
-          "from": "tests/graph",
-          "to": "src/embeddings",
-          "importCount": 2
-        },
-        {
-          "from": "tests/graph",
-          "to": "src/indexing",
-          "importCount": 1
-        },
-        {
-          "from": "tests/graph",
-          "to": "src/graph",
-          "importCount": 2
-        },
-        {
-          "from": "tests/graph",
-          "to": "tests",
-          "importCount": 3
-        },
-        {
-          "from": "tests/conversation",
-          "to": "src/db",
-          "importCount": 1
-        },
-        {
-          "from": "tests/conversation",
-          "to": "src/embeddings",
-          "importCount": 2
-        },
-        {
-          "from": "tests/conversation",
-          "to": "src/conversation",
-          "importCount": 5
-        },
-        {
-          "from": "tests/conversation",
-          "to": "tests",
-          "importCount": 3
         },
         {
           "from": "src/cli",
@@ -5742,14 +6060,19 @@
           "importCount": 2
         },
         {
-          "from": "src/conversation",
-          "to": "src/indexing",
+          "from": "src/cli",
+          "to": "src/config",
           "importCount": 1
         },
         {
-          "from": "src/conversation",
-          "to": "src/embeddings",
-          "importCount": 1
+          "from": "src/wiki",
+          "to": "src/db",
+          "importCount": 6
+        },
+        {
+          "from": "tests/tools",
+          "to": "tests",
+          "importCount": 6
         },
         {
           "from": "src/tools",
@@ -5763,8 +6086,23 @@
         },
         {
           "from": "src/tools",
+          "to": "src/search",
+          "importCount": 2
+        },
+        {
+          "from": "src/tools",
           "to": "src/utils",
           "importCount": 1
+        },
+        {
+          "from": "src/tools",
+          "to": "src/db",
+          "importCount": 2
+        },
+        {
+          "from": "src/tools",
+          "to": "src/config",
+          "importCount": 2
         },
         {
           "from": "src/tools",
@@ -5772,108 +6110,13 @@
           "importCount": 1
         },
         {
-          "from": "src/tools",
-          "to": "src/graph",
-          "importCount": 1
-        },
-        {
-          "from": "src/git",
-          "to": "src/embeddings",
-          "importCount": 1
-        },
-        {
-          "from": "src/git",
-          "to": "src/utils",
-          "importCount": 1
-        },
-        {
-          "from": "tests/db",
-          "to": "src/db",
-          "importCount": 1
-        },
-        {
-          "from": "tests/db",
-          "to": "src/embeddings",
-          "importCount": 2
-        },
-        {
-          "from": "tests/db",
-          "to": "tests",
-          "importCount": 2
-        },
-        {
-          "from": "tests/features",
-          "to": "tests",
-          "importCount": 10
-        },
-        {
-          "from": "tests/features",
-          "to": "src/db",
-          "importCount": 3
-        },
-        {
-          "from": "tests/features",
-          "to": "src/embeddings",
-          "importCount": 4
-        },
-        {
-          "from": "tests/features",
-          "to": "src/git",
-          "importCount": 1
-        },
-        {
-          "from": "tests/features",
-          "to": "src/config",
-          "importCount": 2
-        },
-        {
-          "from": "src/indexing",
-          "to": "src/graph",
-          "importCount": 4
-        },
-        {
-          "from": "src/indexing",
-          "to": "src/utils",
-          "importCount": 3
-        },
-        {
-          "from": "src/db",
-          "to": "src/search",
-          "importCount": 4
-        },
-        {
-          "from": "tests/search",
-          "to": "src/db",
-          "importCount": 10
-        },
-        {
-          "from": "tests/search",
-          "to": "src/embeddings",
-          "importCount": 18
-        },
-        {
-          "from": "tests/search",
-          "to": "tests",
-          "importCount": 22
-        },
-        {
-          "from": "tests/search",
-          "to": "src/search",
-          "importCount": 14
-        },
-        {
-          "from": "tests/search",
+          "from": "src/conversation",
           "to": "src/indexing",
-          "importCount": 2
-        },
-        {
-          "from": "tests/search",
-          "to": "src/config",
           "importCount": 1
         },
         {
-          "from": "tests/search",
-          "to": "src/graph",
+          "from": "src/conversation",
+          "to": "src/embeddings",
           "importCount": 1
         },
         {
@@ -5912,69 +6155,169 @@
           "importCount": 1
         },
         {
+          "from": "src/config",
+          "to": "src/utils",
+          "importCount": 1
+        },
+        {
+          "from": "src/config",
+          "to": "src/embeddings",
+          "importCount": 3
+        },
+        {
+          "from": "tests/conversation",
+          "to": "src/db",
+          "importCount": 1
+        },
+        {
+          "from": "tests/conversation",
+          "to": "src/embeddings",
+          "importCount": 2
+        },
+        {
+          "from": "tests/conversation",
+          "to": "src/conversation",
+          "importCount": 5
+        },
+        {
+          "from": "tests/conversation",
+          "to": "tests",
+          "importCount": 3
+        },
+        {
+          "from": "src/git",
+          "to": "src/embeddings",
+          "importCount": 1
+        },
+        {
+          "from": "src/git",
+          "to": "src/utils",
+          "importCount": 1
+        },
+        {
+          "from": "tests/wiki",
+          "to": "src/db",
+          "importCount": 2
+        },
+        {
+          "from": "tests/wiki",
+          "to": "src/embeddings",
+          "importCount": 4
+        },
+        {
+          "from": "tests/wiki",
+          "to": "src/indexing",
+          "importCount": 1
+        },
+        {
+          "from": "tests/wiki",
+          "to": "src/graph",
+          "importCount": 2
+        },
+        {
+          "from": "tests/wiki",
+          "to": "tests",
+          "importCount": 4
+        },
+        {
+          "from": "tests/wiki",
+          "to": "src/wiki",
+          "importCount": 19
+        },
+        {
+          "from": "tests/config",
+          "to": "src/config",
+          "importCount": 1
+        },
+        {
+          "from": "tests/config",
+          "to": "tests",
+          "importCount": 2
+        },
+        {
+          "from": "tests/features",
+          "to": "tests",
+          "importCount": 10
+        },
+        {
+          "from": "tests/features",
+          "to": "src/db",
+          "importCount": 3
+        },
+        {
+          "from": "tests/features",
+          "to": "src/embeddings",
+          "importCount": 4
+        },
+        {
+          "from": "tests/features",
+          "to": "src/git",
+          "importCount": 1
+        },
+        {
+          "from": "tests/features",
+          "to": "src/config",
+          "importCount": 2
+        },
+        {
+          "from": "src/indexing",
+          "to": "src/graph",
+          "importCount": 4
+        },
+        {
+          "from": "src/indexing",
+          "to": "src/embeddings",
+          "importCount": 3
+        },
+        {
+          "from": "src/indexing",
+          "to": "src/db",
+          "importCount": 1
+        },
+        {
+          "from": "src/indexing",
+          "to": "src/utils",
+          "importCount": 3
+        },
+        {
           "from": "tests/embeddings",
           "to": "src/embeddings",
           "importCount": 5
         },
         {
-          "from": "src/search",
+          "from": "tests/graph",
           "to": "src/db",
-          "importCount": 3
+          "importCount": 1
         },
         {
-          "from": "src/search",
-          "to": "src/config",
+          "from": "tests/graph",
+          "to": "src/embeddings",
           "importCount": 2
         },
         {
-          "from": "src/cli/commands",
-          "to": "src/db",
-          "importCount": 16
-        },
-        {
-          "from": "src/cli/commands",
-          "to": "src/config",
-          "importCount": 13
-        },
-        {
-          "from": "src/cli/commands",
-          "to": "src/git",
+          "from": "tests/graph",
+          "to": "src/indexing",
           "importCount": 1
         },
         {
-          "from": "src/cli/commands",
-          "to": "src/embeddings",
-          "importCount": 7
+          "from": "tests/graph",
+          "to": "src/graph",
+          "importCount": 2
         },
         {
-          "from": "src/cli/commands",
-          "to": "src/cli",
-          "importCount": 12
+          "from": "tests/graph",
+          "to": "tests",
+          "importCount": 3
         },
         {
-          "from": "src/cli/commands",
-          "to": "src/utils",
-          "importCount": 18
-        },
-        {
-          "from": "src/cli/commands",
-          "to": "src/indexing",
+          "from": "src/db",
+          "to": "src/search",
           "importCount": 4
         },
         {
-          "from": "src/cli/commands",
-          "to": "src/search",
-          "importCount": 13
-        },
-        {
-          "from": "src/cli/commands",
-          "to": "src/graph",
+          "from": "src/db",
+          "to": "src/embeddings",
           "importCount": 1
-        },
-        {
-          "from": "src/cli/commands",
-          "to": "src/conversation",
-          "importCount": 3
         },
         {
           "from": "tests/indexing",
@@ -6002,34 +6345,129 @@
           "importCount": 3
         },
         {
-          "from": "src/config",
+          "from": "src/search",
+          "to": "src/db",
+          "importCount": 3
+        },
+        {
+          "from": "src/search",
+          "to": "src/config",
+          "importCount": 2
+        },
+        {
+          "from": "src/search",
+          "to": "src/embeddings",
+          "importCount": 1
+        },
+        {
+          "from": "src/search",
           "to": "src/utils",
           "importCount": 1
         },
         {
-          "from": "src/config",
-          "to": "src/embeddings",
-          "importCount": 3
-        },
-        {
-          "from": "src/indexing",
-          "to": "src/embeddings",
-          "importCount": 3
-        },
-        {
-          "from": "src/indexing",
+          "from": "tests/db",
           "to": "src/db",
           "importCount": 1
         },
         {
-          "from": "tests/config",
+          "from": "tests/db",
+          "to": "src/embeddings",
+          "importCount": 2
+        },
+        {
+          "from": "tests/db",
+          "to": "tests",
+          "importCount": 2
+        },
+        {
+          "from": "tests/search",
+          "to": "src/db",
+          "importCount": 10
+        },
+        {
+          "from": "tests/search",
+          "to": "src/embeddings",
+          "importCount": 18
+        },
+        {
+          "from": "tests/search",
+          "to": "tests",
+          "importCount": 22
+        },
+        {
+          "from": "tests/search",
+          "to": "src/search",
+          "importCount": 14
+        },
+        {
+          "from": "tests/search",
+          "to": "src/indexing",
+          "importCount": 2
+        },
+        {
+          "from": "tests/search",
           "to": "src/config",
           "importCount": 1
         },
         {
-          "from": "tests/config",
+          "from": "tests/search",
+          "to": "src/graph",
+          "importCount": 1
+        },
+        {
+          "from": "src/cli/commands",
+          "to": "src/db",
+          "importCount": 16
+        },
+        {
+          "from": "src/cli/commands",
+          "to": "src/config",
+          "importCount": 13
+        },
+        {
+          "from": "src/cli/commands",
+          "to": "src/git",
+          "importCount": 1
+        },
+        {
+          "from": "src/cli/commands",
+          "to": "src/embeddings",
+          "importCount": 7
+        },
+        {
+          "from": "src/cli/commands",
+          "to": "src/cli",
+          "importCount": 13
+        },
+        {
+          "from": "src/cli/commands",
+          "to": "src/utils",
+          "importCount": 18
+        },
+        {
+          "from": "src/cli/commands",
+          "to": "src/search",
+          "importCount": 13
+        },
+        {
+          "from": "src/cli/commands",
+          "to": "src/indexing",
+          "importCount": 4
+        },
+        {
+          "from": "src/cli/commands",
+          "to": "src/conversation",
+          "importCount": 3
+        },
+        {
+          "from": "tests/cli",
           "to": "tests",
-          "importCount": 2
+          "importCount": 3
+        },
+        {
+          "from": "src/tools",
+          "to": "src/wiki",
+          "importCount": 11
         },
         {
           "from": "src/graph",
@@ -6037,89 +6475,24 @@
           "importCount": 1
         },
         {
-          "from": "src/wiki",
-          "to": "src/db",
-          "importCount": 6
-        },
-        {
-          "from": "src/wiki",
-          "to": "src/graph",
-          "importCount": 2
-        },
-        {
-          "from": "tests/wiki",
-          "to": "src/db",
-          "importCount": 2
-        },
-        {
-          "from": "tests/wiki",
-          "to": "src/embeddings",
-          "importCount": 4
-        },
-        {
-          "from": "tests/wiki",
-          "to": "src/graph",
-          "importCount": 2
-        },
-        {
-          "from": "tests/wiki",
-          "to": "tests",
-          "importCount": 4
-        },
-        {
-          "from": "tests/wiki",
-          "to": "src/wiki",
-          "importCount": 19
-        },
-        {
-          "from": "tests/wiki",
-          "to": "src/indexing",
-          "importCount": 1
-        },
-        {
-          "from": "src/db",
-          "to": "src/embeddings",
-          "importCount": 1
-        },
-        {
-          "from": "src/search",
-          "to": "src/embeddings",
-          "importCount": 1
-        },
-        {
-          "from": "src/search",
-          "to": "src/utils",
-          "importCount": 1
-        },
-        {
           "from": "src/tools",
-          "to": "src/search",
+          "to": "src/graph",
+          "importCount": 1
+        },
+        {
+          "from": "src/wiki",
+          "to": "src/graph",
           "importCount": 2
+        },
+        {
+          "from": "src/cli/commands",
+          "to": "src/graph",
+          "importCount": 1
         },
         {
           "from": "src/cli",
           "to": "src/cli/commands",
           "importCount": 19
-        },
-        {
-          "from": "src/cli",
-          "to": "src/config",
-          "importCount": 1
-        },
-        {
-          "from": "src/tools",
-          "to": "src/db",
-          "importCount": 2
-        },
-        {
-          "from": "src/tools",
-          "to": "src/config",
-          "importCount": 2
-        },
-        {
-          "from": "src/tools",
-          "to": "src/wiki",
-          "importCount": 11
         }
       ]
     }

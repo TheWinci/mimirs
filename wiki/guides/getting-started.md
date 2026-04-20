@@ -48,7 +48,7 @@ bunx mimirs read "how does the indexer resume"
 Other first-run niceties — all real subcommands wired in `src/cli/index.ts`:
 
 ```sh
-bunx mimirs demo                  # indexes a tiny sample project end-to-end
+bunx mimirs demo                  # 4-step walkthrough: index, search, read_relevant, search_symbols
 bunx mimirs doctor                # checks Bun + SQLite + extension load
 bunx mimirs status                # prints totalFiles / totalChunks / dbSize
 bunx mimirs map --focus src/db    # Mermaid dependency graph around a file

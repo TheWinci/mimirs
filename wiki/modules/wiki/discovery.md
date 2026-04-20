@@ -50,14 +50,9 @@ flowchart TD
   perdir --> result
 ```
 
-### Node-cap sizing
+### Graph fetches
 
-`computeMaxNodes(fileCount, level)` scales the `maxNodes` cap passed to `generateProjectMap` with the project size:
-
-- directory level: `round(sqrt(fileCount) * 8 + 20)`
-- file level: `round(sqrt(fileCount) * 12 + 30)`
-
-Both caps act as a safety net — if the resulting JSON is truncated or invalid, the catch block pushes a warning and substitutes an empty graph rather than aborting discovery.
+Both `generateProjectMap` calls run without a node cap — the file-level map uses the default `zoom`, the directory-level map passes `zoom: "directory"`, and both request `format: "json"`. The prior `computeMaxNodes(fileCount, level)` heuristic was removed alongside the resolver's node cap; discovery now sees the full graph on every project regardless of size. The JSON-parse `try/catch` still pushes a warning and substitutes an empty graph if parsing fails, so a malformed payload degrades discovery rather than aborting it.
 
 ### `detectDirectoryModules`
 
