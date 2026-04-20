@@ -244,37 +244,14 @@ export function searchSymbols(
   const isListing = !query;
   const effectiveTopK = topK ?? (isListing ? 200 : 20);
 
-  // Transitive reference counting: count imports targeting this file OR any
-  // file that re-exports the same symbol name. This handles barrel files
-  // (e.g., index.ts re-exporting types.ts symbols) correctly.
+  // Step 1: Flat query for base export rows. The old implementation used four
+  // correlated subqueries per row (snippet/child_count/reference_count/paths),
+  // which turned a listing of ~1k symbols into minutes of work on medium-sized
+  // projects. Each subquery also did LOWER(...) comparisons that couldn't use
+  // indexes. The fix is to fetch the base rows once, then batch-load the
+  // supporting data with plain IN-list queries and join in JS.
   let sql = `
-    SELECT fe.name AS symbol_name, fe.type AS symbol_type, f.path,
-      fe.is_reexport,
-      (SELECT snippet FROM chunks
-       WHERE file_id = fe.file_id AND LOWER(entity_name) = LOWER(fe.name)
-       ORDER BY chunk_index LIMIT 1) AS snippet,
-      (SELECT chunk_index FROM chunks
-       WHERE file_id = fe.file_id AND LOWER(entity_name) = LOWER(fe.name)
-       ORDER BY chunk_index LIMIT 1) AS chunk_index,
-      (SELECT COUNT(*) FROM chunks c2
-       WHERE c2.parent_id = (
-         SELECT c1.id FROM chunks c1
-         WHERE c1.file_id = fe.file_id AND LOWER(c1.entity_name) = LOWER(fe.name)
-         ORDER BY c1.chunk_index LIMIT 1
-       )) AS child_count,
-      (SELECT COUNT(DISTINCT fi.file_id) FROM file_imports fi
-       WHERE LOWER(fi.names) = LOWER(fe.name)
-       AND fi.resolved_file_id IN (
-         SELECT fe2.file_id FROM file_exports fe2
-         WHERE LOWER(fe2.name) = LOWER(fe.name)
-       )) AS reference_count,
-      (SELECT GROUP_CONCAT(DISTINCT f2.path) FROM file_imports fi
-       JOIN files f2 ON f2.id = fi.file_id
-       WHERE LOWER(fi.names) = LOWER(fe.name)
-       AND fi.resolved_file_id IN (
-         SELECT fe2.file_id FROM file_exports fe2
-         WHERE LOWER(fe2.name) = LOWER(fe.name)
-       )) AS reference_paths
+    SELECT fe.file_id, fe.name AS symbol_name, fe.type AS symbol_type, f.path, fe.is_reexport
     FROM file_exports fe
     JOIN files f ON f.id = fe.file_id
   `;
@@ -296,41 +273,153 @@ export function searchSymbols(
   sql += " ORDER BY fe.name LIMIT ?";
   params.push(effectiveTopK);
 
-  return db
-    .query<{
-      symbol_name: string;
-      symbol_type: string;
-      path: string;
-      snippet: string | null;
-      chunk_index: number | null;
-      is_reexport: number;
-      child_count: number;
-      reference_count: number;
-      reference_paths: string | null;
-    }, any[]>(sql)
-    .all(...params)
-    .map((r) => {
-      // Compute referenceModuleCount from reference paths using directory as module proxy
-      const refPaths = r.reference_paths ? r.reference_paths.split(",") : [];
-      const refDirs = new Set(refPaths.map((p) => dirname(p)));
-      const referenceModules = [...refDirs]
-        .map((d) => basename(d))
-        .filter((v, i, a) => a.indexOf(v) === i)
-        .sort();
-      return {
-        path: r.path,
-        symbolName: r.symbol_name,
-        symbolType: r.symbol_type,
-        snippet: r.snippet,
-        chunkIndex: r.chunk_index,
-        hasChildren: r.child_count > 0,
-        childCount: r.child_count,
-        referenceCount: r.reference_count,
-        referenceModuleCount: refDirs.size,
-        referenceModules,
-        isReexport: r.is_reexport === 1,
-      };
-    });
+  const baseRows = db
+    .query<
+      {
+        file_id: number;
+        symbol_name: string;
+        symbol_type: string;
+        path: string;
+        is_reexport: number;
+      },
+      any[]
+    >(sql)
+    .all(...params);
+
+  if (baseRows.length === 0) return [];
+
+  const fileIds = [...new Set(baseRows.map((r) => r.file_id))];
+  const loweredNames = [...new Set(baseRows.map((r) => r.symbol_name.toLowerCase()))];
+
+  // Step 2: Load the candidate chunks (first chunk per file+entity_name match).
+  // One scan over all chunks in the relevant files — cheap even for large projects.
+  const chunkRows = batchIn<
+    { id: number; file_id: number; entity_name: string | null; snippet: string; chunk_index: number },
+    number
+  >(db, fileIds, (ph) =>
+    `SELECT id, file_id, entity_name, snippet, chunk_index FROM chunks WHERE file_id IN (${ph})`
+  );
+
+  const chunkByFileName = new Map<string, { id: number; snippet: string; chunk_index: number }>();
+  for (const c of chunkRows) {
+    if (!c.entity_name) continue;
+    const key = `${c.file_id}|${c.entity_name.toLowerCase()}`;
+    const existing = chunkByFileName.get(key);
+    if (!existing || c.chunk_index < existing.chunk_index) {
+      chunkByFileName.set(key, { id: c.id, snippet: c.snippet, chunk_index: c.chunk_index });
+    }
+  }
+
+  // Step 3: Child counts for each candidate parent chunk.
+  const parentIds = [...new Set([...chunkByFileName.values()].map((c) => c.id))];
+  const childCountByParent = new Map<number, number>();
+  if (parentIds.length > 0) {
+    const childRows = batchIn<{ parent_id: number; cnt: number }, number>(
+      db,
+      parentIds,
+      (ph) =>
+        `SELECT parent_id, COUNT(*) AS cnt FROM chunks WHERE parent_id IN (${ph}) GROUP BY parent_id`
+    );
+    for (const r of childRows) {
+      childCountByParent.set(r.parent_id, r.cnt);
+    }
+  }
+
+  // Step 4: Transitive reference counting.
+  // 4a: all exports sharing a (case-insensitive) name with one of our base rows.
+  // This gives the set of files that define/re-export each name.
+  const siblingExportRows = batchIn<{ name_lower: string; file_id: number }, string>(
+    db,
+    loweredNames,
+    (ph) => `SELECT LOWER(name) AS name_lower, file_id FROM file_exports WHERE LOWER(name) IN (${ph})`
+  );
+  const fileIdsByName = new Map<string, Set<number>>();
+  for (const r of siblingExportRows) {
+    let s = fileIdsByName.get(r.name_lower);
+    if (!s) {
+      s = new Set();
+      fileIdsByName.set(r.name_lower, s);
+    }
+    s.add(r.file_id);
+  }
+
+  // 4b: all resolved imports whose name matches one of our base rows. We filter
+  // to (name, resolved_file_id) pairs in JS so each base row only pays for
+  // its own name's imports.
+  const importRows = batchIn<
+    { name_lower: string; importer_id: number; resolved_file_id: number; importer_path: string },
+    string
+  >(db, loweredNames, (ph) =>
+    `SELECT LOWER(fi.names) AS name_lower, fi.file_id AS importer_id, fi.resolved_file_id, f.path AS importer_path
+     FROM file_imports fi JOIN files f ON f.id = fi.file_id
+     WHERE LOWER(fi.names) IN (${ph}) AND fi.resolved_file_id IS NOT NULL`
+  );
+  const importsByName = new Map<
+    string,
+    { importer_id: number; resolved_file_id: number; importer_path: string }[]
+  >();
+  for (const r of importRows) {
+    let arr = importsByName.get(r.name_lower);
+    if (!arr) {
+      arr = [];
+      importsByName.set(r.name_lower, arr);
+    }
+    arr.push(r);
+  }
+
+  // Step 5: compose results.
+  return baseRows.map((row) => {
+    const lowered = row.symbol_name.toLowerCase();
+    const chunkKey = `${row.file_id}|${lowered}`;
+    const chunk = chunkByFileName.get(chunkKey);
+    const childCount = chunk ? childCountByParent.get(chunk.id) ?? 0 : 0;
+
+    const candidateFileIds = fileIdsByName.get(lowered) ?? new Set<number>();
+    const importerIds = new Set<number>();
+    const importerPaths = new Set<string>();
+    for (const imp of importsByName.get(lowered) ?? []) {
+      if (candidateFileIds.has(imp.resolved_file_id)) {
+        importerIds.add(imp.importer_id);
+        importerPaths.add(imp.importer_path);
+      }
+    }
+    const refDirs = new Set([...importerPaths].map((p) => dirname(p)));
+    const referenceModules = [...refDirs]
+      .map((d) => basename(d))
+      .filter((v, i, a) => a.indexOf(v) === i)
+      .sort();
+
+    return {
+      path: row.path,
+      symbolName: row.symbol_name,
+      symbolType: row.symbol_type,
+      snippet: chunk?.snippet ?? null,
+      chunkIndex: chunk?.chunk_index ?? null,
+      hasChildren: childCount > 0,
+      childCount,
+      referenceCount: importerIds.size,
+      referenceModuleCount: refDirs.size,
+      referenceModules,
+      isReexport: row.is_reexport === 1,
+    };
+  });
+}
+
+/** Run an IN-list query in batches of 499 to stay under SQLite's 999-param limit. */
+function batchIn<Row, Id extends number | string>(
+  db: Database,
+  ids: Id[],
+  buildSql: (placeholders: string) => string
+): Row[] {
+  const BATCH = 499;
+  if (ids.length === 0) return [];
+  const results: Row[] = [];
+  for (let i = 0; i < ids.length; i += BATCH) {
+    const batch = ids.slice(i, i + BATCH);
+    const ph = batch.map(() => "?").join(",");
+    results.push(...db.query<Row, Id[]>(buildSql(ph)).all(...batch));
+  }
+  return results;
 }
 
 export function findUsages(db: Database, symbolName: string, exact: boolean, top: number): UsageResult[] {
