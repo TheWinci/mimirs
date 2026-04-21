@@ -525,6 +525,9 @@ export class RagDB {
   getDependedOnBy(fileId: number) {
     return graphOps.getDependedOnBy(this.db, fileId);
   }
+  getSymbolGraphData() {
+    return graphOps.getSymbolGraphData(this.db);
+  }
 
   // ── Conversation operations ───────────────────────────────────
 

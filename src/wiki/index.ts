@@ -4,6 +4,7 @@ import { runCategorization } from "./categorization";
 import { buildPageTree } from "./page-tree";
 import { prefetchContent } from "./content-prefetch";
 import { buildPagePayload } from "./page-payload";
+import type { ClusterMode } from "./community-detection";
 import type { WikiPlanResult, PagePayload, PageManifest, ContentCache, ClassifiedInventory } from "./types";
 
 export { runDiscovery } from "./discovery";
@@ -11,6 +12,7 @@ export { runCategorization } from "./categorization";
 export { buildPageTree } from "./page-tree";
 export { prefetchContent } from "./content-prefetch";
 export { buildPagePayload } from "./page-payload";
+export type { ClusterMode } from "./community-detection";
 export type { WikiPlanResult, PagePayload } from "./types";
 
 /**
@@ -24,12 +26,13 @@ export function runWikiPlanning(
   db: RagDB,
   projectDir: string,
   gitRef: string,
+  cluster: ClusterMode = "files",
 ): WikiPlanResult {
   const status = db.getStatus();
-  console.error(`[wiki] planning ${status.totalFiles} files, ${status.totalChunks} chunks`);
+  console.error(`[wiki] planning ${status.totalFiles} files, ${status.totalChunks} chunks (cluster=${cluster})`);
 
   const t0 = Date.now();
-  const discovery = runDiscovery(db, projectDir);
+  const discovery = runDiscovery(db, projectDir, cluster);
   console.error(`[wiki] discovery ${Date.now() - t0}ms — ${discovery.modules.length} modules`);
 
   const t1 = Date.now();
@@ -43,6 +46,8 @@ export function runWikiPlanning(
   const t3 = Date.now();
   const content = prefetchContent(db, manifest, discovery, classified, projectDir);
   console.error(`[wiki] prefetch ${Date.now() - t3}ms — total ${Date.now() - t0}ms`);
+
+  manifest.cluster = cluster;
 
   const warnings = [
     ...discovery.warnings,

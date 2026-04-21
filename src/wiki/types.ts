@@ -161,6 +161,8 @@ export interface PageManifest {
   pageCount: number;
   pages: Record<string, ManifestPage>; // wiki path → page info
   warnings: string[];
+  /** Clustering strategy used for module discovery. Defaults to "files". */
+  cluster?: "files" | "symbols";
 }
 
 // ─── Phase 4: Content Pre-fetch ───

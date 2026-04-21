@@ -6,6 +6,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { type GetDB, resolveProject } from "./index";
 import { findGitRoot, runGit } from "./git-tools";
 import { runWikiPlanning, getPagePayload } from "../wiki";
+import type { ClusterMode } from "../wiki/community-detection";
 import { classifyStaleness, type StalenessReport } from "../wiki/staleness";
 import { appendInitLog, appendIncrementalLog } from "../wiki/update-log";
 import type {
@@ -82,8 +83,12 @@ export function registerWikiTools(server: McpServer, getDB: GetDB) {
         .boolean()
         .optional()
         .describe("Re-plan against the stored lastGitRef; regenerate only pages whose source files changed. Requires an existing manifest."),
+      cluster: z
+        .enum(["files", "symbols"])
+        .optional()
+        .describe("Module-discovery strategy. 'files' (default) runs Louvain on the file-import graph — one module per cluster of files. 'symbols' runs Louvain on a symbol-level call graph and projects back to files — finer-grained, useful when a single directory holds multiple distinct workflows. Persisted in the manifest and reused by incremental runs."),
     },
-    async ({ directory, page, section, finalize, resume, incremental }) => {
+    async ({ directory, page, section, finalize, resume, incremental, cluster }) => {
       const { db: ragDb, projectDir } = await resolveProject(directory, getDB);
       const wikiDir = join(projectDir, "wiki");
 
@@ -109,7 +114,7 @@ export function registerWikiTools(server: McpServer, getDB: GetDB) {
 
       // ── Incremental mode ──
       if (incremental) {
-        const text = await buildIncrementalResponse(ragDb, projectDir, wikiDir);
+        const text = await buildIncrementalResponse(ragDb, projectDir, wikiDir, cluster);
         return { content: [{ type: "text" as const, text }] };
       }
 
@@ -128,7 +133,7 @@ export function registerWikiTools(server: McpServer, getDB: GetDB) {
       // A bare `generate_wiki()` call used to silently overwrite `lastGitRef`,
       // clobbering the incremental baseline for any commits since the last init.
       if (existsSync(join(wikiDir, "_manifest.json"))) {
-        const text = await buildIncrementalResponse(ragDb, projectDir, wikiDir);
+        const text = await buildIncrementalResponse(ragDb, projectDir, wikiDir, cluster);
         return { content: [{ type: "text" as const, text }] };
       }
 
@@ -153,7 +158,7 @@ export function registerWikiTools(server: McpServer, getDB: GetDB) {
       }
 
       // Run phases 1-3 + pre-fetch
-      const result = runWikiPlanning(ragDb, projectDir, gitRef);
+      const result = runWikiPlanning(ragDb, projectDir, gitRef, cluster ?? "files");
 
       // Write artifacts
       mkdirSync(wikiDir, { recursive: true });
@@ -710,6 +715,7 @@ async function buildIncrementalResponse(
   ragDb: RagDB,
   projectDir: string,
   wikiDir: string,
+  clusterOverride?: ClusterMode,
 ): Promise<string> {
   const manifestPath = join(wikiDir, "_manifest.json");
   if (!existsSync(manifestPath)) {
@@ -723,6 +729,7 @@ async function buildIncrementalResponse(
 
   const oldManifest: PageManifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
   const sinceRef = oldManifest.lastGitRef;
+  const cluster: ClusterMode = clusterOverride ?? oldManifest.cluster ?? "files";
 
   const currentHead = await runGit(["rev-parse", "--short", "HEAD"], gitRoot);
   if (!currentHead) {
@@ -747,7 +754,7 @@ async function buildIncrementalResponse(
   }
 
   // Re-run full planning against the fresh DB state
-  const result = runWikiPlanning(ragDb, projectDir, currentHead);
+  const result = runWikiPlanning(ragDb, projectDir, currentHead, cluster);
 
   // Build entry-point set from fresh discovery for aggregate staleness checks
   const newEntryPoints = new Set(
