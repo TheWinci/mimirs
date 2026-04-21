@@ -1,6 +1,11 @@
 import { basename, dirname } from "path";
 import type { RagDB } from "../db";
 import { generateProjectMap } from "../graph/resolver";
+import {
+  detectFileCommunities,
+  detectSymbolCommunities,
+  type ClusterMode,
+} from "./community-detection";
 import type {
   DiscoveryResult,
   DiscoveryModule,
@@ -16,8 +21,20 @@ const WORKSPACE_ROOTS = ["package.json", "Cargo.toml", "go.mod", "pyproject.toml
 /**
  * Phase 1: Discover the project's structure from the graph index.
  * Returns module inventory + raw graph data for subsequent phases.
+ *
+ * `cluster` picks the module-detection strategy:
+ *   - `"files"` (default): Louvain on the file-level import graph.
+ *     Falls back to directory heuristic if the graph is too sparse.
+ *   - `"symbols"`: Louvain on a symbol-level call graph, projected back to
+ *     files by majority vote. Finer grained; useful when a single directory
+ *     holds multiple distinct workflows. Falls back to `"files"` if the
+ *     symbol graph is too sparse.
  */
-export function runDiscovery(db: RagDB, projectDir: string): DiscoveryResult {
+export function runDiscovery(
+  db: RagDB,
+  projectDir: string,
+  cluster: ClusterMode = "files",
+): DiscoveryResult {
   const warnings: string[] = [];
   const status = db.getStatus();
 
@@ -76,8 +93,25 @@ export function runDiscovery(db: RagDB, projectDir: string): DiscoveryResult {
     dirToFiles.get(dir)!.push(node.path);
   }
 
-  // Detect modules from directories
-  let modules = detectDirectoryModules(dirGraph, fileGraph, dirToFiles);
+  // Detect modules. Louvain is the default; directory heuristic is kept as
+  // a fallback for sparse graphs where Louvain returns nothing useful.
+  let modules: DiscoveryModule[] = [];
+
+  if (cluster === "symbols") {
+    const symbolData = db.getSymbolGraphData();
+    modules = detectSymbolCommunities(symbolData, fileGraph, projectDir);
+    if (modules.length === 0) {
+      warnings.push("Symbol graph too sparse — falling back to file-level Louvain");
+      modules = detectFileCommunities(fileGraph);
+    }
+  } else {
+    modules = detectFileCommunities(fileGraph);
+  }
+
+  if (modules.length === 0) {
+    warnings.push("Louvain produced no communities — falling back to directory heuristic");
+    modules = detectDirectoryModules(dirGraph, fileGraph, dirToFiles);
+  }
 
   // Flat project fallback
   if (modules.length < 3) {

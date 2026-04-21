@@ -254,3 +254,55 @@ export function getDependedOnBy(db: Database, fileId: number): { path: string; s
     )
     .all(fileId);
 }
+
+export interface SymbolGraphData {
+  files: { id: number; path: string }[];
+  imports: { fileId: number; names: string; resolvedFileId: number; isNamespace: boolean }[];
+  exports: { fileId: number; name: string; type: string }[];
+  chunks: { fileId: number; entityName: string; chunkType: string; snippet: string }[];
+}
+
+/**
+ * Raw data needed to build a symbol-level call graph for community detection.
+ * Imports are filtered to resolved ones; chunks are filtered to those with
+ * entity_name (so every chunk corresponds to a named symbol).
+ */
+export function getSymbolGraphData(db: Database): SymbolGraphData {
+  const files = db.query<{ id: number; path: string }, []>(`SELECT id, path FROM files`).all();
+
+  const imports = db
+    .query<{ file_id: number; names: string; resolved_file_id: number; is_namespace: number }, []>(
+      `SELECT file_id, names, resolved_file_id, is_namespace
+       FROM file_imports
+       WHERE resolved_file_id IS NOT NULL`
+    )
+    .all()
+    .map((r) => ({
+      fileId: r.file_id,
+      names: r.names,
+      resolvedFileId: r.resolved_file_id,
+      isNamespace: r.is_namespace === 1,
+    }));
+
+  const exports = db
+    .query<{ file_id: number; name: string; type: string }, []>(
+      `SELECT file_id, name, type FROM file_exports`
+    )
+    .all()
+    .map((r) => ({ fileId: r.file_id, name: r.name, type: r.type }));
+
+  const chunks = db
+    .query<{ file_id: number; entity_name: string; chunk_type: string; snippet: string }, []>(
+      `SELECT file_id, entity_name, chunk_type, snippet FROM chunks
+       WHERE entity_name IS NOT NULL`
+    )
+    .all()
+    .map((r) => ({
+      fileId: r.file_id,
+      entityName: r.entity_name,
+      chunkType: r.chunk_type,
+      snippet: r.snippet,
+    }));
+
+  return { files, imports, exports, chunks };
+}
