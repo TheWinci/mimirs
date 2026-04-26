@@ -320,6 +320,12 @@
         "signature": "export interface PageContentCache"
       },
       {
+        "name": "PageDiff",
+        "type": "interface",
+        "file": "src/wiki/types.ts",
+        "signature": "/** Per-page structural diff fed to the narrative LLM as grounding. */\nexport interface PageDiff"
+      },
+      {
         "name": "PageManifest",
         "type": "interface",
         "file": "src/wiki/types.ts",
@@ -330,6 +336,18 @@
         "type": "interface",
         "file": "src/wiki/types.ts",
         "signature": "export interface PagePayload"
+      },
+      {
+        "name": "PreRegenSnapshot",
+        "type": "interface",
+        "file": "src/wiki/types.ts",
+        "signature": "export interface PreRegenSnapshot"
+      },
+      {
+        "name": "PreRegenSnapshotPage",
+        "type": "interface",
+        "file": "src/wiki/types.ts",
+        "signature": " */\nexport interface PreRegenSnapshotPage"
       },
       {
         "name": "PrefetchedQueryHit",
@@ -558,24 +576,6 @@
         "type": "function",
         "file": "src/wiki/community-synthesis.ts",
         "signature": "/** True if the community warrants sub-pages (see thresholds above). */\nexport function isSplitCommunity(bundle: CommunityBundle): boolean"
-      },
-      {
-        "name": "mergeRequiredSections",
-        "type": "function",
-        "file": "src/wiki/community-synthesis.ts",
-        "signature": " */\nexport function mergeRequiredSections(\n  proposed: import(\"./types\").SectionSpec[],\n  required: RequiredSection[],\n):"
-      },
-      {
-        "name": "renderSynthesisPrompt",
-        "type": "function",
-        "file": "src/wiki/community-synthesis.ts",
-        "signature": " */\nexport function renderSynthesisPrompt(\n  bundle: CommunityBundle,\n  catalogMarkdown: string,\n  usedSlugs: string[],\n): string"
-      },
-      {
-        "name": "requiredSectionsFor",
-        "type": "function",
-        "file": "src/wiki/community-synthesis.ts",
-        "signature": "export function requiredSectionsFor(\n  bundle: CommunityBundle,\n): RequiredSection[]"
       }
     ],
     "tunables": [
@@ -628,10 +628,10 @@
       "src/wiki/pagerank.ts": 90,
       "src/wiki/semantic-queries.ts": 42,
       "src/wiki/staleness.ts": 107,
-      "src/wiki/types.ts": 458
+      "src/wiki/types.ts": 509
     },
     "tunableCount": 6,
-    "exportCount": 76,
+    "exportCount": 79,
     "externalConsumers": [
       "/Users/winci/repos/mimirs/src/db/index.ts",
       "/Users/winci/repos/mimirs/src/tools/wiki-tools.ts",
@@ -639,6 +639,7 @@
       "/Users/winci/repos/mimirs/src/wiki/community-detection.ts",
       "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
       "/Users/winci/repos/mimirs/src/wiki/content-prefetch.ts",
+      "/Users/winci/repos/mimirs/src/wiki/diff-page.ts",
       "/Users/winci/repos/mimirs/src/wiki/discovery.ts",
       "/Users/winci/repos/mimirs/src/wiki/index.ts",
       "/Users/winci/repos/mimirs/src/wiki/isolate-docs.ts",
@@ -655,7 +656,8 @@
       "/Users/winci/repos/mimirs/tests/wiki/page-payload.test.ts",
       "/Users/winci/repos/mimirs/tests/wiki/page-tree.test.ts",
       "/Users/winci/repos/mimirs/tests/wiki/staleness.test.ts",
-      "/Users/winci/repos/mimirs/tests/wiki/synthesis-prompt.test.ts"
+      "/Users/winci/repos/mimirs/tests/wiki/synthesis-prompt.test.ts",
+      "/Users/winci/repos/mimirs/tests/wiki/update-log.test.ts"
     ],
     "externalDependencies": [
       "/Users/winci/repos/mimirs/src/config/index.ts",
@@ -713,7 +715,6 @@
       ],
       "src/wiki/staleness.ts": [
         "/Users/winci/repos/mimirs/src/tools/wiki-tools.ts",
-        "/Users/winci/repos/mimirs/src/wiki/update-log.ts",
         "/Users/winci/repos/mimirs/tests/wiki/staleness.test.ts"
       ],
       "src/wiki/types.ts": [
@@ -722,6 +723,7 @@
         "/Users/winci/repos/mimirs/src/wiki/community-detection.ts",
         "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
         "/Users/winci/repos/mimirs/src/wiki/content-prefetch.ts",
+        "/Users/winci/repos/mimirs/src/wiki/diff-page.ts",
         "/Users/winci/repos/mimirs/src/wiki/discovery.ts",
         "/Users/winci/repos/mimirs/src/wiki/index.ts",
         "/Users/winci/repos/mimirs/src/wiki/isolate-docs.ts",
@@ -736,7 +738,8 @@
         "/Users/winci/repos/mimirs/tests/wiki/page-payload.test.ts",
         "/Users/winci/repos/mimirs/tests/wiki/page-tree.test.ts",
         "/Users/winci/repos/mimirs/tests/wiki/staleness.test.ts",
-        "/Users/winci/repos/mimirs/tests/wiki/synthesis-prompt.test.ts"
+        "/Users/winci/repos/mimirs/tests/wiki/synthesis-prompt.test.ts",
+        "/Users/winci/repos/mimirs/tests/wiki/update-log.test.ts"
       ]
     },
     "dependenciesByFile": {
@@ -1843,15 +1846,396 @@
     "nearbyDocs": []
   },
   {
-    "communityId": "bef3a1fcc8697bd9",
+    "communityId": "2524c69a117484b6",
+    "memberFiles": [
+      "src/graph/resolver.ts",
+      "src/indexing/chunker.ts",
+      "src/indexing/indexer.ts",
+      "src/indexing/parse.ts",
+      "src/indexing/watcher.ts",
+      "src/utils/dir-guard.ts"
+    ],
+    "exports": [
+      {
+        "name": "GraphOptions",
+        "type": "interface",
+        "file": "src/graph/resolver.ts",
+        "signature": "export interface GraphOptions"
+      },
+      {
+        "name": "buildIdToPathMap",
+        "type": "function",
+        "file": "src/graph/resolver.ts",
+        "signature": "export function buildIdToPathMap(pathToId: Map<string, number>): Map<number, string>"
+      },
+      {
+        "name": "buildPathToIdMap",
+        "type": "function",
+        "file": "src/graph/resolver.ts",
+        "signature": "/** Build path → fileId and fileId → path lookups from all indexed files. */\nexport function buildPathToIdMap(db: RagDB): Map<string, number>"
+      },
+      {
+        "name": "generateProjectMap",
+        "type": "function",
+        "file": "src/graph/resolver.ts",
+        "signature": " */\nexport function generateProjectMap(\n  db: RagDB,\n  options: GraphOptions\n): string"
+      },
+      {
+        "name": "resolveImports",
+        "type": "function",
+        "file": "src/graph/resolver.ts",
+        "signature": " */\nexport function resolveImports(db: RagDB, projectDir: string): number"
+      },
+      {
+        "name": "resolveImportsForFile",
+        "type": "function",
+        "file": "src/graph/resolver.ts",
+        "signature": " */\nexport function resolveImportsForFile(\n  db: RagDB,\n  fileId: number,\n  projectDir: string,\n  pathToId?: Map<string, number>,\n  idToPath?: Map<number, string>\n): void"
+      },
+      {
+        "name": "Chunk",
+        "type": "interface",
+        "file": "src/indexing/chunker.ts",
+        "signature": "export interface Chunk"
+      },
+      {
+        "name": "ChunkTextResult",
+        "type": "interface",
+        "file": "src/indexing/chunker.ts",
+        "signature": "export interface ChunkTextResult"
+      },
+      {
+        "name": "chunkText",
+        "type": "function",
+        "file": "src/indexing/chunker.ts",
+        "signature": " */\nexport async function chunkText(\n  text: string,\n  extension: string,\n  chunkSize = DEFAULT_CHUNK_SIZE,\n  chunkOverlap = DEFAULT_CHUNK_OVERLAP,\n  filePath?: string\n): Promise<ChunkTextResult>"
+      },
+      {
+        "name": "KNOWN_EXTENSIONS",
+        "type": "variable",
+        "file": "src/indexing/chunker.ts",
+        "signature": " */\nexport const KNOWN_EXTENSIONS = new Set([\n  // Markdown\n  \".md\", \".mdx\", \".markdown\",\n  // Plain text\n  \".txt\",\n  // AST-aware code\n  \".ts\", \".tsx\", \".js\", \".jsx\", \".py\", \".go\", \".rs\", \".java\",\n  \".c\", \".h\", \".cpp\", \".cc\", \".cxx\", \".hp…"
+      },
+      {
+        "name": "ParsedFile",
+        "type": "interface",
+        "file": "src/indexing/parse.ts",
+        "signature": "export interface ParsedFile"
+      },
+      {
+        "name": "parseFile",
+        "type": "function",
+        "file": "src/indexing/parse.ts",
+        "signature": "export function parseFile(filePath: string, raw: string): ParsedFile"
+      },
+      {
+        "name": "DirCheckResult",
+        "type": "interface",
+        "file": "src/utils/dir-guard.ts",
+        "signature": "export interface DirCheckResult"
+      },
+      {
+        "name": "checkIndexDir",
+        "type": "function",
+        "file": "src/utils/dir-guard.ts",
+        "signature": " */\nexport function checkIndexDir(directory: string): DirCheckResult"
+      },
+      {
+        "name": "IndexResult",
+        "type": "interface",
+        "file": "src/indexing/indexer.ts",
+        "signature": "export interface IndexResult"
+      },
+      {
+        "name": "indexDirectory",
+        "type": "function",
+        "file": "src/indexing/indexer.ts",
+        "signature": "export async function indexDirectory(\n  directory: string,\n  db: RagDB,\n  config: RagConfig,\n  onProgress?: (msg: string, opts?: { transient?: boolean }) => void,\n  signal?: AbortSignal\n): Promise<IndexResult>"
+      },
+      {
+        "name": "indexFile",
+        "type": "function",
+        "file": "src/indexing/indexer.ts",
+        "signature": " */\nexport async function indexFile(\n  filePath: string,\n  db: RagDB,\n  config: RagConfig\n): Promise<\"indexed\" | \"skipped\" | \"error\">"
+      },
+      {
+        "name": "Watcher",
+        "type": "interface",
+        "file": "src/indexing/watcher.ts",
+        "signature": "export interface Watcher"
+      },
+      {
+        "name": "startWatcher",
+        "type": "function",
+        "file": "src/indexing/watcher.ts",
+        "signature": "export function startWatcher(\n  directory: string,\n  db: RagDB,\n  config: RagConfig,\n  onEvent?: (msg: string) => void\n): Watcher"
+      }
+    ],
+    "tunables": [
+      {
+        "name": "KNOWN_EXTENSIONS",
+        "type": "variable",
+        "file": "src/indexing/chunker.ts",
+        "snippet": " */\nexport const KNOWN_EXTENSIONS = new Set([\n  // Markdown\n  \".md\", \".mdx\", \".markdown\",\n  // Plain text\n  \".txt\",\n  // AST-aware code\n  \".ts\", \".tsx\", \".js\", \".jsx\", \".py\", \".go\", \".rs\", \".java\",\n  \".c\", \".h\", \".cpp\", \".cc\", \".cxx\", \".hpp\", \".hh\", \".hxx\",\n  \".cs\", \".rb\", \".php\", \".scala\", \".sc\",\n  \".kt\", \".kts\",       // Kotlin\n  \".lua\",              // Lua\n  \".zig\", \".zon\",      // Zig\n  \".ex\", \".exs\",       // Elixir\n  \".hs\", \".lhs\",       // Haskell\n  \".ml\", \".mli\",       // OCaml\n  \".dart\",             // Dart\n  \".html\", \".htm\", \".css\", \".scss\", \".less\",\n  // AST-aware config/scripting\n  \".sh\", \".bash\", \".zsh\",\n  \".toml\",\n  \".yaml\", \".yml\",\n  // Heuristic code (blank-line blocks)\n  \".swift\",\n  \".fish\",\n  \".tf\", \".proto\", \".graphql\", \".gql\",\n  \".mod\",\n  \".xml\",\n  // Virtual extensions for basename-detected files\n  \".makefile\", \".dockerfile\", \".jenkinsfile\",\n  \".vagrantfile\", \".gemfile\", \".rakefile\", \".brewfile\", \".procfile\",\n  // Structured data (heuristic fallback for non-AST parsing)\n  \".json\",\n  // Query / schema languages\n  \".sql\",\n  // API collections\n  \".bru\",\n]);"
+      }
+    ],
+    "topMemberLoc": 677,
+    "memberLoc": {
+      "src/graph/resolver.ts": 450,
+      "src/indexing/chunker.ts": 554,
+      "src/indexing/indexer.ts": 677,
+      "src/indexing/parse.ts": 98,
+      "src/indexing/watcher.ts": 116,
+      "src/utils/dir-guard.ts": 41
+    },
+    "tunableCount": 1,
+    "exportCount": 19,
+    "externalConsumers": [
+      "/Users/winci/repos/mimirs/benchmarks/ast-truncation-analysis.ts",
+      "/Users/winci/repos/mimirs/benchmarks/excalidraw-parent-bench.ts",
+      "/Users/winci/repos/mimirs/benchmarks/indexing-bench-v2.ts",
+      "/Users/winci/repos/mimirs/benchmarks/indexing-bench.ts",
+      "/Users/winci/repos/mimirs/benchmarks/large-json.bench.test.ts",
+      "/Users/winci/repos/mimirs/benchmarks/quality-bench-worker.ts",
+      "/Users/winci/repos/mimirs/benchmarks/subchunk-impact.ts",
+      "/Users/winci/repos/mimirs/src/cli/commands/benchmark-models.ts",
+      "/Users/winci/repos/mimirs/src/cli/commands/demo.ts",
+      "/Users/winci/repos/mimirs/src/cli/commands/index-cmd.ts",
+      "/Users/winci/repos/mimirs/src/cli/commands/init.ts",
+      "/Users/winci/repos/mimirs/src/cli/commands/map.ts",
+      "/Users/winci/repos/mimirs/src/conversation/indexer.ts",
+      "/Users/winci/repos/mimirs/src/indexing/indexer.ts",
+      "/Users/winci/repos/mimirs/src/indexing/watcher.ts",
+      "/Users/winci/repos/mimirs/src/server/index.ts",
+      "/Users/winci/repos/mimirs/src/tools/graph-tools.ts",
+      "/Users/winci/repos/mimirs/src/tools/index-tools.ts",
+      "/Users/winci/repos/mimirs/src/wiki/discovery.ts",
+      "/Users/winci/repos/mimirs/tests/graph/graph.test.ts",
+      "/Users/winci/repos/mimirs/tests/indexing/chunker.test.ts",
+      "/Users/winci/repos/mimirs/tests/indexing/indexer.test.ts",
+      "/Users/winci/repos/mimirs/tests/indexing/line-numbers.test.ts",
+      "/Users/winci/repos/mimirs/tests/indexing/parse.test.ts",
+      "/Users/winci/repos/mimirs/tests/indexing/watcher.test.ts",
+      "/Users/winci/repos/mimirs/tests/search/fts-special-chars.test.ts",
+      "/Users/winci/repos/mimirs/tests/search/search-symbols.test.ts",
+      "/Users/winci/repos/mimirs/tests/wiki/categorization.test.ts",
+      "/Users/winci/repos/mimirs/tests/wiki/discovery.test.ts"
+    ],
+    "externalDependencies": [
+      "/Users/winci/repos/mimirs/src/db/index.ts",
+      "/Users/winci/repos/mimirs/src/embeddings/embed.ts",
+      "/Users/winci/repos/mimirs/src/graph/resolver.ts",
+      "/Users/winci/repos/mimirs/src/indexing/chunker.ts",
+      "/Users/winci/repos/mimirs/src/indexing/indexer.ts",
+      "/Users/winci/repos/mimirs/src/indexing/parse.ts",
+      "/Users/winci/repos/mimirs/src/utils/dir-guard.ts",
+      "/Users/winci/repos/mimirs/src/utils/log.ts"
+    ],
+    "consumersByFile": {
+      "src/graph/resolver.ts": [
+        "/Users/winci/repos/mimirs/benchmarks/indexing-bench-v2.ts",
+        "/Users/winci/repos/mimirs/benchmarks/indexing-bench.ts",
+        "/Users/winci/repos/mimirs/benchmarks/quality-bench-worker.ts",
+        "/Users/winci/repos/mimirs/benchmarks/subchunk-impact.ts",
+        "/Users/winci/repos/mimirs/src/cli/commands/map.ts",
+        "/Users/winci/repos/mimirs/src/indexing/indexer.ts",
+        "/Users/winci/repos/mimirs/src/indexing/watcher.ts",
+        "/Users/winci/repos/mimirs/src/tools/graph-tools.ts",
+        "/Users/winci/repos/mimirs/src/wiki/discovery.ts",
+        "/Users/winci/repos/mimirs/tests/graph/graph.test.ts",
+        "/Users/winci/repos/mimirs/tests/search/search-symbols.test.ts",
+        "/Users/winci/repos/mimirs/tests/wiki/categorization.test.ts",
+        "/Users/winci/repos/mimirs/tests/wiki/discovery.test.ts"
+      ],
+      "src/indexing/chunker.ts": [
+        "/Users/winci/repos/mimirs/benchmarks/ast-truncation-analysis.ts",
+        "/Users/winci/repos/mimirs/benchmarks/indexing-bench-v2.ts",
+        "/Users/winci/repos/mimirs/benchmarks/indexing-bench.ts",
+        "/Users/winci/repos/mimirs/benchmarks/quality-bench-worker.ts",
+        "/Users/winci/repos/mimirs/benchmarks/subchunk-impact.ts",
+        "/Users/winci/repos/mimirs/src/conversation/indexer.ts",
+        "/Users/winci/repos/mimirs/src/indexing/indexer.ts",
+        "/Users/winci/repos/mimirs/tests/graph/graph.test.ts",
+        "/Users/winci/repos/mimirs/tests/indexing/chunker.test.ts",
+        "/Users/winci/repos/mimirs/tests/search/search-symbols.test.ts",
+        "/Users/winci/repos/mimirs/tests/wiki/categorization.test.ts"
+      ],
+      "src/indexing/indexer.ts": [
+        "/Users/winci/repos/mimirs/benchmarks/excalidraw-parent-bench.ts",
+        "/Users/winci/repos/mimirs/benchmarks/indexing-bench.ts",
+        "/Users/winci/repos/mimirs/benchmarks/large-json.bench.test.ts",
+        "/Users/winci/repos/mimirs/benchmarks/subchunk-impact.ts",
+        "/Users/winci/repos/mimirs/src/cli/commands/benchmark-models.ts",
+        "/Users/winci/repos/mimirs/src/cli/commands/demo.ts",
+        "/Users/winci/repos/mimirs/src/cli/commands/index-cmd.ts",
+        "/Users/winci/repos/mimirs/src/cli/commands/init.ts",
+        "/Users/winci/repos/mimirs/src/indexing/watcher.ts",
+        "/Users/winci/repos/mimirs/src/server/index.ts",
+        "/Users/winci/repos/mimirs/src/tools/index-tools.ts",
+        "/Users/winci/repos/mimirs/tests/indexing/indexer.test.ts",
+        "/Users/winci/repos/mimirs/tests/indexing/line-numbers.test.ts",
+        "/Users/winci/repos/mimirs/tests/indexing/watcher.test.ts",
+        "/Users/winci/repos/mimirs/tests/search/fts-special-chars.test.ts"
+      ],
+      "src/indexing/parse.ts": [
+        "/Users/winci/repos/mimirs/benchmarks/ast-truncation-analysis.ts",
+        "/Users/winci/repos/mimirs/benchmarks/indexing-bench-v2.ts",
+        "/Users/winci/repos/mimirs/benchmarks/indexing-bench.ts",
+        "/Users/winci/repos/mimirs/benchmarks/quality-bench-worker.ts",
+        "/Users/winci/repos/mimirs/benchmarks/subchunk-impact.ts",
+        "/Users/winci/repos/mimirs/src/indexing/indexer.ts",
+        "/Users/winci/repos/mimirs/tests/indexing/parse.test.ts"
+      ],
+      "src/indexing/watcher.ts": [
+        "/Users/winci/repos/mimirs/src/server/index.ts",
+        "/Users/winci/repos/mimirs/tests/indexing/watcher.test.ts"
+      ],
+      "src/utils/dir-guard.ts": [
+        "/Users/winci/repos/mimirs/src/indexing/indexer.ts",
+        "/Users/winci/repos/mimirs/src/server/index.ts"
+      ]
+    },
+    "dependenciesByFile": {
+      "src/graph/resolver.ts": [
+        "/Users/winci/repos/mimirs/src/db/index.ts"
+      ],
+      "src/indexing/chunker.ts": [
+        "/Users/winci/repos/mimirs/src/utils/log.ts"
+      ],
+      "src/indexing/indexer.ts": [
+        "/Users/winci/repos/mimirs/src/db/index.ts",
+        "/Users/winci/repos/mimirs/src/embeddings/embed.ts",
+        "/Users/winci/repos/mimirs/src/graph/resolver.ts",
+        "/Users/winci/repos/mimirs/src/indexing/chunker.ts",
+        "/Users/winci/repos/mimirs/src/indexing/parse.ts",
+        "/Users/winci/repos/mimirs/src/utils/dir-guard.ts",
+        "/Users/winci/repos/mimirs/src/utils/log.ts"
+      ],
+      "src/indexing/parse.ts": [],
+      "src/indexing/watcher.ts": [
+        "/Users/winci/repos/mimirs/src/graph/resolver.ts",
+        "/Users/winci/repos/mimirs/src/indexing/indexer.ts"
+      ],
+      "src/utils/dir-guard.ts": []
+    },
+    "recentCommits": [],
+    "annotations": [],
+    "topRankedFile": "src/graph/resolver.ts",
+    "memberPreviews": [
+      {
+        "file": "src/indexing/chunker.ts",
+        "firstLines": "import { chunk as astChunk, chunkFile as astChunkFile } from \"@winci/bun-chunk\";\nimport type { ChunkImport, ChunkExport } from \"@winci/bun-chunk\";\nimport { log } from \"../utils/log\";\n\nexport type { ChunkImport, ChunkExport };\n\nexport interface Chunk {\n  text: string;\n  index: number;\n  startLine?: number;\n  endLine?: number;\n  imports?: ChunkImport[];\n  exports?: ChunkExport[];\n  parentName?: string;\n  /** Symbol name from AST (e.g. \"emit\", \"constructor\") — available even without exports */\n  name?: string;\n  /** AST chunk type (e.g. \"method\", \"field\", \"class\") — available even without exports */\n  chunkType?: string;\n  hash?: string;\n}\n\nconst DEFAULT_CHUNK_SIZE = 512; // in characters\nconst DEFAULT_CHUNK_OVERLAP = 50;\n\n// Extensions that bun-chunk supports via tree-sitter\nconst AST_SUPPORTED = new Set([\n  // Original\n  \".ts\", \".tsx\", \".js\", \".jsx\", \".py\", \".go\", \".rs\", \".java\",\n  // bun-chunk 0.1.2\n  \".c\", \".h\",\n  \".cpp\", \".cc\", \".cxx\", \".hpp\", \".hh\", \".hxx\",\n  \".cs\",\n  \".rb\",\n  \".php\",\n  \".scala\", \".sc\",\n  \".html\", \".htm\",\n  \".css\", \".scss\", \".less\",\n  // bun-chunk 0.1.4\n  \".kt\", \".kts\",       // Kotlin\n  \".lua\",              // Lua\n  \".zig\", \".zon\",      // Zig\n  \".ex\", \".exs\",       // Elixir\n  \".sh\", \".bash\", \".zsh\", // Bash (was heuristic-only)\n  \".toml\",             // TOML (was heuristic-only)\n  \".yaml\", \".yml\",     // YAML (was heuristic-only)\n  \".hs\", \".lhs\",       // Haskell\n  \".ml\", \".mli\",       // OCaml\n  \".dart\",             // Dart\n]);\n\n// Code-like extensions handled by blank-line heuristic splitting\nconst HEURISTIC_CODE = new Set([\n  \".swift\",\n  \".fish\",  // .sh/.bash/.zsh now handled by AST\n  \".tf\", \".proto\", \".graphql\", \".gql\",\n  \".mod\", \".xml\",\n  \".jenkinsfile\", \".vagrantfile\", \".gemfile\", \".rakefile\", \".brewfile\", \".procfile\",\n]);\n\n/**",
+        "loc": 554
+      },
+      {
+        "file": "src/indexing/parse.ts",
+        "firstLines": "import matter from \"gray-matter\";\nimport { extname } from \"path\";\n\nexport interface ParsedFile {\n  path: string;\n  content: string;\n  frontmatter: Record<string, unknown> | null;\n  extension: string;\n}\n\nconst MARKDOWN_EXTENSIONS = new Set([\".md\", \".mdx\", \".markdown\"]);\n\n// Files with no real extension matched by exact basename.\nconst EXACT_NAME_MAP = new Map<string, string>([\n  [\"makefile\", \".makefile\"],\n  [\"gnumakefile\", \".makefile\"],\n  [\"vagrantfile\", \".vagrantfile\"],\n  [\"gemfile\", \".gemfile\"],\n  [\"rakefile\", \".rakefile\"],\n  [\"brewfile\", \".brewfile\"],\n  [\"procfile\", \".procfile\"],\n]);\n\n// Files whose basename starts with a known prefix (e.g. Dockerfile.dev,\n// Jenkinsfile.staging). Each entry is [lowerPrefix, virtualExtension].\nconst PREFIX_NAME_MAP: [string, string][] = [\n  [\"dockerfile\", \".dockerfile\"],\n  [\"jenkinsfile\", \".jenkinsfile\"],\n];\n\nfunction resolveExtension(rawExt: string, basename: string): string {\n  if (rawExt) {\n    // Even with an extension, check prefixes: Dockerfile.dev should win.\n    for (const [prefix, virtualExt] of PREFIX_NAME_MAP) {\n      if (basename === prefix || basename.startsWith(prefix + \".\")) {\n        return virtualExt;\n      }\n    }\n    return rawExt;\n  }\n  // No extension — check exact names first, then prefixes.\n  if (EXACT_NAME_MAP.has(basename)) return EXACT_NAME_MAP.get(basename)!;\n  for (const [prefix, virtualExt] of PREFIX_NAME_MAP) {\n    if (basename === prefix || basename.startsWith(prefix + \".\")) {\n      return virtualExt;\n    }\n  }\n  return rawExt;\n}\n\nexport function parseFile(filePath: string, raw: string): ParsedFile {\n  const rawExt = extname(filePath).toLowerCase();\n  const basename = filePath.split(\"/\").pop()?.toLowerCase() ?? \"\";\n  const ext = resolveExtension(rawExt, basename);\n\n  if (MARKDOWN_EXTENSIONS.has(ext)) {\n    const { data, content } = matter(raw);\n    const hasFrontmatter = Object.keys(data).length > 0;\n    return {\n      path: filePath,",
+        "loc": 98
+      },
+      {
+        "file": "src/utils/dir-guard.ts",
+        "firstLines": "import { resolve } from \"path\";\nimport { homedir } from \"os\";\n\n/**\n * Directories that should never be indexed.\n * Catches the common case where RAG_PROJECT_DIR isn't set and cwd\n * falls back to home or root — which would OOM the process.\n */\nconst DANGEROUS_DIRS = new Set([\n  homedir(),\n  \"/\",\n  \"/home\",\n  \"/Users\",\n  \"/tmp\",\n  \"/var\",\n]);\n\nexport interface DirCheckResult {\n  safe: boolean;\n  reason?: string;\n}\n\n/**\n * Returns { safe: false, reason } if the directory is too broad to index.\n */\nexport function checkIndexDir(directory: string): DirCheckResult {\n  const resolved = resolve(directory);\n\n  if (DANGEROUS_DIRS.has(resolved)) {\n    return {\n      safe: false,\n      reason:\n        `Refusing to index \"${resolved}\" — this is a system-level directory that would cause excessive memory usage. ` +\n        `Set RAG_PROJECT_DIR to your actual project path in your MCP server config.\\n` +\n        `Example: \"env\": { \"RAG_PROJECT_DIR\": \"/path/to/your/project\" }`,\n    };\n  }\n\n  return { safe: true };\n}\n",
+        "loc": 41
+      },
+      {
+        "file": "src/indexing/indexer.ts",
+        "firstLines": "import { relative, resolve, extname, basename } from \"path\";\nimport { createHash } from \"crypto\";\nimport { readFile, stat, readdir } from \"fs/promises\";\nimport { parseFile } from \"./parse\";\nimport { embedBatch, embedBatchMerged, mergeEmbeddings } from \"../embeddings/embed\";\nimport { chunkText, KNOWN_EXTENSIONS, type ChunkImport, type ChunkExport } from \"./chunker\";\nimport { RagDB } from \"../db\";\nimport { type RagConfig } from \"../config\";\nimport { resolveImports } from \"../graph/resolver\";\nimport { log } from \"../utils/log\";\nimport { checkIndexDir } from \"../utils/dir-guard\";\nimport { type EmbeddedChunk } from \"../types\";\n\nfunction aggregateGraphData(chunks: { imports?: ChunkImport[]; exports?: ChunkExport[] }[]): {\n  imports: ChunkImport[];\n  exports: ChunkExport[];\n} {\n  const importMap = new Map<string, ChunkImport>();\n  const exportMap = new Map<string, ChunkExport>();\n\n  for (const chunk of chunks) {\n    if (chunk.imports) {\n      for (const imp of chunk.imports) {\n        if (!importMap.has(imp.source)) {\n          importMap.set(imp.source, imp);\n        }\n      }\n    }\n    if (chunk.exports) {\n      for (const exp of chunk.exports) {\n        if (!exportMap.has(exp.name)) {\n          exportMap.set(exp.name, exp);\n        }\n      }\n    }\n  }\n\n  return {\n    imports: Array.from(importMap.values()),\n    exports: Array.from(exportMap.values()),\n  };\n}\n\nexport interface IndexResult {\n  indexed: number;\n  skipped: number;\n  pruned: number;\n  errors: string[];\n}\n\nfunction hashString(content: string): string {\n  return createHash(\"sha256\").update(content, \"utf-8\").digest(\"hex\");\n}\n\n/**\n * Threshold at which we warn the user that the directory may be too broad.\n * We no longer abort — large monorepos can legitimately exceed this count.\n */\nconst LARGE_PROJECT_WARN_THRESHOLD = 200_000;\n",
+        "loc": 677
+      },
+      {
+        "file": "src/indexing/watcher.ts",
+        "firstLines": "import { watch } from \"fs\";\nimport { resolve, relative } from \"path\";\nimport { existsSync } from \"fs\";\nimport { Glob } from \"bun\";\nimport { indexFile } from \"./indexer\";\nimport { type RagConfig } from \"../config\";\nimport { type RagDB } from \"../db\";\nimport { resolveImportsForFile, buildPathToIdMap, buildIdToPathMap } from \"../graph/resolver\";\n\nconst DEBOUNCE_MS = 2000;\n\nexport interface Watcher {\n  close(): void;\n}\n\nexport function startWatcher(\n  directory: string,\n  db: RagDB,\n  config: RagConfig,\n  onEvent?: (msg: string) => void\n): Watcher {\n  const pending = new Map<string, NodeJS.Timeout>();\n\n  // Pre-compile globs once instead of per-event\n  const excludeGlobs = config.exclude.map((pat) => new Glob(pat));\n  const includeGlobs = config.include.map((pat) => new Glob(pat));\n\n  function matchesAny(filePath: string, globs: Glob[]): boolean {\n    return globs.some((g) => g.match(filePath));\n  }\n\n  // Serial queue: prevents concurrent indexFile + buildPathToIdMap from interleaving.\n  // While one cycle runs, new files accumulate in nextBatch and get processed next.\n  let processing = false;\n  const nextBatch = new Map<string, \"index\" | \"remove\">();\n\n  async function processQueue() {\n    if (processing) return;\n    processing = true;\n\n    try {\n      while (nextBatch.size > 0) {\n        // Snapshot and clear the batch so new events accumulate into a fresh batch\n        const batch = new Map(nextBatch);\n        nextBatch.clear();\n\n        for (const [absPath, action] of batch) {\n          const rel = relative(directory, absPath);\n\n          if (action === \"remove\") {\n            const removed = db.removeFile(absPath);\n            if (removed) onEvent?.(`Removed deleted file: ${rel}`);\n            continue;\n          }\n\n          const result = await indexFile(absPath, db, config);\n          if (result === \"indexed\") {\n            const file = db.getFileByPath(absPath);\n            if (file) {\n              // Build lookups once and reuse for all resolve calls.",
+        "loc": 116
+      }
+    ],
+    "pageRank": {
+      "src/graph/resolver.ts": 0.3062702153803601,
+      "src/indexing/chunker.ts": 0.23337376409405344,
+      "src/indexing/indexer.ts": 0.03531558976486637,
+      "src/indexing/parse.ts": 0.20002021538036008,
+      "src/indexing/watcher.ts": 0.025000000000000005,
+      "src/utils/dir-guard.ts": 0.20002021538036008
+    },
+    "cohesion": 0.6,
+    "nearbyDocs": []
+  },
+  {
+    "communityId": "3272d1b8d89f87ce",
     "memberFiles": [
       "src/tools/wiki-tools.ts",
+      "src/wiki/diff-page.ts",
       "src/wiki/index.ts",
       "src/wiki/lint-page.ts",
       "src/wiki/section-catalog.ts",
       "src/wiki/update-log.ts"
     ],
     "exports": [
+      {
+        "name": "CommitEntry",
+        "type": "interface",
+        "file": "src/wiki/update-log.ts",
+        "signature": "export interface CommitEntry"
+      },
+      {
+        "name": "appendFallbackLog",
+        "type": "function",
+        "file": "src/wiki/update-log.ts",
+        "signature": " */\nexport function appendFallbackLog(\n  wikiDir: string,\n  sinceRef: string,\n  newRef: string,\n  dirty: number,\n  total: number,\n  commitCount: number,\n): void"
+      },
+      {
+        "name": "appendInitLog",
+        "type": "function",
+        "file": "src/wiki/update-log.ts",
+        "signature": "export function appendInitLog(\n  wikiDir: string,\n  gitRef: string,\n  manifest: PageManifest,\n): void"
+      },
+      {
+        "name": "appendNarrative",
+        "type": "function",
+        "file": "src/wiki/update-log.ts",
+        "signature": " */\nexport function appendNarrative(\n  wikiDir: string,\n  newRef: string,\n  narrative: string,\n):"
+      },
+      {
+        "name": "appendQueueStub",
+        "type": "function",
+        "file": "src/wiki/update-log.ts",
+        "signature": " */\nexport function appendQueueStub(\n  wikiDir: string,\n  sinceRef: string,\n  newRef: string,\n  changedFileCount: number,\n  staleCount: number,\n  addedCount: number,\n  removedCount: number,\n  commitCount: number,\n): void"
+      },
+      {
+        "name": "deleteSnapshot",
+        "type": "function",
+        "file": "src/wiki/update-log.ts",
+        "signature": "export function deleteSnapshot(wikiDir: string): void"
+      },
+      {
+        "name": "migrateHeader",
+        "type": "function",
+        "file": "src/wiki/update-log.ts",
+        "signature": " */\nexport function migrateHeader(raw: string): string"
+      },
+      {
+        "name": "readSnapshot",
+        "type": "function",
+        "file": "src/wiki/update-log.ts",
+        "signature": "export function readSnapshot(wikiDir: string): PreRegenSnapshot | null"
+      },
+      {
+        "name": "snapshotPath",
+        "type": "function",
+        "file": "src/wiki/update-log.ts",
+        "signature": "export function snapshotPath(wikiDir: string): string"
+      },
+      {
+        "name": "writeSnapshot",
+        "type": "function",
+        "file": "src/wiki/update-log.ts",
+        "signature": "export function writeSnapshot(wikiDir: string, snap: PreRegenSnapshot): void"
+      },
+      {
+        "name": "SNAPSHOT_FILENAME",
+        "type": "variable",
+        "file": "src/wiki/update-log.ts",
+        "signature": "export const SNAPSHOT_FILENAME = \"_pre-regen-snapshot.json\";"
+      },
       {
         "name": "getPagePayload",
         "type": "function",
@@ -1979,16 +2363,10 @@
         "signature": "export const SECTION_CATALOG: SectionCatalogEntry[] = ["
       },
       {
-        "name": "appendIncrementalLog",
+        "name": "diffPage",
         "type": "function",
-        "file": "src/wiki/update-log.ts",
-        "signature": "export function appendIncrementalLog(\n  wikiDir: string,\n  sinceRef: string,\n  newRef: string,\n  changedFileCount: number,\n  report: StalenessReport,\n): void"
-      },
-      {
-        "name": "appendInitLog",
-        "type": "function",
-        "file": "src/wiki/update-log.ts",
-        "signature": "export function appendInitLog(\n  wikiDir: string,\n  gitRef: string,\n  manifest: PageManifest,\n): void"
+        "file": "src/wiki/diff-page.ts",
+        "signature": " */\nexport function diffPage(\n  wikiPath: string,\n  meta: { title: string; kind: string; status: \"stale\" | \"added\"; triggers: string[] },\n  oldBody: string | null,\n  newBody: string,\n): PageDiff"
       },
       {
         "name": "ChunkRange",
@@ -2046,6 +2424,12 @@
       }
     ],
     "tunables": [
+      {
+        "name": "SNAPSHOT_FILENAME",
+        "type": "variable",
+        "file": "src/wiki/update-log.ts",
+        "snippet": "export const SNAPSHOT_FILENAME = \"_pre-regen-snapshot.json\";"
+      },
       {
         "name": "buildCommunityBundles",
         "type": "variable",
@@ -2125,23 +2509,25 @@
         "snippet": "export const SECTION_CATALOG: SectionCatalogEntry[] = [\n  {\n    id: \"entry-points\",\n    title: \"Entry points\",\n    purpose: \"List the public surface a consumer reaches first\",\n    shape: \"bulleted list of exports with 1-line purpose each\",\n    exampleBody: \"- `indexFiles(dir)` — top-level scan + embed\\n- `search(query)` — semantic query over the index\",\n  },\n  {\n    id: \"lifecycle-flow\",\n    title: \"How it works\",\n    purpose:\n      \"Trace the runtime flow across the community's files — a caller triggers work that fans out through internal files to a sink. The diagram shows who calls whom; the numbered steps say what happens at each hop. Required for any multi-file community.\",\n    shape:\n      \"A `sequenceDiagram` mermaid block showing the real participants (use concrete file/function names, not placeholders), followed by a numbered prose list citing specific files and line ranges for each step. Skip only when the community is a static utility bag with no runtime flow.\",\n    exampleBody:\n      \"```mermaid\\nsequenceDiagram\\n  participant caller as CLI\\n  participant parser as parser.ts\\n  participant resolver as resolver.ts\\n  participant emitter as emitter.ts\\n  caller->>parser: parse(input)\\n  parser->>resolver: AST\\n  resolver->>emitter: typed AST\\n  emitter-->>caller: output\\n```\\n\\n1. **Parse** — `parser.ts:parse()` tokenises input into an AST.\\n2. **Resolve** — `resolver.ts:resolve()` attaches type info.\\n3. **Emit** — `emitter.ts:emit()` writes the final output.\",\n  },\n  {\n    id: \"dependency-graph\",\n    title: \"Dependencies and consumers\",\n    purpose:\n      \"Show who this community imports from and who imports it, at a glance. Required whenever the community has a meaningful edge count so readers can see the blast radius before touching code.\",\n    shape:\n      \"A `flowchart LR` mermaid block with an `Upstream` subgraph (external dependencies), the community name as the central node, and a `Downstream` subgraph (external consumers). Use real file/module names, not placeholders. Follow the diagram with a compact bulleted list: `Depends on:` and `Depended on by:` pointing to wiki pages where they exist.\",\n    exampleBody:\n      \"```mermaid\\nflowchart LR\\n  subgraph Upstream[Depends On]\\n    db[db/index.ts]\\n    utils[utils/paths.ts]\\n  end\\n  self[This community]\\n  subgraph Downstream[Depended On By]\\n    tools[tools/mcp.ts]\\n    cli[cli/main.ts]\\n  end\\n  db --> self\\n  utils --> self\\n  self --> tools\\n  self --> cli\\n```\\n\\n- **Depends on:** `db/`, `utils/paths.ts`\\n- **Depended on by:** `tools/mcp.ts`, `cli/main.ts`\",\n  },\n  {\n    id: \"data-shapes\",\n    title: \"Data shapes\",\n    purpose: \"Define the core types or records that flow through the module\",\n    shape: \"code blocks of type definitions, each followed by 1-2 sentences of intent\",\n    exampleBody: \"```ts\\ninterface Chunk { id: string; content: string; embedding: Float32Array }\\n```\\nOne row per semantic unit. `embedding` is populated lazily on first search.\",\n  },\n  {\n    id: \"failure-modes\",\n    title: \"Failure modes\",\n    purpose: \"Call out how things break, what the module does about it, and what callers must handle\",\n    shape: \"bulleted list of failure modes, each with cause / behavior / caller action\",\n    exampleBody: \"- **Index missing** — `search` returns `[]`; caller should surface an empty-state UI, not an error.\\n- **Embedding model OOM** — batch is retried at half size; persistent failure throws `EmbedError`.\",\n  },\n  {\n    id: \"integration-points\",\n    title: \"Integration points\",\n    purpose: \"Show where this module plugs into the rest of the system\",\n    shape: \"subsections per integration target, each with direction (imports-from / imported-by) and purpose\",\n    exampleBody: \"### `db/` (imports)\\nReads chunks via `getChunks(fileId)`; writes embeddings back with `upsertEmbedding`.\\n\\n### `tools/` (imported by)\\nMCP tool handlers call `search()` to serve `mimirs_search`.\",\n  },\n  {\n    id: \"key-invariants\",\n    title: \"Invariants\",\n    purpose: \"State the rules the module relies on internally and that callers must preserve\",\n    shape: \"bulleted list, each invariant phrased as a declarative rule\",\n    exampleBody: \"- Every chunk has exactly one embedding once indexed.\\n- File paths stored in the DB are project-relative, never absolute.\",\n  },\n  {\n    id: \"tuning-knobs\",\n    title: \"Tuning\",\n    purpose: \"Parameters or config flags that change behavior without code edits\","
       }
     ],
-    "topMemberLoc": 1920,
+    "topMemberLoc": 2247,
     "memberLoc": {
-      "src/tools/wiki-tools.ts": 1920,
+      "src/tools/wiki-tools.ts": 2247,
+      "src/wiki/diff-page.ts": 168,
       "src/wiki/index.ts": 120,
       "src/wiki/lint-page.ts": 768,
       "src/wiki/section-catalog.ts": 236,
-      "src/wiki/update-log.ts": 98
+      "src/wiki/update-log.ts": 239
     },
-    "tunableCount": 13,
-    "exportCount": 32,
+    "tunableCount": 14,
+    "exportCount": 42,
     "externalConsumers": [
       "/Users/winci/repos/mimirs/scripts/regen-meta.ts",
       "/Users/winci/repos/mimirs/src/tools/index.ts",
       "/Users/winci/repos/mimirs/src/tools/wiki-tools.ts",
       "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
       "/Users/winci/repos/mimirs/tests/tools/page-assist.test.ts",
-      "/Users/winci/repos/mimirs/tests/wiki/lint-page.test.ts"
+      "/Users/winci/repos/mimirs/tests/wiki/lint-page.test.ts",
+      "/Users/winci/repos/mimirs/tests/wiki/update-log.test.ts"
     ],
     "externalDependencies": [
       "/Users/winci/repos/mimirs/src/config/index.ts",
@@ -2152,6 +2538,7 @@
       "/Users/winci/repos/mimirs/src/wiki/community-detection.ts",
       "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
       "/Users/winci/repos/mimirs/src/wiki/content-prefetch.ts",
+      "/Users/winci/repos/mimirs/src/wiki/diff-page.ts",
       "/Users/winci/repos/mimirs/src/wiki/discovery.ts",
       "/Users/winci/repos/mimirs/src/wiki/index.ts",
       "/Users/winci/repos/mimirs/src/wiki/lint-page.ts",
@@ -2167,6 +2554,10 @@
         "/Users/winci/repos/mimirs/src/tools/index.ts",
         "/Users/winci/repos/mimirs/tests/tools/page-assist.test.ts"
       ],
+      "src/wiki/diff-page.ts": [
+        "/Users/winci/repos/mimirs/src/tools/wiki-tools.ts",
+        "/Users/winci/repos/mimirs/tests/wiki/update-log.test.ts"
+      ],
       "src/wiki/index.ts": [
         "/Users/winci/repos/mimirs/scripts/regen-meta.ts",
         "/Users/winci/repos/mimirs/src/tools/wiki-tools.ts"
@@ -2180,7 +2571,8 @@
         "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts"
       ],
       "src/wiki/update-log.ts": [
-        "/Users/winci/repos/mimirs/src/tools/wiki-tools.ts"
+        "/Users/winci/repos/mimirs/src/tools/wiki-tools.ts",
+        "/Users/winci/repos/mimirs/tests/wiki/update-log.test.ts"
       ]
     },
     "dependenciesByFile": {
@@ -2189,12 +2581,16 @@
         "/Users/winci/repos/mimirs/src/tools/git-tools.ts",
         "/Users/winci/repos/mimirs/src/tools/index.ts",
         "/Users/winci/repos/mimirs/src/wiki/community-detection.ts",
+        "/Users/winci/repos/mimirs/src/wiki/diff-page.ts",
         "/Users/winci/repos/mimirs/src/wiki/index.ts",
         "/Users/winci/repos/mimirs/src/wiki/lint-page.ts",
         "/Users/winci/repos/mimirs/src/wiki/section-catalog.ts",
         "/Users/winci/repos/mimirs/src/wiki/staleness.ts",
         "/Users/winci/repos/mimirs/src/wiki/types.ts",
         "/Users/winci/repos/mimirs/src/wiki/update-log.ts"
+      ],
+      "src/wiki/diff-page.ts": [
+        "/Users/winci/repos/mimirs/src/wiki/types.ts"
       ],
       "src/wiki/index.ts": [
         "/Users/winci/repos/mimirs/src/config/index.ts",
@@ -2211,23 +2607,27 @@
       "src/wiki/lint-page.ts": [],
       "src/wiki/section-catalog.ts": [],
       "src/wiki/update-log.ts": [
-        "/Users/winci/repos/mimirs/src/wiki/staleness.ts",
         "/Users/winci/repos/mimirs/src/wiki/types.ts"
       ]
     },
     "recentCommits": [],
     "annotations": [],
-    "topRankedFile": "src/wiki/index.ts",
+    "topRankedFile": "src/wiki/update-log.ts",
     "memberPreviews": [
+      {
+        "file": "src/wiki/index.ts",
+        "firstLines": "import type { RagDB } from \"../db\";\nimport type { RagConfig } from \"../config\";\nimport { runDiscovery } from \"./discovery\";\nimport { runCategorization } from \"./categorization\";\nimport { buildPageTree } from \"./page-tree\";\nimport { prefetchContent } from \"./content-prefetch\";\nimport { buildPagePayload } from \"./page-payload\";\nimport { buildCommunityBundles } from \"./community-synthesis\";\nimport type { ClusterMode } from \"./community-detection\";\nimport type {\n  WikiPlanResult,\n  PagePayload,\n  PageManifest,\n  ContentCache,\n  CommunityBundle,\n  SynthesesFile,\n} from \"./types\";\n\nexport { runDiscovery } from \"./discovery\";\nexport { runCategorization } from \"./categorization\";\nexport { buildPageTree } from \"./page-tree\";\nexport { prefetchContent } from \"./content-prefetch\";\nexport { buildPagePayload } from \"./page-payload\";\nexport {\n  buildCommunityBundles,\n  renderSynthesisPrompt,\n  validateSynthesisPayload,\n  communityIdFor,\n  requiredSectionsFor,\n  mergeRequiredSections,\n  clipDocPreview,\n} from \"./community-synthesis\";\nexport type { RequiredSection } from \"./community-synthesis\";\nexport type { ClusterMode } from \"./community-detection\";\nexport type { WikiPlanResult, PagePayload } from \"./types\";\n\n/**\n * Run phases 1-2 (discovery + categorization) and build community bundles.\n *\n * This is the first half of planning — everything the synthesis LLM needs\n * to decide community names, slugs, and section shapes. Call\n * `runWikiFinalPlanning` after syntheses are stored to produce the manifest\n * and content cache.\n */\nexport function runWikiBundling(\n  db: RagDB,\n  projectDir: string,\n  cluster: ClusterMode = \"files\",\n) {\n  const status = db.getStatus();\n  console.error(`[wiki] bundling ${status.totalFiles} files, ${status.totalChunks} chunks (cluster=${cluster})`);\n\n  const t0 = Date.now();\n  const discovery = runDiscovery(db, projectDir, cluster);\n  console.error(`[wiki] discovery ${Date.now() - t0}ms — ${discovery.modules.length} communities`);\n\n  const t1 = Date.now();\n  const classified = runCategorization(db,",
+        "loc": 120
+      },
       {
         "file": "src/wiki/section-catalog.ts",
         "firstLines": "/**\n * Curated catalog of section shapes used as building blocks during community\n * synthesis (step 4 of the Louvain-led wiki pipeline).\n *\n * The LLM receives this catalog alongside a community bundle and picks,\n * adapts, or invents sections. When it picks a catalog entry, the `shape`\n * field is copied into the synthesis payload so step 5 (page writing) knows\n * how to structure that section without re-reading the catalog.\n *\n * Not content to reuse — examples to base shape decisions on.\n */\nexport interface SectionCatalogEntry {\n  id: string;\n  title: string;\n  purpose: string;\n  shape: string;\n  exampleBody: string;\n}\n\nexport const SECTION_CATALOG: SectionCatalogEntry[] = [\n  {\n    id: \"entry-points\",\n    title: \"Entry points\",\n    purpose: \"List the public surface a consumer reaches first\",\n    shape: \"bulleted list of exports with 1-line purpose each\",\n    exampleBody: \"- `indexFiles(dir)` — top-level scan + embed\\n- `search(query)` — semantic query over the index\",\n  },\n  {\n    id: \"lifecycle-flow\",\n    title: \"How it works\",\n    purpose:\n      \"Trace the runtime flow across the community's files — a caller triggers work that fans out through internal files to a sink. The diagram shows who calls whom; the numbered steps say what happens at each hop. Required for any multi-file community.\",\n    shape:\n      \"A `sequenceDiagram` mermaid block showing the real participants (use concrete file/function names, not placeholders), followed by a numbered prose list citing specific files and line ranges for each step. Skip only when the community is a static utility bag with no runtime flow.\",\n    exampleBody:\n      \"```mermaid\\nsequenceDiagram\\n  participant caller as CLI\\n  participant parser as parser.ts\\n  participant resolver as resolver.ts\\n  participant emitter as emitter.ts\\n  caller->>parser: parse(input)\\n  parser->>resolver: AST\\n  resolver->>emitter: typed AST\\n  emitter-->>caller: output\\n```\\n\\n1. **Parse** — `parser.ts:parse()` tokenises input into an AST.\\n2. **Resolve** — `resolver.ts:",
         "loc": 236
       },
       {
-        "file": "src/wiki/update-log.ts",
-        "firstLines": "import { existsSync, mkdirSync, readFileSync, writeFileSync } from \"node:fs\";\nimport { dirname, join } from \"node:path\";\nimport type { PageManifest } from \"./types\";\nimport type { StalenessReport } from \"./staleness\";\n\nconst LOG_FILENAME = \"_update-log.md\";\n\nconst HEADER =\n  `# Wiki Update Log\\n\\n` +\n  `Append-only log of wiki generation and incremental updates. ` +\n  `Newest entries at the bottom. Emitted deterministically from the ` +\n  `staleness report — not LLM-generated.\\n\\n`;\n\nexport function appendInitLog(\n  wikiDir: string,\n  gitRef: string,\n  manifest: PageManifest,\n): void {\n  const counts: Record<string, number> = {};\n  for (const p of Object.values(manifest.pages)) {\n    counts[p.kind] = (counts[p.kind] ?? 0) + 1;\n  }\n  const breakdown = Object.entries(counts)\n    .sort(([a], [b]) => a.localeCompare(b))\n    .map(([kind, count]) => `${count} ${kind}`)\n    .join(\", \");\n\n  const entry =\n    `## ${isoStamp()} — Full initialization (\\`${gitRef}\\`)\\n\\n` +\n    `${manifest.pageCount} pages generated` +\n    (breakdown ? ` (${breakdown}).\\n` : `.\\n`);\n\n  append(wikiDir, entry);\n}\n\nexport function appendIncrementalLog(\n  wikiDir: string,\n  sinceRef: string,\n  newRef: string,\n  changedFileCount: number,\n  report: StalenessReport,\n): void {\n  const { stale, added, removed } = report;\n  const byOrder = (a: { order: number }, b: { order: number }) =>\n    a.order - b.order;\n\n  let entry =\n    `## ${isoStamp()} — Incremental update (\\`${sinceRef}\\` → \\`${newRef}\\`)\\n\\n` +\n    `${changedFileCount} file${plural(changedFileCount)} changed. ` +\n    `${stale.length} regenerated, ${added.length} added, ${removed.length} removed.\\n`;\n\n  if (stale.length === 0 && added.length === 0 && removed.length === 0) {\n    entry += `\\nNo wiki pages invalidated by the changed files.\\n`;\n    append(wikiDir, entry);\n    return;\n  }\n\n  if (stale.length > 0) {\n    entry += `\\n### Regenerated\\n\\n`;\n    for (const d of [...stale].sort(byOrder)) {",
-        "loc": 98
+        "file": "src/wiki/diff-page.ts",
+        "firstLines": "import type { PageDiff } from \"./types\";\n\n/**\n * Pure structural diff between two markdown bodies. No LLM. Output is\n * passed to the narrative LLM as grounding so it leads with what changed\n * on the page rather than which trigger files fired.\n *\n * Returns null only if both sides are missing — caller should treat that\n * as \"no diff to narrate\".\n */\nexport function diffPage(\n  wikiPath: string,\n  meta: { title: string; kind: string; status: \"stale\" | \"added\"; triggers: string[] },\n  oldBody: string | null,\n  newBody: string,\n): PageDiff {\n  const oldSections = parseSections(oldBody ?? \"\");\n  const newSections = parseSections(newBody);\n\n  const oldHeads = new Set(oldSections.map((s) => s.heading));\n  const newHeads = new Set(newSections.map((s) => s.heading));\n\n  const sectionsAdded = [...newHeads].filter((h) => !oldHeads.has(h));\n  const sectionsRemoved = [...oldHeads].filter((h) => !newHeads.has(h));\n\n  const sectionsRewritten: string[] = [];\n  for (const ns of newSections) {\n    const os = oldSections.find((o) => o.heading === ns.heading);\n    if (!os) continue;\n    const oldBytes = byteLen(os.body);\n    const newBytes = byteLen(ns.body);\n    if (oldBytes === 0 && newBytes === 0) continue;\n    const oldParas = countParagraphs(os.body);\n    const newParas = countParagraphs(ns.body);\n    const byteDelta = Math.abs(newBytes - oldBytes) / Math.max(oldBytes, 1);\n    const paraDelta = Math.abs(newParas - oldParas) / Math.max(oldParas, 1);\n    if (byteDelta >= 0.3 || paraDelta >= 0.5) sectionsRewritten.push(ns.heading);\n  }\n\n  const oldCites = new Set(extractCitations(oldBody ?? \"\"));\n  const newCites = new Set(extractCitations(newBody));\n  const citationsAdded = [...newCites].filter((c) => !oldCites.has(c));\n  const citationsRemoved = [...oldCites].filter((c) => !newCites.has(c));\n\n  const oldMermaid = extractMermaid(oldBody ?? \"\");\n  const newMermaid = extractMermaid(newBody);\n\n  const oldLits = new Set(extractNumericLiterals(oldBody ?? \"\"));\n  const newLits = new Set(extractNumericLiterals(newBody));\n  const nu",
+        "loc": 168
       },
       {
         "file": "src/wiki/lint-page.ts",
@@ -2236,237 +2636,19 @@
       },
       {
         "file": "src/tools/wiki-tools.ts",
-        "firstLines": "import { z } from \"zod\";\nimport { join, relative, dirname, resolve } from \"path\";\nimport { mkdirSync, readFileSync, readdirSync, writeFileSync, existsSync, renameSync, unlinkSync } from \"fs\";\nimport { execSync } from \"child_process\";\nimport type { McpServer } from \"@modelcontextprotocol/sdk/server/mcp.js\";\nimport { type GetDB, resolveProject } from \"./index\";\nimport { findGitRoot, runGit } from \"./git-tools\";\nimport {\n  runWikiBundling,\n  runWikiFinalPlanning,\n  getPagePayload,\n  renderSynthesisPrompt,\n  validateSynthesisPayload,\n  requiredSectionsFor,\n  clipDocPreview,\n} from \"../wiki\";\nimport { lintPage, type PageLintWarning, type ChunkRange } from \"../wiki/lint-page\";\nimport type { ClusterMode } from \"../wiki/community-detection\";\nimport { renderCatalog, paletteForRequired } from \"../wiki/section-catalog\";\nimport { classifyStaleness, type StalenessReport } from \"../wiki/staleness\";\nimport { appendInitLog, appendIncrementalLog } from \"../wiki/update-log\";\nimport type {\n  PageManifest,\n  ContentCache,\n  DiscoveryResult,\n  ClassifiedInventory,\n  CommunityBundle,\n  SynthesesFile,\n  SynthesisPayload,\n  PagePayload,\n} from \"../wiki/types\";\nimport type { RagDB } from \"../db\";\n\nconst WRITING_RULES = `## Writing Rules\n\n- **Page header is mandatory.** Copy the payload's \\`Required page header\\` block verbatim as the first content below the H1 title, before any section. It carries the breadcrumb trail (sub-pages only) and the generation stamp (\\`> Generated from <ref> · <date>\\`). Do not rewrite the stamp — readers use it to tell if a page matches HEAD.\n- **Run the semantic queries first.** When the payload lists \\`Semantic queries to run before drafting\\`, call \\`read_relevant(query)\\` on each before writing the matching section. Skip a query only when the bundle already covers that angle in the relevant chunks — never skip all three. Queries surface error paths, call sites, and internal constants the bundle misses.\n- **Sections come from the synthesis.** The page payload lists the exact sections to write (title + ",
-        "loc": 1920
+        "firstLines": "import { z } from \"zod\";\nimport { join, relative, dirname, resolve } from \"path\";\nimport { mkdirSync, readFileSync, readdirSync, writeFileSync, existsSync, renameSync, unlinkSync } from \"fs\";\nimport { execSync } from \"child_process\";\nimport type { McpServer } from \"@modelcontextprotocol/sdk/server/mcp.js\";\nimport { type GetDB, resolveProject } from \"./index\";\nimport { findGitRoot, runGit } from \"./git-tools\";\nimport {\n  runWikiBundling,\n  runWikiFinalPlanning,\n  getPagePayload,\n  renderSynthesisPrompt,\n  validateSynthesisPayload,\n  requiredSectionsFor,\n  clipDocPreview,\n} from \"../wiki\";\nimport { lintPage, type PageLintWarning, type ChunkRange } from \"../wiki/lint-page\";\nimport type { ClusterMode } from \"../wiki/community-detection\";\nimport { renderCatalog, paletteForRequired } from \"../wiki/section-catalog\";\nimport { classifyStaleness, type StalenessReport } from \"../wiki/staleness\";\nimport {\n  appendInitLog,\n  appendQueueStub,\n  appendFallbackLog,\n  appendNarrative,\n  writeSnapshot,\n  readSnapshot,\n  deleteSnapshot,\n  snapshotPath,\n} from \"../wiki/update-log\";\nimport { diffPage } from \"../wiki/diff-page\";\nimport type {\n  PageManifest,\n  ContentCache,\n  DiscoveryResult,\n  ClassifiedInventory,\n  CommunityBundle,\n  SynthesesFile,\n  SynthesisPayload,\n  PagePayload,\n  PreRegenSnapshot,\n  PreRegenSnapshotPage,\n  PageDiff,\n} from \"../wiki/types\";\nimport type { RagDB } from \"../db\";\n\nconst WRITING_RULES = `## Writing Rules\n\n- **Page header is mandatory.** Copy the payload's \\`Required page header\\` block verbatim as the first content below the H1 title, before any section. It carries the breadcrumb trail (sub-pages only) and the generation stamp (\\`> Generated from <ref> · <date>\\`). Do not rewrite the stamp — readers use it to tell if a page matches HEAD.\n- **Run the semantic queries first.** When the payload lists \\`Semantic queries to run before drafting\\`, call \\`read_relevant(query)\\` on each before writing the matching section. Skip a query only when the bundle already covers that angle in the relevant chunks ",
+        "loc": 2247
       }
     ],
     "pageRank": {
-      "src/tools/wiki-tools.ts": 0.030000000000000006,
-      "src/wiki/index.ts": 0.2991666666666667,
-      "src/wiki/lint-page.ts": 0.21416666666666667,
-      "src/wiki/section-catalog.ts": 0.22833333333333336,
-      "src/wiki/update-log.ts": 0.22833333333333336
+      "src/tools/wiki-tools.ts": 0.025000000000000005,
+      "src/wiki/diff-page.ts": 0.17412280701754385,
+      "src/wiki/index.ts": 0.21885964912280703,
+      "src/wiki/lint-page.ts": 0.17412280701754385,
+      "src/wiki/section-catalog.ts": 0.18157894736842106,
+      "src/wiki/update-log.ts": 0.2263157894736842
     },
-    "cohesion": 1.2,
-    "nearbyDocs": []
-  },
-  {
-    "communityId": "af79ae68a38bcfd5",
-    "memberFiles": [
-      "src/indexing/chunker.ts",
-      "src/indexing/indexer.ts",
-      "src/indexing/parse.ts",
-      "src/utils/dir-guard.ts"
-    ],
-    "exports": [
-      {
-        "name": "Chunk",
-        "type": "interface",
-        "file": "src/indexing/chunker.ts",
-        "signature": "export interface Chunk"
-      },
-      {
-        "name": "ChunkTextResult",
-        "type": "interface",
-        "file": "src/indexing/chunker.ts",
-        "signature": "export interface ChunkTextResult"
-      },
-      {
-        "name": "chunkText",
-        "type": "function",
-        "file": "src/indexing/chunker.ts",
-        "signature": " */\nexport async function chunkText(\n  text: string,\n  extension: string,\n  chunkSize = DEFAULT_CHUNK_SIZE,\n  chunkOverlap = DEFAULT_CHUNK_OVERLAP,\n  filePath?: string\n): Promise<ChunkTextResult>"
-      },
-      {
-        "name": "KNOWN_EXTENSIONS",
-        "type": "variable",
-        "file": "src/indexing/chunker.ts",
-        "signature": " */\nexport const KNOWN_EXTENSIONS = new Set([\n  // Markdown\n  \".md\", \".mdx\", \".markdown\",\n  // Plain text\n  \".txt\",\n  // AST-aware code\n  \".ts\", \".tsx\", \".js\", \".jsx\", \".py\", \".go\", \".rs\", \".java\",\n  \".c\", \".h\", \".cpp\", \".cc\", \".cxx\", \".hp…"
-      },
-      {
-        "name": "ParsedFile",
-        "type": "interface",
-        "file": "src/indexing/parse.ts",
-        "signature": "export interface ParsedFile"
-      },
-      {
-        "name": "parseFile",
-        "type": "function",
-        "file": "src/indexing/parse.ts",
-        "signature": "export function parseFile(filePath: string, raw: string): ParsedFile"
-      },
-      {
-        "name": "DirCheckResult",
-        "type": "interface",
-        "file": "src/utils/dir-guard.ts",
-        "signature": "export interface DirCheckResult"
-      },
-      {
-        "name": "checkIndexDir",
-        "type": "function",
-        "file": "src/utils/dir-guard.ts",
-        "signature": " */\nexport function checkIndexDir(directory: string): DirCheckResult"
-      },
-      {
-        "name": "IndexResult",
-        "type": "interface",
-        "file": "src/indexing/indexer.ts",
-        "signature": "export interface IndexResult"
-      },
-      {
-        "name": "indexDirectory",
-        "type": "function",
-        "file": "src/indexing/indexer.ts",
-        "signature": "export async function indexDirectory(\n  directory: string,\n  db: RagDB,\n  config: RagConfig,\n  onProgress?: (msg: string, opts?: { transient?: boolean }) => void,\n  signal?: AbortSignal\n): Promise<IndexResult>"
-      },
-      {
-        "name": "indexFile",
-        "type": "function",
-        "file": "src/indexing/indexer.ts",
-        "signature": " */\nexport async function indexFile(\n  filePath: string,\n  db: RagDB,\n  config: RagConfig\n): Promise<\"indexed\" | \"skipped\" | \"error\">"
-      }
-    ],
-    "tunables": [
-      {
-        "name": "KNOWN_EXTENSIONS",
-        "type": "variable",
-        "file": "src/indexing/chunker.ts",
-        "snippet": " */\nexport const KNOWN_EXTENSIONS = new Set([\n  // Markdown\n  \".md\", \".mdx\", \".markdown\",\n  // Plain text\n  \".txt\",\n  // AST-aware code\n  \".ts\", \".tsx\", \".js\", \".jsx\", \".py\", \".go\", \".rs\", \".java\",\n  \".c\", \".h\", \".cpp\", \".cc\", \".cxx\", \".hpp\", \".hh\", \".hxx\",\n  \".cs\", \".rb\", \".php\", \".scala\", \".sc\",\n  \".kt\", \".kts\",       // Kotlin\n  \".lua\",              // Lua\n  \".zig\", \".zon\",      // Zig\n  \".ex\", \".exs\",       // Elixir\n  \".hs\", \".lhs\",       // Haskell\n  \".ml\", \".mli\",       // OCaml\n  \".dart\",             // Dart\n  \".html\", \".htm\", \".css\", \".scss\", \".less\",\n  // AST-aware config/scripting\n  \".sh\", \".bash\", \".zsh\",\n  \".toml\",\n  \".yaml\", \".yml\",\n  // Heuristic code (blank-line blocks)\n  \".swift\",\n  \".fish\",\n  \".tf\", \".proto\", \".graphql\", \".gql\",\n  \".mod\",\n  \".xml\",\n  // Virtual extensions for basename-detected files\n  \".makefile\", \".dockerfile\", \".jenkinsfile\",\n  \".vagrantfile\", \".gemfile\", \".rakefile\", \".brewfile\", \".procfile\",\n  // Structured data (heuristic fallback for non-AST parsing)\n  \".json\",\n  // Query / schema languages\n  \".sql\",\n  // API collections\n  \".bru\",\n]);"
-      }
-    ],
-    "topMemberLoc": 677,
-    "memberLoc": {
-      "src/indexing/chunker.ts": 554,
-      "src/indexing/indexer.ts": 677,
-      "src/indexing/parse.ts": 98,
-      "src/utils/dir-guard.ts": 41
-    },
-    "tunableCount": 1,
-    "exportCount": 11,
-    "externalConsumers": [
-      "/Users/winci/repos/mimirs/benchmarks/ast-truncation-analysis.ts",
-      "/Users/winci/repos/mimirs/benchmarks/excalidraw-parent-bench.ts",
-      "/Users/winci/repos/mimirs/benchmarks/indexing-bench-v2.ts",
-      "/Users/winci/repos/mimirs/benchmarks/indexing-bench.ts",
-      "/Users/winci/repos/mimirs/benchmarks/large-json.bench.test.ts",
-      "/Users/winci/repos/mimirs/benchmarks/quality-bench-worker.ts",
-      "/Users/winci/repos/mimirs/benchmarks/subchunk-impact.ts",
-      "/Users/winci/repos/mimirs/src/cli/commands/benchmark-models.ts",
-      "/Users/winci/repos/mimirs/src/cli/commands/demo.ts",
-      "/Users/winci/repos/mimirs/src/cli/commands/index-cmd.ts",
-      "/Users/winci/repos/mimirs/src/cli/commands/init.ts",
-      "/Users/winci/repos/mimirs/src/conversation/indexer.ts",
-      "/Users/winci/repos/mimirs/src/indexing/indexer.ts",
-      "/Users/winci/repos/mimirs/src/indexing/watcher.ts",
-      "/Users/winci/repos/mimirs/src/server/index.ts",
-      "/Users/winci/repos/mimirs/src/tools/index-tools.ts",
-      "/Users/winci/repos/mimirs/tests/graph/graph.test.ts",
-      "/Users/winci/repos/mimirs/tests/indexing/chunker.test.ts",
-      "/Users/winci/repos/mimirs/tests/indexing/indexer.test.ts",
-      "/Users/winci/repos/mimirs/tests/indexing/line-numbers.test.ts",
-      "/Users/winci/repos/mimirs/tests/indexing/parse.test.ts",
-      "/Users/winci/repos/mimirs/tests/indexing/watcher.test.ts",
-      "/Users/winci/repos/mimirs/tests/search/fts-special-chars.test.ts",
-      "/Users/winci/repos/mimirs/tests/search/search-symbols.test.ts",
-      "/Users/winci/repos/mimirs/tests/wiki/categorization.test.ts"
-    ],
-    "externalDependencies": [
-      "/Users/winci/repos/mimirs/src/db/index.ts",
-      "/Users/winci/repos/mimirs/src/embeddings/embed.ts",
-      "/Users/winci/repos/mimirs/src/graph/resolver.ts",
-      "/Users/winci/repos/mimirs/src/indexing/chunker.ts",
-      "/Users/winci/repos/mimirs/src/indexing/parse.ts",
-      "/Users/winci/repos/mimirs/src/utils/dir-guard.ts",
-      "/Users/winci/repos/mimirs/src/utils/log.ts"
-    ],
-    "consumersByFile": {
-      "src/indexing/chunker.ts": [
-        "/Users/winci/repos/mimirs/benchmarks/ast-truncation-analysis.ts",
-        "/Users/winci/repos/mimirs/benchmarks/indexing-bench-v2.ts",
-        "/Users/winci/repos/mimirs/benchmarks/indexing-bench.ts",
-        "/Users/winci/repos/mimirs/benchmarks/quality-bench-worker.ts",
-        "/Users/winci/repos/mimirs/benchmarks/subchunk-impact.ts",
-        "/Users/winci/repos/mimirs/src/conversation/indexer.ts",
-        "/Users/winci/repos/mimirs/src/indexing/indexer.ts",
-        "/Users/winci/repos/mimirs/tests/graph/graph.test.ts",
-        "/Users/winci/repos/mimirs/tests/indexing/chunker.test.ts",
-        "/Users/winci/repos/mimirs/tests/search/search-symbols.test.ts",
-        "/Users/winci/repos/mimirs/tests/wiki/categorization.test.ts"
-      ],
-      "src/indexing/indexer.ts": [
-        "/Users/winci/repos/mimirs/benchmarks/excalidraw-parent-bench.ts",
-        "/Users/winci/repos/mimirs/benchmarks/indexing-bench.ts",
-        "/Users/winci/repos/mimirs/benchmarks/large-json.bench.test.ts",
-        "/Users/winci/repos/mimirs/benchmarks/subchunk-impact.ts",
-        "/Users/winci/repos/mimirs/src/cli/commands/benchmark-models.ts",
-        "/Users/winci/repos/mimirs/src/cli/commands/demo.ts",
-        "/Users/winci/repos/mimirs/src/cli/commands/index-cmd.ts",
-        "/Users/winci/repos/mimirs/src/cli/commands/init.ts",
-        "/Users/winci/repos/mimirs/src/indexing/watcher.ts",
-        "/Users/winci/repos/mimirs/src/server/index.ts",
-        "/Users/winci/repos/mimirs/src/tools/index-tools.ts",
-        "/Users/winci/repos/mimirs/tests/indexing/indexer.test.ts",
-        "/Users/winci/repos/mimirs/tests/indexing/line-numbers.test.ts",
-        "/Users/winci/repos/mimirs/tests/indexing/watcher.test.ts",
-        "/Users/winci/repos/mimirs/tests/search/fts-special-chars.test.ts"
-      ],
-      "src/indexing/parse.ts": [
-        "/Users/winci/repos/mimirs/benchmarks/ast-truncation-analysis.ts",
-        "/Users/winci/repos/mimirs/benchmarks/indexing-bench-v2.ts",
-        "/Users/winci/repos/mimirs/benchmarks/indexing-bench.ts",
-        "/Users/winci/repos/mimirs/benchmarks/quality-bench-worker.ts",
-        "/Users/winci/repos/mimirs/benchmarks/subchunk-impact.ts",
-        "/Users/winci/repos/mimirs/src/indexing/indexer.ts",
-        "/Users/winci/repos/mimirs/tests/indexing/parse.test.ts"
-      ],
-      "src/utils/dir-guard.ts": [
-        "/Users/winci/repos/mimirs/src/indexing/indexer.ts",
-        "/Users/winci/repos/mimirs/src/server/index.ts"
-      ]
-    },
-    "dependenciesByFile": {
-      "src/indexing/chunker.ts": [
-        "/Users/winci/repos/mimirs/src/utils/log.ts"
-      ],
-      "src/indexing/indexer.ts": [
-        "/Users/winci/repos/mimirs/src/db/index.ts",
-        "/Users/winci/repos/mimirs/src/embeddings/embed.ts",
-        "/Users/winci/repos/mimirs/src/graph/resolver.ts",
-        "/Users/winci/repos/mimirs/src/indexing/chunker.ts",
-        "/Users/winci/repos/mimirs/src/indexing/parse.ts",
-        "/Users/winci/repos/mimirs/src/utils/dir-guard.ts",
-        "/Users/winci/repos/mimirs/src/utils/log.ts"
-      ],
-      "src/indexing/parse.ts": [],
-      "src/utils/dir-guard.ts": []
-    },
-    "recentCommits": [],
-    "annotations": [],
-    "topRankedFile": "src/indexing/chunker.ts",
-    "memberPreviews": [
-      {
-        "file": "src/indexing/parse.ts",
-        "firstLines": "import matter from \"gray-matter\";\nimport { extname } from \"path\";\n\nexport interface ParsedFile {\n  path: string;\n  content: string;\n  frontmatter: Record<string, unknown> | null;\n  extension: string;\n}\n\nconst MARKDOWN_EXTENSIONS = new Set([\".md\", \".mdx\", \".markdown\"]);\n\n// Files with no real extension matched by exact basename.\nconst EXACT_NAME_MAP = new Map<string, string>([\n  [\"makefile\", \".makefile\"],\n  [\"gnumakefile\", \".makefile\"],\n  [\"vagrantfile\", \".vagrantfile\"],\n  [\"gemfile\", \".gemfile\"],\n  [\"rakefile\", \".rakefile\"],\n  [\"brewfile\", \".brewfile\"],\n  [\"procfile\", \".procfile\"],\n]);\n\n// Files whose basename starts with a known prefix (e.g. Dockerfile.dev,\n// Jenkinsfile.staging). Each entry is [lowerPrefix, virtualExtension].\nconst PREFIX_NAME_MAP: [string, string][] = [\n  [\"dockerfile\", \".dockerfile\"],\n  [\"jenkinsfile\", \".jenkinsfile\"],\n];\n\nfunction resolveExtension(rawExt: string, basename: string): string {\n  if (rawExt) {\n    // Even with an extension, check prefixes: Dockerfile.dev should win.\n    for (const [prefix, virtualExt] of PREFIX_NAME_MAP) {\n      if (basename === prefix || basename.startsWith(prefix + \".\")) {\n        return virtualExt;\n      }\n    }\n    return rawExt;\n  }\n  // No extension — check exact names first, then prefixes.\n  if (EXACT_NAME_MAP.has(basename)) return EXACT_NAME_MAP.get(basename)!;\n  for (const [prefix, virtualExt] of PREFIX_NAME_MAP) {\n    if (basename === prefix || basename.startsWith(prefix + \".\")) {\n      return virtualExt;\n    }\n  }\n  return rawExt;\n}\n\nexport function parseFile(filePath: string, raw: string): ParsedFile {\n  const rawExt = extname(filePath).toLowerCase();\n  const basename = filePath.split(\"/\").pop()?.toLowerCase() ?? \"\";\n  const ext = resolveExtension(rawExt, basename);\n\n  if (MARKDOWN_EXTENSIONS.has(ext)) {\n    const { data, content } = matter(raw);\n    const hasFrontmatter = Object.keys(data).length > 0;\n    return {\n      path: filePath,",
-        "loc": 98
-      },
-      {
-        "file": "src/utils/dir-guard.ts",
-        "firstLines": "import { resolve } from \"path\";\nimport { homedir } from \"os\";\n\n/**\n * Directories that should never be indexed.\n * Catches the common case where RAG_PROJECT_DIR isn't set and cwd\n * falls back to home or root — which would OOM the process.\n */\nconst DANGEROUS_DIRS = new Set([\n  homedir(),\n  \"/\",\n  \"/home\",\n  \"/Users\",\n  \"/tmp\",\n  \"/var\",\n]);\n\nexport interface DirCheckResult {\n  safe: boolean;\n  reason?: string;\n}\n\n/**\n * Returns { safe: false, reason } if the directory is too broad to index.\n */\nexport function checkIndexDir(directory: string): DirCheckResult {\n  const resolved = resolve(directory);\n\n  if (DANGEROUS_DIRS.has(resolved)) {\n    return {\n      safe: false,\n      reason:\n        `Refusing to index \"${resolved}\" — this is a system-level directory that would cause excessive memory usage. ` +\n        `Set RAG_PROJECT_DIR to your actual project path in your MCP server config.\\n` +\n        `Example: \"env\": { \"RAG_PROJECT_DIR\": \"/path/to/your/project\" }`,\n    };\n  }\n\n  return { safe: true };\n}\n",
-        "loc": 41
-      },
-      {
-        "file": "src/indexing/indexer.ts",
-        "firstLines": "import { relative, resolve, extname, basename } from \"path\";\nimport { createHash } from \"crypto\";\nimport { readFile, stat, readdir } from \"fs/promises\";\nimport { parseFile } from \"./parse\";\nimport { embedBatch, embedBatchMerged, mergeEmbeddings } from \"../embeddings/embed\";\nimport { chunkText, KNOWN_EXTENSIONS, type ChunkImport, type ChunkExport } from \"./chunker\";\nimport { RagDB } from \"../db\";\nimport { type RagConfig } from \"../config\";\nimport { resolveImports } from \"../graph/resolver\";\nimport { log } from \"../utils/log\";\nimport { checkIndexDir } from \"../utils/dir-guard\";\nimport { type EmbeddedChunk } from \"../types\";\n\nfunction aggregateGraphData(chunks: { imports?: ChunkImport[]; exports?: ChunkExport[] }[]): {\n  imports: ChunkImport[];\n  exports: ChunkExport[];\n} {\n  const importMap = new Map<string, ChunkImport>();\n  const exportMap = new Map<string, ChunkExport>();\n\n  for (const chunk of chunks) {\n    if (chunk.imports) {\n      for (const imp of chunk.imports) {\n        if (!importMap.has(imp.source)) {\n          importMap.set(imp.source, imp);\n        }\n      }\n    }\n    if (chunk.exports) {\n      for (const exp of chunk.exports) {\n        if (!exportMap.has(exp.name)) {\n          exportMap.set(exp.name, exp);\n        }\n      }\n    }\n  }\n\n  return {\n    imports: Array.from(importMap.values()),\n    exports: Array.from(exportMap.values()),\n  };\n}\n\nexport interface IndexResult {\n  indexed: number;\n  skipped: number;\n  pruned: number;\n  errors: string[];\n}\n\nfunction hashString(content: string): string {\n  return createHash(\"sha256\").update(content, \"utf-8\").digest(\"hex\");\n}\n\n/**\n * Threshold at which we warn the user that the directory may be too broad.\n * We no longer abort — large monorepos can legitimately exceed this count.\n */\nconst LARGE_PROJECT_WARN_THRESHOLD = 200_000;\n",
-        "loc": 677
-      }
-    ],
-    "pageRank": {
-      "src/indexing/chunker.ts": 0.35625,
-      "src/indexing/indexer.ts": 0.037500000000000006,
-      "src/indexing/parse.ts": 0.303125,
-      "src/utils/dir-guard.ts": 0.303125
-    },
-    "cohesion": 0.6666666666666666,
+    "cohesion": 1.2666666666666666,
     "nearbyDocs": []
   },
   {
@@ -3706,139 +3888,6 @@
     "pageRank": {
       "src/config/index.ts": 0.07500000000000001,
       "src/embeddings/embed.ts": 0.925
-    },
-    "cohesion": 3,
-    "nearbyDocs": []
-  },
-  {
-    "communityId": "eb1906b45cbc92a9",
-    "memberFiles": [
-      "src/graph/resolver.ts",
-      "src/indexing/watcher.ts"
-    ],
-    "exports": [
-      {
-        "name": "GraphOptions",
-        "type": "interface",
-        "file": "src/graph/resolver.ts",
-        "signature": "export interface GraphOptions"
-      },
-      {
-        "name": "buildIdToPathMap",
-        "type": "function",
-        "file": "src/graph/resolver.ts",
-        "signature": "export function buildIdToPathMap(pathToId: Map<string, number>): Map<number, string>"
-      },
-      {
-        "name": "buildPathToIdMap",
-        "type": "function",
-        "file": "src/graph/resolver.ts",
-        "signature": "/** Build path → fileId and fileId → path lookups from all indexed files. */\nexport function buildPathToIdMap(db: RagDB): Map<string, number>"
-      },
-      {
-        "name": "generateProjectMap",
-        "type": "function",
-        "file": "src/graph/resolver.ts",
-        "signature": " */\nexport function generateProjectMap(\n  db: RagDB,\n  options: GraphOptions\n): string"
-      },
-      {
-        "name": "resolveImports",
-        "type": "function",
-        "file": "src/graph/resolver.ts",
-        "signature": " */\nexport function resolveImports(db: RagDB, projectDir: string): number"
-      },
-      {
-        "name": "resolveImportsForFile",
-        "type": "function",
-        "file": "src/graph/resolver.ts",
-        "signature": " */\nexport function resolveImportsForFile(\n  db: RagDB,\n  fileId: number,\n  projectDir: string,\n  pathToId?: Map<string, number>,\n  idToPath?: Map<number, string>\n): void"
-      },
-      {
-        "name": "Watcher",
-        "type": "interface",
-        "file": "src/indexing/watcher.ts",
-        "signature": "export interface Watcher"
-      },
-      {
-        "name": "startWatcher",
-        "type": "function",
-        "file": "src/indexing/watcher.ts",
-        "signature": "export function startWatcher(\n  directory: string,\n  db: RagDB,\n  config: RagConfig,\n  onEvent?: (msg: string) => void\n): Watcher"
-      }
-    ],
-    "tunables": [],
-    "topMemberLoc": 450,
-    "memberLoc": {
-      "src/graph/resolver.ts": 450,
-      "src/indexing/watcher.ts": 116
-    },
-    "tunableCount": 0,
-    "exportCount": 8,
-    "externalConsumers": [
-      "/Users/winci/repos/mimirs/benchmarks/indexing-bench-v2.ts",
-      "/Users/winci/repos/mimirs/benchmarks/indexing-bench.ts",
-      "/Users/winci/repos/mimirs/benchmarks/quality-bench-worker.ts",
-      "/Users/winci/repos/mimirs/benchmarks/subchunk-impact.ts",
-      "/Users/winci/repos/mimirs/src/cli/commands/map.ts",
-      "/Users/winci/repos/mimirs/src/indexing/indexer.ts",
-      "/Users/winci/repos/mimirs/src/indexing/watcher.ts",
-      "/Users/winci/repos/mimirs/src/server/index.ts",
-      "/Users/winci/repos/mimirs/src/tools/graph-tools.ts",
-      "/Users/winci/repos/mimirs/src/wiki/discovery.ts",
-      "/Users/winci/repos/mimirs/tests/graph/graph.test.ts",
-      "/Users/winci/repos/mimirs/tests/indexing/watcher.test.ts",
-      "/Users/winci/repos/mimirs/tests/search/search-symbols.test.ts",
-      "/Users/winci/repos/mimirs/tests/wiki/categorization.test.ts",
-      "/Users/winci/repos/mimirs/tests/wiki/discovery.test.ts"
-    ],
-    "externalDependencies": [
-      "/Users/winci/repos/mimirs/src/db/index.ts",
-      "/Users/winci/repos/mimirs/src/graph/resolver.ts",
-      "/Users/winci/repos/mimirs/src/indexing/indexer.ts"
-    ],
-    "consumersByFile": {
-      "src/graph/resolver.ts": [
-        "/Users/winci/repos/mimirs/benchmarks/indexing-bench-v2.ts",
-        "/Users/winci/repos/mimirs/benchmarks/indexing-bench.ts",
-        "/Users/winci/repos/mimirs/benchmarks/quality-bench-worker.ts",
-        "/Users/winci/repos/mimirs/benchmarks/subchunk-impact.ts",
-        "/Users/winci/repos/mimirs/src/cli/commands/map.ts",
-        "/Users/winci/repos/mimirs/src/indexing/indexer.ts",
-        "/Users/winci/repos/mimirs/src/indexing/watcher.ts",
-        "/Users/winci/repos/mimirs/src/tools/graph-tools.ts",
-        "/Users/winci/repos/mimirs/src/wiki/discovery.ts",
-        "/Users/winci/repos/mimirs/tests/graph/graph.test.ts",
-        "/Users/winci/repos/mimirs/tests/search/search-symbols.test.ts",
-        "/Users/winci/repos/mimirs/tests/wiki/categorization.test.ts",
-        "/Users/winci/repos/mimirs/tests/wiki/discovery.test.ts"
-      ],
-      "src/indexing/watcher.ts": [
-        "/Users/winci/repos/mimirs/src/server/index.ts",
-        "/Users/winci/repos/mimirs/tests/indexing/watcher.test.ts"
-      ]
-    },
-    "dependenciesByFile": {
-      "src/graph/resolver.ts": [
-        "/Users/winci/repos/mimirs/src/db/index.ts"
-      ],
-      "src/indexing/watcher.ts": [
-        "/Users/winci/repos/mimirs/src/graph/resolver.ts",
-        "/Users/winci/repos/mimirs/src/indexing/indexer.ts"
-      ]
-    },
-    "recentCommits": [],
-    "annotations": [],
-    "topRankedFile": "src/graph/resolver.ts",
-    "memberPreviews": [
-      {
-        "file": "src/indexing/watcher.ts",
-        "firstLines": "import { watch } from \"fs\";\nimport { resolve, relative } from \"path\";\nimport { existsSync } from \"fs\";\nimport { Glob } from \"bun\";\nimport { indexFile } from \"./indexer\";\nimport { type RagConfig } from \"../config\";\nimport { type RagDB } from \"../db\";\nimport { resolveImportsForFile, buildPathToIdMap, buildIdToPathMap } from \"../graph/resolver\";\n\nconst DEBOUNCE_MS = 2000;\n\nexport interface Watcher {\n  close(): void;\n}\n\nexport function startWatcher(\n  directory: string,\n  db: RagDB,\n  config: RagConfig,\n  onEvent?: (msg: string) => void\n): Watcher {\n  const pending = new Map<string, NodeJS.Timeout>();\n\n  // Pre-compile globs once instead of per-event\n  const excludeGlobs = config.exclude.map((pat) => new Glob(pat));\n  const includeGlobs = config.include.map((pat) => new Glob(pat));\n\n  function matchesAny(filePath: string, globs: Glob[]): boolean {\n    return globs.some((g) => g.match(filePath));\n  }\n\n  // Serial queue: prevents concurrent indexFile + buildPathToIdMap from interleaving.\n  // While one cycle runs, new files accumulate in nextBatch and get processed next.\n  let processing = false;\n  const nextBatch = new Map<string, \"index\" | \"remove\">();\n\n  async function processQueue() {\n    if (processing) return;\n    processing = true;\n\n    try {\n      while (nextBatch.size > 0) {\n        // Snapshot and clear the batch so new events accumulate into a fresh batch\n        const batch = new Map(nextBatch);\n        nextBatch.clear();\n\n        for (const [absPath, action] of batch) {\n          const rel = relative(directory, absPath);\n\n          if (action === \"remove\") {\n            const removed = db.removeFile(absPath);\n            if (removed) onEvent?.(`Removed deleted file: ${rel}`);\n            continue;\n          }\n\n          const result = await indexFile(absPath, db, config);\n          if (result === \"indexed\") {\n            const file = db.getFileByPath(absPath);\n            if (file) {\n              // Build lookups once and reuse for all resolve calls.",
-        "loc": 116
-      }
-    ],
-    "pageRank": {
-      "src/graph/resolver.ts": 0.925,
-      "src/indexing/watcher.ts": 0.07500000000000001
     },
     "cohesion": 3,
     "nearbyDocs": []

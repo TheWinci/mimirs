@@ -2,38 +2,37 @@
 
 > [Architecture](../../architecture.md) › [Wiki Pipeline — Types & Internals](../wiki-pipeline-internals.md)
 >
-> Generated from `79e963f` · 2026-04-26
+> Generated from `b47d98e` · 2026-04-26
 
 ## Role
 
-`src/db/types.ts` defines the raw database row shapes and query result interfaces that the DB layer returns and the wiki pipeline consumes. It is a pure type file — no logic, no imports — that acts as the boundary contract between SQLite persistence and everything above it.
+`src/db/types.ts` is the typed contract between the SQLite layer (`src/db/index.ts`) and every consumer that reads from it — search handlers, the wiki categorizer, and the wiki's internal type module. It declares twelve flat interfaces (no enums, no helper types, no defaults) that together describe the row and search-result shapes the database returns. The file is pure type declarations: no runtime code, no imports, no exports beyond the interfaces themselves. Consumers either map a SQLite row into one of these shapes inside `src/db/index.ts` or accept a typed result downstream.
 
 ## Exports
 
 | Name | Kind | Signature | What it does |
 |------|------|-----------|--------------|
-| `StoredChunk` | interface | `export interface StoredChunk` | A chunk row as stored in the DB: id, fileId, chunkIndex, snippet text, optional entity name and type, source line range, and parent chunk id for nested constructs (e.g. a method inside a class). |
-| `StoredFile` | interface | `export interface StoredFile` | A file row: numeric id, project-relative path, content hash, and ISO timestamp of last indexing. |
-| `SearchResult` | interface | `export interface SearchResult` | Lightweight result from a hybrid search: file path, relevance score, snippet preview, chunk index, entity name, and chunk type. No line numbers — use `ChunkSearchResult` when you need them. |
-| `ChunkSearchResult` | interface | `export interface ChunkSearchResult` | Extended search result with full chunk content and line-range fields (`startLine`, `endLine`, `parentId`). Used by `read_relevant` responses and lint passes that need to verify line numbers. |
-| `UsageResult` | interface | `export interface UsageResult` | A single usage site for a symbol: file path, line number (nullable), and a snippet of the importing line. |
-| `AnnotationRow` | interface | `export interface AnnotationRow` | A persisted annotation: id, file path, optional symbol name, free-text note, optional author, and created/updated timestamps. |
-| `SymbolResult` | interface | `export interface SymbolResult` | A classified symbol from `file_exports`: path, symbol name and type, optional snippet, chunk index, parent/child counts, reference counts across files and modules, module name list, and a re-export flag. |
-| `CheckpointRow` | interface | `export interface CheckpointRow` | A saved checkpoint: id, session id, turn index, timestamp, type, title, summary, involved file paths, and tags. |
-| `GitCommitRow` | interface | `export interface GitCommitRow` | A git commit stored in the history index: id, full and short hash, message, author name and email, date, changed file paths, insertion/deletion counts, merge flag, ref names, and optional diff summary. |
-| `GitCommitSearchResult` | interface | `export interface GitCommitSearchResult extends GitCommitRow` | Extends `GitCommitRow` with a `score` field for semantic search ranking. |
-| `ConversationSearchResult` | interface | `export interface ConversationSearchResult` | A matched conversation turn from the conversation index: turn id and index, session id, timestamp, summary, snippet, tools used, referenced files, and relevance score. |
-| `PathFilter` | interface | `export interface PathFilter` | Scoping filter accepted by search and symbol queries: optional `extensions` array, `dirs` array, and `excludeDirs` array. All fields are optional; an empty filter means "no restriction". |
+| `StoredChunk` | interface | `interface StoredChunk { id, fileId, chunkIndex, snippet, entityName, chunkType, startLine, endLine, parentId }` | One row from the chunks table. `entityName`, `chunkType`, `startLine`, `endLine`, and `parentId` are nullable because plain text or markdown chunks have no AST symbol or parent. |
+| `StoredFile` | interface | `interface StoredFile { id, path, hash, indexedAt }` | One row from the files table. `hash` is the content hash used for incremental skip-detection; `indexedAt` is an ISO timestamp string. |
+| `SearchResult` | interface | `interface SearchResult { path, score, snippet, chunkIndex, entityName, chunkType }` | Trimmed search-result shape returned by hybrid search — only the fields a UI needs, no chunk content. |
+| `ChunkSearchResult` | interface | `interface ChunkSearchResult { path, score, content, chunkIndex, entityName, chunkType, startLine, endLine, parentId }` | Heavier variant that includes the full `content` of the chunk plus line range and parent chunk id. Used by `read_relevant`. |
+| `UsageResult` | interface | `interface UsageResult { path, line, snippet }` | A single call site — minimal shape returned by `find_usages`. `line` is nullable when the symbol is referenced in a chunk without resolved line metadata. |
+| `AnnotationRow` | interface | `interface AnnotationRow { id, path, symbolName, note, author, createdAt, updatedAt }` | One row from the annotations table. `symbolName` is `null` for file-level notes; `author` defaults to `"agent"` upstream but may be null when historical rows are read back. |
+| `SymbolResult` | interface | `interface SymbolResult { path, symbolName, symbolType, snippet, chunkIndex, hasChildren, childCount, referenceCount, referenceModuleCount, referenceModules, isReexport }` | Symbol search result with reference fan-out. `referenceModules` is the deduplicated list of importing module paths, `referenceModuleCount` is its length, and `referenceCount` is the raw call-site count. |
+| `CheckpointRow` | interface | `interface CheckpointRow { id, sessionId, turnIndex, timestamp, type, title, summary, filesInvolved, tags }` | One row from the checkpoints table. `filesInvolved` and `tags` are deserialized JSON arrays — SQLite stores them as text, the DB layer parses them before returning. |
+| `GitCommitRow` | interface | `interface GitCommitRow { id, hash, shortHash, message, authorName, authorEmail, date, filesChanged, insertions, deletions, isMerge, refs, diffSummary }` | One row from the git commits table. `filesChanged` and `refs` are JSON-decoded; `diffSummary` is nullable because the indexer only stores it for non-merge commits. |
+| `GitCommitSearchResult` | interface | `interface GitCommitSearchResult extends GitCommitRow { score: number }` | A `GitCommitRow` plus the hybrid-search score. The extension keeps the row fields stable so formatters can be shared between chronological and ranked views. |
+| `ConversationSearchResult` | interface | `interface ConversationSearchResult { turnId, turnIndex, sessionId, timestamp, summary, snippet, toolsUsed, filesReferenced, score }` | Conversation hybrid-search hit. `toolsUsed` and `filesReferenced` are deserialized arrays extracted at index time from the turn's tool calls and file paths. |
+| `PathFilter` | interface | `interface PathFilter { extensions?, dirs?, excludeDirs? }` | The optional filter passed to most search calls. All fields are arrays of strings; absence means "no filter". The `excludeDirs` field is applied after `dirs`, so a directory listed in both is excluded. |
 
 ## Internals
 
-- **`SearchResult` vs `ChunkSearchResult` is a deliberate split.** `SearchResult` carries only what the MCP `search` tool needs to render a file-path-plus-snippet response. `ChunkSearchResult` carries the full chunk content and line numbers needed by `read_relevant` and the lint pipeline. Keeping them separate prevents the search hot path from paying the cost of fetching line ranges it will never use.
-
-- **`SymbolResult.referenceModules` is already aggregated.** The DB query that produces `SymbolResult` joins across the `file_exports` and import-graph tables to collect the set of module names that reference the symbol. Callers do not need to aggregate themselves — but the list is capped by the DB query and may be a sample on highly-referenced symbols.
-
-- **`StoredChunk.parentId` enables nested-symbol reconstruction.** When the AST chunker emits a method inside a class, it sets `parentId` to the class chunk's id. The lint pipeline uses this to reconstruct the enclosing symbol's line range when detecting line-range drift on a method chunk.
-
-- **`PathFilter` fields are all optional and additive.** Passing `{ extensions: [".ts"] }` restricts to TypeScript files; passing `{ dirs: ["src/wiki"] }` restricts to one subtree; combining them ANDs the constraints. An empty or absent filter means "no restriction" — not "match nothing". This is different from a WHERE clause where a missing column value would be NULL.
+- **All array-valued columns are stored as JSON strings, decoded by the DB layer.** `CheckpointRow.filesInvolved`, `CheckpointRow.tags`, `GitCommitRow.filesChanged`, `GitCommitRow.refs`, `ConversationSearchResult.toolsUsed`, `ConversationSearchResult.filesReferenced`, and `SymbolResult.referenceModules` are all `string[]` in the type, but SQLite holds the raw JSON. Code reading these rows must trust the DB layer's parse — never re-parse a value already typed as `string[]`.
+- **Nullable line ranges signal "no AST".** `StoredChunk.startLine`, `StoredChunk.endLine`, `ChunkSearchResult.startLine`, `ChunkSearchResult.endLine`, and `UsageResult.line` are nullable specifically because non-code chunks (markdown, plain text) skip AST extraction. Code that formats `path:start-end` must guard against `null` and fall back to `path` alone.
+- **`SearchResult` and `ChunkSearchResult` differ only in payload weight.** Both carry `path`, `score`, `chunkIndex`, `entityName`, `chunkType`; the lightweight `SearchResult` ships `snippet` (a truncated preview) while `ChunkSearchResult` ships `content` (the full chunk body) plus line range and parent. Choosing the wrong type at the call boundary leaks either too little context (UI can't show the chunk) or too much (transport bloats unnecessarily).
+- **`SymbolResult.isReexport` is the de-dup signal.** A symbol that appears in a re-export chain shows up with `isReexport: true` so callers can filter or annotate. `hasChildren` and `childCount` exist to distinguish leaf symbols from container types (classes, namespaces) without a follow-up query.
+- **`PathFilter.excludeDirs` overrides `PathFilter.dirs`.** When both are set, `dirs` defines the candidate set and `excludeDirs` removes from it — there is no union semantic. This is documented at the call sites (search handlers) but invisible from the type declaration; a caller passing `dirs: ["src"], excludeDirs: ["src/legacy"]` gets the expected subset.
+- **`GitCommitSearchResult extends GitCommitRow` is intentional inheritance.** The DB layer uses the same row mapper for both shapes and attaches `score` on the search path. A non-extending design (separate interfaces) would force two parallel mappers; the extension keeps the formatter helpers in `src/tools/git-history-tools.ts` (`formatCommitResult`, `formatCommitRow`) sharing logic on the row fields.
 
 ## See also
 

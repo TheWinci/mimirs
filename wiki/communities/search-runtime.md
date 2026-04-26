@@ -2,144 +2,151 @@
 
 > [Architecture](../architecture.md)
 >
-> Generated from `79e963f` · 2026-04-26
+> Generated from `b47d98e` · 2026-04-26
 
-The Search Runtime community is the hybrid retrieval engine at the heart of mimirs. It merges vector (semantic) and BM25 (keyword) results, applies a layered stack of ranking boosts, and provides the benchmark and eval harnesses used to measure and improve retrieval quality. Every MCP search tool call and CLI search command flows through this community before hitting the database.
+The search runtime is the query-time engine that turns a natural-language string into a ranked list of files (or chunks). It owns the hybrid vector-plus-FTS merge, the symbol expansion path, the path/filename/graph boost stack, the parent-chunk grouping logic, and the benchmark and eval harnesses that measure all of it. It depends on the database layer for the underlying vec/FTS queries and on the embeddings module for the query embedding; everything else — scoring, deduplication, demotion of generated and test files, doc expansion, analytics logging — lives here.
 
 ## Per-file breakdown
 
-### `src/search/hybrid.ts` — The retrieval engine
+### `src/search/hybrid.ts` — the engine
 
-`src/search/hybrid.ts` is the highest-PageRank file in the community and the sole implementation of the two public search functions: `search` (file-level, deduplicated) and `searchChunks` (chunk-level, no file deduplication). Both functions follow the same pipeline: embed the query, run vector and FTS queries in parallel against the DB, merge scores with `mergeHybridScores`, apply a four-stage boost pipeline, and return results.
+This is the highest-PageRank file in the community and the one every search caller (`searchCommand`, `readCommand`, the demo, the MCP tools, every benchmark) reaches into. Two functions are exported as the public surface — `search` (file-level dedup) and `searchChunks` (no dedup, parent-grouping) — plus `mergeHybridScores`, the `DedupedResult` type, and the `ChunkResult` type.
 
-`DEFAULT_HYBRID_WEIGHT = 0.7` controls the blend: 70% vector score, 30% BM25 score. This is the constant callers override by passing `hybridWeight` explicitly; the `src/config/index.ts` `hybridWeight` field is passed through from `resolveProject` in tool handlers.
+`search` runs in seven stages. (1) Embed the query and run two SQL queries in parallel: `db.search(queryEmbedding, topK * 4, filter)` for vectors and `db.textSearch(query, topK * 4, filter)` for FTS. The 4x over-fetch is the head room for the post-merge dedup and boost passes. (2) `mergeHybridScores` — fuse the two result lists by `path:chunkIndex` key, applying `score = hybridWeight * vectorScore + (1 - hybridWeight) * textScore`. (3) File-level deduplication: for every fused result, keep the highest score per `path` and append unique snippets. (4) Symbol expansion: extract identifier-shaped tokens via the `IDENTIFIER_RE` regex, drop those in `STOP_WORDS`, run `db.searchSymbols(id, true, undefined, 5)` for each, then `mergeSymbolResults` either boosts an existing entry by `Math.max(score, score * 1.3)` or seeds a new one at score `0.75`. (5) Boost stack — `applyPathBoost` (test 0.85x, source 1.1x), `applyFilenameBoost` (which also handles boilerplate and generated demotion), `applyGraphBoost`. (6) Sort, then `expandForDocs` adds a doc bonus when docs are pushing code out of the top-K. (7) `db.logQuery` records the query, the result count, the top score and path, and `durationMs`.
 
-The boost pipeline runs in this order: `applyPathBoost` (source up / test down), `applyFilenameBoost` (filename-query affinity, boilerplate demotion, generated file demotion), `applyGraphBoost` (import-count logarithmic boost). Boosts are multiplicative for path/filename and additive for graph. The constants are:
+`searchChunks` follows the same shape but skips file-level dedup, applies the boosts inline (no separate helper passes), and finishes with `groupByParent`. Parent grouping is the chunk-tier story: when two or more child chunks of the same `parentId` end up in the candidate set, they are consolidated into the parent chunk (fetched from `db.getChunkById`, cached locally) carrying the best child score. The `chunkIndex: -1` marker on the promoted parent disambiguates it from a regular chunk hit. The default chunk-level `threshold = 0.3` filters noise that the file-level path tolerates because of dedup.
 
-- Test file multiplier: `0.85`
-- Source file multiplier: `1.1`
-- Boilerplate filename demotion: `0.8`
-- Generated file demotion: `GENERATED_DEMOTION = 0.75`
-- Stem word match boost: `+0.1` per matching word (capped at the count)
-- Path segment match boost: `+0.05` per matching segment
-- Symbol-only match base score: `0.75`
-- Symbol expansion boost for existing results: `Math.max(existing.score, existing.score * 1.3)`
-- Graph import-count boost: `0.05 * Math.log2(importerCount + 1)` (additive)
+`mergeHybridScores` is generic over `T extends { score: number; path: string; chunkIndex: number }` so it serves both `SearchResult` (file-level) and `ChunkSearchResult` (chunk-level) shapes. The `path:chunkIndex` key is what makes the same chunk in both lists fuse rather than appear twice. Records present in only one list keep `vectorScore = 0` or `textScore = 0` and still emerge — the merge does not require both sides.
 
-`BOILERPLATE_BASENAMES` is a hardcoded set of filenames demoted regardless of query affinity. It covers conventional Go type/doc/constants files and their TypeScript equivalents (type declaration files, index declaration files). These files contain vocabulary without implementations, so they appear in FTS results for nearly every query — demotion keeps them from displacing real hits.
+The internal helpers below the exports are where the tuning lives. `applyPathBoost` runs `TEST_PATTERNS` and `SOURCE_PATTERNS` regex sets against the path: any test-style segment multiplies score by `0.85`, otherwise an `src|lib|app|pkg|packages|internal|cmd` segment multiplies by `1.1`. `applyFilenameBoost` extracts query words (3+ chars, lower-cased, after splitting on `[\s_/.-]+`, minus the `STOP_WORDS` set), demotes basenames in the `BOILERPLATE_BASENAMES` set (the literal Go and TypeScript boilerplate names — types, doc, index.d.ts, constants, defaults, conversion variants) by `0.8x`, demotes paths that match the `generatedPatterns` glob set by the constant `GENERATED_DEMOTION = 0.75`, and otherwise computes a multiplicative bonus of `1 + 0.1 * stemMatchCount + 0.05 * pathMatchCount`. `applyGraphBoost` pulls `db.getImportersOf(file.id)` and adds `0.05 * Math.log2(importerCount + 1)` — additive, not multiplicative, so a heavily-imported file gets a fixed top-up rather than a runaway score.
 
-`STOP_WORDS` is a set of 50 common English and code-vocabulary words filtered out before filename affinity and symbol expansion. Words shorter than 3 characters are also excluded.
+`buildGeneratedMatcher` parses the `generated` glob list from `.mimirs/config.json` into four buckets — `dirPrefixes` (`generated/**`), `anyDepthDirs` (`applyconfigurations/**` matched anywhere in the path), `filenameSuffixes` (`**/*_generated.go`), and `filenamePatterns` (`**/zz_generated*` and the regex fallback). The matcher returns a `(path) => boolean` closure consumed by `applyFilenameBoost`. The internal `escapeForRegex` helper exists to defuse user-supplied glob characters when they fall through to the regex bucket.
 
-Doc expansion (`expandForDocs`) prevents markdown files from displacing code results: when the initial top-K contains both docs and code, the result set is expanded by the doc count so code files keep their slots.
+`expandForDocs` is a small but load-bearing helper. When the initial top-K slice contains both docs (`.md` / `.mdx`) and code, it returns `topK + docCount` — the docs are added as bonus context without displacing code. When all results are docs (or zero are), no expansion happens; the function avoids exceeding `topK` for free.
 
-`searchChunks` additionally applies count-based parent grouping via `groupByParent`: when two or more sub-chunks from the same parent chunk (same `parent_id`) appear in results, they are replaced by the parent chunk at the best child score. The minimum count is hardcoded to 2 and is not user-configurable in this file (it is `parentGroupingMinCount` from config, but `searchChunks` calls `groupByParent` with its default of 2 directly).
+`matchesFilter` mirrors `buildPathFilter` from `src/db/search.ts` but in JS, because symbol expansion adds candidates that bypassed the SQL filter. It applies `extensions`, `dirs`, and `excludeDirs` against the path string the same way the SQL builder does.
 
-`mergeHybridScores` is a generic function (works on any `{ score, path, chunkIndex }` type) that combines two ranked lists into one scored map, computing the blended score as `hybridWeight * vectorScore + (1 - hybridWeight) * textScore`. Results that appear in only one list get a score of 0 on the missing dimension.
+The only constant exported as a tunable is `DEFAULT_HYBRID_WEIGHT = 0.7` (70% vector, 30% BM25). It is used as the default when `search`/`searchChunks` are called without an explicit `hybridWeight`. Callers that want to tune the mix pass a different number directly.
 
-### `src/search/usages.ts` — FTS sanitization utilities
+### `src/search/usages.ts` — FTS-safe helpers
 
-`src/search/usages.ts` is a tiny two-function module consumed by both `src/db/search.ts` and `src/db/conversation.ts` and `src/db/git-history.ts`. `sanitizeFTS` wraps each whitespace-split token in double quotes before passing it to FTS5 MATCH, which forces literal matching instead of operator interpretation — without this, tokens like `NOT`, `AND`, bare parentheses, and the `+` prefix all trigger FTS5 query syntax. `escapeRegex` escapes regex metacharacters for the word-boundary regex used in `findUsages`.
+A 28-line module with two exports. `escapeRegex` runs the standard regex meta-character escape and is the single safe way to interpolate user input into a JS regex elsewhere. `sanitizeFTS` is the more interesting one: FTS5 treats bare `+`, `-`, `*`, `AND`, `OR`, `NOT`, `NEAR`, `(`, and `)` as operators, so handing a user query straight to `MATCH ?` will throw on anything that resembles those tokens. The fix is to split on whitespace, drop empties, double-quote each token (escaping internal `"` as `""`), and join with spaces — every token becomes a literal phrase. An empty input collapses to `'""'` so the SQL query still parses.
 
-### `src/search/benchmark.ts` — Retrieval quality benchmark
+The header comment explains the design of the `find_usages` feature: FTS finds chunks containing the symbol name, defining files are excluded via `file_exports`, a word-boundary regex finds the exact line within each chunk, and absolute line numbers are computed from the chunk's stored `start_line`. There is no pre-indexing pass — usages are computed on demand. `sanitizeFTS` is also used by `src/db/conversation.ts` and `src/db/git-history.ts` for their respective FTS searches.
 
-`src/search/benchmark.ts` provides a quantitative benchmark harness for the search function. A benchmark file is a JSON array of `{ query, expected }` objects where `expected` is a list of file paths (relative or absolute). `runBenchmark` runs each query through `search`, normalizes paths to absolute, and computes three metrics per query: recall at K (fraction of expected files found in top-K), reciprocal rank (1/rank of the first expected file, 0 if none), and hit (at least one expected file found). The summary aggregates these as `recallAtK` (mean recall), `mrr` (mean reciprocal rank), and `zeroMissRate` (fraction of queries where no expected file appeared). Config fields `benchmarkTopK` (default 5) and `benchmarkMinRecall` (default 0.8) and `benchmarkMinMrr` (default 0.6) set pass/fail thresholds used by the `benchmark` CLI command.
+### `src/search/benchmark.ts` — quality measurement harness
 
-### `src/search/eval.ts` — Agent-level eval harness
+`BenchmarkQuery` is a `{ query, expected }` pair where `expected` lists the file paths a correct retrieval should surface. `BenchmarkResult` is the per-query outcome (`recall`, `reciprocalRank`, `hit`); `BenchmarkSummary` aggregates them into `recallAtK`, `mrr`, and `zeroMissRate`.
 
-`src/search/eval.ts` provides a higher-level eval for measuring the impact of RAG on agent task performance. An eval task is a `{ task, grading, expectedFiles? }` object. `runEvalTask` simulates two conditions: `"with-rag"` runs a semantic search on the task description and returns what was found; `"without-rag"` returns empty results. `runEval` runs all tasks under both conditions and computes averages for search result count, files referenced, duration, and file hit rate. `saveEvalTraces` persists full `EvalTrace` objects to a JSON file for offline inspection. The eval harness is primarily a developer tool for before/after comparison when changing search parameters.
+`loadBenchmarkQueries(path)` parses a JSON file and validates the shape (must be an array; every entry needs `query` string and a non-empty `expected` array). `runBenchmark` calls `loadConfig(projectDir)` once, then runs `search(...)` per query at a fixed `topK = 5` (or whatever the caller passes) using `hybridWeight ?? config.hybridWeight`. The internal `normalizePath` resolves relative `expected` paths against the project root so authors can write either form. `formatBenchmarkReport` renders the results into the human-readable text the `bun run benchmark` and `bun run benchmark-models` commands print.
+
+### `src/search/eval.ts` — A/B agent harness
+
+`EvalTask` carries a `task` string, a `grading` rubric, and an optional `expectedFiles` array. `EvalTrace` records what an agent run looked like (`condition`, `searchResults`, `filesReferenced`, `searchCount`, `durationMs`); `EvalSummary` aggregates `with-rag` against `without-rag` so the eval can answer "did RAG help".
+
+`runEval` iterates tasks, calls `runEvalTask` once with `condition: "with-rag"` and once with `"without-rag"`, accumulates traces, and computes the two-sided summary. `runEvalTask` simulates an agent's lookup behaviour: in `with-rag` it runs `search(...)` against the task description and returns what was found; in `without-rag` it returns empty results. `saveEvalTraces(traces, outputPath)` writes the full trace JSON to disk for later replay or post-hoc grading. `formatEvalReport` is the matching pretty-printer used by `bun run eval`.
 
 ## How it works
 
 ```mermaid
 sequenceDiagram
-    participant MCP as "MCP tool handler"
-    participant hybridSrc as "src/search/hybrid.ts"
-    participant embedder as "src/embeddings/embed.ts"
-    participant db as "RagDB"
-    participant fts as "FTS5 index"
-    participant vec as "vec_chunks"
-
-    MCP->>hybridSrc: search(query, db, topK, ...)
-    hybridSrc->>embedder: embed(query)
-    embedder-->>hybridSrc: Float32Array
-    hybridSrc->>vec: vectorSearch(embedding, topK*4)
-    vec-->>hybridSrc: SearchResult[]
-    hybridSrc->>fts: textSearch(sanitizeFTS(query), topK*4)
-    fts-->>hybridSrc: SearchResult[]
-    hybridSrc->>hybridSrc: mergeHybridScores(vector, text, weight)
-    hybridSrc->>hybridSrc: dedup by file path
-    hybridSrc->>db: searchSymbols(identifiers) [optional]
-    hybridSrc->>hybridSrc: applyPathBoost / applyFilenameBoost / applyGraphBoost
-    hybridSrc->>hybridSrc: expandForDocs
-    hybridSrc->>db: logQuery(query, results, durationMs)
-    hybridSrc-->>MCP: DedupedResult[]
+    participant caller as "search caller"
+    participant hybrid as "src/search/hybrid.ts"
+    participant embedFn as "embed"
+    participant ragdb as "RagDB"
+    participant scorer as "boost stack"
+    caller->>hybrid: "search query topK threshold weight"
+    hybrid->>embedFn: "embed query"
+    embedFn-->>hybrid: "Float32Array"
+    hybrid->>ragdb: "vector + FTS searches"
+    ragdb-->>hybrid: "candidate rows"
+    hybrid->>hybrid: "mergeHybridScores"
+    hybrid->>hybrid: "dedup by path"
+    hybrid->>ragdb: "searchSymbols on identifiers"
+    ragdb-->>hybrid: "exact name hits"
+    hybrid->>scorer: "applyPathBoost"
+    hybrid->>scorer: "applyFilenameBoost"
+    hybrid->>scorer: "applyGraphBoost"
+    hybrid->>hybrid: "expandForDocs"
+    hybrid->>ragdb: "logQuery analytics"
+    hybrid-->>caller: "DedupedResult list"
 ```
 
-Both `search` and `searchChunks` fetch `topK * 4` results from each source to give the merge and deduplication stages enough candidates. FTS queries are wrapped in a try/catch — if the FTS5 index is corrupt or the query triggers a parse error, the function falls back to vector-only results and logs a debug message. The query is always logged at the end, regardless of whether it returned results.
+The flow above is the file-level path. The chunk-level path (`searchChunks`) is identical through the merge, then differs in the score-adjust stage (boosts inlined into one map per chunk), uses `groupByParent` instead of file dedup, and shares the same `expandForDocs` and `logQuery` tail. Every search — file or chunk — costs one embed call plus two SQL queries plus N symbol-expansion lookups (one per identifier extracted from the query) plus one `getImportersOf` per result. The bulk of the time is the embed call; the SQL path is sub-millisecond on a warm WAL.
 
 ## Dependencies and consumers
 
 ```mermaid
 flowchart LR
-    configSrc["src/config/index.ts"]
-    dbSrc["src/db/index.ts"]
-    embedSrc["src/embeddings/embed.ts"]
-    logSrc["src/utils/log.ts"]
-
-    subgraph searchComm ["src/search/"]
-        hybridSrc["hybrid.ts"]
-        usagesSrc["usages.ts"]
-        benchSrc["benchmark.ts"]
-        evalSrc["eval.ts"]
-    end
-
-    configSrc --> hybridSrc
-    configSrc --> benchSrc
-    configSrc --> evalSrc
-    dbSrc --> hybridSrc
-    dbSrc --> benchSrc
-    dbSrc --> evalSrc
-    embedSrc --> hybridSrc
-    logSrc --> hybridSrc
-    usagesSrc --> dbSrc
-
-    hybridSrc --> benchSrc
-    hybridSrc --> evalSrc
+    hybrid["src/search/hybrid.ts"]
+    bench["src/search/benchmark.ts"]
+    evalMod["src/search/eval.ts"]
+    usagesMod["src/search/usages.ts"]
+    embedMod["src/embeddings/embed.ts"]
+    ragdb["src/db/index.ts"]
+    cfg["src/config/index.ts"]
+    logMod["src/utils/log.ts"]
+    hybrid --> embedMod
+    hybrid --> ragdb
+    hybrid --> logMod
+    bench --> hybrid
+    bench --> ragdb
+    bench --> cfg
+    evalMod --> hybrid
+    evalMod --> ragdb
+    evalMod --> cfg
+    usagesMod --> ragdb
+    consumers["CLI commands · benchmarks · MCP tools"]
+    consumers --> hybrid
+    consumers --> bench
+    consumers --> evalMod
 ```
 
-The search community is consumed by MCP tool handlers (`src/tools/search.ts`, `src/tools/wiki-tools.ts`), CLI commands (`search-cmd.ts`, `demo.ts`, `benchmark.ts`, `eval.ts`), and benchmarks. `src/search/usages.ts` flows in the opposite direction — it is consumed by the DB layer, not by the hybrid engine itself.
+Internally `benchmark.ts` and `eval.ts` both import `search` from `hybrid.ts`, so the harness measures the production query path rather than a fork. `usages.ts` is leaf-level — its consumers are the three DB modules that need FTS sanitisation (`src/db/search.ts`, `src/db/conversation.ts`, `src/db/git-history.ts`). On the consumer side, 24 external files reach into this community (the search/read CLI commands, every quality benchmark in `benchmarks/`, the MCP search tools, and the demo runner).
 
 ## Internals
 
-**FTS fallback is silent.** When the FTS query throws (malformed query, corrupt index), `search` and `searchChunks` catch the error, log at `debug` level, and continue with vector-only results. Callers have no way to detect the fallback. This is intentional — a degraded but functional search is better than a thrown error in an MCP call.
+The over-fetch factor is `topK * 4` for both the vector and FTS legs. The headroom is consumed by file-level dedup (which collapses many sibling chunks into a single per-file entry), the boost-driven re-sort, and the doc expansion. Without it, a top-5 query would routinely return three or four results because dedup removed the rest.
 
-**Symbol expansion runs on every query that contains an identifier.** `extractIdentifiers` scans the query for camelCase, PascalCase, snake_case, and dotted identifiers at least 3 characters long and not in `STOP_WORDS`. For each identifier, `db.searchSymbols(id, true, undefined, 5)` runs an exact case-insensitive match. A query like `"how does configureEmbedder work"` will also run a symbol lookup for `configureEmbedder`, boosting any file that exports that exact symbol.
+The merge uses a `Map<string, ...>` keyed by `path:chunkIndex`. That key is sufficient because `chunkIndex` is unique within a file in the chunks table. Two chunks with the same `chunkIndex` from the same path is a database invariant violation, not a query-time concern.
 
-**Boilerplate demotion applies before filename affinity.** If a file is in `BOILERPLATE_BASENAMES`, it receives the `0.8` multiplier and filename-affinity boosting is skipped for it entirely — the two are not combined.
+`mergeHybridScores` does not weight separately — both `vectorScore` and `textScore` are already on the `0..1` axis (`1 / (1 + distance)` and `1 / (1 + abs(rank))` from `src/db/search.ts`), so the linear interpolation `hybridWeight * v + (1 - hybridWeight) * t` is meaningful. Setting `hybridWeight = 1` collapses to vector-only; `hybridWeight = 0` collapses to FTS-only. The default `0.7` was chosen to favour semantic similarity but keep keyword matches above the noise floor.
 
-**Generated file demotion requires explicit config.** The `GENERATED_DEMOTION = 0.75` multiplier only applies when `config.generated` lists glob patterns. The default `generated: []` means no files are demoted as generated unless the user configures them in `.mimirs/config.json`.
+Symbol expansion runs `db.searchSymbols(id, true, undefined, 5)` — the `exact = true` flag is critical. Prefix matches at the symbol expansion stage produce too many false positives (typing "search" matches every `*search*` symbol in the project); requiring an exact case-insensitive match is what lets the score `0.75` and the `1.3x` boost be aggressive without pulling unrelated files into the top results.
 
-**Doc expansion can increase result count above topK.** When the initial top-K contains `D` doc files alongside at least one code file, the returned slice is `pool.slice(0, topK + D)`. Callers that assume exactly `topK` results will see more. The MCP tool handler in `src/tools/search.ts` passes this through without capping.
+The path-boost regexes (`TEST_PATTERNS`, `SOURCE_PATTERNS`) are deliberately Unix-flavoured but tolerate `\\` separators so Windows paths still match. Tests demote by `0.85x`; source by `1.1x`. A path that matches both — for example a file living under a `__tests__` directory beneath `src` — gets only the test demotion because the `if (isTest) ... else if (isSource)` branch order is fixed.
 
-**`logQuery` is always called, even on empty results.** This means every search — including failed or empty ones — appears in `query_log`, which is by design: zero-result queries are precisely what `getAnalytics` surfaces as `zeroResultQueries`.
+`applyGraphBoost` is additive (`score + boost`), not multiplicative, because importer counts are heavy-tailed. Multiplying would let a `RagDB`-imported `src/db/index.ts` dominate every query; adding `0.05 * log2(N + 1)` keeps the bonus capped (e.g. ~`0.30` for 64 importers) regardless of how widely a module is used.
+
+`STOP_WORDS` covers more than English filler — it deliberately includes coding noise like `class`, `function`, `path`, `query`, `result`. Without these, identifier extraction would expand "find the search query handler" into `["find", "search", "query", "handler"]` and run four symbol lookups, three of which would be noise.
+
+`searchChunks` runs the same boost math inline rather than via the helper functions. That is partly performance (one map pass instead of three) and partly because the helpers operate on `DedupedResult` (which has `snippets: string[]`), while chunk-level results are `ChunkSearchResult` (`content: string`, plus line range).
 
 ## Invariants
 
-- `mergeHybridScores` requires that `vectorResults` and `textResults` use the same `path + chunkIndex` key space. Mixing file-level and chunk-level results in the same call produces undefined behavior.
-- FTS queries must be sanitized with `sanitizeFTS` before passing to `db.textSearch`. Passing raw user strings may trigger FTS5 query syntax errors.
-- `hybridWeight` must be in `[0, 1]`. Values outside this range produce scores that can exceed 1 or go negative, breaking the boost arithmetic.
-- `topK` must be positive. Passing 0 or negative values causes the SQL LIMIT to misbehave in SQLite's vec0 virtual table.
-- The `generatedPatterns` list must use glob patterns compatible with `buildGeneratedMatcher` — only `dir/**`, `**/*suffix`, and `**/prefix*` forms are recognized; other patterns fall back to a substring regex match on the full path.
+`mergeHybridScores` requires both inputs to have already-normalised scores. The DB layer guarantees this — every `SearchResult` and `ChunkSearchResult` from `src/db/search.ts` carries `1 / (1 + distance)` or `1 / (1 + abs(rank))`. New search backends must produce scores on the same axis or the linear interpolation becomes meaningless.
+
+Path filters must be applied at the SQL layer *and* at the symbol-expansion layer. `matchesFilter` exists for the second — without it, an `excludeDirs: ["node_modules"]` filter would still leak symbol-expanded results from there.
+
+`db.searchSymbols(..., exact = true)` is the only mode used in production search. The non-exact mode exists for the `search_symbols` MCP tool and listings; using it in `search()` would saturate the candidate pool with prefix noise.
+
+Every query path that lands in a result is logged via `db.logQuery`. This is what powers `mimirs analytics` and the `search_analytics` MCP tool — analytics gaps are caused by callers reaching into `RagDB.search` directly instead of through `hybrid.search`.
+
+`expandForDocs` returns at most `topK + docCount` results and never fewer than the original `topK` slice. If both `docCount` and `codeCount` are zero (impossible in practice — empty pool would never reach this branch), it falls through to the `slice(0, topK)` early return.
 
 ## Failure modes
 
-**FTS index corruption.** If `fts_chunks` is corrupted (can happen with interrupted writes or extension mismatches), `db.textSearch` will throw on every call. `search` and `searchChunks` catch this and fall back to vector-only silently. Recovery requires rebuilding the FTS index: `INSERT INTO fts_chunks(fts_chunks) VALUES ('rebuild')`.
+The FTS branch is wrapped in `try/catch` in both `search` and `searchChunks`. When `db.textSearch` throws (typically because `sanitizeFTS` was bypassed and a raw user query hit the FTS5 parser), the error is logged via `log.debug` with context `"search"` and the merge proceeds with an empty `textResults` — i.e. vector-only. The caller never sees an error from FTS issues; the trade-off is that BM25 contributions silently drop until someone notices the score profile change.
 
-**Dimension mismatch on embed output.** If `configureEmbedder` was called with a different model than was used to build the index, the query embedding will have a different dimension than the stored embeddings. `sqlite-vec` will throw a dimension mismatch error that propagates to the caller as an uncaught exception — it is not caught inside `search`.
+Symbol expansion swallows zero results gracefully. When `extractIdentifiers` returns an empty array (queries with no identifier-shaped tokens, e.g. a pure prose question), the symbol-merge loop is skipped entirely. The `mergeSymbolResults` call also tolerates an empty `symbolPaths` argument and is a no-op in that case.
 
-**Symbol expansion on very long queries.** `extractIdentifiers` applies the `IDENTIFIER_RE` regex to the full query string. Extremely long queries (>2000 chars, which the MCP schema allows) with many identifiers trigger O(identifiers) symbol lookups, each with a DB round-trip. The MCP handler limits queries to 2000 chars; the CLI does not enforce a limit.
+`applyGraphBoost` calls `db.getFileByPath(r.path)` per result. When the path is not in the index (rare — would mean the search returned a file the index does not know about), the helper returns the result unchanged. The same is true of `applyGraphBoost` in `searchChunks`: a missing file leaves `boost = 0`.
 
-**Empty FTS match from over-aggressive sanitization.** `sanitizeFTS` filters out empty tokens and returns `'""'` for an all-whitespace query. This triggers an FTS5 query that matches nothing, which is correct behavior — the fallback to vector-only provides results.
+`groupByParent` caches `db.getChunkById` per parent in `parentCache` and tolerates `null` returns: a missing parent (chunk deleted between query and parent fetch — race against re-indexing) is replaced by keeping the children individually. The function never returns fewer chunks than it received, only the same set re-shaped.
+
+`runBenchmark` validates the shape of the input file at load time and throws an `Error` with the offending JSON inlined when an entry is malformed. The CLI command handles this by printing the message and exiting non-zero — no partial benchmark runs survive a bad input file.
+
+`db.logQuery` failures are not caught here. The DB layer is expected to handle write failures internally; a thrown exception from `logQuery` would propagate up to the caller, which in the CLI is fine but in the MCP path is wrapped at a higher layer.
 
 ## See also
 

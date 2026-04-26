@@ -1,8 +1,8 @@
 {
   "version": 3,
-  "generatedAt": "2026-04-26T07:05:28.633Z",
-  "lastGitRef": "79e963f",
-  "pageCount": 22,
+  "generatedAt": "2026-04-26T12:45:46.086Z",
+  "lastGitRef": "b47d98e",
+  "pageCount": 25,
   "pages": {
     "wiki/communities/cli-commands.md": {
       "kind": "community",
@@ -155,7 +155,7 @@
         "wiki/architecture.md",
         "wiki/communities/community-detection.md",
         "wiki/communities/db-layer.md",
-        "wiki/communities/wiki-orchestrator.md",
+        "wiki/communities/wiki-orchestration.md",
         "wiki/communities/wiki-pipeline-internals/community-synthesis.md",
         "wiki/communities/wiki-pipeline-internals/content-prefetch.md",
         "wiki/communities/wiki-pipeline-internals/src-db-types-ts.md",
@@ -295,78 +295,155 @@
       "relatedPages": [
         "wiki/architecture.md",
         "wiki/communities/config-embeddings.md",
-        "wiki/communities/conversation-server.md",
-        "wiki/communities/wiki-orchestrator.md",
+        "wiki/communities/indexing-runtime.md",
+        "wiki/communities/wiki-orchestration.md",
         "wiki/data-flows.md",
         "wiki/getting-started.md"
       ],
       "order": 3
     },
-    "wiki/communities/wiki-orchestrator.md": {
+    "wiki/communities/indexing-runtime.md": {
       "kind": "community",
-      "slug": "wiki-orchestrator",
-      "title": "Wiki Orchestrator & MCP Tools",
-      "purpose": "Documents the wiki orchestration layer: the generate_wiki MCP tool handlers, the wiki/index.ts barrel, the lint-page validator, the section catalog registry, and the update log writer. Read this to understand how a generate_wiki() call becomes a page payload.",
+      "slug": "indexing-runtime",
+      "title": "Indexing runtime",
+      "purpose": "Walks the project tree, parses and chunks files, embeds them into the RAG DB, watches for changes, and resolves the import graph that downstream search and wiki tooling depend on.",
       "sections": [
         {
+          "title": "Entry points",
+          "purpose": "Surface the public functions consumers reach first when ingesting a project or generating a project map.",
+          "shape": "bulleted list of exports with 1-line purpose each"
+        },
+        {
           "title": "Per-file breakdown",
-          "purpose": "Give each load-bearing file its own prose section — role, key exports, constants worth citing, and the non-obvious behavior a reader would miss from signatures alone.",
-          "shape": "per-file-breakdown"
+          "purpose": "Give each load-bearing file its own prose section — role, key exports, constants worth citing, and the non-obvious behavior a reader would miss from signatures alone. This is what distinguishes a wiki from a signature dump. When the link map ships sub-pages for big members, SKIP those files here (the sub-page covers them) — cover only the members that don't have a sub-page.",
+          "shape": "One `### path/to/file.ts — <short role label>` heading per member file that does NOT have a sub-page in the link map (order by per-file PageRank). Each section: 2-6 sentences of prose naming the file's role in the community, the 2-4 most important exports with what they do (not just signatures), any named constants with their values (e.g. `DEFAULT_HYBRID_WEIGHT = 0.7`), and one or two gotchas worth knowing. No redundant signature tables — the prose carries the information."
         },
         {
           "title": "How it works",
-          "purpose": "Trace the runtime flow from an MCP generate_wiki call through the orchestrator phases to the page payload returned to the caller.",
-          "shape": "lifecycle-flow"
+          "purpose": "Trace the runtime flow across the community's files — a caller triggers work that fans out through internal files to a sink. The diagram shows who calls whom; the numbered steps say what happens at each hop. Required for any multi-file community.",
+          "shape": "A `sequenceDiagram` mermaid block showing the real participants (use concrete file/function names, not placeholders), followed by a numbered prose list citing specific files and line ranges for each step. Skip only when the community is a static utility bag with no runtime flow."
         },
         {
           "title": "Dependencies and consumers",
-          "purpose": "Show who this community imports from and who imports it, at a glance.",
-          "shape": "dependency-graph"
-        },
-        {
-          "title": "Tuning",
-          "purpose": "Parameters or config flags that change behavior without code edits — section catalog entries, lint rule thresholds, split community triggers.",
-          "shape": "tuning-knobs"
+          "purpose": "Show who this community imports from and who imports it, at a glance. Required whenever the community has a meaningful edge count so readers can see the blast radius before touching code.",
+          "shape": "A `flowchart LR` mermaid block with an `Upstream` subgraph (external dependencies), the community name as the central node, and a `Downstream` subgraph (external consumers). Use real file/module names, not placeholders. Follow the diagram with a compact bulleted list: `Depends on:` and `Depended on by:` pointing to wiki pages where they exist."
         },
         {
           "title": "Internals",
-          "purpose": "Surface the insider knowledge that's not obvious from signatures — lint warning kinds, breadcrumb vs. suggested-query distinction, section catalog lookup mechanics.",
-          "shape": "internals"
+          "purpose": "Surface the insider knowledge that's not obvious from signatures — tuning knobs masquerading as constants, silent fallbacks, guards against conditions that can't occur, heuristics with blind spots. This is where someone who wrote the code would drop hints a reader would otherwise have to hit a bug to learn.",
+          "shape": "Bulleted list. Each bullet leads with a bold claim (usually a named symbol or behavior), then 1-3 sentences of elaboration citing the specific file and line or constant. Prefer concrete numbers over generic prose."
+        },
+        {
+          "title": "Tuning",
+          "purpose": "Parameters or config flags that change behavior without code edits",
+          "shape": "table: name / default / effect / when to change"
+        },
+        {
+          "title": "Failure modes",
+          "purpose": "Cover what happens when parsing fails, the watcher loses events, or the directory check refuses to index — and what callers must do.",
+          "shape": "bulleted list of failure modes, each with cause / behavior / caller action"
+        }
+      ],
+      "depth": "full",
+      "memberFiles": [
+        "src/graph/resolver.ts",
+        "src/indexing/chunker.ts",
+        "src/indexing/indexer.ts",
+        "src/indexing/parse.ts",
+        "src/indexing/watcher.ts",
+        "src/utils/dir-guard.ts"
+      ],
+      "communityId": "2524c69a117484b6",
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/cli-commands.md",
+        "wiki/communities/config-embeddings.md",
+        "wiki/communities/conversation-server.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 4
+    },
+    "wiki/communities/wiki-orchestration.md": {
+      "kind": "community",
+      "slug": "wiki-orchestration",
+      "title": "Wiki orchestration",
+      "purpose": "Top-level wiki pipeline surface: bundles communities, drives the synthesis prompt, lints rendered pages, diffs against snapshots, and writes the human-facing update log that ties regen runs to git refs.",
+      "sections": [
+        {
+          "title": "Entry points",
+          "purpose": "Surface the public functions and MCP tools that callers reach when running, resuming, linting, or diffing a wiki regen.",
+          "shape": "bulleted list of exports with 1-line purpose each"
+        },
+        {
+          "title": "Per-file breakdown",
+          "purpose": "Give each load-bearing file its own prose section — role, key exports, constants worth citing, and the non-obvious behavior a reader would miss from signatures alone. This is what distinguishes a wiki from a signature dump. When the link map ships sub-pages for big members, SKIP those files here (the sub-page covers them) — cover only the members that don't have a sub-page.",
+          "shape": "One `### path/to/file.ts — <short role label>` heading per member file that does NOT have a sub-page in the link map (order by per-file PageRank). Each section: 2-6 sentences of prose naming the file's role in the community, the 2-4 most important exports with what they do (not just signatures), any named constants with their values (e.g. `DEFAULT_HYBRID_WEIGHT = 0.7`), and one or two gotchas worth knowing. No redundant signature tables — the prose carries the information."
+        },
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow across the community's files — a caller triggers work that fans out through internal files to a sink. The diagram shows who calls whom; the numbered steps say what happens at each hop. Required for any multi-file community.",
+          "shape": "A `sequenceDiagram` mermaid block showing the real participants (use concrete file/function names, not placeholders), followed by a numbered prose list citing specific files and line ranges for each step. Skip only when the community is a static utility bag with no runtime flow."
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance. Required whenever the community has a meaningful edge count so readers can see the blast radius before touching code.",
+          "shape": "A `flowchart LR` mermaid block with an `Upstream` subgraph (external dependencies), the community name as the central node, and a `Downstream` subgraph (external consumers). Use real file/module names, not placeholders. Follow the diagram with a compact bulleted list: `Depends on:` and `Depended on by:` pointing to wiki pages where they exist."
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface the insider knowledge that's not obvious from signatures — tuning knobs masquerading as constants, silent fallbacks, guards against conditions that can't occur, heuristics with blind spots. This is where someone who wrote the code would drop hints a reader would otherwise have to hit a bug to learn.",
+          "shape": "Bulleted list. Each bullet leads with a bold claim (usually a named symbol or behavior), then 1-3 sentences of elaboration citing the specific file and line or constant. Prefer concrete numbers over generic prose."
+        },
+        {
+          "title": "Tuning",
+          "purpose": "Parameters or config flags that change behavior without code edits",
+          "shape": "table: name / default / effect / when to change"
         },
         {
           "title": "Why it's built this way",
-          "purpose": "Explain non-obvious structural decisions and the alternatives rejected.",
-          "shape": "design-rationale"
+          "purpose": "Explain non-obvious structural decisions and the alternatives rejected",
+          "shape": "short prose, one paragraph per decision, leading with the decision and following with the reason"
         },
         {
           "title": "Trade-offs",
-          "purpose": "Name the gains and costs of the current design so a future maintainer can tell whether a constraint is load-bearing.",
-          "shape": "trade-offs"
+          "purpose": "Name the gains and costs of the current design so a future maintainer can tell whether a constraint is load-bearing. Different from `design-rationale` in framing: rationale explains why the alternative was rejected; trade-offs explain what the current choice gives up. Use for communities where multiple reasonable designs exist and the chosen one commits to one set of properties at the expense of another.",
+          "shape": "Bulleted list. Each bullet opens with the chosen property in bold, then a `Cost:` clause naming what was given up and why it's acceptable here."
         },
         {
           "title": "Common gotchas",
-          "purpose": "Things a first-time reader of this community will get wrong.",
-          "shape": "common-gotchas"
+          "purpose": "Things a first-time reader of this community will get wrong. Shorter and more pragmatic than `known-issues`: these aren't bugs, they're counter-intuitive facts about how the code behaves. Think: \"I spent two hours on X before realising Y.\" Required for deep/high-LOC communities where the signatures don't reveal the whole story.",
+          "shape": "Bulleted list. Each bullet: short bold claim (often a symbol or behavior), then 1–2 sentences of elaboration. Cite file:line or constant. Keep each gotcha under three sentences."
+        },
+        {
+          "title": "Sub-pages",
+          "purpose": "One bullet per big-member sub-page in the link map: `- [sub-page title](./<slug>/<sub-slug>.md) — <1-line role>`. Omit the section entirely if the link map has no sub-pages. Small members are NOT listed here — they live inline in the per-file-breakdown section.",
+          "shape": "bulleted list: [sub-page](relative link) — 1-line role"
         }
       ],
       "depth": "full",
       "memberFiles": [
         "src/tools/wiki-tools.ts",
+        "src/wiki/diff-page.ts",
         "src/wiki/index.ts",
         "src/wiki/lint-page.ts",
         "src/wiki/section-catalog.ts",
         "src/wiki/update-log.ts"
       ],
-      "communityId": "bef3a1fcc8697bd9",
+      "communityId": "3272d1b8d89f87ce",
       "relatedPages": [
         "wiki/architecture.md",
         "wiki/communities/db-layer.md",
         "wiki/communities/mcp-tools.md",
+        "wiki/communities/wiki-orchestration/index.md",
+        "wiki/communities/wiki-orchestration/lint-page.md",
+        "wiki/communities/wiki-orchestration/update-log.md",
+        "wiki/communities/wiki-orchestration/wiki-tools.md",
         "wiki/communities/wiki-pipeline-internals.md",
         "wiki/data-flows.md",
         "wiki/getting-started.md"
       ],
-      "order": 4
+      "order": 5
     },
     "wiki/communities/cli-entry-core.md": {
       "kind": "community",
@@ -412,62 +489,7 @@
         "wiki/architecture.md",
         "wiki/communities/cli-commands.md",
         "wiki/communities/git-indexer-progress.md",
-        "wiki/communities/indexing-pipeline.md",
-        "wiki/data-flows.md",
-        "wiki/getting-started.md"
-      ],
-      "order": 5
-    },
-    "wiki/communities/indexing-pipeline.md": {
-      "kind": "community",
-      "slug": "indexing-pipeline",
-      "title": "Indexing Pipeline",
-      "purpose": "Documents the file ingestion pipeline: directory validation, file parsing, AST-aware chunking, embedding, and DB upsert. The authoritative reference for adding new language support or tuning chunk behavior.",
-      "sections": [
-        {
-          "title": "Per-file breakdown",
-          "purpose": "Give each load-bearing file its own prose section — role, key exports, constants worth citing, and the non-obvious behavior a reader would miss from signatures alone.",
-          "shape": "per-file-breakdown"
-        },
-        {
-          "title": "How it works",
-          "purpose": "Trace the runtime flow from indexDirectory() entry through parse, chunk, embed, and DB upsert.",
-          "shape": "lifecycle-flow"
-        },
-        {
-          "title": "Dependencies and consumers",
-          "purpose": "Show who this community imports from and who imports it, at a glance.",
-          "shape": "dependency-graph"
-        },
-        {
-          "title": "Tuning",
-          "purpose": "Parameters or config flags that change behavior without code edits — KNOWN_EXTENSIONS set, chunk size limits.",
-          "shape": "tuning-knobs"
-        },
-        {
-          "title": "Internals",
-          "purpose": "Surface the insider knowledge that's not obvious from signatures — extension detection fallbacks, parent chunk mechanics, incremental hash checks.",
-          "shape": "internals"
-        },
-        {
-          "title": "Failure modes",
-          "purpose": "Call out how things break, what the module does about it, and what callers must handle.",
-          "shape": "failure-modes"
-        }
-      ],
-      "depth": "full",
-      "memberFiles": [
-        "src/indexing/chunker.ts",
-        "src/indexing/indexer.ts",
-        "src/indexing/parse.ts",
-        "src/utils/dir-guard.ts"
-      ],
-      "communityId": "af79ae68a38bcfd5",
-      "relatedPages": [
-        "wiki/architecture.md",
-        "wiki/communities/cli-commands.md",
-        "wiki/communities/config-embeddings.md",
-        "wiki/communities/conversation-server.md",
+        "wiki/communities/indexing-runtime.md",
         "wiki/data-flows.md",
         "wiki/getting-started.md"
       ],
@@ -571,7 +593,7 @@
         "wiki/architecture.md",
         "wiki/communities/cli-commands.md",
         "wiki/communities/config-embeddings.md",
-        "wiki/communities/indexing-pipeline.md",
+        "wiki/communities/indexing-runtime.md",
         "wiki/data-flows.md",
         "wiki/getting-started.md"
       ],
@@ -618,7 +640,7 @@
       "relatedPages": [
         "wiki/architecture.md",
         "wiki/communities/db-layer.md",
-        "wiki/communities/wiki-orchestrator.md",
+        "wiki/communities/wiki-orchestration.md",
         "wiki/communities/wiki-pipeline-internals.md",
         "wiki/data-flows.md",
         "wiki/getting-started.md"
@@ -724,54 +746,6 @@
       ],
       "order": 11
     },
-    "wiki/communities/graph-watcher.md": {
-      "kind": "community",
-      "slug": "graph-watcher",
-      "title": "Import Graph & File Watcher",
-      "purpose": "Documents the static import graph resolver and the filesystem watcher: how inter-file dependencies are extracted and persisted, and how file-change events trigger incremental re-indexing. The reference for understanding dependency tracking and live-index updates.",
-      "sections": [
-        {
-          "title": "How it works",
-          "purpose": "Trace the runtime flow from resolveImports() through per-file import resolution and DB upsert, and the parallel path where startWatcher() responds to fs events.",
-          "shape": "lifecycle-flow"
-        },
-        {
-          "title": "Dependencies and consumers",
-          "purpose": "Show who this community imports from and who imports it, at a glance.",
-          "shape": "dependency-graph"
-        },
-        {
-          "title": "Internals",
-          "purpose": "Surface the insider knowledge that's not obvious from signatures — path-to-id map construction, import resolution heuristics, watcher debounce mechanics.",
-          "shape": "internals"
-        },
-        {
-          "title": "Entry points",
-          "purpose": "List the public surface a consumer reaches first.",
-          "shape": "entry-points"
-        },
-        {
-          "title": "Failure modes",
-          "purpose": "Call out how things break, what the module does about it, and what callers must handle.",
-          "shape": "failure-modes"
-        }
-      ],
-      "depth": "full",
-      "memberFiles": [
-        "src/graph/resolver.ts",
-        "src/indexing/watcher.ts"
-      ],
-      "communityId": "eb1906b45cbc92a9",
-      "relatedPages": [
-        "wiki/architecture.md",
-        "wiki/communities/cli-commands.md",
-        "wiki/communities/db-layer.md",
-        "wiki/communities/indexing-pipeline.md",
-        "wiki/data-flows.md",
-        "wiki/getting-started.md"
-      ],
-      "order": 12
-    },
     "wiki/communities/cli-setup.md": {
       "kind": "community",
       "slug": "cli-setup",
@@ -817,7 +791,7 @@
         "wiki/data-flows.md",
         "wiki/getting-started.md"
       ],
-      "order": 13
+      "order": 12
     },
     "wiki/communities/search-tool.md": {
       "kind": "community",
@@ -852,7 +826,7 @@
         "wiki/data-flows.md",
         "wiki/getting-started.md"
       ],
-      "order": 14
+      "order": 13
     },
     "wiki/communities/wiki-pipeline-internals/src-db-types-ts.md": {
       "kind": "community-file",
@@ -890,7 +864,7 @@
         "wiki/data-flows.md",
         "wiki/getting-started.md"
       ],
-      "order": 15
+      "order": 14
     },
     "wiki/communities/wiki-pipeline-internals/community-synthesis.md": {
       "kind": "community-file",
@@ -928,7 +902,7 @@
         "wiki/data-flows.md",
         "wiki/getting-started.md"
       ],
-      "order": 16
+      "order": 15
     },
     "wiki/communities/wiki-pipeline-internals/content-prefetch.md": {
       "kind": "community-file",
@@ -966,7 +940,7 @@
         "wiki/data-flows.md",
         "wiki/getting-started.md"
       ],
-      "order": 17
+      "order": 16
     },
     "wiki/communities/wiki-pipeline-internals/src-wiki-types-ts.md": {
       "kind": "community-file",
@@ -1004,7 +978,159 @@
         "wiki/data-flows.md",
         "wiki/getting-started.md"
       ],
+      "order": 17
+    },
+    "wiki/communities/wiki-orchestration/wiki-tools.md": {
+      "kind": "community-file",
+      "slug": "wiki-orchestration/wiki-tools",
+      "title": "src/tools/wiki-tools.ts",
+      "purpose": "Per-file detail for `src/tools/wiki-tools.ts` — a member of the Wiki orchestration community.",
+      "sections": [
+        {
+          "title": "Role",
+          "purpose": "1-2 sentences naming the file's role in the parent community: what concern it owns, what other members it leans on.",
+          "shape": "short prose paragraph"
+        },
+        {
+          "title": "Exports",
+          "purpose": "Every export from this file with signature + 1-sentence description of what it does (not just types). Quote constants verbatim (e.g. `DEFAULT_WEIGHT = 0.7`).",
+          "shape": "markdown table: Name | Kind | Signature | What it does"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Non-obvious behavior a reader would miss from signatures alone — silent fallbacks, tuning knobs disguised as constants, defensive guards, heuristics with blind spots. Skip if the file is pure signature glue.",
+          "shape": "bulleted list: bold claim, then 1-3 sentences of elaboration with file:line references"
+        }
+      ],
+      "depth": "standard",
+      "memberFiles": [
+        "src/tools/wiki-tools.ts"
+      ],
+      "communityId": "3272d1b8d89f87ce",
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/wiki-orchestration.md",
+        "wiki/communities/wiki-orchestration/index.md",
+        "wiki/communities/wiki-orchestration/lint-page.md",
+        "wiki/communities/wiki-orchestration/update-log.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
       "order": 18
+    },
+    "wiki/communities/wiki-orchestration/index.md": {
+      "kind": "community-file",
+      "slug": "wiki-orchestration/index",
+      "title": "src/wiki/index.ts",
+      "purpose": "Per-file detail for `src/wiki/index.ts` — a member of the Wiki orchestration community.",
+      "sections": [
+        {
+          "title": "Role",
+          "purpose": "1-2 sentences naming the file's role in the parent community: what concern it owns, what other members it leans on.",
+          "shape": "short prose paragraph"
+        },
+        {
+          "title": "Exports",
+          "purpose": "Every export from this file with signature + 1-sentence description of what it does (not just types). Quote constants verbatim (e.g. `DEFAULT_WEIGHT = 0.7`).",
+          "shape": "markdown table: Name | Kind | Signature | What it does"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Non-obvious behavior a reader would miss from signatures alone — silent fallbacks, tuning knobs disguised as constants, defensive guards, heuristics with blind spots. Skip if the file is pure signature glue.",
+          "shape": "bulleted list: bold claim, then 1-3 sentences of elaboration with file:line references"
+        }
+      ],
+      "depth": "standard",
+      "memberFiles": [
+        "src/wiki/index.ts"
+      ],
+      "communityId": "3272d1b8d89f87ce",
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/wiki-orchestration.md",
+        "wiki/communities/wiki-orchestration/lint-page.md",
+        "wiki/communities/wiki-orchestration/update-log.md",
+        "wiki/communities/wiki-orchestration/wiki-tools.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 19
+    },
+    "wiki/communities/wiki-orchestration/lint-page.md": {
+      "kind": "community-file",
+      "slug": "wiki-orchestration/lint-page",
+      "title": "src/wiki/lint-page.ts",
+      "purpose": "Per-file detail for `src/wiki/lint-page.ts` — a member of the Wiki orchestration community.",
+      "sections": [
+        {
+          "title": "Role",
+          "purpose": "1-2 sentences naming the file's role in the parent community: what concern it owns, what other members it leans on.",
+          "shape": "short prose paragraph"
+        },
+        {
+          "title": "Exports",
+          "purpose": "Every export from this file with signature + 1-sentence description of what it does (not just types). Quote constants verbatim (e.g. `DEFAULT_WEIGHT = 0.7`).",
+          "shape": "markdown table: Name | Kind | Signature | What it does"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Non-obvious behavior a reader would miss from signatures alone — silent fallbacks, tuning knobs disguised as constants, defensive guards, heuristics with blind spots. Skip if the file is pure signature glue.",
+          "shape": "bulleted list: bold claim, then 1-3 sentences of elaboration with file:line references"
+        }
+      ],
+      "depth": "standard",
+      "memberFiles": [
+        "src/wiki/lint-page.ts"
+      ],
+      "communityId": "3272d1b8d89f87ce",
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/wiki-orchestration.md",
+        "wiki/communities/wiki-orchestration/index.md",
+        "wiki/communities/wiki-orchestration/update-log.md",
+        "wiki/communities/wiki-orchestration/wiki-tools.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 20
+    },
+    "wiki/communities/wiki-orchestration/update-log.md": {
+      "kind": "community-file",
+      "slug": "wiki-orchestration/update-log",
+      "title": "src/wiki/update-log.ts",
+      "purpose": "Per-file detail for `src/wiki/update-log.ts` — a member of the Wiki orchestration community.",
+      "sections": [
+        {
+          "title": "Role",
+          "purpose": "1-2 sentences naming the file's role in the parent community: what concern it owns, what other members it leans on.",
+          "shape": "short prose paragraph"
+        },
+        {
+          "title": "Exports",
+          "purpose": "Every export from this file with signature + 1-sentence description of what it does (not just types). Quote constants verbatim (e.g. `DEFAULT_WEIGHT = 0.7`).",
+          "shape": "markdown table: Name | Kind | Signature | What it does"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Non-obvious behavior a reader would miss from signatures alone — silent fallbacks, tuning knobs disguised as constants, defensive guards, heuristics with blind spots. Skip if the file is pure signature glue.",
+          "shape": "bulleted list: bold claim, then 1-3 sentences of elaboration with file:line references"
+        }
+      ],
+      "depth": "standard",
+      "memberFiles": [
+        "src/wiki/update-log.ts"
+      ],
+      "communityId": "3272d1b8d89f87ce",
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/wiki-orchestration.md",
+        "wiki/communities/wiki-orchestration/index.md",
+        "wiki/communities/wiki-orchestration/lint-page.md",
+        "wiki/communities/wiki-orchestration/wiki-tools.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 21
     },
     "wiki/architecture.md": {
       "kind": "architecture",
@@ -1045,17 +1171,16 @@
         "wiki/communities/conversation-server.md",
         "wiki/communities/db-layer.md",
         "wiki/communities/git-indexer-progress.md",
-        "wiki/communities/graph-watcher.md",
-        "wiki/communities/indexing-pipeline.md",
+        "wiki/communities/indexing-runtime.md",
         "wiki/communities/mcp-tools.md",
         "wiki/communities/search-runtime.md",
         "wiki/communities/search-tool.md",
-        "wiki/communities/wiki-orchestrator.md",
+        "wiki/communities/wiki-orchestration.md",
         "wiki/communities/wiki-pipeline-internals.md",
         "wiki/data-flows.md",
         "wiki/getting-started.md"
       ],
-      "order": 19
+      "order": 22
     },
     "wiki/data-flows.md": {
       "kind": "data-flows",
@@ -1092,16 +1217,15 @@
         "wiki/communities/conversation-server.md",
         "wiki/communities/db-layer.md",
         "wiki/communities/git-indexer-progress.md",
-        "wiki/communities/graph-watcher.md",
-        "wiki/communities/indexing-pipeline.md",
+        "wiki/communities/indexing-runtime.md",
         "wiki/communities/mcp-tools.md",
         "wiki/communities/search-runtime.md",
         "wiki/communities/search-tool.md",
-        "wiki/communities/wiki-orchestrator.md",
+        "wiki/communities/wiki-orchestration.md",
         "wiki/communities/wiki-pipeline-internals.md",
         "wiki/getting-started.md"
       ],
-      "order": 20
+      "order": 23
     },
     "wiki/getting-started.md": {
       "kind": "getting-started",
@@ -1138,16 +1262,15 @@
         "wiki/communities/conversation-server.md",
         "wiki/communities/db-layer.md",
         "wiki/communities/git-indexer-progress.md",
-        "wiki/communities/graph-watcher.md",
-        "wiki/communities/indexing-pipeline.md",
+        "wiki/communities/indexing-runtime.md",
         "wiki/communities/mcp-tools.md",
         "wiki/communities/search-runtime.md",
         "wiki/communities/search-tool.md",
-        "wiki/communities/wiki-orchestrator.md",
+        "wiki/communities/wiki-orchestration.md",
         "wiki/communities/wiki-pipeline-internals.md",
         "wiki/data-flows.md"
       ],
-      "order": 21
+      "order": 24
     }
   },
   "warnings": [],

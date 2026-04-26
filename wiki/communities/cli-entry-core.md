@@ -2,74 +2,78 @@
 
 > [Architecture](../architecture.md)
 >
-> Generated from `79e963f` · 2026-04-26
+> Generated from `b47d98e` · 2026-04-26
 
-The CLI entry and core utilities community is the thinnest layer in mimirs: four files that handle process start, command dispatch, cross-cutting type definitions, and the single logging abstraction every other module imports. Understanding these four files is the prerequisite for understanding how any command actually reaches its implementation.
+The CLI entry-and-core community is the boot floor of mimirs: the shebang script `src/main.ts`, the dispatch table in `src/cli/index.ts`, the cross-cutting `EmbeddedChunk` type in `src/types.ts`, and the dual `log` / `cli` output helpers in `src/utils/log.ts`. Everything else in the codebase — every command, every MCP tool, every benchmark — depends on at least one of these four files. The community is small (only four files) but very widely consumed (28 external consumers).
 
 ## How it works
 
-`src/main.ts` is the process entry point — a ten-line shebang script that calls `main()` from `src/cli/index.ts` and wraps the entire invocation in an error handler. If `main()` rejects, the handler writes a timestamped crash report to `.mimirs/server-error.log` (under `RAG_PROJECT_DIR` or `cwd()`) before exiting with code 1. This out-of-band crash log is intentional: MCP clients often hide stderr, so a file-backed error trail is the only reliable post-mortem surface.
-
 ```mermaid
 sequenceDiagram
-  participant proc as "Process"
-  participant mainTs as "src/main.ts"
-  participant cliIdx as "src/cli/index.ts"
-  participant cmd as "Command handler"
-  proc->>mainTs: bun run (shebang)
-  mainTs->>cliIdx: main()
-  cliIdx->>cliIdx: parse argv
-  cliIdx->>cmd: dispatch
-  cmd-->>cliIdx: result / throw
-  cliIdx-->>mainTs: resolved/rejected
-  mainTs-->>proc: exit 0 / write crash log + exit 1
+    participant proc as "process (bun)"
+    participant entry as "src/main.ts"
+    participant dispatch as "src/cli/index.ts"
+    participant cmd as "subcommand handler"
+    participant out as "cli helper"
+    participant logSink as "log helper"
+    proc->>entry: "spawn with argv"
+    entry->>dispatch: "main()"
+    dispatch->>dispatch: "switch on argv 0"
+    dispatch->>cmd: "await commandHandler"
+    cmd->>out: "cli.log status text"
+    cmd->>logSink: "log.warn diagnostics"
+    logSink-->>proc: "stderr write"
+    out-->>proc: "stdout write"
+    cmd-->>dispatch: "resolve or throw"
+    dispatch-->>entry: "return or reject"
+    entry->>entry: "catch and write server-error.log"
+    entry-->>proc: "exit code"
 ```
 
-Inside `src/cli/index.ts`, the exported `main()` function reads `process.argv.slice(2)`, peeks at `args[0]` for the command name, and dispatches through a `switch` statement. The `serve` command is imported dynamically (`await import("./commands/serve")`) to avoid loading native SQLite and `sqlite-vec` modules at startup — those modules cause bun to crash at module-load time if the native binaries are missing. Every other command is statically imported and called directly. `getFlag` is a small helper that scans `args` by name (`idx + 1`) and is passed as a dependency to each command handler rather than reading `process.argv` again internally.
+`src/main.ts` is the shebang entry (`#!/usr/bin/env bun`). It does almost nothing in the happy path: it imports `main` from `./cli` and awaits it, letting any subcommand drive the process to natural exit. The interesting code is the `.catch(...)` at the top level: when an exception escapes `main()`, mimirs writes a `server-error.log` file into `<projectDir>/.mimirs/` (resolved via `RAG_PROJECT_DIR` or `process.cwd()`) before printing `[mimirs] FATAL: <msg>` to stderr and exiting with code 1. The on-disk log exists because stderr is often invisible when mimirs runs as an MCP child process — without it, a crash on boot would be silently unobservable from the host editor. The log includes a hint to run `bunx mimirs doctor` for diagnosis.
 
-The logging utilities in `src/utils/log.ts` expose two completely separate output channels: `log` for MCP diagnostics and `cli` for user-facing CLI output. They are intentionally kept apart so that diagnostic noise never pollutes the command output that tools parse.
+`src/cli/index.ts` is the dispatch table. It synchronously imports every subcommand handler at module load — `initCommand`, `indexCommand`, `searchCommand`, `readCommand`, `statusCommand`, `removeCommand`, `analyticsCommand`, `mapCommand`, `benchmarkCommand`, `benchmarkModelsCommand`, `evalCommand`, `conversationCommand`, `checkpointCommand`, `historyCommand`, `annotationsCommand`, `sessionContextCommand`, `demoCommand`, `doctorCommand`, `cleanupCommand` — except for `serveCommand`, which is loaded lazily via `await import("./commands/serve")` inside the `serve` switch arm. The comment at lines 16–18 spells out why: the serve transitive deps include native modules (`bun:sqlite`, `sqlite-vec`) and top-level awaits, and a failure during their initialisation would crash the entire CLI before even `mimirs doctor` could run. Lazy import quarantines that risk to the `serve` subcommand alone.
+
+The dispatch itself is a plain `switch (command)` over `process.argv.slice(2)[0]`. Each branch awaits the command handler with `(args, getFlag)`. `getFlag(name)` is a tiny helper that returns the argv value following `name`, or `undefined`. There is no flag library — the cost is per-command flag parsing, the gain is zero startup overhead and zero added dependency surface.
 
 ## Dependencies and consumers
 
 ```mermaid
 flowchart LR
-  subgraph core ["Core utilities"]
-    mainTs["src/main.ts"]
-    cliIdx["src/cli/index.ts"]
-    logUtil["src/utils/log.ts"]
-    types["src/types.ts"]
-  end
-  subgraph cmds ["CLI commands (28+)"]
-    cmdHandlers["commands/*"]
-  end
-  subgraph consumers ["MCP & indexing"]
-    tools["src/tools/*"]
-    indexing["src/indexing/*"]
-  end
-  mainTs --> cliIdx
-  cliIdx --> cmdHandlers
-  cmdHandlers --> logUtil
-  tools --> logUtil
-  indexing --> logUtil
+    entry["src/main.ts"]
+    dispatch["src/cli/index.ts"]
+    logMod["src/utils/log.ts"]
+    typesMod["src/types.ts"]
+    commands["src/cli/commands/*"]
+    serve["src/cli/commands/serve.ts"]
+    consumers["benchmarks · src/index/* · src/wiki/* · src/tools/* · MCP tools"]
+    entry --> dispatch
+    dispatch --> commands
+    dispatch -.lazy.-> serve
+    dispatch --> logMod
+    commands --> logMod
+    commands --> typesMod
+    consumers --> logMod
+    consumers --> typesMod
 ```
 
-`src/utils/log.ts` is the community's highest-PageRank member because it is imported by every command handler, every tool, and most of the indexing pipeline. `src/types.ts` (which exports only `EmbeddedChunk`) is imported by the indexing and embedding layers. `src/main.ts` has exactly one consumer: itself as the bun entry point. `src/cli/index.ts` is imported only by `src/main.ts`.
+`src/main.ts` depends only on `src/cli/index.ts`. `src/cli/index.ts` reaches every command file under `src/cli/commands/` and uses `cli` from `src/utils/log.ts` for usage output. `src/utils/log.ts` and `src/types.ts` have no project dependencies — they are pure leaves. On the consumer side, `src/utils/log.ts` is imported by 27+ files including every command and most indexing/wiki modules; `src/types.ts` is imported wherever an `EmbeddedChunk` is built or persisted (the indexer, the chunker, every embedder, every DB writer that handles chunks).
 
 ## Tuning
 
-The `log` channel's verbosity is controlled by the LOG_LEVEL environment variable. Valid values are `debug`, `warn`, `error`, and `silent`. The default is `warn`. Setting LOG_LEVEL=debug emits every diagnostic line, including per-chunk embedding progress, which can be verbose during large indexing runs. LOG_LEVEL=silent suppresses all stderr output.
+The `LOG_LEVEL` environment variable is the one runtime knob the community exposes. `src/utils/log.ts` reads it lower-cased on every `write(...)` call (no caching) and resolves it against the internal numeric ladder where `debug` is 0, `warn` is 1, `error` is 2, and `silent` is 3. The default when the env var is missing or unrecognised is `warn` — `log.debug(...)` calls are silent unless `debug` is set in the environment. Setting it to `silent` suppresses everything, including `log.error(...)`, which is appropriate when running mimirs under a parent process that would otherwise log MCP diagnostics twice.
 
-No configuration file keys map to this community — verbosity is purely environment-variable driven, and the CLI dispatch logic has no tunables of its own.
+The `RAG_PROJECT_DIR` environment variable is the second knob and lives in `src/main.ts`'s catch handler: when set, it overrides `process.cwd()` for the path where `server-error.log` is written. CLI commands respect the same variable through `resolveProject` in `src/tools/index.ts` (outside this community), but the crash-handler reads it directly so it can write a log even when the rest of the system has not initialised.
 
 ## Entry points
 
-`src/main.ts` is the bun entry point (declared in the project's `bin` field). `main()` exported from `src/cli/index.ts` is the only function a test or embedding harness would call directly — the CLI commands themselves are not individually exported outside their own files.
+`main` (in `src/cli/index.ts`) is the public async entry awaited from `src/main.ts`. Calling it with no `process.argv` subcommand or with `--help` / `-h` prints the multi-line usage block and exits 0. Calling it with an unknown command prints `Unknown command: <name>` to `cli.error` followed by usage and exits 1. Every recognised command resolves to one of two shapes: synchronous handlers compiled into the binary (the default) and the `serve` subcommand that dynamically imports `./commands/serve` to defer native-module loading.
 
-The `usage()` function inside `src/cli/index.ts` prints the full command reference to stdout and is called on `--help` / `-h` / no arguments. It is not exported.
+The `cli` and `log` exports from `src/utils/log.ts` are the canonical IO helpers for the rest of the codebase. `cli.log(msg = "")` writes to stdout (no prefix), `cli.error(msg)` to stderr (no prefix); these are the user-facing channels. `log.debug` / `log.warn` / `log.error` go to stderr with a `[mimirs]` prefix and an optional `(<context>)` suffix — these are the MCP diagnostic channel, gated by `LOG_LEVEL`. The split exists so MCP transport (which uses stdout for JSON-RPC frames) is never accidentally polluted by diagnostics: anything that might be diagnostic flows through `log`, anything user-facing through `cli`, and the rule "MCP server commands only use `log`" is checked by the absence of `cli.*` calls in `src/cli/commands/serve.ts`.
+
+`EmbeddedChunk` (in `src/types.ts`) is the inter-module contract for an embedded chunk in flight: a snippet ready for the DB plus its computed embedding plus optional metadata. It is the data shape that connects the chunker, the embedder, and `RagDB.upsertFile`/`insertChunkBatch` — every other community in the project handles this type at some boundary.
 
 ## Data shapes
-
-`EmbeddedChunk` from `src/types.ts` is the single cross-cutting type this community owns. It is the contract between the chunker, embedder, and database inserter:
 
 ```ts
 export interface EmbeddedChunk {
@@ -84,20 +88,11 @@ export interface EmbeddedChunk {
 }
 ```
 
-`snippet` is the raw text stored in the DB; `embedding` is the computed float vector; `startLine`/`endLine` are the source line range used for line-range-drift lint; `contentHash` enables incremental indexing (skip re-embedding unchanged chunks); `parentId` links a method chunk to its parent class chunk.
+`snippet` is the indexable text, `embedding` the vector aligned to whatever embedder is configured (`Float32Array` because that is what `sqlite-vec` consumes via `new Uint8Array(buffer)`), and the optional fields carry symbol identity (`entityName`, `chunkType`), source-line position (`startLine`, `endLine`), a content-hash key for incremental re-indexing (`contentHash`), and a parent-chunk pointer that lets the search-time path query stitch a small chunk back into a bigger surrounding scope (`parentId`). Every field except `snippet` and `embedding` is optional because earlier versions of the chunker did not produce them and the type is shared with code that reads chunks back from the DB where these may legitimately be NULL.
 
-The two logging objects are also effectively part of the public API since every module imports them:
+`log` and `cli` themselves are also data shapes — they are exported as plain object literals with method-only members so callers can destructure `const { log } = await import(...)` or use them as namespace handles. There is no class or builder; the literal is the API.
 
-`log` (MCP diagnostic channel — stderr, `[mimirs]`-prefixed, level-gated by the LOG_LEVEL env var):
-- `log.debug(msg, context?)` — emits only at debug level
-- `log.warn(msg, context?)` — default floor; skipped at error or silent level
-- `log.error(msg, context?)` — skipped only at silent level
-
-`cli` (user-facing CLI output — no prefix, not level-gated):
-- `cli.log(msg?)` — writes to stdout via `console.log`; no args prints a blank line
-- `cli.error(msg)` — writes to stderr via `console.error`
-
-The key design difference: `log` is gated by the LOG_LEVEL env var; `cli` always emits. Command handlers use `cli` for output the user reads; internal modules use `log` for diagnostics the operator inspects.
+The internal `Level` type (`"debug" | "warn" | "error" | "silent"`) and the `LEVELS` map are not exported. They are the implementation detail of `currentLevel()`, which reads `process.env.LOG_LEVEL` on each call. There is also a `process.stderr.on("error", () => {})` line near the top of `src/utils/log.ts` whose sole purpose is to swallow `EPIPE` errors when an MCP parent disconnects; without it, a closed stderr pipe would crash the process during a routine log write.
 
 ## See also
 
@@ -106,4 +101,4 @@ The key design difference: `log` is gated by the LOG_LEVEL env var; `cli` always
 - [Data flows](../data-flows.md)
 - [Getting started](../getting-started.md)
 - [Git History Indexer & CLI Progress](git-indexer-progress.md)
-- [Indexing Pipeline](indexing-pipeline.md)
+- [Indexing runtime](indexing-runtime.md)

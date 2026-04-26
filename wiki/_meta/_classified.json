@@ -261,6 +261,20 @@
       "snippet": "export interface ClassifiedSymbol {\n  name: string;\n  type: string; // class, interface, type, enum, function, export\n  file: string;\n  tier: SymbolTier;\n  scope: Scope;\n  referenceCount: number;\n  referenceModuleCount: number;\n  referenceModules: string[];\n  hasChildren: boolean;\n  childCount: number;\n  isReexport: boolean;\n  snippet: string | null;\n}"
     },
     {
+      "name": "CommitEntry",
+      "type": "interface",
+      "file": "src/wiki/update-log.ts",
+      "tier": "entity",
+      "scope": "local",
+      "referenceCount": 0,
+      "referenceModuleCount": 0,
+      "referenceModules": [],
+      "hasChildren": false,
+      "childCount": 0,
+      "isReexport": false,
+      "snippet": "export interface CommitEntry {\n  hash: string;\n  message: string;\n}"
+    },
+    {
       "name": "CommunityBundle",
       "type": "interface",
       "file": "src/wiki/types.ts",
@@ -747,6 +761,23 @@
       "snippet": "export interface PageDelta {\n  wikiPath: string;\n  order: number;\n  page: ManifestPage;\n  /** Files or events that triggered staleness. Empty for new pages. */\n  triggers: string[];\n}"
     },
     {
+      "name": "PageDiff",
+      "type": "interface",
+      "file": "src/wiki/types.ts",
+      "tier": "entity",
+      "scope": "shared",
+      "referenceCount": 2,
+      "referenceModuleCount": 2,
+      "referenceModules": [
+        "tools",
+        "wiki"
+      ],
+      "hasChildren": false,
+      "childCount": 0,
+      "isReexport": false,
+      "snippet": "/** Per-page structural diff fed to the narrative LLM as grounding. */\nexport interface PageDiff {\n  wikiPath: string;\n  title: string;\n  kind: string;\n  /** \"added\" when there was no prior content. */\n  status: \"stale\" | \"added\";\n  triggers: string[];\n  sectionsAdded: string[];\n  sectionsRemoved: string[];\n  sectionsRewritten: string[];\n  citationsAdded: string[];\n  citationsRemoved: string[];\n  mermaidDelta: { oldCount: number; newCount: number; oldTypes: string[]; newTypes: string[] };\n  numericLiteralsAdded: string[];\n  numericLiteralsRemoved: string[];\n  /** Byte-size delta for cheap \"tightened/expanded\" signal. */\n  byteDelta: number;\n}"
+    },
+    {
       "name": "PageLintWarning",
       "type": "interface",
       "file": "src/wiki/lint-page.ts",
@@ -766,7 +797,7 @@
       "file": "src/wiki/types.ts",
       "tier": "entity",
       "scope": "cross-cutting",
-      "referenceCount": 9,
+      "referenceCount": 10,
       "referenceModuleCount": 3,
       "referenceModules": [
         "tools",
@@ -837,6 +868,39 @@
       "childCount": 0,
       "isReexport": false,
       "snippet": "export interface PathFilter {\n  extensions?: string[];\n  dirs?: string[];\n  excludeDirs?: string[];\n}"
+    },
+    {
+      "name": "PreRegenSnapshot",
+      "type": "interface",
+      "file": "src/wiki/types.ts",
+      "tier": "entity",
+      "scope": "cross-cutting",
+      "referenceCount": 3,
+      "referenceModuleCount": 3,
+      "referenceModules": [
+        "tools",
+        "wiki"
+      ],
+      "hasChildren": false,
+      "childCount": 0,
+      "isReexport": false,
+      "snippet": "export interface PreRegenSnapshot {\n  version: 1;\n  sinceRef: string;\n  newRef: string;\n  capturedAt: string;\n  /** Commit subjects in the `sinceRef..newRef` window. */\n  commits: { hash: string; message: string }[];\n  /** Pages that were removed entirely — name only, no diff. */\n  removed: { wikiPath: string; title: string }[];\n  /** Stale + added pages keyed by wiki path. */\n  pages: Record<string, PreRegenSnapshotPage>;\n}"
+    },
+    {
+      "name": "PreRegenSnapshotPage",
+      "type": "interface",
+      "file": "src/wiki/types.ts",
+      "tier": "entity",
+      "scope": "local",
+      "referenceCount": 1,
+      "referenceModuleCount": 1,
+      "referenceModules": [
+        "tools"
+      ],
+      "hasChildren": false,
+      "childCount": 0,
+      "isReexport": false,
+      "snippet": " */\nexport interface PreRegenSnapshotPage {\n  title: string;\n  kind: string;\n  depth: PageDepth;\n  /** Files (or events like `community set changed`) that flagged this page. */\n  triggers: string[];\n  /** Full markdown body of the prior page, or null for added pages. */\n  oldContent: string | null;\n}"
     },
     {
       "name": "PrefetchedQueryHit",
@@ -974,11 +1038,9 @@
       "file": "src/wiki/staleness.ts",
       "tier": "entity",
       "scope": "local",
-      "referenceCount": 1,
-      "referenceModuleCount": 1,
-      "referenceModules": [
-        "wiki"
-      ],
+      "referenceCount": 0,
+      "referenceModuleCount": 0,
+      "referenceModules": [],
       "hasChildren": false,
       "childCount": 0,
       "isReexport": false,
@@ -1340,7 +1402,7 @@
       "snippet": "export async function annotationsCommand(args: string[], getFlag: (flag: string) => string | undefined) {\n  const dir = resolve(args[1] && !args[1].startsWith(\"--\") ? args[1] : getFlag(\"--dir\") || \".\");\n  const filterPath = getFlag(\"--path\");\n  const db = new RagDB(dir);\n  const annotations = db.getAnnotations(filterPath);\n\n  if (annotations.length === 0) {\n    cli.log(filterPath ? `No annotations for ${filterPath}.` : \"No annotations found.\");\n    db.close();\n    return;\n  }\n\n  for (const a of annotations) {\n    const target = a.symbolName ? `${a.path}  •  ${a.symbolName}` : a.path;\n    const authorStr = a.author ? ` [${a.author}]` : \"\";\n    cli.log(`#${a.id}  ${target}${authorStr}`);\n    cli.log(`  ${a.note}`);\n    cli.log(`  (${a.updatedAt})`);\n    cli.log();\n  }\n\n  db.close();\n}"
     },
     {
-      "name": "appendIncrementalLog",
+      "name": "appendFallbackLog",
       "type": "function",
       "file": "src/wiki/update-log.ts",
       "tier": "entity",
@@ -1353,23 +1415,58 @@
       "hasChildren": false,
       "childCount": 0,
       "isReexport": false,
-      "snippet": "export function appendIncrementalLog(\n  wikiDir: string,\n  sinceRef: string,\n  newRef: string,\n  changedFileCount: number,\n  report: StalenessReport,\n): void {\n  const { stale, added, removed } = report;\n  const byOrder = (a: { order: number }, b: { order: number }) =>\n    a.order - b.order;\n\n  let entry =\n    `## ${isoStamp()} — Incremental update (\\`${sinceRef}\\` → \\`${newRef}\\`)\\n\\n` +\n    `${changedFileCount} file${plural(changedFileCount)} changed. ` +\n    `${stale.length} regenerated, ${added.length} added, ${removed.length} removed.\\n`;\n\n  if (stale.length === 0 && added.length === 0 && removed.length === 0) {\n    entry += `\\nNo wiki pages invalidated by the changed files.\\n`;\n    append(wikiDir, entry);\n    return;\n  }\n\n  if (stale.length > 0) {\n    entry += `\\n### Regenerated\\n\\n`;\n    for (const d of [...stale].sort(byOrder)) {\n      entry += `- \\`${d.wikiPath}\\` — ${d.page.title} (${d.page.kind}, ${d.page.depth})\\n`;\n      entry += `  - trigger: ${d.triggers.map((t) => `\\`${t}\\``).join(\", \")}\\n`;\n    }\n  }\n\n  if (added.length > 0) {\n    entry += `\\n### Added\\n\\n`;\n    for (const d of [...added].sort(byOrder)) {\n      entry += `- \\`${d.wikiPath}\\` — ${d.page.title} (${d.page.kind}, ${d.page.depth})\\n`;\n    }\n  }\n\n  if (removed.length > 0) {\n    entry += `\\n### Removed\\n\\n`;\n    for (const r of removed) {\n      entry += `- \\`${r.wikiPath}\\` — ${r.page.title}\\n`;\n    }\n  }\n\n  append(wikiDir, entry);\n}"
+      "snippet": " */\nexport function appendFallbackLog(\n  wikiDir: string,\n  sinceRef: string,\n  newRef: string,\n  dirty: number,\n  total: number,\n  commitCount: number,\n): void {\n  let entry = `## ${isoStamp()} — Incremental fallback regen (\\`${sinceRef}\\` → \\`${newRef}\\`)\\n\\n`;\n  entry += `<!-- regen:${newRef} -->\\n\\n`;\n  entry += `Fell back to forced full regen: ${dirty}/${total} pages dirty (>50%). ` +\n    `All pages regenerating across ${commitCount} commit${plural(commitCount)}.\\n\\n`;\n  entry += `_Per-page narrative pending writer run + \\`wiki_finalize_log\\`._\\n`;\n  append(wikiDir, entry);\n}"
     },
     {
       "name": "appendInitLog",
       "type": "function",
       "file": "src/wiki/update-log.ts",
       "tier": "entity",
-      "scope": "local",
-      "referenceCount": 1,
-      "referenceModuleCount": 1,
+      "scope": "shared",
+      "referenceCount": 2,
+      "referenceModuleCount": 2,
       "referenceModules": [
-        "tools"
+        "tools",
+        "wiki"
       ],
       "hasChildren": false,
       "childCount": 0,
       "isReexport": false,
       "snippet": "export function appendInitLog(\n  wikiDir: string,\n  gitRef: string,\n  manifest: PageManifest,\n): void {\n  const counts: Record<string, number> = {};\n  for (const p of Object.values(manifest.pages)) {\n    counts[p.kind] = (counts[p.kind] ?? 0) + 1;\n  }\n  const breakdown = Object.entries(counts)\n    .sort(([a], [b]) => a.localeCompare(b))\n    .map(([kind, count]) => `${count} ${kind}`)\n    .join(\", \");\n\n  const entry =\n    `## ${isoStamp()} — Full initialization (\\`${gitRef}\\`)\\n\\n` +\n    `${manifest.pageCount} pages generated` +\n    (breakdown ? ` (${breakdown}).\\n` : `.\\n`);\n\n  append(wikiDir, entry);\n}"
+    },
+    {
+      "name": "appendNarrative",
+      "type": "function",
+      "file": "src/wiki/update-log.ts",
+      "tier": "entity",
+      "scope": "shared",
+      "referenceCount": 2,
+      "referenceModuleCount": 2,
+      "referenceModules": [
+        "tools",
+        "wiki"
+      ],
+      "hasChildren": false,
+      "childCount": 0,
+      "isReexport": false,
+      "snippet": " */\nexport function appendNarrative(\n  wikiDir: string,\n  newRef: string,\n  narrative: string,\n): { mode: \"inserted\" | \"appended\" } {\n  const path = join(wikiDir, LOG_FILENAME);\n  const marker = `<!-- regen:${newRef} -->`;\n  const block =\n    `\\n### What changed in this regen\\n\\n` +\n    narrative.trim() + \"\\n\";\n  const prior = existsSync(path) ? readFileSync(path, \"utf-8\") : HEADER;\n  const idx = prior.indexOf(marker);\n  if (idx === -1) {\n    const recovery =\n      `## ${isoStamp()} — Narrative (orphan, \\`${newRef}\\`)\\n\\n` +\n      `_Queue stub not found for \\`${newRef}\\`; appending narrative standalone._\\n` +\n      block;\n    append(wikiDir, recovery);\n    return { mode: \"appended\" };\n  }\n  // Find end of stub block: next `\\n## ` heading after the marker, or EOF.\n  const tailSearchStart = idx + marker.length;\n  const nextHeading = prior.indexOf(\"\\n## \", tailSearchStart);\n  const blockEnd = nextHeading === -1 ? prior.length : nextHeading + 1;\n  let stub = prior.slice(idx, blockEnd);\n  // Drop the pending sentinel — the narrative replaces it.\n  stub = stub.replace(PENDING_SENTINEL_RE, \"\\n\");\n  // Trim trailing whitespace inside the stub before appending narrative.\n  stub = stub.replace(/\\s+$/, \"\") + \"\\n\";\n  const before = prior.slice(0, idx);\n  const after = prior.slice(blockEnd);\n  const tailSep = after.startsWith(\"\\n\") ? \"\" : \"\\n\";\n  writeFileSync(path, before + stub + block + tailSep + after);\n  return { mode: \"inserted\" };\n}"
+    },
+    {
+      "name": "appendQueueStub",
+      "type": "function",
+      "file": "src/wiki/update-log.ts",
+      "tier": "entity",
+      "scope": "shared",
+      "referenceCount": 2,
+      "referenceModuleCount": 2,
+      "referenceModules": [
+        "tools",
+        "wiki"
+      ],
+      "hasChildren": false,
+      "childCount": 0,
+      "isReexport": false,
+      "snippet": " */\nexport function appendQueueStub(\n  wikiDir: string,\n  sinceRef: string,\n  newRef: string,\n  changedFileCount: number,\n  staleCount: number,\n  addedCount: number,\n  removedCount: number,\n  commitCount: number,\n): void {\n  const total = staleCount + addedCount;\n  let entry = `## ${isoStamp()} — Incremental regen queued (\\`${sinceRef}\\` → \\`${newRef}\\`)\\n\\n`;\n  entry += `<!-- regen:${newRef} -->\\n\\n`;\n  entry += `${changedFileCount} file${plural(changedFileCount)} changed across ` +\n    `${commitCount} commit${plural(commitCount)}. ` +\n    `${staleCount} regenerated, ${addedCount} added, ${removedCount} removed.\\n`;\n  if (total === 0 && removedCount === 0) {\n    entry += `\\nNo wiki pages invalidated by the changed files.\\n`;\n  } else {\n    entry += `\\n_Per-page narrative pending writer run + \\`wiki_finalize_log\\`._\\n`;\n  }\n  append(wikiDir, entry);\n}"
     },
     {
       "name": "applyEmbeddingConfig",
@@ -1950,6 +2047,23 @@
       "snippet": "export function deleteAnnotation(db: Database, id: number): boolean {\n  const existing = db\n    .query<{ id: number; note: string }, [number]>(\n      \"SELECT id, note FROM annotations WHERE id = ?\"\n    )\n    .get(id);\n  if (!existing) return false;\n\n  const tx = db.transaction(() => {\n    db.run(\n      \"INSERT INTO fts_annotations(fts_annotations, rowid, note) VALUES ('delete', ?, ?)\",\n      [id, existing.note]\n    );\n    db.run(\"DELETE FROM vec_annotations WHERE annotation_id = ?\", [id]);\n    db.run(\"DELETE FROM annotations WHERE id = ?\", [id]);\n  });\n\n  tx();\n  return true;\n}"
     },
     {
+      "name": "deleteSnapshot",
+      "type": "function",
+      "file": "src/wiki/update-log.ts",
+      "tier": "entity",
+      "scope": "shared",
+      "referenceCount": 2,
+      "referenceModuleCount": 2,
+      "referenceModules": [
+        "tools",
+        "wiki"
+      ],
+      "hasChildren": false,
+      "childCount": 0,
+      "isReexport": false,
+      "snippet": "export function deleteSnapshot(wikiDir: string): void {\n  const path = snapshotPath(wikiDir);\n  if (existsSync(path)) {\n    try { unlinkSync(path); } catch { /* ignore */ }\n  }\n}"
+    },
+    {
       "name": "deleteStaleChunks",
       "type": "function",
       "file": "src/db/files.ts",
@@ -2040,6 +2154,23 @@
       "childCount": 0,
       "isReexport": false,
       "snippet": " */\nexport function detectSymbolCommunities(\n  data: SymbolGraphData,\n  fileGraph: FileLevelGraph,\n  projectDir: string,\n): DiscoveryModule[] {\n  const productFiles = new Set(\n    fileGraph.nodes.filter(isClusterable).map((n) => n.path),\n  );\n\n  // fileGraph uses paths relative to projectDir; DB stores absolute paths.\n  // Build id → relative-path so the rest of the function speaks one format.\n  const pathById = new Map<number, string>();\n  for (const f of data.files) {\n    const rel = toRel(f.path, projectDir);\n    pathById.set(f.id, rel);\n  }\n\n  // Restrict to product files (tests/benches excluded) whose path is also in\n  // the file graph.\n  const idsInScope = new Set<number>();\n  for (const f of data.files) {\n    const rel = pathById.get(f.id)!;\n    if (productFiles.has(rel)) idsInScope.add(f.id);\n  }\n\n  const namedImportsByFile = new Map<number, Map<string, number>>();\n  const namespaceImportsByFile = new Map<number, { alias: string; resolvedFileId: number }[]>();\n  for (const imp of data.imports) {\n    if (!idsInScope.has(imp.fileId) || !idsInScope.has(imp.resolvedFileId)) continue;\n    if (imp.isNamespace) {\n      let arr = namespaceImportsByFile.get(imp.fileId);\n      if (!arr) { arr = []; namespaceImportsByFile.set(imp.fileId, arr); }\n      arr.push({ alias: imp.names, resolvedFileId: imp.resolvedFileId });\n    } else {\n      let m = namedImportsByFile.get(imp.fileId);\n      if (!m) { m = new Map(); namedImportsByFile.set(imp.fileId, m); }\n      m.set(imp.names, imp.resolvedFileId);\n    }\n  }\n\n  const exportsByFile = new Map<number, Set<string>>();\n  for (const e of data.exports) {\n    if (!idsInScope.has(e.fileId)) continue;\n    let s = exportsByFile.get(e.fileId);\n    if (!s) { s = new Set(); exportsByFile.set(e.fileId, s); }\n    s.add(e.name);\n  }\n\n  const callerChunks = data.chunks.filter(\n    (c) => idsInScope.has(c.fileId) && CALLER_CHUNK_TYPES.has(c.chunkType),\n  );\n\n  const symKey = (fileId: number, name: string) => `${fileId}:${name}`;\n\n  // Register caller-chunk nodes and exported-symbol nodes.\n  const nodeMeta = new Map<string, { fileId: number; name: string }>();\n  for (const c of callerChunks) {\n    const k = symKey(c.fileId, c.entityName);\n    if (!nodeMeta.has(k)) nodeMeta.set(k, { fileId: c.fileId, name: c.entityName });"
+    },
+    {
+      "name": "diffPage",
+      "type": "function",
+      "file": "src/wiki/diff-page.ts",
+      "tier": "entity",
+      "scope": "shared",
+      "referenceCount": 2,
+      "referenceModuleCount": 2,
+      "referenceModules": [
+        "tools",
+        "wiki"
+      ],
+      "hasChildren": false,
+      "childCount": 0,
+      "isReexport": false,
+      "snippet": " */\nexport function diffPage(\n  wikiPath: string,\n  meta: { title: string; kind: string; status: \"stale\" | \"added\"; triggers: string[] },\n  oldBody: string | null,\n  newBody: string,\n): PageDiff {\n  const oldSections = parseSections(oldBody ?? \"\");\n  const newSections = parseSections(newBody);\n\n  const oldHeads = new Set(oldSections.map((s) => s.heading));\n  const newHeads = new Set(newSections.map((s) => s.heading));\n\n  const sectionsAdded = [...newHeads].filter((h) => !oldHeads.has(h));\n  const sectionsRemoved = [...oldHeads].filter((h) => !newHeads.has(h));\n\n  const sectionsRewritten: string[] = [];\n  for (const ns of newSections) {\n    const os = oldSections.find((o) => o.heading === ns.heading);\n    if (!os) continue;\n    const oldBytes = byteLen(os.body);\n    const newBytes = byteLen(ns.body);\n    if (oldBytes === 0 && newBytes === 0) continue;\n    const oldParas = countParagraphs(os.body);\n    const newParas = countParagraphs(ns.body);\n    const byteDelta = Math.abs(newBytes - oldBytes) / Math.max(oldBytes, 1);\n    const paraDelta = Math.abs(newParas - oldParas) / Math.max(oldParas, 1);\n    if (byteDelta >= 0.3 || paraDelta >= 0.5) sectionsRewritten.push(ns.heading);\n  }\n\n  const oldCites = new Set(extractCitations(oldBody ?? \"\"));\n  const newCites = new Set(extractCitations(newBody));\n  const citationsAdded = [...newCites].filter((c) => !oldCites.has(c));\n  const citationsRemoved = [...oldCites].filter((c) => !newCites.has(c));\n\n  const oldMermaid = extractMermaid(oldBody ?? \"\");\n  const newMermaid = extractMermaid(newBody);\n\n  const oldLits = new Set(extractNumericLiterals(oldBody ?? \"\"));\n  const newLits = new Set(extractNumericLiterals(newBody));\n  const numericLiteralsAdded = [...newLits].filter((l) => !oldLits.has(l));\n  const numericLiteralsRemoved = [...oldLits].filter((l) => !newLits.has(l));\n\n  return {\n    wikiPath,\n    title: meta.title,\n    kind: meta.kind,\n    status: meta.status,\n    triggers: meta.triggers,\n    sectionsAdded,\n    sectionsRemoved,\n    sectionsRewritten,\n    citationsAdded,\n    citationsRemoved,\n    mermaidDelta: {\n      oldCount: oldMermaid.length,\n      newCount: newMermaid.length,\n      oldTypes: dedupe(oldMermaid),\n      newTypes: dedupe(newMermaid),\n    },"
     },
     {
       "name": "discoverSessions",
@@ -3259,6 +3390,20 @@
       "snippet": " */\nexport function mergeRequiredSections(\n  proposed: import(\"./types\").SectionSpec[],\n  required: RequiredSection[],\n): { merged: import(\"./types\").SectionSpec[]; injected: string[] } {\n  const titles = new Set(proposed.map((s) => s.title.trim().toLowerCase()));\n  const injected: string[] = [];\n  const merged = [...proposed];\n  for (const r of required) {\n    const key = r.entry.title.trim().toLowerCase();\n    if (titles.has(key)) continue;\n    merged.push({\n      title: r.entry.title,\n      purpose: r.entry.purpose,\n      shape: r.entry.shape,\n    });\n    injected.push(r.entry.id);\n  }\n  return { merged, injected };\n}"
     },
     {
+      "name": "migrateHeader",
+      "type": "function",
+      "file": "src/wiki/update-log.ts",
+      "tier": "entity",
+      "scope": "local",
+      "referenceCount": 0,
+      "referenceModuleCount": 0,
+      "referenceModules": [],
+      "hasChildren": false,
+      "childCount": 0,
+      "isReexport": false,
+      "snippet": " */\nexport function migrateHeader(raw: string): string {\n  if (raw.startsWith(HEADER)) return raw;\n  const firstHeading = raw.indexOf(\"\\n## \");\n  const headEnd = firstHeading === -1 ? raw.length : firstHeading;\n  const head = raw.slice(0, headEnd);\n  const tail = raw.slice(headEnd);\n  const looksLikeOldHeader =\n    head.startsWith(\"# Wiki Update Log\") &&\n    (head.includes(\"Newest entries at the bottom\") ||\n      head.includes(\"Append-only log of wiki generation\"));\n  if (!looksLikeOldHeader) return raw;\n  const tailSep = tail.startsWith(\"\\n\") ? \"\" : \"\\n\";\n  return HEADER.replace(/\\n+$/, \"\\n\\n\") + (tail ? tailSep + tail.replace(/^\\n+/, \"\") : \"\");\n}"
+    },
+    {
       "name": "paletteEntries",
       "type": "function",
       "file": "src/wiki/section-catalog.ts",
@@ -3426,6 +3571,23 @@
       "childCount": 0,
       "isReexport": false,
       "snippet": " */\nexport function readJSONL(\n  filePath: string,\n  fromOffset = 0\n): { entries: JournalEntry[]; newOffset: number } {\n  const stat = statSync(filePath);\n  if (fromOffset >= stat.size) {\n    return { entries: [], newOffset: fromOffset };\n  }\n\n  const bytesToRead = stat.size - fromOffset;\n  const buf = Buffer.alloc(bytesToRead);\n  const fd = openSync(filePath, \"r\");\n  try {\n    readSync(fd, buf, 0, bytesToRead, fromOffset);\n  } finally {\n    closeSync(fd);\n  }\n  const text = buf.toString(\"utf-8\");\n  const entries: JournalEntry[] = [];\n\n  for (const line of text.split(\"\\n\")) {\n    const trimmed = line.trim();\n    if (!trimmed) continue;\n    try {\n      entries.push(JSON.parse(trimmed));\n    } catch {\n      // Skip malformed lines\n    }\n  }\n\n  return { entries, newOffset: stat.size };\n}"
+    },
+    {
+      "name": "readSnapshot",
+      "type": "function",
+      "file": "src/wiki/update-log.ts",
+      "tier": "entity",
+      "scope": "shared",
+      "referenceCount": 2,
+      "referenceModuleCount": 2,
+      "referenceModules": [
+        "tools",
+        "wiki"
+      ],
+      "hasChildren": false,
+      "childCount": 0,
+      "isReexport": false,
+      "snippet": "export function readSnapshot(wikiDir: string): PreRegenSnapshot | null {\n  const path = snapshotPath(wikiDir);\n  if (!existsSync(path)) return null;\n  try {\n    const raw = readFileSync(path, \"utf-8\");\n    const parsed = JSON.parse(raw) as PreRegenSnapshot;\n    if (parsed.version !== 1) return null;\n    return parsed;\n  } catch {\n    return null;\n  }\n}"
     },
     {
       "name": "registerAllTools",
@@ -4165,6 +4327,23 @@
       "snippet": "export async function sessionContextCommand(args: string[], getFlag: (flag: string) => string | undefined) {\n  const dir = resolve(args[1] && !args[1].startsWith(\"--\") ? args[1] : getFlag(\"--dir\") || \".\");\n  const sections: string[] = [];\n\n  // 1. Git context\n  const gitRoot = await runGit([\"rev-parse\", \"--show-toplevel\"], dir);\n  if (gitRoot) {\n    const status = await runGit([\"status\", \"--short\"], gitRoot);\n    if (status) {\n      sections.push(\"## Uncommitted changes\\n\" + status);\n    }\n\n    const log = await runGit([\"log\", \"--oneline\", \"-5\"], gitRoot);\n    if (log) {\n      sections.push(\"## Recent commits\\n\" + log);\n    }\n  }\n\n  // 2. Index status + search analytics\n  let db: RagDB | null = null;\n  try {\n    db = new RagDB(dir);\n    const dbStatus = db.getStatus();\n    if (dbStatus.totalFiles > 0) {\n      sections.push(\n        `## Index\\n${dbStatus.totalFiles} files, ${dbStatus.totalChunks} chunks (last indexed: ${dbStatus.lastIndexed || \"unknown\"})`\n      );\n    }\n\n    const analytics = db.getAnalytics(7);\n    if (analytics.totalQueries > 0) {\n      const lines: string[] = [];\n      if (analytics.zeroResultQueries.length > 0) {\n        lines.push(\"Zero-result queries (last 7 days):\");\n        for (const q of analytics.zeroResultQueries.slice(0, 5)) {\n          lines.push(`  ${q.count}× \"${q.query}\"`);\n        }\n      }\n      if (analytics.lowScoreQueries.length > 0) {\n        lines.push(\"Low-relevance queries:\");\n        for (const q of analytics.lowScoreQueries.slice(0, 5)) {\n          lines.push(`  \"${q.query}\" (score: ${q.topScore.toFixed(2)})`);\n        }\n      }\n      if (lines.length > 0) {\n        sections.push(\"## Search gaps\\n\" + lines.join(\"\\n\"));\n      }\n    }\n\n    // 3. Annotations on recently modified files\n    if (gitRoot) {\n      const modifiedOutput = await runGit([\"diff\", \"--name-only\", \"HEAD\"], gitRoot);\n      const untrackedOutput = await runGit([\"ls-files\", \"--others\", \"--exclude-standard\"], gitRoot);\n      const modifiedFiles = new Set<string>();\n      for (const output of [modifiedOutput, untrackedOutput]) {\n        if (output) {\n          for (const f of output.split(\"\\n\").filter(Boolean)) {\n            modifiedFiles.add(f);\n          }\n        }"
     },
     {
+      "name": "snapshotPath",
+      "type": "function",
+      "file": "src/wiki/update-log.ts",
+      "tier": "entity",
+      "scope": "shared",
+      "referenceCount": 2,
+      "referenceModuleCount": 2,
+      "referenceModules": [
+        "tools",
+        "wiki"
+      ],
+      "hasChildren": false,
+      "childCount": 0,
+      "isReexport": false,
+      "snippet": "export function snapshotPath(wikiDir: string): string {\n  return join(wikiDir, \"_meta\", SNAPSHOT_FILENAME);\n}"
+    },
+    {
       "name": "startConversationTail",
       "type": "function",
       "file": "src/conversation/indexer.ts",
@@ -4508,6 +4687,23 @@
       "snippet": "export async function writeFixture(\n  dir: string,\n  relativePath: string,\n  content: string\n): Promise<string> {\n  const fullPath = join(dir, relativePath);\n  const parentDir = fullPath.substring(0, fullPath.lastIndexOf(\"/\"));\n  await mkdir(parentDir, { recursive: true });\n  await writeFile(fullPath, content);\n  return fullPath;\n}"
     },
     {
+      "name": "writeSnapshot",
+      "type": "function",
+      "file": "src/wiki/update-log.ts",
+      "tier": "entity",
+      "scope": "shared",
+      "referenceCount": 2,
+      "referenceModuleCount": 2,
+      "referenceModules": [
+        "tools",
+        "wiki"
+      ],
+      "hasChildren": false,
+      "childCount": 0,
+      "isReexport": false,
+      "snippet": "export function writeSnapshot(wikiDir: string, snap: PreRegenSnapshot): void {\n  const path = snapshotPath(wikiDir);\n  mkdirSync(dirname(path), { recursive: true });\n  const tmp = `${path}.tmp`;\n  writeFileSync(tmp, JSON.stringify(snap, null, 2));\n  // rename via writeFileSync + unlink fallback — keep deps minimal.\n  try {\n    renameSync(tmp, path);\n  } catch (err) {\n    try { unlinkSync(tmp); } catch { /* ignore */ }\n    throw err;\n  }\n}"
+    },
+    {
       "name": "AGGREGATE_PAGE_PATHS",
       "type": "variable",
       "file": "src/wiki/page-tree.ts",
@@ -4659,6 +4855,20 @@
       "childCount": 0,
       "isReexport": false,
       "snippet": "export const SEMANTIC_QUERIES: Record<string, string[]> = {\n  architecture: [\n    \"system entry points and module boundaries\",\n    \"cross-cutting dependencies and shared hubs\",\n    \"module-level invariants and design rationale comments\",\n  ],\n  community: [\n    \"public API and exported function signatures\",\n    \"tunable constants thresholds and magic numbers exported\",\n    \"error paths fallback handling and try/catch comments\",\n  ],\n  \"community-file\": [\n    \"every export const and tunable literal in this file\",\n    \"function signatures and their direct call sites\",\n    \"TODO FIXME workaround and known-bug comments inline\",\n  ],\n  \"getting-started\": [\n    \"first-run setup and prerequisites\",\n    \"CLI commands and flags\",\n    \"known issues and troubleshooting\",\n  ],\n  guide: [\n    \"first-run setup and prerequisites\",\n    \"CLI commands and flags\",\n    \"known issues and troubleshooting\",\n  ],\n};"
+    },
+    {
+      "name": "SNAPSHOT_FILENAME",
+      "type": "variable",
+      "file": "src/wiki/update-log.ts",
+      "tier": "entity",
+      "scope": "local",
+      "referenceCount": 0,
+      "referenceModuleCount": 0,
+      "referenceModules": [],
+      "hasChildren": false,
+      "childCount": 0,
+      "isReexport": false,
+      "snippet": "export const SNAPSHOT_FILENAME = \"_pre-regen-snapshot.json\";"
     },
     {
       "name": "SPLIT_BIG_MEMBER_COUNT",
@@ -4925,7 +5135,7 @@
       "path": ".ai/smoke-test.txt",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -4934,7 +5144,7 @@
       "path": ".claude-plugin/skills/mimirs/SKILL.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -4943,7 +5153,7 @@
       "path": ".claude-plugin/skills/wiki/SKILL.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -4952,7 +5162,7 @@
       "path": ".claude/projects/-Users-winci-repos-claude-skills-local-rag/memory/MEMORY.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -4961,7 +5171,7 @@
       "path": ".claude/projects/-Users-winci-repos-claude-skills-local-rag/memory/feedback_use_bun.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -4970,7 +5180,7 @@
       "path": ".claude/projects/-Users-winci-repos-claude-skills-local-rag/memory/project_plugin_cr.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -4979,7 +5189,7 @@
       "path": ".junie/guidelines/mimirs.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -4988,7 +5198,7 @@
       "path": "BENCHMARKS.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -4997,7 +5207,7 @@
       "path": "CHANGELOG.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5006,7 +5216,7 @@
       "path": "CLAUDE.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5015,7 +5225,7 @@
       "path": "README.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5024,7 +5234,7 @@
       "path": "benchmarks/ast-truncation-analysis.ts",
       "fanIn": 0,
       "fanOut": 7,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5033,7 +5243,7 @@
       "path": "benchmarks/collect-files-bench.ts",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5042,7 +5252,7 @@
       "path": "benchmarks/count-grouping-sim.ts",
       "fanIn": 0,
       "fanOut": 4,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5051,7 +5261,7 @@
       "path": "benchmarks/excalidraw-parent-bench.ts",
       "fanIn": 0,
       "fanOut": 5,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5060,7 +5270,7 @@
       "path": "benchmarks/indexing-bench-v2.ts",
       "fanIn": 0,
       "fanOut": 9,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5069,7 +5279,7 @@
       "path": "benchmarks/indexing-bench.ts",
       "fanIn": 0,
       "fanOut": 13,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5078,7 +5288,7 @@
       "path": "benchmarks/large-json.bench.test.ts",
       "fanIn": 0,
       "fanOut": 8,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5087,7 +5297,7 @@
       "path": "benchmarks/parent-promotion-bench.ts",
       "fanIn": 0,
       "fanOut": 4,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5096,7 +5306,7 @@
       "path": "benchmarks/quality-bench-worker.ts",
       "fanIn": 0,
       "fanOut": 11,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5105,7 +5315,7 @@
       "path": "benchmarks/quality-bench.ts",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5114,7 +5324,7 @@
       "path": "benchmarks/subchunk-impact.ts",
       "fanIn": 0,
       "fanOut": 11,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5123,7 +5333,7 @@
       "path": "docs/configuration.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5132,7 +5342,7 @@
       "path": "docs/examples.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5141,7 +5351,7 @@
       "path": "docs/tools.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5150,7 +5360,7 @@
       "path": "hooks/scripts/reindex-file.sh",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5159,7 +5369,7 @@
       "path": "hooks/scripts/session-end.sh",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5168,7 +5378,7 @@
       "path": "hooks/scripts/session-start.sh",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5177,7 +5387,7 @@
       "path": "scripts/bump-version.sh",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5186,7 +5396,7 @@
       "path": "scripts/regen-meta.ts",
       "fanIn": 0,
       "fanOut": 2,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5195,7 +5405,7 @@
       "path": "skills/mimirs/SKILL.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5204,7 +5414,7 @@
       "path": "skills/wiki/SKILL.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5213,7 +5423,7 @@
       "path": "src/cli/commands/analytics.ts",
       "fanIn": 1,
       "fanOut": 2,
-      "pageRank": 0.0016719986420636848,
+      "pageRank": 0.0016036689178855316,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5224,7 +5434,7 @@
       "path": "src/cli/commands/annotations.ts",
       "fanIn": 1,
       "fanOut": 2,
-      "pageRank": 0.0016719986420636848,
+      "pageRank": 0.0016036689178855316,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5235,7 +5445,7 @@
       "path": "src/cli/commands/benchmark-models.ts",
       "fanIn": 1,
       "fanOut": 11,
-      "pageRank": 0.0012896133023988959,
+      "pageRank": 0.0012369105554991544,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5246,7 +5456,7 @@
       "path": "src/cli/commands/benchmark.ts",
       "fanIn": 1,
       "fanOut": 6,
-      "pageRank": 0.0013638796511142796,
+      "pageRank": 0.0013081418544269514,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5257,7 +5467,7 @@
       "path": "src/cli/commands/checkpoint.ts",
       "fanIn": 1,
       "fanOut": 4,
-      "pageRank": 0.0014436936066011736,
+      "pageRank": 0.0013846940455638126,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5268,7 +5478,7 @@
       "path": "src/cli/commands/cleanup.ts",
       "fanIn": 1,
       "fanOut": 2,
-      "pageRank": 0.0016719986420636848,
+      "pageRank": 0.0016036689178855316,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5279,7 +5489,7 @@
       "path": "src/cli/commands/conversation.ts",
       "fanIn": 1,
       "fanOut": 6,
-      "pageRank": 0.0013638796511142796,
+      "pageRank": 0.0013081418544269514,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5290,7 +5500,7 @@
       "path": "src/cli/commands/demo.ts",
       "fanIn": 1,
       "fanOut": 8,
-      "pageRank": 0.0013232381891178856,
+      "pageRank": 0.0012691612908419239,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5301,7 +5511,7 @@
       "path": "src/cli/commands/doctor.ts",
       "fanIn": 1,
       "fanOut": 1,
-      "pageRank": 0.0020839403364851725,
+      "pageRank": 0.001998775752726895,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5312,7 +5522,7 @@
       "path": "src/cli/commands/eval.ts",
       "fanIn": 1,
       "fanOut": 7,
-      "pageRank": 0.0013407168598366145,
+      "pageRank": 0.001285925659097023,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5323,7 +5533,7 @@
       "path": "src/cli/commands/history.ts",
       "fanIn": 1,
       "fanOut": 8,
-      "pageRank": 0.0013232381891178856,
+      "pageRank": 0.0012691612908419239,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5334,7 +5544,7 @@
       "path": "src/cli/commands/index-cmd.ts",
       "fanIn": 1,
       "fanOut": 7,
-      "pageRank": 0.0013407168598366145,
+      "pageRank": 0.001285925659097023,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5345,7 +5555,7 @@
       "path": "src/cli/commands/init.ts",
       "fanIn": 1,
       "fanOut": 10,
-      "pageRank": 0.001298613066824504,
+      "pageRank": 0.00124554252571405,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5356,7 +5566,7 @@
       "path": "src/cli/commands/map.ts",
       "fanIn": 1,
       "fanOut": 3,
-      "pageRank": 0.0015216072298145703,
+      "pageRank": 0.0014594235654831293,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5367,7 +5577,7 @@
       "path": "src/cli/commands/remove.ts",
       "fanIn": 1,
       "fanOut": 2,
-      "pageRank": 0.0016719986420636848,
+      "pageRank": 0.0016036689178855316,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5378,7 +5588,7 @@
       "path": "src/cli/commands/search-cmd.ts",
       "fanIn": 2,
       "fanOut": 6,
-      "pageRank": 0.00163175695332169,
+      "pageRank": 0.0015650717899840948,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5390,7 +5600,7 @@
       "path": "src/cli/commands/serve.ts",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5401,7 +5611,7 @@
       "path": "src/cli/commands/session-context.ts",
       "fanIn": 1,
       "fanOut": 2,
-      "pageRank": 0.0016719986420636848,
+      "pageRank": 0.0016036689178855316,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5412,7 +5622,7 @@
       "path": "src/cli/commands/status.ts",
       "fanIn": 1,
       "fanOut": 2,
-      "pageRank": 0.0016719986420636848,
+      "pageRank": 0.0016036689178855316,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5423,7 +5633,7 @@
       "path": "src/cli/index.ts",
       "fanIn": 1,
       "fanOut": 20,
-      "pageRank": 0.0021430600617635236,
+      "pageRank": 0.0020554794266879,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5434,7 +5644,7 @@
       "path": "src/cli/progress.ts",
       "fanIn": 8,
       "fanOut": 1,
-      "pageRank": 0.0085786825984387,
+      "pageRank": 0.008228097077092513,
       "isTopHub": false,
       "bridges": [
         "createQuietProgress"
@@ -5447,7 +5657,7 @@
       "path": "src/cli/setup.ts",
       "fanIn": 6,
       "fanOut": 1,
-      "pageRank": 0.007635658753840124,
+      "pageRank": 0.007323611647298873,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5470,7 +5680,7 @@
       "path": "src/config/index.ts",
       "fanIn": 42,
       "fanOut": 4,
-      "pageRank": 0.040680528281692656,
+      "pageRank": 0.03895852988007147,
       "isTopHub": true,
       "bridges": [],
       "entities": [
@@ -5483,7 +5693,7 @@
       "path": "src/conversation/indexer.ts",
       "fanIn": 4,
       "fanOut": 5,
-      "pageRank": 0.0025184199119810567,
+      "pageRank": 0.0024154994109583765,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5495,7 +5705,7 @@
       "path": "src/conversation/parser.ts",
       "fanIn": 11,
       "fanOut": 0,
-      "pageRank": 0.024140664125848598,
+      "pageRank": 0.02315410535737929,
       "isTopHub": true,
       "bridges": [
         "parseTurns"
@@ -5515,7 +5725,7 @@
       "path": "src/db/analytics.ts",
       "fanIn": 1,
       "fanOut": 0,
-      "pageRank": 0.011636088084308483,
+      "pageRank": 0.011149826684659952,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5528,7 +5738,7 @@
       "path": "src/db/annotations.ts",
       "fanIn": 1,
       "fanOut": 0,
-      "pageRank": 0.011636088084308483,
+      "pageRank": 0.011149826684659952,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5543,7 +5753,7 @@
       "path": "src/db/checkpoints.ts",
       "fanIn": 1,
       "fanOut": 0,
-      "pageRank": 0.011636088084308483,
+      "pageRank": 0.011149826684659952,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5557,7 +5767,7 @@
       "path": "src/db/conversation.ts",
       "fanIn": 1,
       "fanOut": 1,
-      "pageRank": 0.003035511672794658,
+      "pageRank": 0.0029086608507035714,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5574,7 +5784,7 @@
       "path": "src/db/files.ts",
       "fanIn": 1,
       "fanOut": 0,
-      "pageRank": 0.011636088084308483,
+      "pageRank": 0.011149826684659952,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5600,7 +5810,7 @@
       "path": "src/db/git-history.ts",
       "fanIn": 1,
       "fanOut": 1,
-      "pageRank": 0.003035511672794658,
+      "pageRank": 0.0029086608507035714,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5622,7 +5832,7 @@
       "path": "src/db/graph.ts",
       "fanIn": 3,
       "fanOut": 0,
-      "pageRank": 0.01478726490829246,
+      "pageRank": 0.014137916838608502,
       "isTopHub": false,
       "bridges": [
         "getSubgraph"
@@ -5647,7 +5857,7 @@
       "path": "src/db/index.ts",
       "fanIn": 59,
       "fanOut": 10,
-      "pageRank": 0.051457405541960335,
+      "pageRank": 0.04922387418245353,
       "isTopHub": true,
       "bridges": [
         "RagDB"
@@ -5658,7 +5868,7 @@
       "path": "src/db/search.ts",
       "fanIn": 1,
       "fanOut": 2,
-      "pageRank": 0.002435468330466917,
+      "pageRank": 0.0023336926711199106,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5674,7 +5884,7 @@
       "path": "src/db/types.ts",
       "fanIn": 3,
       "fanOut": 0,
-      "pageRank": 0.018798263157732534,
+      "pageRank": 0.01794924458890376,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5696,7 +5906,7 @@
       "path": "src/embeddings/embed.ts",
       "fanIn": 77,
       "fanOut": 0,
-      "pageRank": 0.11302949310662667,
+      "pageRank": 0.10835027046893017,
       "isTopHub": true,
       "bridges": [],
       "entities": [
@@ -5719,7 +5929,7 @@
       "path": "src/git/indexer.ts",
       "fanIn": 2,
       "fanOut": 2,
-      "pageRank": 0.0023851580972116147,
+      "pageRank": 0.0022876836191805796,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5731,8 +5941,8 @@
       "path": "src/graph/resolver.ts",
       "fanIn": 16,
       "fanOut": 1,
-      "pageRank": 0.019015927309166156,
-      "isTopHub": false,
+      "pageRank": 0.01823579883330483,
+      "isTopHub": true,
       "bridges": [],
       "entities": [
         "GraphOptions",
@@ -5747,8 +5957,8 @@
       "path": "src/indexing/chunker.ts",
       "fanIn": 17,
       "fanOut": 1,
-      "pageRank": 0.020628268601971703,
-      "isTopHub": false,
+      "pageRank": 0.01978525690325548,
+      "isTopHub": true,
       "bridges": [],
       "entities": [
         "Chunk",
@@ -5761,7 +5971,7 @@
       "path": "src/indexing/indexer.ts",
       "fanIn": 17,
       "fanOut": 10,
-      "pageRank": 0.00731254392410145,
+      "pageRank": 0.007013701510714415,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5774,7 +5984,7 @@
       "path": "src/indexing/parse.ts",
       "fanIn": 7,
       "fanOut": 0,
-      "pageRank": 0.01847287953869736,
+      "pageRank": 0.017717946650655327,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5786,7 +5996,7 @@
       "path": "src/indexing/watcher.ts",
       "fanIn": 2,
       "fanOut": 4,
-      "pageRank": 0.001835598808422507,
+      "pageRank": 0.0017605832210136271,
       "isTopHub": false,
       "bridges": [
         "startWatcher"
@@ -5799,7 +6009,7 @@
       "path": "src/main.ts",
       "fanIn": 0,
       "fanOut": 1,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5808,7 +6018,7 @@
       "path": "src/search/benchmark.ts",
       "fanIn": 12,
       "fanOut": 3,
-      "pageRank": 0.0076548529365819806,
+      "pageRank": 0.0073420213534378794,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5824,7 +6034,7 @@
       "path": "src/search/eval.ts",
       "fanIn": 8,
       "fanOut": 3,
-      "pageRank": 0.005503237299934175,
+      "pageRank": 0.00527833598887426,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5842,7 +6052,7 @@
       "path": "src/search/hybrid.ts",
       "fanIn": 21,
       "fanOut": 3,
-      "pageRank": 0.023235640789507607,
+      "pageRank": 0.022270574670030165,
       "isTopHub": true,
       "bridges": [],
       "entities": [
@@ -5857,7 +6067,7 @@
       "path": "src/search/usages.ts",
       "fanIn": 4,
       "fanOut": 0,
-      "pageRank": 0.033811924484983324,
+      "pageRank": 0.03240578622160917,
       "isTopHub": true,
       "bridges": [],
       "entities": [
@@ -5869,7 +6079,7 @@
       "path": "src/server/index.ts",
       "fanIn": 0,
       "fanOut": 11,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [
         "startServer"
@@ -5882,7 +6092,7 @@
       "path": "src/tools/analytics-tools.ts",
       "fanIn": 1,
       "fanOut": 1,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5893,7 +6103,7 @@
       "path": "src/tools/annotation-tools.ts",
       "fanIn": 1,
       "fanOut": 2,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5904,7 +6114,7 @@
       "path": "src/tools/checkpoint-tools.ts",
       "fanIn": 1,
       "fanOut": 3,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5915,7 +6125,7 @@
       "path": "src/tools/conversation-tools.ts",
       "fanIn": 1,
       "fanOut": 3,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5926,7 +6136,7 @@
       "path": "src/tools/git-history-tools.ts",
       "fanIn": 1,
       "fanOut": 2,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5937,7 +6147,7 @@
       "path": "src/tools/git-tools.ts",
       "fanIn": 3,
       "fanOut": 1,
-      "pageRank": 0.002216410095630226,
+      "pageRank": 0.0020490994568662982,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5950,7 +6160,7 @@
       "path": "src/tools/graph-tools.ts",
       "fanIn": 1,
       "fanOut": 2,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5961,7 +6171,7 @@
       "path": "src/tools/index-tools.ts",
       "fanIn": 1,
       "fanOut": 2,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5972,7 +6182,7 @@
       "path": "src/tools/index.ts",
       "fanIn": 12,
       "fanOut": 14,
-      "pageRank": 0.014741049726648199,
+      "pageRank": 0.014065215222908909,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5986,7 +6196,7 @@
       "path": "src/tools/search.ts",
       "fanIn": 1,
       "fanOut": 3,
-      "pageRank": 0.0036093228747368093,
+      "pageRank": 0.0034534726411924056,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5997,7 +6207,7 @@
       "path": "src/tools/server-info-tools.ts",
       "fanIn": 1,
       "fanOut": 3,
-      "pageRank": 0.0036093228747368093,
+      "pageRank": 0.0034534726411924056,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6008,8 +6218,8 @@
     {
       "path": "src/tools/wiki-tools.ts",
       "fanIn": 3,
-      "fanOut": 26,
-      "pageRank": 0.002779104437814965,
+      "fanOut": 36,
+      "pageRank": 0.002572488329573801,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6022,7 +6232,7 @@
       "path": "src/types.ts",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6033,7 +6243,7 @@
       "path": "src/utils/dir-guard.ts",
       "fanIn": 2,
       "fanOut": 0,
-      "pageRank": 0.00951748599641978,
+      "pageRank": 0.009128534010069985,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6045,7 +6255,7 @@
       "path": "src/utils/log.ts",
       "fanIn": 27,
       "fanOut": 0,
-      "pageRank": 0.07429540505320736,
+      "pageRank": 0.07124817091935368,
       "isTopHub": true,
       "bridges": [],
       "entities": [
@@ -6057,7 +6267,7 @@
       "path": "src/wiki/categorization.ts",
       "fanIn": 2,
       "fanOut": 9,
-      "pageRank": 0.0015725558825041002,
+      "pageRank": 0.0014987065026548666,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6068,7 +6278,7 @@
       "path": "src/wiki/community-detection.ts",
       "fanIn": 9,
       "fanOut": 4,
-      "pageRank": 0.005164913758161223,
+      "pageRank": 0.004875133917176591,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6085,7 +6295,7 @@
       "path": "src/wiki/community-synthesis.ts",
       "fanIn": 7,
       "fanOut": 11,
-      "pageRank": 0.0030806495902169755,
+      "pageRank": 0.002940828238187723,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6110,7 +6320,7 @@
       "path": "src/wiki/content-prefetch.ts",
       "fanIn": 2,
       "fanOut": 16,
-      "pageRank": 0.0018739264979871133,
+      "pageRank": 0.0017883970326124142,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6121,10 +6331,21 @@
       ]
     },
     {
+      "path": "src/wiki/diff-page.ts",
+      "fanIn": 2,
+      "fanOut": 1,
+      "pageRank": 0.002798731087507834,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": [
+        "diffPage"
+      ]
+    },
+    {
       "path": "src/wiki/discovery.ts",
       "fanIn": 3,
       "fanOut": 11,
-      "pageRank": 0.0017906490830035503,
+      "pageRank": 0.0017075634836109877,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6135,7 +6356,7 @@
       "path": "src/wiki/exemplars/architecture.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6144,7 +6365,7 @@
       "path": "src/wiki/exemplars/conventions.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6153,7 +6374,7 @@
       "path": "src/wiki/exemplars/data-flows.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6162,7 +6383,7 @@
       "path": "src/wiki/exemplars/getting-started.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6171,7 +6392,7 @@
       "path": "src/wiki/exemplars/index.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6180,7 +6401,7 @@
       "path": "src/wiki/exemplars/testing.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6189,7 +6410,7 @@
       "path": "src/wiki/index.ts",
       "fanIn": 8,
       "fanOut": 15,
-      "pageRank": 0.003058312180815185,
+      "pageRank": 0.002714083962519703,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6214,7 +6435,7 @@
       "path": "src/wiki/isolate-docs.ts",
       "fanIn": 4,
       "fanOut": 2,
-      "pageRank": 0.004326623560251081,
+      "pageRank": 0.004146772279907596,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6229,7 +6450,7 @@
       "path": "src/wiki/lint-page.ts",
       "fanIn": 2,
       "fanOut": 0,
-      "pageRank": 0.014251824425902586,
+      "pageRank": 0.013522323354866701,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6245,7 +6466,7 @@
       "path": "src/wiki/page-payload.ts",
       "fanIn": 2,
       "fanOut": 6,
-      "pageRank": 0.00185491550334469,
+      "pageRank": 0.001768821620576257,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6256,7 +6477,7 @@
       "path": "src/wiki/page-tree.ts",
       "fanIn": 2,
       "fanOut": 11,
-      "pageRank": 0.0015899265693081579,
+      "pageRank": 0.0015156294416849472,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6268,7 +6489,7 @@
       "path": "src/wiki/pagerank.ts",
       "fanIn": 3,
       "fanOut": 0,
-      "pageRank": 0.009780030407338772,
+      "pageRank": 0.009368211643610095,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6281,7 +6502,7 @@
       "path": "src/wiki/section-catalog.ts",
       "fanIn": 3,
       "fanOut": 0,
-      "pageRank": 0.009466072830149795,
+      "pageRank": 0.008780697548518082,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6297,7 +6518,7 @@
       "path": "src/wiki/sections/configuration.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6306,7 +6527,7 @@
       "path": "src/wiki/sections/cross-cutting-inventory.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6315,7 +6536,7 @@
       "path": "src/wiki/sections/dependency-graph.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6324,7 +6545,7 @@
       "path": "src/wiki/sections/dependency-table.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6333,7 +6554,7 @@
       "path": "src/wiki/sections/entry-points.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6342,7 +6563,7 @@
       "path": "src/wiki/sections/how-it-works-sequence.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6351,7 +6572,7 @@
       "path": "src/wiki/sections/hub-analysis.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6360,7 +6581,7 @@
       "path": "src/wiki/sections/internals.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6369,7 +6590,7 @@
       "path": "src/wiki/sections/key-exports-table.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6378,7 +6599,7 @@
       "path": "src/wiki/sections/known-issues.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6387,7 +6608,7 @@
       "path": "src/wiki/sections/module-inventory.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6396,7 +6617,7 @@
       "path": "src/wiki/sections/overview.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6405,7 +6626,7 @@
       "path": "src/wiki/sections/per-file-breakdown.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6414,7 +6635,7 @@
       "path": "src/wiki/sections/public-api.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6423,7 +6644,7 @@
       "path": "src/wiki/sections/see-also.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6432,7 +6653,7 @@
       "path": "src/wiki/sections/test-structure.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6441,7 +6662,7 @@
       "path": "src/wiki/sections/usage-examples.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6450,7 +6671,7 @@
       "path": "src/wiki/semantic-queries.ts",
       "fanIn": 3,
       "fanOut": 0,
-      "pageRank": 0.010573716037468515,
+      "pageRank": 0.010131494227194419,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6460,9 +6681,9 @@
     },
     {
       "path": "src/wiki/staleness.ts",
-      "fanIn": 3,
+      "fanIn": 2,
       "fanOut": 4,
-      "pageRank": 0.0029147139779943303,
+      "pageRank": 0.00181870019739704,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6473,9 +6694,9 @@
     },
     {
       "path": "src/wiki/types.ts",
-      "fanIn": 88,
+      "fanIn": 95,
       "fanOut": 1,
-      "pageRank": 0.09979149185068015,
+      "pageRank": 0.10214122661257057,
       "isTopHub": true,
       "bridges": [],
       "entities": [
@@ -6496,8 +6717,11 @@
         "GettingStartedBundle",
         "ManifestPage",
         "PageContentCache",
+        "PageDiff",
         "PageManifest",
         "PagePayload",
+        "PreRegenSnapshot",
+        "PreRegenSnapshotPage",
         "PrefetchedQueryHit",
         "SectionSpec",
         "SynthesesFile",
@@ -6511,21 +6735,30 @@
     },
     {
       "path": "src/wiki/update-log.ts",
-      "fanIn": 2,
+      "fanIn": 15,
       "fanOut": 2,
-      "pageRank": 0.002216410095630226,
+      "pageRank": 0.008595856982123654,
       "isTopHub": false,
       "bridges": [],
       "entities": [
-        "appendIncrementalLog",
-        "appendInitLog"
+        "CommitEntry",
+        "appendFallbackLog",
+        "appendInitLog",
+        "appendNarrative",
+        "appendQueueStub",
+        "deleteSnapshot",
+        "migrateHeader",
+        "readSnapshot",
+        "snapshotPath",
+        "writeSnapshot",
+        "SNAPSHOT_FILENAME"
       ]
     },
     {
       "path": "tests/cli/cli.test.ts",
       "fanIn": 0,
       "fanOut": 3,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6534,7 +6767,7 @@
       "path": "tests/config/config.test.ts",
       "fanIn": 0,
       "fanOut": 3,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6543,7 +6776,7 @@
       "path": "tests/conversation/conversation-index.test.ts",
       "fanIn": 0,
       "fanOut": 8,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6552,7 +6785,7 @@
       "path": "tests/conversation/conversation.test.ts",
       "fanIn": 0,
       "fanOut": 3,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6561,7 +6794,7 @@
       "path": "tests/db/db.test.ts",
       "fanIn": 0,
       "fanOut": 5,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6570,7 +6803,7 @@
       "path": "tests/embeddings/embed.test.ts",
       "fanIn": 0,
       "fanOut": 5,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6579,7 +6812,7 @@
       "path": "tests/features/annotations.test.ts",
       "fanIn": 0,
       "fanOut": 5,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6588,7 +6821,7 @@
       "path": "tests/features/checkpoint.test.ts",
       "fanIn": 0,
       "fanOut": 5,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6597,7 +6830,7 @@
       "path": "tests/features/git-context.test.ts",
       "fanIn": 0,
       "fanOut": 3,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6606,7 +6839,7 @@
       "path": "tests/features/git-history.test.ts",
       "fanIn": 0,
       "fanOut": 7,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6615,7 +6848,7 @@
       "path": "tests/fixtures/frontmatter-only.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6624,7 +6857,7 @@
       "path": "tests/fixtures/large.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6633,7 +6866,7 @@
       "path": "tests/fixtures/no-frontmatter.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6642,7 +6875,7 @@
       "path": "tests/fixtures/sample.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6651,7 +6884,7 @@
       "path": "tests/fixtures/sample.ts",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6663,7 +6896,7 @@
       "path": "tests/fixtures/sample.txt",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6672,7 +6905,7 @@
       "path": "tests/graph/graph.test.ts",
       "fanIn": 0,
       "fanOut": 9,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6681,7 +6914,7 @@
       "path": "tests/helpers.ts",
       "fanIn": 67,
       "fanOut": 0,
-      "pageRank": 0.08651293541993794,
+      "pageRank": 0.08297740323326683,
       "isTopHub": true,
       "bridges": [],
       "entities": [
@@ -6694,7 +6927,7 @@
       "path": "tests/indexing/chunker.test.ts",
       "fanIn": 0,
       "fanOut": 1,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6703,7 +6936,7 @@
       "path": "tests/indexing/indexer.test.ts",
       "fanIn": 0,
       "fanOut": 7,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6712,7 +6945,7 @@
       "path": "tests/indexing/line-numbers.test.ts",
       "fanIn": 0,
       "fanOut": 8,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6721,7 +6954,7 @@
       "path": "tests/indexing/parse.test.ts",
       "fanIn": 0,
       "fanOut": 1,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6730,7 +6963,7 @@
       "path": "tests/indexing/watcher.test.ts",
       "fanIn": 0,
       "fanOut": 8,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6739,7 +6972,7 @@
       "path": "tests/search/analytics.test.ts",
       "fanIn": 0,
       "fanOut": 3,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6748,7 +6981,7 @@
       "path": "tests/search/benchmark.test.ts",
       "fanIn": 0,
       "fanOut": 9,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6757,7 +6990,7 @@
       "path": "tests/search/eval.test.ts",
       "fanIn": 0,
       "fanOut": 9,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6766,7 +6999,7 @@
       "path": "tests/search/find-usages.test.ts",
       "fanIn": 0,
       "fanOut": 5,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6775,7 +7008,7 @@
       "path": "tests/search/fts-special-chars.test.ts",
       "fanIn": 0,
       "fanOut": 10,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6784,7 +7017,7 @@
       "path": "tests/search/hybrid-search.test.ts",
       "fanIn": 0,
       "fanOut": 6,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6793,7 +7026,7 @@
       "path": "tests/search/read-relevant.test.ts",
       "fanIn": 0,
       "fanOut": 6,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6802,7 +7035,7 @@
       "path": "tests/search/scoped-search.test.ts",
       "fanIn": 0,
       "fanOut": 7,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6811,7 +7044,7 @@
       "path": "tests/search/search-symbols.test.ts",
       "fanIn": 0,
       "fanOut": 7,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6820,7 +7053,7 @@
       "path": "tests/search/search.test.ts",
       "fanIn": 0,
       "fanOut": 6,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6829,7 +7062,7 @@
       "path": "tests/tools/page-assist.test.ts",
       "fanIn": 0,
       "fanOut": 5,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6838,7 +7071,7 @@
       "path": "tests/tools/server.test.ts",
       "fanIn": 0,
       "fanOut": 3,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6847,7 +7080,7 @@
       "path": "tests/tools/wiki-tools.test.ts",
       "fanIn": 0,
       "fanOut": 3,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6856,7 +7089,7 @@
       "path": "tests/wiki/categorization.test.ts",
       "fanIn": 0,
       "fanOut": 9,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6865,7 +7098,7 @@
       "path": "tests/wiki/community-detection.test.ts",
       "fanIn": 0,
       "fanOut": 7,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6874,7 +7107,7 @@
       "path": "tests/wiki/content-prefetch-scope.test.ts",
       "fanIn": 0,
       "fanOut": 2,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6883,7 +7116,7 @@
       "path": "tests/wiki/discovery.test.ts",
       "fanIn": 0,
       "fanOut": 7,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6892,7 +7125,7 @@
       "path": "tests/wiki/isolate-docs.test.ts",
       "fanIn": 0,
       "fanOut": 4,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6901,7 +7134,7 @@
       "path": "tests/wiki/lint-page.test.ts",
       "fanIn": 0,
       "fanOut": 1,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6910,7 +7143,7 @@
       "path": "tests/wiki/page-payload.test.ts",
       "fanIn": 0,
       "fanOut": 4,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6919,7 +7152,7 @@
       "path": "tests/wiki/page-tree.test.ts",
       "fanIn": 0,
       "fanOut": 6,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6928,7 +7161,7 @@
       "path": "tests/wiki/staleness.test.ts",
       "fanIn": 0,
       "fanOut": 5,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6937,7 +7170,241 @@
       "path": "tests/wiki/synthesis-prompt.test.ts",
       "fanIn": 0,
       "fanOut": 6,
-      "pageRank": 0.0011115227862171172,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "tests/wiki/update-log.test.ts",
+      "fanIn": 0,
+      "fanOut": 10,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/_meta/writing-rules.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/_update-log.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/architecture.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/communities/cli-commands.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/communities/cli-entry-core.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/communities/cli-setup.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/communities/community-detection.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/communities/config-embeddings.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/communities/conversation-server.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/communities/db-layer.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/communities/git-indexer-progress.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/communities/graph-watcher.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/communities/indexing-pipeline.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/communities/mcp-tools.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/communities/search-runtime.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/communities/search-tool.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/communities/wiki-orchestrator.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/communities/wiki-pipeline-internals.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/communities/wiki-pipeline-internals/community-synthesis.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/communities/wiki-pipeline-internals/content-prefetch.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/communities/wiki-pipeline-internals/src-db-types-ts.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/communities/wiki-pipeline-internals/src-wiki-types-ts.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/data-flows.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/getting-started.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/index.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.0010660980810234541,
       "isTopHub": false,
       "bridges": [],
       "entities": []

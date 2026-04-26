@@ -2,140 +2,158 @@
 
 > [Architecture](architecture.md)
 >
-> Generated from `79e963f` · 2026-04-26
+> Generated from `b47d98e` · 2026-04-26
 
 ## Overview
 
-Mimirs has four primary triggers, each with its own call path through the community stack. The `search` / `read_relevant` MCP tool call is the most frequent: an agent issues a query, the [Search MCP Tool](communities/search-tool.md) receives it, the [Search Runtime](communities/search-runtime.md) embeds and merges vector + FTS results, and ranked hits come back over the wire. File indexing runs on two triggers: the `index_files` MCP tool call (batch, invoked by agents or the CLI `index` subcommand) and the [Import Graph & File Watcher](communities/graph-watcher.md) (incremental, running in the background during `mimirs watch`). A fourth flow — wiki generation — is triggered by `generate_wiki()` and fans out through [Community Detection & Discovery](communities/community-detection.md) and the [Wiki Pipeline — Types & Internals](communities/wiki-pipeline-internals.md) to produce page payloads.
+Mimirs has three primary runtime flows. **Search** (the `search` and `read_relevant` MCP tools) is the highest-frequency path — every agent query enters here. **Indexing** runs in two modes: batch on `index_files` and incremental via the file watcher. **Wiki generation** is the heaviest flow, a multi-phase pipeline triggered by `generate_wiki()` that fans out across community detection, content prefetch, and per-page payload assembly. The architecture page shows where these communities live; this page shows what runs in what order when each flow fires.
 
-## Flow 1: Semantic search (search / read_relevant)
+## Flow 1 — Search and `read_relevant`
 
-The search flow is triggered on every agent query. It is the hottest path in the system.
-
-```mermaid
-sequenceDiagram
-    participant agent as "Agent"
-    participant searchTool as "registerSearchTools"
-    participant hybridFn as "search or searchChunks"
-    participant embedFn as "embed"
-    participant ragDB as "RagDB"
-    participant logFn as "logQuery"
-
-    agent->>searchTool: search or read_relevant tool call
-    searchTool->>hybridFn: query + topK + filter
-    hybridFn->>embedFn: query string
-    embedFn-->>hybridFn: Float32Array
-    hybridFn->>ragDB: vector KNN
-    ragDB-->>hybridFn: vector results
-    hybridFn->>ragDB: FTS BM25
-    ragDB-->>hybridFn: FTS results
-    hybridFn->>hybridFn: merge + boost + dedup
-    hybridFn->>ragDB: graph boost lookup per result
-    hybridFn-->>searchTool: ranked results
-    searchTool->>logFn: persist query stats
-    searchTool-->>agent: ranked results
-```
-
-1. The agent calls the `search` or `read_relevant` MCP tool. The handler lives in `src/tools/search.ts` (registered by `registerSearchTools` inside `src/tools/index.ts`).
-2. The handler calls `search()` or `searchChunks()` from `src/search/hybrid.ts`, passing the raw query string, the `RagDB` handle, `topK`, a relevance `threshold`, and the `hybridWeight` (default `DEFAULT_HYBRID_WEIGHT = 0.7`).
-3. `search()` calls `embed(query)` from `src/embeddings/embed.ts`, which runs the local transformer model (singleton, initialized once at server start) and returns a `Float32Array`.
-4. Two DB queries fire: `db.search()` for vector KNN (via `sqlite-vec`) and `db.textSearch()` for BM25 FTS5. Both fetch `topK * 4` candidates to give the merge step room to deduplicate. If the FTS query fails (malformed query, escape bug), it logs at debug level and falls back to vector-only — the error is never surfaced to the caller.
-5. `mergeHybridScores()` interleaves the two result lists using the hybrid weight (0.7 vector, 0.3 BM25 by default). The merged list then passes through a chain of boosting functions: `applyPathBoost` (×1.1 for source files, ×0.85 for tests), `applyFilenameBoost` (up to +10% per matching filename stem word), and `applyGraphBoost` (+0.05 × log₂(importers + 1) per file). Symbol expansion runs in parallel: `extractIdentifiers` pulls camelCase / dotted tokens from the query, looks them up via `db.searchSymbols()`, and merges exact symbol hits at a ×1.3 boost.
-6. For `search`, results are deduplicated by file path (best score per file). For `searchChunks` (`read_relevant`), no deduplication happens — two chunks from the same file can both appear, which is intentional for code navigation.
-7. The tool handler calls `db.logQuery()` to persist the query, result count, top score, and duration to the `query_log` table for analytics.
-8. Ranked results return to the agent over MCP.
-
-### Error paths
-
-FTS failure is the most common non-fatal error path. The `db.textSearch()` call is wrapped in a try/catch inside `search()` and `searchChunks()`; any exception logs at `debug` level and the flow continues with the vector-only candidate set. Filter bypass is another subtle path: `PathFilter` is applied in the SQL for both vector and FTS queries, but symbol expansion calls `db.searchSymbols()` outside those queries. To prevent filter leakage, `matchesFilter()` re-checks each symbol hit in memory before it is merged into the candidate pool.
-
-## Flow 2: Batch file indexing (index_files / mimirs index)
-
-The indexing flow is triggered by the `index_files` MCP tool call or by the `mimirs index <directory>` CLI subcommand. Both paths converge on `indexDirectory()` in `src/indexing/indexer.ts`.
+An agent issues a `search` or `read_relevant` MCP call. The request lands in the [Search MCP Tool](communities/search-tool.md) adapter (`src/tools/search.ts`), which delegates straight into the [Search Runtime](communities/search-runtime.md) (`src/search/hybrid.ts`). The runtime runs vector and FTS queries against the [Database Layer](communities/db-layer.md) in parallel, merges and reranks the candidates, then returns ranked chunks back to the agent.
 
 ```mermaid
 sequenceDiagram
-    participant caller as "Agent or CLI"
-    participant indexTool as "registerIndexTools"
-    participant dirFn as "indexDirectory"
-    participant collectFn as "collectFiles"
-    participant embedder as "getEmbedder"
-    participant procFn as "processFile"
-    participant chunker as "chunkText"
-    participant embedBatch as "embedBatchMerged"
-    participant ragDB as "RagDB"
-
-    caller->>indexTool: index_files directory
-    indexTool->>dirFn: directory + config
-    dirFn->>collectFn: directory + config
-    collectFn-->>dirFn: matched file list
-    dirFn->>embedder: load model
-    embedder-->>dirFn: model ready
-    loop each file
-        dirFn->>procFn: file path + options
-        procFn->>chunker: file content + extension
-        chunker-->>procFn: Chunk list
-        procFn->>embedBatch: chunk texts
-        embedBatch-->>procFn: embeddings
-        procFn->>ragDB: write chunks
-        procFn->>ragDB: write import graph
-    end
-    dirFn->>ragDB: prune deleted paths
-    dirFn-->>indexTool: IndexResult
-    indexTool-->>caller: summary counts
+  participant agent
+  participant tool
+  participant runtime
+  participant embedder
+  participant ragdb
+  agent->>tool: search query
+  tool->>runtime: search
+  runtime->>embedder: embed query
+  embedder-->>runtime: vector
+  par vector + FTS
+    runtime->>ragdb: vectorSearch
+    runtime->>ragdb: textSearch
+  end
+  ragdb-->>runtime: candidates
+  runtime->>runtime: merge and rerank
+  runtime->>ragdb: optional symbol expansion
+  ragdb-->>runtime: extra chunks
+  runtime-->>tool: ranked results
+  tool-->>agent: MCP text content
 ```
 
-1. `registerIndexTools()` (in `src/tools/index-tools.ts`) receives the MCP request and calls `resolveProject()` to locate the project directory and open the `RagDB`. It then calls `indexDirectory()`.
-2. `collectFiles()` walks the directory recursively using `readdir`, filtering against `config.include` and `config.exclude` glob patterns. Files matching `LARGE_PROJECT_WARN_THRESHOLD` trigger a warning. The embedding model is eagerly initialized via `getEmbedder()` before the per-file loop starts so that progress reporting reflects model-loading time rather than hiding it.
-3. For each file, `processFile()` runs the full pipeline: (a) hash the file content, (b) skip if the hash matches the DB record for that path, (c) call `chunkText()` in `src/indexing/chunker.ts` to split the content into AST-aware `Chunk` objects, (d) run `embedBatchMerged()` in batches of `config.indexBatchSize` (default 50) so memory stays bounded, (e) detect parent groups with `detectParentGroups()` and create synthetic parent chunks, (f) write child chunks to the DB via `db.insertChunkBatch()`, (g) persist the import/export graph via `db.upsertFileGraph()`.
-4. When `config.incrementalChunks` is enabled and the file already has content-hashed chunks in the DB, `processFileIncremental()` fires instead of a full re-index. It computes the diff between old and new chunk hashes: if more than 50% changed it falls through to full re-index; otherwise it deletes stale chunks, updates position metadata for kept chunks, and re-embeds only the new chunks.
-5. After all files are processed, `db.pruneDeleted()` removes DB records for paths no longer on disk. The final `IndexResult` (`{ indexed, skipped, pruned, errors }`) is returned to the caller.
-6. On error, `processFile()` exceptions are caught per-file, appended to `result.errors`, and reported via `onProgress`. A single errored file does not abort the run.
+Participants: `agent` (MCP client), `tool` is the Search MCP Tool adapter, `runtime` is `src/search/hybrid.ts`, `embedder` is `src/embeddings/embed.ts`, `ragdb` is `src/db/index.ts`.
+
+1. **Adapter** — `src/tools/search.ts` parses MCP arguments, builds the path filter, and calls `search()` from `src/search/hybrid.ts`. No retrieval logic lives in the adapter.
+2. **Embed query** — `src/search/hybrid.ts` calls the singleton `embed()` in `src/embeddings/embed.ts` to turn the query string into a 384-dim vector. The model loads once per process.
+3. **Vector + FTS in parallel** — `src/db/index.ts` exposes `vectorSearch` (against `sqlite-vec`) and `textSearch` (against the FTS5 virtual table). Both run in the same `RagDB` instance and share the path filter.
+4. **Merge and rerank** — `src/search/hybrid.ts` combines the two result sets at a default 70/30 vector/FTS weight, then applies the boost stack: `applyPathBoost` (×1.1 source / ×0.85 test), `applyFilenameBoost`, `applyGraphBoost` (+0.05 × log2(importers+1)), and the boilerplate demotion.
+5. **Symbol expansion** — when the query has high lexical signal, `src/search/hybrid.ts` looks up symbol matches in `src/db/index.ts` and merges them with a ×1.3 boost. Re-applies the path filter in memory because the symbol query bypasses SQL filters.
+6. **Format and return** — the adapter wraps the results as MCP `text` content. `read_relevant` returns chunk content; `search` returns paths + previews only.
 
 ### Error paths
 
-Per-file errors are isolated: the loop catches each exception, logs it via `onProgress`, and continues to the next file. Abortable runs respect an `AbortSignal` passed through `ProcessFileOptions`; each batch and each iteration checks `signal.aborted` before proceeding. Directory safety is validated up front by `checkIndexDir()`; attempting to index a system directory (home root, `/`) throws before any file is touched. Permission errors on the `.mimirs` directory during `RagDB` construction surface as a structured message directing the user to set `RAG_DB_DIR`.
+- **FTS failure is non-fatal.** `db.textSearch()` throwing (malformed query, escape bug) logs at debug level and falls back to vector-only. Users do not see the error.
+- **Empty index returns empty array.** `search()` does not throw when no chunks have been indexed — it returns `[]`. Callers that need to distinguish "no match" from "no index" must call `index_status` separately.
+- **Embedder cold start.** First call after process boot pays the model load cost. Subsequent calls reuse the singleton.
 
-## Additional flows
+## Flow 2 — Indexing (batch and incremental)
 
-### Watcher-triggered incremental re-index
-
-The watcher flow runs when `mimirs watch` is active. `startWatcher()` in `src/indexing/watcher.ts` wraps Node's `fs.watch()` with a DEBOUNCE_MS = 2000 ms debounce and a serial processing queue. When a file event fires: the path is checked against the config include/exclude globs; if it passes, a debounce timer is (re)set. When the timer fires it checks whether the path still exists — if not it schedules a `"remove"` action, otherwise `"index"`. The serial queue (`processing` flag + `nextBatch` map) prevents concurrent `indexFile` calls from interleaving, which would produce race conditions in `buildPathToIdMap`. After a successful re-index, `resolveImportsForFile()` (from `src/graph/resolver.ts`) updates the import graph for the changed file and for every file that imported it (`db.getImportersOf()`), so the dependency graph stays consistent without a full graph rebuild.
-
-### Wiki generation pipeline
-
-Wiki generation is triggered by the `generate_wiki()` MCP tool call, handled by `registerWikiTools()` in `src/tools/wiki-tools.ts`. The pipeline has five logical phases:
-
-1. **Discovery**: `runDiscovery()` in `src/wiki/discovery.ts` extracts the file-level import graph from the DB, runs Louvain community detection (via `src/wiki/community-detection.ts`), and assigns each file to a community. The result is a `DiscoveryResult` containing communities, PageRank scores, hub files, and entry points.
-2. **Classification**: the discovery result is classified into a `ClassifiedInventory` that groups files into community buckets, separates test fixtures from source, and identifies markdown isolates.
-3. **Synthesis**: for each community, the pipeline assembles a bundle (member files, exports, hub stats, nearby docs) and returns it as a prompt to the LLM. The LLM writes a `SynthesisPayload` naming the community and proposing page sections. These are stored in the `SynthesesFile` on disk.
-4. **Manifest build**: once all syntheses are stored, `buildManifest()` constructs the `PageManifest` — the ordered list of `ManifestPage` entries with slugs, titles, sections, depths, and related-page links.
-5. **Page payload**: `generate_wiki(page: N)` retrieves the Nth page's `ManifestPage`, assembles its full `PagePayload` (bundle, link map, required header and see-also blocks), and returns it for the LLM to write to disk.
-
-The [Wiki Orchestrator & MCP Tools](communities/wiki-orchestrator.md) page covers the orchestration layer in detail; [Wiki Pipeline — Types & Internals](communities/wiki-pipeline-internals.md) covers the data model, PageRank algorithm, and bundling logic.
-
-## Cross-cutting dependencies
-
-Two files are touched by every flow. `src/embeddings/embed.ts` is imported by 7 of 15 communities (fanIn=77) — it is the only path to the transformer model and is a singleton that lazy-initializes on first call. `src/db/index.ts` (`RagDB`) is imported by 9 of 15 communities (fanIn=59, fanOut=10) and is the sole gateway to all SQLite storage; every read and write for chunks, files, graph, conversations, checkpoints, annotations, and git history passes through its methods.
+The same end state — chunks embedded into SQLite — is reached through two entry points. The batch path runs when `index_files` is invoked from MCP or the CLI `mimirs index` command. The incremental path runs continuously while `mimirs watch` is active. Both converge inside the [Indexing runtime](communities/indexing-runtime.md) and write through the [Database Layer](communities/db-layer.md).
 
 ```mermaid
-flowchart LR
-    searchFlow["Search flow"]
-    indexFlow["Index flow"]
-    watchFlow["Watcher flow"]
-    wikiFlow["Wiki flow"]
-    embedTs["src/embeddings/embed.ts"]
-    dbIdx["src/db/index.ts"]
-
-    searchFlow --> embedTs
-    searchFlow --> dbIdx
-    indexFlow --> embedTs
-    indexFlow --> dbIdx
-    watchFlow --> dbIdx
-    wikiFlow --> dbIdx
+sequenceDiagram
+  participant trigger
+  participant indexer
+  participant guard
+  participant parser
+  participant chunker
+  participant embedder
+  participant resolver
+  participant ragdb
+  trigger->>indexer: indexDirectory dir
+  indexer->>guard: checkIndexDir dir
+  guard-->>indexer: ok or refusal
+  loop each file
+    indexer->>parser: parseFile path raw
+    parser-->>indexer: ParsedFile
+    indexer->>chunker: chunkText content ext
+    chunker-->>indexer: chunks
+    indexer->>embedder: embed batch
+    embedder-->>indexer: vectors
+    indexer->>ragdb: upsert chunks and embeddings
+  end
+  indexer->>resolver: resolveImports db dir
+  resolver->>ragdb: write graph edges
+  resolver-->>indexer: edge count
+  indexer-->>trigger: IndexResult
 ```
 
-Test infrastructure note: `tests/helpers.ts` is imported by 67 test files across the codebase and provides shared DB fixtures; it does not participate in any runtime flow.
+Participants: `trigger` is the CLI subcommand, MCP `index_files`, or the watcher; `indexer` is `src/indexing/indexer.ts`; `guard` is `src/utils/dir-guard.ts`; `parser` is `src/indexing/parse.ts`; `chunker` is `src/indexing/chunker.ts`; `embedder` is `src/embeddings/embed.ts`; `resolver` is `src/graph/resolver.ts`; `ragdb` is `src/db/index.ts`.
+
+1. **Trigger** — the batch path enters at `indexDirectory` in `src/indexing/indexer.ts`. The watcher path enters at `startWatcher` in `src/indexing/watcher.ts`, which calls `indexFile` per filesystem event with debouncing.
+2. **Directory guard** — `checkIndexDir` in `src/utils/dir-guard.ts` refuses obvious mistakes (home directories, system roots) before the index touches them. Returns a `DirCheckResult`; the caller decides whether to proceed.
+3. **Parse** — `parseFile` in `src/indexing/parse.ts` reads each file and turns it into a `ParsedFile`. AST-aware extensions (the `KNOWN_EXTENSIONS` set in `src/indexing/chunker.ts`) get tree-sitter parses; everything else falls back to heuristic chunking.
+4. **Chunk** — `chunkText` in `src/indexing/chunker.ts` splits the content into semantic chunks (functions, classes, markdown sections). Returns a `ChunkTextResult` with line ranges so search results can cite `path:start-end`.
+5. **Embed in batches** — `embed()` in `src/embeddings/embed.ts` runs Transformers.js + ONNX over `all-MiniLM-L6-v2`. The indexer batches multiple chunks per call to amortise the model overhead.
+6. **Upsert** — `RagDB` in `src/db/index.ts` upserts file rows, chunk rows, and embedding rows in one transaction. Files are skipped when their content hash matches the stored hash; deleted files are pruned.
+7. **Resolve imports** — once chunks are written, `resolveImports` in `src/graph/resolver.ts` walks the parsed import statements and writes `graph_edges` rows. This step is what makes `applyGraphBoost`, `depends_on`, and `find_usages` work.
+8. **Watcher loop** — for the incremental path, `startWatcher` keeps the watcher alive and calls `resolveImportsForFile` per change instead of the full graph. Closing the watcher returns control.
+
+### Error paths
+
+- **Parse failure is per-file.** `parseFile` throwing logs and skips that one file; the rest of the directory still indexes.
+- **Embedding failure aborts the batch.** A model error during `embed()` propagates — partial batches are not written. Re-running `index_files` resumes from where the hash check says nothing changed.
+- **Watcher debounce.** The watcher coalesces rapid edits into a single re-index call. A file edited 50 times in 100ms is indexed once.
+
+## Flow 3 — Wiki generation
+
+`generate_wiki()` is the entry point for the entire wiki pipeline. The first call returns a synthesis prompt list; subsequent calls advance through the phases. Unlike search and indexing, this flow is multi-call by design — it interleaves deterministic computation with LLM-driven steps (synthesis and page writing) and persists state across calls in `wiki/_meta/`.
+
+```mermaid
+sequenceDiagram
+  participant caller
+  participant tool
+  participant orchestrator
+  participant discovery
+  participant detection
+  participant categorize
+  participant synth
+  participant prefetch
+  participant payload
+  caller->>tool: generate_wiki call
+  tool->>orchestrator: runWikiBundling
+  orchestrator->>discovery: runDiscovery db
+  discovery->>detection: louvain on import graph
+  detection-->>discovery: communities
+  discovery-->>orchestrator: DiscoveryResult
+  orchestrator->>categorize: runCategorization
+  categorize-->>orchestrator: pinned and classified
+  orchestrator->>synth: buildCommunityBundles
+  synth-->>orchestrator: bundles per community
+  orchestrator-->>tool: pending list
+  tool-->>caller: synthesis prompts
+  Note over caller: writes synthesis per community
+  caller->>tool: generate_wiki again
+  tool->>orchestrator: runWikiFinalPlanning
+  orchestrator->>prefetch: prefetchContent
+  prefetch-->>orchestrator: per page cache
+  orchestrator-->>tool: page list
+  tool-->>caller: 25 pages
+  caller->>tool: generate_wiki page N
+  tool->>payload: buildPagePayload
+  payload-->>tool: title sections bundle
+  tool-->>caller: page N payload
+```
+
+Participants: `caller` is the agent invoking `generate_wiki`; `tool` is `src/tools/wiki-tools.ts`; `orchestrator` is `src/wiki/index.ts`; `discovery` is `src/wiki/discovery.ts`; `detection` is `src/wiki/community-detection.ts`; `categorize` is `src/wiki/categorization.ts`; `synth` is `src/wiki/community-synthesis.ts`; `prefetch` is `src/wiki/content-prefetch.ts`; `payload` is `src/wiki/page-payload.ts`.
+
+1. **Discovery** — `runDiscovery` in `src/wiki/discovery.ts` reads file rows and import edges from `src/db/index.ts`, then calls `src/wiki/community-detection.ts` (Louvain) to assign each file to a community. Returns a `DiscoveryResult` with per-community PageRank scores.
+2. **Categorization** — `runCategorization` in `src/wiki/categorization.ts` classifies which communities get full / standard / brief depth pages and which big files get their own sub-pages.
+3. **Bundle communities** — `buildCommunityBundles` in `src/wiki/community-synthesis.ts` extracts exports, tunable constants, hub data, and external edges per community. The bundle is what the synthesis prompt shows the writer.
+4. **Synthesis loop** — for each pending community, the agent calls `generate_wiki(synthesis: <id>)` to fetch the bundle, picks a name and slug, and stores the result via `write_synthesis`. Bundles are deterministic; the LLM only chooses presentation.
+5. **Final planning** — `runWikiFinalPlanning` in `src/wiki/index.ts` builds the page manifest, computes link maps, and runs `prefetchContent` (`src/wiki/content-prefetch.ts`) to pre-execute the per-page semantic queries.
+6. **Per-page payload** — when `generate_wiki(page: N)` fires, `buildPagePayload` in `src/wiki/page-payload.ts` reads the cached prefetch and assembles the final payload (title, sections, bundle, link map). The agent writes the markdown and calls `wiki_lint_page`.
+7. **Finalize** — `generate_wiki(finalize: true)` runs the validation checklist; `wiki_finalize_log` and `wiki_finalize_log_apply` append the human-readable change narrative to `wiki/_update-log.md`.
+
+### Error paths
+
+- **Stale syntheses.** When the bundle for a community has changed since the synthesis was stored, the incremental run flags it as pending and the agent must regenerate.
+- **Force full regen.** When more than 50% of pages are dirty (`> dirtyRatio` threshold), the planner falls back to a full regen rather than thrashing through incremental writes.
+- **Mid-run resume.** `generate_wiki(resume: true)` reports which page files are missing on disk so a partially completed run can finish without redoing the synthesis phase.
 
 ## See also
 
@@ -149,10 +167,9 @@ Test infrastructure note: `tests/helpers.ts` is imported by 67 test files across
 - [Database Layer](communities/db-layer.md)
 - [Getting started](getting-started.md)
 - [Git History Indexer & CLI Progress](communities/git-indexer-progress.md)
-- [Import Graph & File Watcher](communities/graph-watcher.md)
-- [Indexing Pipeline](communities/indexing-pipeline.md)
+- [Indexing runtime](communities/indexing-runtime.md)
 - [MCP Tool Handlers](communities/mcp-tools.md)
 - [Search MCP Tool](communities/search-tool.md)
 - [Search Runtime](communities/search-runtime.md)
-- [Wiki Orchestrator & MCP Tools](communities/wiki-orchestrator.md)
+- [Wiki orchestration](communities/wiki-orchestration.md)
 - [Wiki Pipeline — Types & Internals](communities/wiki-pipeline-internals.md)

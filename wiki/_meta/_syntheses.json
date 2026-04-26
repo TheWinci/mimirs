@@ -182,94 +182,6 @@
       ],
       "kind": "community"
     },
-    "bef3a1fcc8697bd9": {
-      "communityId": "bef3a1fcc8697bd9",
-      "name": "Wiki Orchestrator & MCP Tools",
-      "slug": "wiki-orchestrator",
-      "purpose": "Documents the wiki orchestration layer: the generate_wiki MCP tool handlers, the wiki/index.ts barrel, the lint-page validator, the section catalog registry, and the update log writer. Read this to understand how a generate_wiki() call becomes a page payload.",
-      "sections": [
-        {
-          "title": "Per-file breakdown",
-          "purpose": "Give each load-bearing file its own prose section — role, key exports, constants worth citing, and the non-obvious behavior a reader would miss from signatures alone.",
-          "shape": "per-file-breakdown"
-        },
-        {
-          "title": "How it works",
-          "purpose": "Trace the runtime flow from an MCP generate_wiki call through the orchestrator phases to the page payload returned to the caller.",
-          "shape": "lifecycle-flow"
-        },
-        {
-          "title": "Dependencies and consumers",
-          "purpose": "Show who this community imports from and who imports it, at a glance.",
-          "shape": "dependency-graph"
-        },
-        {
-          "title": "Tuning",
-          "purpose": "Parameters or config flags that change behavior without code edits — section catalog entries, lint rule thresholds, split community triggers.",
-          "shape": "tuning-knobs"
-        },
-        {
-          "title": "Internals",
-          "purpose": "Surface the insider knowledge that's not obvious from signatures — lint warning kinds, breadcrumb vs. suggested-query distinction, section catalog lookup mechanics.",
-          "shape": "internals"
-        },
-        {
-          "title": "Why it's built this way",
-          "purpose": "Explain non-obvious structural decisions and the alternatives rejected.",
-          "shape": "design-rationale"
-        },
-        {
-          "title": "Trade-offs",
-          "purpose": "Name the gains and costs of the current design so a future maintainer can tell whether a constraint is load-bearing.",
-          "shape": "trade-offs"
-        },
-        {
-          "title": "Common gotchas",
-          "purpose": "Things a first-time reader of this community will get wrong.",
-          "shape": "common-gotchas"
-        }
-      ],
-      "kind": "community"
-    },
-    "af79ae68a38bcfd5": {
-      "communityId": "af79ae68a38bcfd5",
-      "name": "Indexing Pipeline",
-      "slug": "indexing-pipeline",
-      "purpose": "Documents the file ingestion pipeline: directory validation, file parsing, AST-aware chunking, embedding, and DB upsert. The authoritative reference for adding new language support or tuning chunk behavior.",
-      "sections": [
-        {
-          "title": "Per-file breakdown",
-          "purpose": "Give each load-bearing file its own prose section — role, key exports, constants worth citing, and the non-obvious behavior a reader would miss from signatures alone.",
-          "shape": "per-file-breakdown"
-        },
-        {
-          "title": "How it works",
-          "purpose": "Trace the runtime flow from indexDirectory() entry through parse, chunk, embed, and DB upsert.",
-          "shape": "lifecycle-flow"
-        },
-        {
-          "title": "Dependencies and consumers",
-          "purpose": "Show who this community imports from and who imports it, at a glance.",
-          "shape": "dependency-graph"
-        },
-        {
-          "title": "Tuning",
-          "purpose": "Parameters or config flags that change behavior without code edits — KNOWN_EXTENSIONS set, chunk size limits.",
-          "shape": "tuning-knobs"
-        },
-        {
-          "title": "Internals",
-          "purpose": "Surface the insider knowledge that's not obvious from signatures — extension detection fallbacks, parent chunk mechanics, incremental hash checks.",
-          "shape": "internals"
-        },
-        {
-          "title": "Failure modes",
-          "purpose": "Call out how things break, what the module does about it, and what callers must handle.",
-          "shape": "failure-modes"
-        }
-      ],
-      "kind": "community"
-    },
     "1051c07f09ccf18d": {
       "communityId": "1051c07f09ccf18d",
       "name": "Search Runtime",
@@ -458,40 +370,6 @@
       ],
       "kind": "community"
     },
-    "eb1906b45cbc92a9": {
-      "communityId": "eb1906b45cbc92a9",
-      "name": "Import Graph & File Watcher",
-      "slug": "graph-watcher",
-      "purpose": "Documents the static import graph resolver and the filesystem watcher: how inter-file dependencies are extracted and persisted, and how file-change events trigger incremental re-indexing. The reference for understanding dependency tracking and live-index updates.",
-      "sections": [
-        {
-          "title": "How it works",
-          "purpose": "Trace the runtime flow from resolveImports() through per-file import resolution and DB upsert, and the parallel path where startWatcher() responds to fs events.",
-          "shape": "lifecycle-flow"
-        },
-        {
-          "title": "Dependencies and consumers",
-          "purpose": "Show who this community imports from and who imports it, at a glance.",
-          "shape": "dependency-graph"
-        },
-        {
-          "title": "Internals",
-          "purpose": "Surface the insider knowledge that's not obvious from signatures — path-to-id map construction, import resolution heuristics, watcher debounce mechanics.",
-          "shape": "internals"
-        },
-        {
-          "title": "Entry points",
-          "purpose": "List the public surface a consumer reaches first.",
-          "shape": "entry-points"
-        },
-        {
-          "title": "Failure modes",
-          "purpose": "Call out how things break, what the module does about it, and what callers must handle.",
-          "shape": "failure-modes"
-        }
-      ],
-      "kind": "community"
-    },
     "bdd263ea000a4c36": {
       "communityId": "bdd263ea000a4c36",
       "name": "Community Detection & Discovery",
@@ -582,6 +460,104 @@
         }
       ],
       "kind": "community"
+    },
+    "2524c69a117484b6": {
+      "communityId": "2524c69a117484b6",
+      "name": "Indexing runtime",
+      "slug": "indexing-runtime",
+      "purpose": "Walks the project tree, parses and chunks files, embeds them into the RAG DB, watches for changes, and resolves the import graph that downstream search and wiki tooling depend on.",
+      "sections": [
+        {
+          "title": "Entry points",
+          "purpose": "Surface the public functions consumers reach first when ingesting a project or generating a project map.",
+          "shape": "bulleted list of exports with 1-line purpose each"
+        },
+        {
+          "title": "Per-file breakdown",
+          "purpose": "Give each load-bearing file its own prose section — role, key exports, constants worth citing, and the non-obvious behavior a reader would miss from signatures alone. This is what distinguishes a wiki from a signature dump. When the link map ships sub-pages for big members, SKIP those files here (the sub-page covers them) — cover only the members that don't have a sub-page.",
+          "shape": "One `### path/to/file.ts — <short role label>` heading per member file that does NOT have a sub-page in the link map (order by per-file PageRank). Each section: 2-6 sentences of prose naming the file's role in the community, the 2-4 most important exports with what they do (not just signatures), any named constants with their values (e.g. `DEFAULT_HYBRID_WEIGHT = 0.7`), and one or two gotchas worth knowing. No redundant signature tables — the prose carries the information."
+        },
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow across the community's files — a caller triggers work that fans out through internal files to a sink. The diagram shows who calls whom; the numbered steps say what happens at each hop. Required for any multi-file community.",
+          "shape": "A `sequenceDiagram` mermaid block showing the real participants (use concrete file/function names, not placeholders), followed by a numbered prose list citing specific files and line ranges for each step. Skip only when the community is a static utility bag with no runtime flow."
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance. Required whenever the community has a meaningful edge count so readers can see the blast radius before touching code.",
+          "shape": "A `flowchart LR` mermaid block with an `Upstream` subgraph (external dependencies), the community name as the central node, and a `Downstream` subgraph (external consumers). Use real file/module names, not placeholders. Follow the diagram with a compact bulleted list: `Depends on:` and `Depended on by:` pointing to wiki pages where they exist."
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface the insider knowledge that's not obvious from signatures — tuning knobs masquerading as constants, silent fallbacks, guards against conditions that can't occur, heuristics with blind spots. This is where someone who wrote the code would drop hints a reader would otherwise have to hit a bug to learn.",
+          "shape": "Bulleted list. Each bullet leads with a bold claim (usually a named symbol or behavior), then 1-3 sentences of elaboration citing the specific file and line or constant. Prefer concrete numbers over generic prose."
+        },
+        {
+          "title": "Tuning",
+          "purpose": "Parameters or config flags that change behavior without code edits",
+          "shape": "table: name / default / effect / when to change"
+        },
+        {
+          "title": "Failure modes",
+          "purpose": "Cover what happens when parsing fails, the watcher loses events, or the directory check refuses to index — and what callers must do.",
+          "shape": "bulleted list of failure modes, each with cause / behavior / caller action"
+        }
+      ],
+      "kind": "community"
+    },
+    "3272d1b8d89f87ce": {
+      "communityId": "3272d1b8d89f87ce",
+      "name": "Wiki orchestration",
+      "slug": "wiki-orchestration",
+      "purpose": "Top-level wiki pipeline surface: bundles communities, drives the synthesis prompt, lints rendered pages, diffs against snapshots, and writes the human-facing update log that ties regen runs to git refs.",
+      "sections": [
+        {
+          "title": "Entry points",
+          "purpose": "Surface the public functions and MCP tools that callers reach when running, resuming, linting, or diffing a wiki regen.",
+          "shape": "bulleted list of exports with 1-line purpose each"
+        },
+        {
+          "title": "Per-file breakdown",
+          "purpose": "Give each load-bearing file its own prose section — role, key exports, constants worth citing, and the non-obvious behavior a reader would miss from signatures alone. This is what distinguishes a wiki from a signature dump. When the link map ships sub-pages for big members, SKIP those files here (the sub-page covers them) — cover only the members that don't have a sub-page.",
+          "shape": "One `### path/to/file.ts — <short role label>` heading per member file that does NOT have a sub-page in the link map (order by per-file PageRank). Each section: 2-6 sentences of prose naming the file's role in the community, the 2-4 most important exports with what they do (not just signatures), any named constants with their values (e.g. `DEFAULT_HYBRID_WEIGHT = 0.7`), and one or two gotchas worth knowing. No redundant signature tables — the prose carries the information."
+        },
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow across the community's files — a caller triggers work that fans out through internal files to a sink. The diagram shows who calls whom; the numbered steps say what happens at each hop. Required for any multi-file community.",
+          "shape": "A `sequenceDiagram` mermaid block showing the real participants (use concrete file/function names, not placeholders), followed by a numbered prose list citing specific files and line ranges for each step. Skip only when the community is a static utility bag with no runtime flow."
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance. Required whenever the community has a meaningful edge count so readers can see the blast radius before touching code.",
+          "shape": "A `flowchart LR` mermaid block with an `Upstream` subgraph (external dependencies), the community name as the central node, and a `Downstream` subgraph (external consumers). Use real file/module names, not placeholders. Follow the diagram with a compact bulleted list: `Depends on:` and `Depended on by:` pointing to wiki pages where they exist."
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface the insider knowledge that's not obvious from signatures — tuning knobs masquerading as constants, silent fallbacks, guards against conditions that can't occur, heuristics with blind spots. This is where someone who wrote the code would drop hints a reader would otherwise have to hit a bug to learn.",
+          "shape": "Bulleted list. Each bullet leads with a bold claim (usually a named symbol or behavior), then 1-3 sentences of elaboration citing the specific file and line or constant. Prefer concrete numbers over generic prose."
+        },
+        {
+          "title": "Tuning",
+          "purpose": "Parameters or config flags that change behavior without code edits",
+          "shape": "table: name / default / effect / when to change"
+        },
+        {
+          "title": "Why it's built this way",
+          "purpose": "Explain non-obvious structural decisions and the alternatives rejected",
+          "shape": "short prose, one paragraph per decision, leading with the decision and following with the reason"
+        },
+        {
+          "title": "Trade-offs",
+          "purpose": "Name the gains and costs of the current design so a future maintainer can tell whether a constraint is load-bearing. Different from `design-rationale` in framing: rationale explains why the alternative was rejected; trade-offs explain what the current choice gives up. Use for communities where multiple reasonable designs exist and the chosen one commits to one set of properties at the expense of another.",
+          "shape": "Bulleted list. Each bullet opens with the chosen property in bold, then a `Cost:` clause naming what was given up and why it's acceptable here."
+        },
+        {
+          "title": "Common gotchas",
+          "purpose": "Things a first-time reader of this community will get wrong. Shorter and more pragmatic than `known-issues`: these aren't bugs, they're counter-intuitive facts about how the code behaves. Think: \"I spent two hours on X before realising Y.\" Required for deep/high-LOC communities where the signatures don't reveal the whole story.",
+          "shape": "Bulleted list. Each bullet: short bold claim (often a symbol or behavior), then 1–2 sentences of elaboration. Cite file:line or constant. Keep each gotcha under three sentences."
+        }
+      ],
+      "kind": "community"
     }
   },
   "memberSets": {
@@ -628,19 +604,6 @@
       "src/tools/index.ts",
       "src/tools/server-info-tools.ts"
     ],
-    "bef3a1fcc8697bd9": [
-      "src/tools/wiki-tools.ts",
-      "src/wiki/index.ts",
-      "src/wiki/lint-page.ts",
-      "src/wiki/section-catalog.ts",
-      "src/wiki/update-log.ts"
-    ],
-    "af79ae68a38bcfd5": [
-      "src/indexing/chunker.ts",
-      "src/indexing/indexer.ts",
-      "src/indexing/parse.ts",
-      "src/utils/dir-guard.ts"
-    ],
     "1051c07f09ccf18d": [
       "src/search/benchmark.ts",
       "src/search/eval.ts",
@@ -681,10 +644,6 @@
       "src/config/index.ts",
       "src/embeddings/embed.ts"
     ],
-    "eb1906b45cbc92a9": [
-      "src/graph/resolver.ts",
-      "src/indexing/watcher.ts"
-    ],
     "bdd263ea000a4c36": [
       "src/wiki/community-detection.ts",
       "src/wiki/discovery.ts"
@@ -694,6 +653,22 @@
     ],
     "aa3360856c186019": [
       "src/tools/search.ts"
+    ],
+    "2524c69a117484b6": [
+      "src/graph/resolver.ts",
+      "src/indexing/chunker.ts",
+      "src/indexing/indexer.ts",
+      "src/indexing/parse.ts",
+      "src/indexing/watcher.ts",
+      "src/utils/dir-guard.ts"
+    ],
+    "3272d1b8d89f87ce": [
+      "src/tools/wiki-tools.ts",
+      "src/wiki/diff-page.ts",
+      "src/wiki/index.ts",
+      "src/wiki/lint-page.ts",
+      "src/wiki/section-catalog.ts",
+      "src/wiki/update-log.ts"
     ]
   }
 }
