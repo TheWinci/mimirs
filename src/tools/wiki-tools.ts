@@ -18,7 +18,17 @@ import { lintPage, type PageLintWarning, type ChunkRange } from "../wiki/lint-pa
 import type { ClusterMode } from "../wiki/community-detection";
 import { renderCatalog, paletteForRequired } from "../wiki/section-catalog";
 import { classifyStaleness, type StalenessReport } from "../wiki/staleness";
-import { appendInitLog, appendIncrementalLog } from "../wiki/update-log";
+import {
+  appendInitLog,
+  appendQueueStub,
+  appendFallbackLog,
+  appendNarrative,
+  writeSnapshot,
+  readSnapshot,
+  deleteSnapshot,
+  snapshotPath,
+} from "../wiki/update-log";
+import { diffPage } from "../wiki/diff-page";
 import type {
   PageManifest,
   ContentCache,
@@ -28,6 +38,9 @@ import type {
   SynthesesFile,
   SynthesisPayload,
   PagePayload,
+  PreRegenSnapshot,
+  PreRegenSnapshotPage,
+  PageDiff,
 } from "../wiki/types";
 import type { RagDB } from "../db";
 
@@ -226,6 +239,37 @@ export function registerWikiTools(server: McpServer, getDB: GetDB) {
       const wikiDir = join(projectDir, "wiki");
       return {
         content: [{ type: "text" as const, text: buildPageResponse(wikiDir, page) }],
+      };
+    },
+  );
+
+  server.tool(
+    "wiki_finalize_log",
+    "Phase-2 of the incremental update log. Loads `wiki/_meta/_pre-regen-snapshot.json` (captured at planning), reads the *new* on-disk markdown for each regenerated page, computes a structural diff (sections added/removed/rewritten, citations, mermaid blocks, numeric literals), and returns a prompt for the calling agent to write a `## What changed in this regen` narrative — one bullet per page, two sentences, grounded in the diffs and commit subjects. Pass the resulting markdown back via `wiki_finalize_log_apply`. No-op when no snapshot exists.",
+    {
+      directory: z.string().optional().describe("Project directory."),
+    },
+    async ({ directory }) => {
+      const { projectDir } = await resolveProject(directory, getDB);
+      const wikiDir = join(projectDir, "wiki");
+      return {
+        content: [{ type: "text" as const, text: buildFinalizeLogResponse(projectDir, wikiDir) }],
+      };
+    },
+  );
+
+  server.tool(
+    "wiki_finalize_log_apply",
+    "Append the LLM-produced \"What changed\" narrative to `wiki/_update-log.md` under the queue stub for the current snapshot's `newRef`, then delete the snapshot. Pair with `wiki_finalize_log` — that tool returns the prompt, the agent writes the markdown, this tool persists it. Pass the narrative as project-relative markdown bullets (no surrounding heading; the tool wraps it).",
+    {
+      directory: z.string().optional().describe("Project directory."),
+      narrative: z.string().describe("Markdown bullets returned by the LLM. One bullet per page. The tool wraps it under `### What changed in this regen`."),
+    },
+    async ({ directory, narrative }) => {
+      const { projectDir } = await resolveProject(directory, getDB);
+      const wikiDir = join(projectDir, "wiki");
+      return {
+        content: [{ type: "text" as const, text: applyFinalizeLog(wikiDir, narrative) }],
       };
     },
   );
@@ -1605,22 +1649,167 @@ async function buildIncrementalResponse(
 
   const dirty = report.stale.length + report.added.length;
   const shouldFallBack = dirty > result.manifest.pageCount * 0.5;
+  const commits = await getCommitsInRange(gitRoot, sinceRef, currentHead);
   if (shouldFallBack) {
-    appendInitLog(wikiDir, currentHead, result.manifest);
-    return buildInitResponse(result.manifest, [
+    appendFallbackLog(
+      wikiDir,
+      sinceRef,
+      currentHead,
+      dirty,
+      result.manifest.pageCount,
+      commits.length,
+    );
+    captureFallbackSnapshot(projectDir, wikiDir, sinceRef, currentHead, commits, result.manifest);
+    let response = buildInitResponse(result.manifest, result.content, [
       ...result.warnings,
-      `Fell back to full init: ${dirty}/${result.manifest.pageCount} pages would regenerate (>50%).`,
+      `Fell back to forced full regen: ${dirty}/${result.manifest.pageCount} pages dirty (>50%).`,
     ]);
+    response += `\n## Update log narrative\n\n` +
+      `A pre-regen snapshot was captured for this fallback. After all writers finish ` +
+      `(and before \`generate_wiki(finalize: true)\`), call \`wiki_finalize_log\` to fetch ` +
+      `the per-page diff prompt, run it, then \`wiki_finalize_log_apply(narrative: ...)\` ` +
+      `to append the "What changed" block to \`wiki/_update-log.md\`.\n`;
+    return response;
   }
 
-  appendIncrementalLog(wikiDir, sinceRef, currentHead, changedFiles.size, report);
+  appendQueueStub(
+    wikiDir,
+    sinceRef,
+    currentHead,
+    changedFiles.size,
+    report.stale.length,
+    report.added.length,
+    report.removed.length,
+    commits.length,
+  );
+  // Snapshot old page content so finalize can diff against the writers'
+  // output. Skip when no pages need writing — nothing to narrate.
+  if (report.stale.length + report.added.length > 0) {
+    captureSnapshot(projectDir, wikiDir, sinceRef, currentHead, commits, report);
+  } else {
+    deleteSnapshot(wikiDir);
+  }
   return renderIncrementalResponse(sinceRef, currentHead, changedFiles.size, report);
+}
+
+/**
+ * Persist `_pre-regen-snapshot.json` capturing the on-disk markdown of
+ * every stale page (added pages get oldContent: null). Finalize loads
+ * this and runs `diffPage` against the writers' new output to produce
+ * the "What changed" narrative grounding.
+ */
+function captureSnapshot(
+  projectDir: string,
+  wikiDir: string,
+  sinceRef: string,
+  newRef: string,
+  commits: { hash: string; message: string }[],
+  report: StalenessReport,
+): void {
+  const pages: Record<string, PreRegenSnapshotPage> = {};
+  for (const d of report.stale) {
+    const abs = join(projectDir, d.wikiPath);
+    const old = existsSync(abs) ? readFileSync(abs, "utf-8") : null;
+    pages[d.wikiPath] = {
+      title: d.page.title,
+      kind: d.page.kind,
+      depth: d.page.depth,
+      triggers: d.triggers,
+      oldContent: old,
+    };
+  }
+  for (const d of report.added) {
+    pages[d.wikiPath] = {
+      title: d.page.title,
+      kind: d.page.kind,
+      depth: d.page.depth,
+      triggers: d.triggers,
+      oldContent: null,
+    };
+  }
+  const snap: PreRegenSnapshot = {
+    version: 1,
+    sinceRef,
+    newRef,
+    capturedAt: new Date().toISOString(),
+    commits,
+    removed: report.removed.map((r) => ({ wikiPath: r.wikiPath, title: r.page.title })),
+    pages,
+  };
+  writeSnapshot(wikiDir, snap);
+}
+
+/**
+ * Snapshot every page in the manifest for the >50%-dirty fallback. The
+ * staleness report is irrelevant here — the response forces the agent to
+ * regenerate everything, so the snapshot must hold every page's old
+ * content, not just the flagged subset. Same shape as `captureSnapshot`
+ * so finalize can diff uniformly.
+ */
+function captureFallbackSnapshot(
+  projectDir: string,
+  wikiDir: string,
+  sinceRef: string,
+  newRef: string,
+  commits: { hash: string; message: string }[],
+  manifest: PageManifest,
+): void {
+  const pages: Record<string, PreRegenSnapshotPage> = {};
+  for (const [wikiPath, page] of Object.entries(manifest.pages)) {
+    const abs = join(projectDir, wikiPath);
+    const old = existsSync(abs) ? readFileSync(abs, "utf-8") : null;
+    pages[wikiPath] = {
+      title: page.title,
+      kind: page.kind,
+      depth: page.depth,
+      triggers: ["incremental fallback (>50% pages dirty)"],
+      oldContent: old,
+    };
+  }
+  const snap: PreRegenSnapshot = {
+    version: 1,
+    sinceRef,
+    newRef,
+    capturedAt: new Date().toISOString(),
+    commits,
+    removed: [],
+    pages,
+  };
+  writeSnapshot(wikiDir, snap);
 }
 
 async function getChangedFiles(gitRoot: string, sinceRef: string): Promise<Set<string>> {
   const out = await runGit(["diff", "--name-only", sinceRef], gitRoot);
   if (out === null) return new Set();
   return new Set(out.split("\n").map((s) => s.trim()).filter(Boolean));
+}
+
+/**
+ * Fetch commit hash + subject for the `sinceRef..newRef` window. Used to
+ * narrate the incremental update log — gives readers the "why" without
+ * forcing them to `git log`. Excludes merge commits since their subjects
+ * are typically uninformative ("Merge branch …"). Hashes are short form
+ * to match the rest of the log.
+ */
+async function getCommitsInRange(
+  gitRoot: string,
+  sinceRef: string,
+  newRef: string,
+): Promise<{ hash: string; message: string }[]> {
+  const out = await runGit(
+    ["log", "--no-merges", "--pretty=format:%h %s", `${sinceRef}..${newRef}`],
+    gitRoot,
+  );
+  if (!out) return [];
+  return out
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const sp = line.indexOf(" ");
+      if (sp < 0) return { hash: line, message: "" };
+      return { hash: line.slice(0, sp), message: line.slice(sp + 1) };
+    });
 }
 
 function renderIncrementalResponse(
@@ -1673,7 +1862,15 @@ function renderIncrementalResponse(
   if (removed.length > 0) {
     steps.push(`Delete the files under "Delete these files".`);
   }
-  steps.push(`Call \`generate_wiki(finalize: true)\` once all pages are written.`);
+  if (stale.length > 0 || added.length > 0) {
+    steps.push(
+      `Call \`wiki_finalize_log\` once every page above is written — it returns a prompt with per-page diffs (old vs new) and the commit window. ` +
+      `Run that prompt yourself and pass the resulting markdown bullets to \`wiki_finalize_log_apply(narrative: ...)\`. ` +
+      `This appends the "What changed in this regen" narrative to \`wiki/_update-log.md\` and clears the snapshot. ` +
+      `Skipping it leaves the log stuck on the bare queue stub.`,
+    );
+  }
+  steps.push(`Call \`generate_wiki(finalize: true)\` last for the lint sweep.`);
   steps.forEach((s, i) => { text += `${i + 1}. ${s}\n`; });
   text += `\n${WORKFLOW_TIPS}\n${INDEX_FRESHNESS_NOTE}\n`;
   return text;
@@ -1718,6 +1915,10 @@ Spot-check 3–5 pages:
 - **Signatures** match the bundle (no paraphrasing, no fabrication).
 
 Fix issues in place.
+
+## Update log narrative
+
+If a pre-regen snapshot exists (incremental flow only), call \`wiki_finalize_log\` to fetch the prompt + per-page diffs, run that prompt, and pass the result to \`wiki_finalize_log_apply\`. Skip when the tool reports no snapshot — that means this was a full init or finalize already ran.
 
 ## Generate index page
 
@@ -1916,4 +2117,130 @@ function safeRead(path: string): string | null {
 
 function plural(n: number): string {
   return n === 1 ? "" : "s";
+}
+
+/**
+ * Build the prompt the orchestrator agent runs to write the per-regen
+ * narrative. Loads the snapshot, reads each page's current on-disk
+ * content, runs `diffPage`, and ships the diff bundle + commits.
+ *
+ * Failure modes follow the plan: missing snapshot → friendly no-op
+ * stub written to the log; stale snapshot (newRef no longer matches the
+ * manifest's lastGitRef) → reject with an explanation.
+ */
+function buildFinalizeLogResponse(projectDir: string, wikiDir: string): string {
+  const snap = readSnapshot(wikiDir);
+  if (!snap) {
+    return `No pre-regen snapshot found at \`${snapshotPath(wikiDir)}\`. Either ` +
+      `(a) no incremental regen has been queued, or (b) finalize already ran. ` +
+      `Skipping narrative.`;
+  }
+
+  const manifest = readJSON<PageManifest>(p(wikiDir, MANIFEST_FILE));
+  if (manifest && manifest.lastGitRef !== snap.newRef) {
+    return `Snapshot is stale: snapshot.newRef=\`${snap.newRef}\` but ` +
+      `manifest.lastGitRef=\`${manifest.lastGitRef}\`. Re-run ` +
+      `\`generate_wiki(incremental: true)\` to capture a fresh snapshot.`;
+  }
+
+  const diffs: PageDiff[] = [];
+  const missingNew: string[] = [];
+  for (const [wikiPath, snapPage] of Object.entries(snap.pages)) {
+    const abs = join(projectDir, wikiPath);
+    const newBody = safeRead(abs);
+    if (newBody === null) {
+      missingNew.push(wikiPath);
+      continue;
+    }
+    diffs.push(
+      diffPage(
+        wikiPath,
+        {
+          title: snapPage.title,
+          kind: snapPage.kind,
+          status: snapPage.oldContent === null ? "added" : "stale",
+          triggers: snapPage.triggers,
+        },
+        snapPage.oldContent,
+        newBody,
+      ),
+    );
+  }
+
+  let prompt = `# Wiki finalize-log prompt\n\n`;
+  prompt += `Run: \`${snap.sinceRef}\` → \`${snap.newRef}\` (captured ${snap.capturedAt}).\n\n`;
+  prompt += `## Instructions\n\n`;
+  prompt += `Write the \`### What changed in this regen\` block for the wiki update log. `;
+  prompt += `One bullet per page, two sentences max each.\n\n`;
+  prompt += `- First sentence: what's visible on the page now (cite specific section names, counts, tunables).\n`;
+  prompt += `- Second sentence: *why*, inferred from the trigger files and commit subjects.\n`;
+  prompt += `- Lead with what's on the page, not the trigger files.\n`;
+  prompt += `- No hedge words (basically, simply, just, really). No marketing words (powerful, robust, seamless).\n`;
+  prompt += `- For pages with only structural rewrites and no new content, say so explicitly: ` +
+    `"Tightened the \`X\` section without adding material."\n`;
+  prompt += `- Pages flagged \`status: "added"\` had no prior version — describe what they cover, not a delta.\n`;
+  if (snap.removed.length > 0) {
+    prompt += `- The "Removed pages" list ships separately; do not duplicate.\n`;
+  }
+  prompt += `\nAfter drafting, call \`wiki_finalize_log_apply(narrative: "<your markdown>")\` to persist.\n\n`;
+
+  if (snap.commits.length > 0) {
+    prompt += `## Commits in this window\n\n`;
+    const COMMIT_CAP = 30;
+    for (const c of snap.commits.slice(0, COMMIT_CAP)) {
+      prompt += `- \`${c.hash}\` ${c.message}\n`;
+    }
+    if (snap.commits.length > COMMIT_CAP) {
+      prompt += `- … (+${snap.commits.length - COMMIT_CAP} more)\n`;
+    }
+    prompt += `\n`;
+  }
+
+  if (snap.removed.length > 0) {
+    prompt += `## Removed pages (mention as a closing line, not per-bullet)\n\n`;
+    for (const r of snap.removed) {
+      prompt += `- \`${r.wikiPath}\` — ${r.title}\n`;
+    }
+    prompt += `\n`;
+  }
+
+  prompt += `## Per-page diffs (JSON)\n\n`;
+  prompt += "```json\n";
+  prompt += JSON.stringify(diffs, null, 2);
+  prompt += "\n```\n";
+
+  if (missingNew.length > 0) {
+    prompt += `\n## Pages missing on disk\n\n`;
+    prompt += `These were flagged for regen but no file exists. Note them in the narrative as "skipped — writer did not produce output":\n\n`;
+    for (const m of missingNew) prompt += `- \`${m}\`\n`;
+    prompt += `\n`;
+  }
+
+  return prompt;
+}
+
+/**
+ * Persist the LLM-produced narrative under the queue stub for this
+ * snapshot's newRef, then delete the snapshot file. Idempotency is the
+ * caller's problem — if the agent calls this twice, two narratives end
+ * up in the log under the same stub. Acceptable trade-off for a
+ * single-user tool.
+ */
+function applyFinalizeLog(wikiDir: string, narrative: string): string {
+  const snap = readSnapshot(wikiDir);
+  if (!snap) {
+    return `No pre-regen snapshot to apply against. Run \`wiki_finalize_log\` first ` +
+      `or skip — there is nothing to narrate.`;
+  }
+  const trimmed = narrative.trim();
+  if (!trimmed) {
+    return `Empty narrative — refusing to write an empty "What changed" block. ` +
+      `Snapshot left in place; re-run with content.`;
+  }
+  const result = appendNarrative(wikiDir, snap.newRef, trimmed);
+  deleteSnapshot(wikiDir);
+  const where = result.mode === "inserted"
+    ? `inserted under queue stub for \`${snap.newRef}\``
+    : `appended (no matching stub found for \`${snap.newRef}\`)`;
+  return `Narrative ${where}. Snapshot deleted.`;
 }

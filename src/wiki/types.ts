@@ -455,3 +455,54 @@ export interface WikiPlanResult {
   syntheses: SynthesesFile;
   warnings: string[];
 }
+
+// ─── Pre-regen snapshot (LLM update-log narration) ───
+
+/**
+ * One entry per page that was flagged stale or added at planning time.
+ * Captures the *old* on-disk content so finalize can diff against the new
+ * content the writers produced. `oldContent` is null for newly-added pages
+ * (no prior version to diff).
+ */
+export interface PreRegenSnapshotPage {
+  title: string;
+  kind: string;
+  depth: PageDepth;
+  /** Files (or events like `community set changed`) that flagged this page. */
+  triggers: string[];
+  /** Full markdown body of the prior page, or null for added pages. */
+  oldContent: string | null;
+}
+
+export interface PreRegenSnapshot {
+  version: 1;
+  sinceRef: string;
+  newRef: string;
+  capturedAt: string;
+  /** Commit subjects in the `sinceRef..newRef` window. */
+  commits: { hash: string; message: string }[];
+  /** Pages that were removed entirely — name only, no diff. */
+  removed: { wikiPath: string; title: string }[];
+  /** Stale + added pages keyed by wiki path. */
+  pages: Record<string, PreRegenSnapshotPage>;
+}
+
+/** Per-page structural diff fed to the narrative LLM as grounding. */
+export interface PageDiff {
+  wikiPath: string;
+  title: string;
+  kind: string;
+  /** "added" when there was no prior content. */
+  status: "stale" | "added";
+  triggers: string[];
+  sectionsAdded: string[];
+  sectionsRemoved: string[];
+  sectionsRewritten: string[];
+  citationsAdded: string[];
+  citationsRemoved: string[];
+  mermaidDelta: { oldCount: number; newCount: number; oldTypes: string[]; newTypes: string[] };
+  numericLiteralsAdded: string[];
+  numericLiteralsRemoved: string[];
+  /** Byte-size delta for cheap "tightened/expanded" signal. */
+  byteDelta: number;
+}
