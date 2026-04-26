@@ -16,6 +16,7 @@ import type {
   ArchitectureBundle,
   GettingStartedBundle,
   CommunityBundle,
+  ServiceAggregateBundle,
   SynthesesFile,
   PrefetchedQueryHit,
 } from "./types";
@@ -223,6 +224,12 @@ export async function prefetchContent(
     projectDir,
   );
 
+  const serviceAggregate = buildServiceAggregateBundle(
+    discovery,
+    syntheses,
+    bundlesById,
+  );
+
   for (const [wikiPath, page] of Object.entries(manifest.pages)) {
     const bag: PageContentCache = {};
     if (page.kind === "architecture") {
@@ -231,6 +238,12 @@ export async function prefetchContent(
       bag.architecture = architecture;
     } else if (page.kind === "getting-started") {
       bag.gettingStarted = gettingStarted;
+    } else if (
+      page.kind === "endpoints" ||
+      page.kind === "queues" ||
+      page.kind === "runtime-config"
+    ) {
+      if (serviceAggregate) bag.serviceAggregate = serviceAggregate;
     } else if (page.kind === "community-file" && page.communityId) {
       // Sub-pages share the parent community bundle scoped to memberFiles.
       // Single-file sub-page: one member; group sub-page: multiple members.
@@ -627,4 +640,57 @@ function collectOriginCommits(
   return [...commitsByHash.values()]
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(0, 5);
+}
+
+/**
+ * Aggregate service signals across every community into a project-level
+ * bundle. Returns null when the project isn't a service — the caller
+ * skips attaching it.
+ *
+ * Each row carries the slug of the owning community so the writer can
+ * link the table cell to the relevant community page directly.
+ */
+function buildServiceAggregateBundle(
+  discovery: DiscoveryResult,
+  syntheses: SynthesesFile,
+  bundlesById: Map<string, CommunityBundle>,
+): ServiceAggregateBundle | null {
+  const profile = discovery.serviceProfile;
+  if (!profile || (profile.kind !== "service" && profile.kind !== "mixed")) {
+    return null;
+  }
+
+  const slugByCommunityId = new Map<string, string>();
+  for (const [communityId, payload] of Object.entries(syntheses.payloads)) {
+    slugByCommunityId.set(communityId, payload.slug);
+  }
+
+  const out: ServiceAggregateBundle = {
+    profile,
+    routes: [],
+    queueOps: [],
+    dataOps: [],
+    externalCalls: [],
+    scheduledJobs: [],
+  };
+
+  for (const [communityId, bundle] of bundlesById) {
+    const slug = slugByCommunityId.get(communityId) ?? communityId;
+    const ss = bundle.serviceSignals;
+    if (!ss) continue;
+    for (const r of ss.routes) out.routes.push({ ...r, communitySlug: slug });
+    for (const q of ss.queueOps) out.queueOps.push({ ...q, communitySlug: slug });
+    for (const d of ss.dataOps) out.dataOps.push({ ...d, communitySlug: slug });
+    for (const e of ss.externalCalls) out.externalCalls.push({ ...e, communitySlug: slug });
+    for (const j of ss.scheduledJobs) out.scheduledJobs.push({ ...j, communitySlug: slug });
+  }
+
+  // Stable ordering for deterministic diffs across regens.
+  out.routes.sort((a, b) => a.path.localeCompare(b.path) || a.method.localeCompare(b.method));
+  out.queueOps.sort((a, b) => a.topic.localeCompare(b.topic) || a.kind.localeCompare(b.kind));
+  out.dataOps.sort((a, b) => a.store.localeCompare(b.store) || (a.model ?? "").localeCompare(b.model ?? ""));
+  out.externalCalls.sort((a, b) => (a.host ?? "").localeCompare(b.host ?? "") || (a.sdk ?? "").localeCompare(b.sdk ?? ""));
+  out.scheduledJobs.sort((a, b) => a.schedule.localeCompare(b.schedule));
+
+  return out;
 }

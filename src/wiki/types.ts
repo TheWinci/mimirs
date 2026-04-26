@@ -74,6 +74,91 @@ export interface DiscoveryResult {
     directoryLevel: DirectoryLevelGraph;
   };
   warnings: string[];
+  /**
+   * Classification of the project's overall shape. Drives backend-flavored
+   * section selection, project-level pages (`endpoints.md`, `queues.md`), and
+   * bundle enrichment with route/queue/data-store evidence.
+   *
+   * Library/CLI projects keep the existing pipeline behavior; only set when
+   * heuristic detects HTTP routes, message-broker calls, or scheduled jobs.
+   */
+  serviceProfile?: ServiceProfile;
+}
+
+// ─── Service detection (Phase 1: backend-service wiki) ───
+
+/**
+ * Project shape classification. `cli` was reserved on the original plan
+ * but never produced — kept off the union until detection grows real CLI
+ * heuristics (commander/cobra imports + `bin` field). `library` is the
+ * default for non-service projects.
+ */
+export type ServiceKind = "library" | "service" | "mixed";
+
+/**
+ * Closed taxonomy for community service roles. Per-file/per-callsite
+ * distinctions (router vs handler, producer vs consumer) live in the bundle
+ * arrays — `routes`, `queueOps`. Communities cluster by domain (Phase 4
+ * decision); this label tags which backend evidence they hold.
+ */
+export type ServiceRole =
+  | "http"
+  | "messaging"
+  | "data-access"
+  | "scheduler"
+  | "shared"
+  | "other";
+
+/**
+ * One framework / library / SDK detected in the project. `category` groups
+ * signals (http, rpc, broker, scheduler, orm, sdk, infra) so consumers can
+ * filter without re-classifying every framework name.
+ */
+export interface ServiceSignal {
+  category:
+    | "http"
+    | "rpc"
+    | "broker"
+    | "scheduler"
+    | "orm"
+    | "sdk"
+    | "infra";
+  /** Display name, e.g. "Express", "Kafka", "Prisma". */
+  name: string;
+  /** Number of distinct files matching this signal. */
+  hitCount: number;
+  /** File paths matching the signal, capped at 10, ranked by per-file PageRank. */
+  topFiles: string[];
+}
+
+/**
+ * Per-community role tag. Communities can have multiple roles (a community
+ * that owns both routes and the DB models is `http` + `data-access`); the
+ * `primary` field picks the one used for required-section injection.
+ */
+export interface CommunityRoleTag {
+  /** Module/community path identifier. */
+  modulePath: string;
+  primary: ServiceRole;
+  all: ServiceRole[];
+}
+
+export interface ServiceProfile {
+  kind: ServiceKind;
+  /** Primary framework name when detectable, e.g. "NestJS", "FastAPI". */
+  framework: string | null;
+  /** All detected signals — both primary and supporting. */
+  signals: ServiceSignal[];
+  /** Per-community role tags; empty for `library` / `cli` projects. */
+  communityRoles: CommunityRoleTag[];
+  /** One-line summary used in manifest + index page. */
+  summary: string;
+  /**
+   * Hash of `(top-pagerank-paths, signal-set)` — when this is unchanged
+   * across regens, persisted profile is reusable without re-running the
+   * heuristic. Stabilises classification against PageRank churn.
+   */
+  fingerprint: string;
 }
 
 // ─── Phase 2: Categorization ───
@@ -187,6 +272,42 @@ export interface CommunityBundle {
    * context (exemplars, inline docs) the import graph can't capture.
    */
   nearbyDocs: { path: string; content: string }[];
+  /**
+   * Service-shape evidence (Phase 3: backend-service wiki). Populated only
+   * when the project's `serviceProfile.kind` is `service` or `mixed` and
+   * the community's `serviceRole` isn't `shared`/`other`. Each list is
+   * capped (MAX_SERVICE_SIGNALS_PER_BUNDLE in community-synthesis.ts);
+   * overflow appended as a `… N more` entry by `renderCommunityBundle`.
+   *
+   * Drives the role-aware required-section injection in Phase 4 — when
+   * `routes` is non-empty the writer is forced to ship `endpoint-catalog`,
+   * `queueOps` forces `queue-topology`, etc.
+   */
+  serviceSignals?: ServiceSignalsBundle;
+}
+
+/** Per-community service evidence shipped inline so the writer doesn't grep. */
+export interface ServiceSignalsBundle {
+  routes: { method: string; path: string; handlerSymbol: string | null; file: string; line: number }[];
+  queueOps: { kind: "produce" | "consume"; topic: string; file: string; line: number }[];
+  dataOps: { store: string; model: string | null; op: "read" | "write"; file: string; line: number }[];
+  externalCalls: { host?: string; sdk?: string; file: string; line: number }[];
+  scheduledJobs: { schedule: string; handler: string | null; file: string; line: number }[];
+  /**
+   * Pre-cap totals per list. Lets the renderer emit "… N more" indicators
+   * when extraction truncated to MAX_PER_LIST so the writer LLM knows the
+   * shown items aren't exhaustive (and can call `find_usages` to recover
+   * the rest if needed).
+   */
+  totals?: {
+    routes: number;
+    queueOps: number;
+    dataOps: number;
+    externalCalls: number;
+    scheduledJobs: number;
+  };
+  /** Tag from `ServiceProfile.communityRoles` — drives section selection. */
+  role: ServiceRole;
 }
 
 /** LLM-produced shape for a community — the "plan" for the page. */
@@ -254,6 +375,13 @@ export interface PageManifest {
   pages: Record<string, ManifestPage>;
   warnings: string[];
   cluster?: "files" | "symbols";
+  /**
+   * Project shape classification carried across regens. Gives reviewers a
+   * one-glance answer to "is this a service?" without re-running detection,
+   * and lets staleness checks notice when a project changed shape (library
+   * → service after a major refactor) so dependent pages can be flagged.
+   */
+  serviceProfile?: ServiceProfile;
 }
 
 /** Persistence for synthesis payloads, keyed by community id. */
@@ -273,6 +401,14 @@ export interface PageContentCache {
   architecture?: ArchitectureBundle;
   /** Getting-started-specific bundle. */
   gettingStarted?: GettingStartedBundle;
+  /**
+   * Service-aggregate bundle for project-level pages (`endpoints.md`,
+   * `queues.md`, `runtime-config.md`). Aggregates `serviceSignals` across
+   * every community so the writer doesn't have to re-load each community
+   * bundle from disk. Only populated when `serviceProfile.kind` is
+   * `service` or `mixed`.
+   */
+  serviceAggregate?: ServiceAggregateBundle;
   /**
    * Pre-run results for the page's `semanticQueries`. Run once during
    * planning so the writer doesn't burn N tool turns calling
@@ -371,6 +507,53 @@ export interface ArchitectureBundle {
    * allowlist (README/ARCHITECTURE/ADRs). Same path+preview discipline.
    */
   supplementaryDocs: DocPreview[];
+}
+
+/**
+ * Aggregated service evidence across every community. Built once per
+ * regen, attached to the three service-only project pages. Each entry
+ * includes its owning-community slug so the writer can link the table
+ * cell to the relevant community page.
+ */
+export interface ServiceAggregateBundle {
+  profile: ServiceProfile;
+  routes: {
+    method: string;
+    path: string;
+    handlerSymbol: string | null;
+    file: string;
+    line: number;
+    communitySlug: string;
+  }[];
+  queueOps: {
+    kind: "produce" | "consume";
+    topic: string;
+    file: string;
+    line: number;
+    communitySlug: string;
+  }[];
+  dataOps: {
+    store: string;
+    model: string | null;
+    op: "read" | "write";
+    file: string;
+    line: number;
+    communitySlug: string;
+  }[];
+  externalCalls: {
+    host?: string;
+    sdk?: string;
+    file: string;
+    line: number;
+    communitySlug: string;
+  }[];
+  scheduledJobs: {
+    schedule: string;
+    handler: string | null;
+    file: string;
+    line: number;
+    communitySlug: string;
+  }[];
 }
 
 export interface GettingStartedBundle {

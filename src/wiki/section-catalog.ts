@@ -151,6 +151,101 @@ export const SECTION_CATALOG: SectionCatalogEntry[] = [
     exampleBody:
       "- **Paths in the DB are project-relative, not absolute.** Callers that pass `resolve(...)` results silently miss every lookup. Normalise with `relative(projectDir, path)` at the boundary.\n- **`search()` returns an empty array, not an error, when the index is missing.** Check `db.indexExists()` first if empty results would confuse the user.\n- **The `<=` in `embedBatchMerged` is intentional.** Off-by-one boundary was the cause of the 2025-10 silent-skip bug; do not `<`.",
   },
+
+  // ─── Backend-service shapes (Phase 2: backend-service wiki) ───
+  // Each fires when the per-community `serviceRole` matches; the writer
+  // gets the role tag in the bundle so injection is one switch in the
+  // selection prompt, not framework-specific code.
+  {
+    id: "endpoint-catalog",
+    title: "Endpoints",
+    purpose:
+      "Enumerate every HTTP route this community owns so a reader scanning the page can locate the handler in one jump. Required when community role is `http` — empty section is worse than no section, so omit if `bundle.serviceSignals.routes` is empty.",
+    shape:
+      "Markdown table with columns: `Method | Path | Handler | File:line | Auth | Summary`. Order rows by path, then method. Cite file:line from `bundle.serviceSignals.routes` verbatim — do not paraphrase. `Auth` column may say `none` when middleware doesn't gate the route.",
+    exampleBody:
+      "| Method | Path | Handler | File:line | Auth | Summary |\n|--------|------|---------|-----------|------|---------|\n| `GET` | `/users/:id` | `UsersController.findOne` | `src/users/users.controller.ts:42` | `JwtAuthGuard` | Lookup by id, 404 if missing |\n| `POST` | `/users` | `UsersController.create` | `src/users/users.controller.ts:58` | `JwtAuthGuard` | Validates against `CreateUserDto`, returns 201 |\n| `DELETE` | `/users/:id` | `UsersController.remove` | `src/users/users.controller.ts:71` | `JwtAuthGuard` + `RolesGuard('admin')` | Soft-delete, idempotent |",
+  },
+  {
+    id: "request-flow",
+    title: "Request flow",
+    purpose:
+      "Trace a representative endpoint from handler to data store, surfacing every hop a debugger would need to set breakpoints on. Pick the top 1-3 endpoints by call-depth or LOC — not every route. Same shape rules as `lifecycle-flow`; this section is the service-flavored variant scoped to one request lifecycle.",
+    shape:
+      "One `sequenceDiagram` Mermaid block per representative endpoint, followed by a numbered prose list citing file:line for each hop. Use real participant names (controller class, service class, repo/DAO, external client) — no placeholders. Skip when `bundle.serviceSignals.routes` has no entries with traceable internal calls.",
+    exampleBody:
+      "**`POST /orders` — place an order**\n\n```mermaid\nsequenceDiagram\n  participant client as HTTP client\n  participant ctl as OrdersController\n  participant svc as OrdersService\n  participant repo as OrdersRepository\n  participant kafka as Kafka producer\n  client->>ctl: POST /orders\n  ctl->>svc: create(dto)\n  svc->>repo: insert(order)\n  repo-->>svc: order\n  svc->>kafka: emit OrderCreated\n  ctl-->>client: 201 + order\n```\n\n1. **Handler** — `OrdersController.create` (`src/orders/orders.controller.ts:48`) parses `CreateOrderDto`, calls the service.\n2. **Service** — `OrdersService.create` (`src/orders/orders.service.ts:33`) wraps the insert + emit in a transaction.\n3. **Repository** — `OrdersRepository.insert` (`src/orders/orders.repository.ts:27`) executes the INSERT via TypeORM.\n4. **Event** — `KafkaProducer.emit` (`src/messaging/producer.ts:18`) publishes `OrderCreated` to topic `orders.v1`.",
+  },
+  {
+    id: "queue-topology",
+    title: "Queue topology",
+    purpose:
+      "Show every topic this community produces to or consumes from, with the file:line of each producer/consumer. Required when community role is `messaging`. Renders as a bipartite-ish flowchart so readers see the topology at a glance.",
+    shape:
+      "Mermaid `flowchart LR` with three subgraphs: `Producers`, `Topics`, `Consumers`. Edges go producer → topic → consumer. Follow with a bullet list of `topic — producer file:line / consumer file:line`. Pull data from `bundle.serviceSignals.queueOps` verbatim. Skip when no queue ops in bundle.",
+    exampleBody:
+      "```mermaid\nflowchart LR\n  subgraph Producers\n    ord[orders.service.ts]\n  end\n  subgraph Topics\n    t1[orders.v1]\n  end\n  subgraph Consumers\n    bill[billing.consumer.ts]\n    notif[notifications.consumer.ts]\n  end\n  ord --> t1\n  t1 --> bill\n  t1 --> notif\n```\n\n- **`orders.v1`** — produced by `src/orders/orders.service.ts:51`; consumed by `src/billing/billing.consumer.ts:14` and `src/notifications/notifications.consumer.ts:9`.",
+  },
+  {
+    id: "message-shapes",
+    title: "Message shapes",
+    purpose:
+      "Define the payload schema for each topic in `queue-topology`. Lets a downstream consumer team understand what they'll receive without reading every producer. Adjacent to `queue-topology` — pair them.",
+    shape:
+      "Per topic: a fenced code block of the type/schema definition (TypeScript `interface`, Python TypedDict, JSON Schema, Avro — whatever the codebase uses), then 1-2 sentences of intent. Cite the file where the type is defined.",
+    exampleBody:
+      "**`orders.v1`** (`src/orders/events.ts:8`)\n```ts\ninterface OrderCreated {\n  orderId: string;\n  userId: string;\n  totalCents: number;\n  createdAt: string; // ISO 8601\n}\n```\nEmitted exactly once per successful checkout. `totalCents` is integer cents — no floating point.",
+  },
+  {
+    id: "data-stores",
+    title: "Data stores",
+    purpose:
+      "Show which tables / collections / caches this community reads from and writes to, plus the transaction boundary if one exists. Required when community role is `data-access`. Lets readers reason about consistency without grepping for ORM calls.",
+    shape:
+      "Markdown table: `Store | Model/Table | Reads | Writes | Tx boundary`. One row per (store, model) pair. Reads/Writes columns name the symbols (e.g. `findOne`, `update`). Tx boundary names the wrapping function or `none` for non-transactional access.",
+    exampleBody:
+      "| Store | Model/Table | Reads | Writes | Tx boundary |\n|-------|-------------|-------|--------|-------------|\n| Postgres | `orders` | `findById`, `listByUser` | `insert`, `markPaid` | `OrdersService.create` |\n| Postgres | `payments` | `findByOrder` | `insert` | `OrdersService.create` |\n| Redis | `order:idempotency` | `get` | `setex(60)` | none |",
+  },
+  {
+    id: "external-services",
+    title: "External services",
+    purpose:
+      "List every external service or vendor SDK this community talks to, where the call lives, and how it's configured (timeout, retry, circuit breaker). Helps reviewers spot cascade-failure surfaces.",
+    shape:
+      "Bulleted list grouped by host or SDK. Each bullet: `**Service / SDK** — client file (file:line). Purpose. Retry/timeout config (or 'defaults').` Cite from `bundle.serviceSignals.externalCalls` and any visible config.",
+    exampleBody:
+      "- **Stripe** — `src/billing/stripe-client.ts:14`. Charges and refunds. 3 retries with exponential backoff on 5xx; 5s timeout per call.\n- **SendGrid** — `src/notifications/email.ts:9`. Transactional email. Default SDK retries; no custom timeout.\n- **Internal user-service** — `src/clients/users-client.ts:22`. JWT-validated REST. 1s timeout; circuit breaker opens after 5 consecutive failures.",
+  },
+  {
+    id: "scheduled-jobs",
+    title: "Scheduled jobs",
+    purpose:
+      "Document every cron job, scheduled task, or recurring background job this community owns. Required when community role is `scheduler`. Covers cron-expression jobs, Celery beat schedules, Quartz triggers, BullMQ repeatables — anything that fires on its own.",
+    shape:
+      "Markdown table: `Job | Schedule | Handler | What it does | Failure behavior`. Order by schedule frequency (most frequent first). Schedule column uses the framework's native syntax (cron, interval, named).",
+    exampleBody:
+      "| Job | Schedule | Handler | What it does | Failure behavior |\n|-----|----------|---------|--------------|------------------|\n| `expireSessions` | `*/5 * * * *` | `SessionsService.sweep` (`src/sessions/sessions.service.ts:41`) | Marks sessions older than 24h as expired | Logs error, retries next tick |\n| `nightlyDigest` | `0 7 * * *` | `DigestJob.run` (`src/jobs/digest.job.ts:18`) | Sends per-user activity summary email | 3 retries, then alerts via PagerDuty |\n| `reconcileBilling` | `@daily` | `BillingJob.reconcile` (`src/billing/billing.job.ts:55`) | Compares Stripe charges vs internal ledger | Halts on mismatch, requires manual intervention |",
+  },
+  {
+    id: "auth-and-middleware",
+    title: "Auth and middleware",
+    purpose:
+      "List the middleware chain this community installs or relies on, in request-lifecycle order. Lets readers understand what runs before a handler executes — auth, rate limit, logging, etc.",
+    shape:
+      "Markdown table: `Name | File:line | Applies to | Effect`. Order rows by execution order in the request lifecycle (outermost first). `Applies to` column names route prefix or 'global'.",
+    exampleBody:
+      "| Name | File:line | Applies to | Effect |\n|------|-----------|------------|--------|\n| `requestId` | `src/middleware/request-id.ts:8` | global | Attaches `x-request-id` header, populates AsyncLocalStorage |\n| `rateLimit` | `src/middleware/rate-limit.ts:14` | `/api/*` | Token bucket per IP — 100 req/min |\n| `JwtAuthGuard` | `src/auth/jwt.guard.ts:19` | `/api/*` (except `/api/login`) | Verifies JWT, attaches `req.user` |\n| `RolesGuard` | `src/auth/roles.guard.ts:22` | routes with `@Roles(...)` | Enforces role allowlist after JWT |",
+  },
+  {
+    id: "config-and-secrets",
+    title: "Configuration and secrets",
+    purpose:
+      "Document every env var this community reads, including required-vs-optional, defaults, and the failure mode when missing. Lets ops set up a new environment without chasing `process.env` references.",
+    shape:
+      "Markdown table: `Name | Required | Default | Consumer | What breaks if missing`. Rows ordered alphabetically. `Consumer` column cites the file:line that reads the var.",
+    exampleBody:
+      "| Name | Required | Default | Consumer | What breaks if missing |\n|------|----------|---------|----------|------------------------|\n| `DATABASE_URL` | yes | — | `src/db/index.ts:12` | Service refuses to start |\n| `KAFKA_BROKERS` | yes | — | `src/messaging/kafka.ts:8` | Producer + consumers fail to connect |\n| `STRIPE_API_KEY` | yes | — | `src/billing/stripe-client.ts:6` | All billing endpoints return 503 |\n| `LOG_LEVEL` | no | `info` | `src/logging/logger.ts:10` | Verbose logging — no functional break |\n| `RATE_LIMIT_RPM` | no | `100` | `src/middleware/rate-limit.ts:11` | Falls back to default — ops may not notice abuse |",
+  },
 ];
 
 /**

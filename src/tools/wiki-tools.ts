@@ -1100,6 +1100,8 @@ function renderPagePayload(payload: PagePayload): string {
     text += renderArchitectureBundle(payload.prefetched.architecture);
   } else if (payload.prefetched.gettingStarted) {
     text += renderGettingStartedBundle(payload.prefetched.gettingStarted);
+  } else if (payload.prefetched.serviceAggregate) {
+    text += renderServiceAggregateBundle(payload.prefetched.serviceAggregate);
   }
 
   text += renderAssistBlock(payload);
@@ -1363,6 +1365,65 @@ function renderCommunityBundle(
     text += `\n`;
   }
 
+  const ss = b.serviceSignals;
+  if (ss) {
+    const header = (label: string, shown: number, total: number | undefined): string => {
+      const count = total !== undefined && total > shown ? `${shown} shown of ${total}` : `${shown}`;
+      return `**${label} (${count}):**\n`;
+    };
+    const overflow = (shown: number, total: number | undefined): string => {
+      if (total === undefined || total <= shown) return "";
+      return `- … (+${total - shown} more — call \`find_usages\` on a member symbol to surface the rest)\n`;
+    };
+    text += `## Service signals\n\n`;
+    text += `_Role: \`${ss.role}\`. Use these to ground service-flavored sections (endpoint-catalog, queue-topology, data-stores, etc.). Cite file:line verbatim — do not paraphrase._\n\n`;
+    if (ss.routes.length > 0) {
+      text += header("Routes", ss.routes.length, ss.totals?.routes);
+      for (const r of ss.routes) {
+        const handler = r.handlerSymbol ? ` → \`${r.handlerSymbol}\`` : "";
+        text += `- \`${r.method} ${r.path}\`${handler} — \`${r.file}:${r.line}\`\n`;
+      }
+      text += overflow(ss.routes.length, ss.totals?.routes);
+      text += `\n`;
+    }
+    if (ss.queueOps.length > 0) {
+      text += header("Queue ops", ss.queueOps.length, ss.totals?.queueOps);
+      for (const q of ss.queueOps) {
+        text += `- ${q.kind} \`${q.topic}\` — \`${q.file}:${q.line}\`\n`;
+      }
+      text += overflow(ss.queueOps.length, ss.totals?.queueOps);
+      text += `\n`;
+    }
+    if (ss.dataOps.length > 0) {
+      text += header("Data ops", ss.dataOps.length, ss.totals?.dataOps);
+      for (const d of ss.dataOps) {
+        const model = d.model ? ` \`${d.model}\`` : "";
+        text += `- ${d.op}${model} (${d.store}) — \`${d.file}:${d.line}\`\n`;
+      }
+      text += overflow(ss.dataOps.length, ss.totals?.dataOps);
+      text += `\n`;
+    }
+    if (ss.externalCalls.length > 0) {
+      text += header("External calls", ss.externalCalls.length, ss.totals?.externalCalls);
+      for (const e of ss.externalCalls) {
+        const sdk = e.sdk ? `[${e.sdk}] ` : "";
+        const host = e.host ? `\`${e.host}\` ` : "";
+        text += `- ${sdk}${host}— \`${e.file}:${e.line}\`\n`;
+      }
+      text += overflow(ss.externalCalls.length, ss.totals?.externalCalls);
+      text += `\n`;
+    }
+    if (ss.scheduledJobs.length > 0) {
+      text += header("Scheduled jobs", ss.scheduledJobs.length, ss.totals?.scheduledJobs);
+      for (const j of ss.scheduledJobs) {
+        const handler = j.handler ? ` → \`${j.handler}\`` : "";
+        text += `- \`${j.schedule}\`${handler} — \`${j.file}:${j.line}\`\n`;
+      }
+      text += overflow(ss.scheduledJobs.length, ss.totals?.scheduledJobs);
+      text += `\n`;
+    }
+  }
+
   if (b.recentCommits.length > 0) {
     text += `**Recent commits:**\n`;
     for (const c of b.recentCommits) text += `- \`${c.sha.slice(0, 8)}\` (${c.date}) — ${c.message.split("\n")[0]}\n`;
@@ -1508,6 +1569,63 @@ function renderGettingStartedBundle(b: import("../wiki/types").GettingStartedBun
     text += `**Origin commits:**\n`;
     for (const c of b.originCommits) {
       text += `- \`${c.sha.slice(0, 8)}\` (${c.date}) — ${c.message.split("\n")[0]}\n`;
+    }
+    text += `\n`;
+  }
+
+  return text;
+}
+
+function renderServiceAggregateBundle(
+  b: import("../wiki/types").ServiceAggregateBundle,
+): string {
+  let text = `## Service aggregate bundle\n\n`;
+  text += `**Project kind:** \`${b.profile.kind}\``;
+  if (b.profile.framework) text += ` (${b.profile.framework})`;
+  text += `\n\n`;
+  text += `_${b.profile.summary}_\n\n`;
+
+  if (b.routes.length > 0) {
+    text += `**Routes (${b.routes.length}) — across all communities:**\n`;
+    for (const r of b.routes) {
+      const handler = r.handlerSymbol ? ` → \`${r.handlerSymbol}\`` : "";
+      text += `- \`${r.method} ${r.path}\`${handler} — \`${r.file}:${r.line}\` (community: \`${r.communitySlug}\`)\n`;
+    }
+    text += `\n`;
+  }
+
+  if (b.queueOps.length > 0) {
+    text += `**Queue ops (${b.queueOps.length}):**\n`;
+    for (const q of b.queueOps) {
+      text += `- ${q.kind} \`${q.topic}\` — \`${q.file}:${q.line}\` (community: \`${q.communitySlug}\`)\n`;
+    }
+    text += `\n`;
+  }
+
+  if (b.dataOps.length > 0) {
+    text += `**Data ops (${b.dataOps.length}):**\n`;
+    for (const d of b.dataOps) {
+      const model = d.model ? ` \`${d.model}\`` : "";
+      text += `- ${d.op}${model} (${d.store}) — \`${d.file}:${d.line}\` (community: \`${d.communitySlug}\`)\n`;
+    }
+    text += `\n`;
+  }
+
+  if (b.externalCalls.length > 0) {
+    text += `**External calls (${b.externalCalls.length}):**\n`;
+    for (const e of b.externalCalls) {
+      const sdk = e.sdk ? `[${e.sdk}] ` : "";
+      const host = e.host ? `\`${e.host}\` ` : "";
+      text += `- ${sdk}${host}— \`${e.file}:${e.line}\` (community: \`${e.communitySlug}\`)\n`;
+    }
+    text += `\n`;
+  }
+
+  if (b.scheduledJobs.length > 0) {
+    text += `**Scheduled jobs (${b.scheduledJobs.length}):**\n`;
+    for (const j of b.scheduledJobs) {
+      const handler = j.handler ? ` → \`${j.handler}\`` : "";
+      text += `- \`${j.schedule}\`${handler} — \`${j.file}:${j.line}\` (community: \`${j.communitySlug}\`)\n`;
     }
     text += `\n`;
   }

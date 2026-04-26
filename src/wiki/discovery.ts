@@ -7,6 +7,7 @@ import {
   detectSymbolCommunities,
   type ClusterMode,
 } from "./community-detection";
+import { runServiceDetection } from "./service-detection";
 import type {
   DiscoveryResult,
   DiscoveryModule,
@@ -167,6 +168,15 @@ export function runDiscovery(
     }
   }
 
+  const serviceProfile = runServiceDetection(db, projectDir, modules, fileGraph);
+  if (serviceProfile.kind === "service" || serviceProfile.kind === "mixed") {
+    warnings.push(
+      `Service detection: ${serviceProfile.kind}${
+        serviceProfile.framework ? ` (${serviceProfile.framework})` : ""
+      } — backend-flavored sections will be selected.`,
+    );
+  }
+
   return {
     fileCount: status.totalFiles,
     chunkCount: status.totalChunks,
@@ -174,6 +184,7 @@ export function runDiscovery(
     modules,
     graphData: { fileLevel: fileGraph, directoryLevel: dirGraph },
     warnings,
+    serviceProfile,
   };
 }
 

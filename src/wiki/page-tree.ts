@@ -25,6 +25,10 @@ const DEPTH_FULL_TUNABLE_COUNT = 8;
 const ARCHITECTURE_PATH = "wiki/architecture.md";
 const GETTING_STARTED_PATH = "wiki/getting-started.md";
 const DATA_FLOWS_PATH = "wiki/data-flows.md";
+/** Service-only project-level pages (Phase 5: backend-service wiki). */
+const ENDPOINTS_PATH = "wiki/endpoints.md";
+const QUEUES_PATH = "wiki/queues.md";
+const RUNTIME_CONFIG_PATH = "wiki/runtime-config.md";
 
 /**
  * Community pages live under a flat `wiki/communities/` folder; aggregates
@@ -68,6 +72,16 @@ export function buildPageTree(
   pages[DATA_FLOWS_PATH] = { ...dataFlowsPage(), order: order++ };
   pages[GETTING_STARTED_PATH] = { ...gettingStartedPage(), order: order++ };
 
+  // Service-only aggregate pages (Phase 5: backend-service wiki). Skip for
+  // library / cli projects — they'd ship empty `## Endpoints` sections that
+  // confuse readers more than they help.
+  const profile = discovery.serviceProfile;
+  if (profile && (profile.kind === "service" || profile.kind === "mixed")) {
+    pages[ENDPOINTS_PATH] = { ...endpointsPage(), order: order++ };
+    pages[QUEUES_PATH] = { ...queuesPage(), order: order++ };
+    pages[RUNTIME_CONFIG_PATH] = { ...runtimeConfigPage(), order: order++ };
+  }
+
   const metaEdges = computeMetaEdges(syntheses, discovery);
   computeRelatedPages(pages, metaEdges);
 
@@ -83,6 +97,7 @@ export function buildPageTree(
     pages,
     warnings,
     cluster,
+    serviceProfile: discovery.serviceProfile,
   };
 }
 
@@ -318,6 +333,131 @@ function gettingStartedPage(): Omit<ManifestPage, "order"> {
 }
 
 /**
+ * Project-level endpoint catalog. Aggregates `serviceSignals.routes` across
+ * every community into a single sortable view. Created only when
+ * `serviceProfile.kind` is `service` or `mixed` — see `buildPageTree`.
+ */
+function endpointsPage(): Omit<ManifestPage, "order"> {
+  const sections: SectionSpec[] = [
+    {
+      title: "Overview",
+      purpose:
+        "One paragraph naming the primary HTTP entry surfaces (which community / module owns each prefix). Pulls from per-community `serviceSignals.routes` to identify clusters.",
+    },
+    {
+      title: "All endpoints",
+      purpose:
+        "Single table covering every route across the repo, grouped by community. Columns: Method, Path, Handler, File:line, Owning community (linked). Order: by community, then by path.",
+      shape:
+        "Markdown table with one row per route. Cite file:line verbatim from `serviceSignals.routes`. Link the owning-community column to the community page.",
+    },
+    {
+      title: "Auth surface",
+      purpose:
+        "Optional. Group routes by their middleware/guard chain when there are multiple distinct auth tiers (public, JWT, JWT+role, internal-only). Skip if every route uses the same chain.",
+    },
+  ];
+  return {
+    kind: "endpoints",
+    slug: "endpoints",
+    title: "Endpoints",
+    purpose:
+      "Every HTTP route the service exposes, grouped by community. Cross-cut companion to community pages: a community page shows the routes it owns, this page shows the full external surface in one place.",
+    sections,
+    depth: "full",
+    memberFiles: [],
+    relatedPages: [],
+  };
+}
+
+/**
+ * Project-level queue topology. Aggregates `serviceSignals.queueOps` into a
+ * producers ↔ topics ↔ consumers map. Created only when
+ * `serviceProfile.kind` is `service` or `mixed`.
+ */
+function queuesPage(): Omit<ManifestPage, "order"> {
+  const sections: SectionSpec[] = [
+    {
+      title: "Overview",
+      purpose:
+        "One paragraph naming the broker(s) in use and the rough topic count. Pull from per-community `serviceSignals.queueOps`.",
+    },
+    {
+      title: "Topology",
+      purpose:
+        "Single Mermaid `flowchart LR` with three subgraphs (Producers / Topics / Consumers) covering every topic the service touches. Use real file/symbol names — no placeholders.",
+      shape:
+        "One Mermaid flowchart followed by a bullet list grouped by topic: `topic — produced by file:line; consumed by file:line`. Link each producer/consumer to its owning community page.",
+    },
+    {
+      title: "Message shapes",
+      purpose:
+        "Per topic the service produces, the payload schema (interface / dataclass / Avro / JSON Schema) and 1-2 sentences of intent. Pull from member-file source — do not invent shapes.",
+    },
+    {
+      title: "Failure handling",
+      purpose:
+        "Optional. Document retry, dead-letter, and idempotency policies when the codebase configures them. Skip when there's no visible retry config.",
+    },
+  ];
+  return {
+    kind: "queues",
+    slug: "queues",
+    title: "Queues",
+    purpose:
+      "Every message topic the service touches, with producers and consumers. Cross-cut companion to community pages: each community page covers its own queue ops, this page shows the full topology.",
+    sections,
+    depth: "full",
+    memberFiles: [],
+    relatedPages: [],
+  };
+}
+
+/**
+ * Project-level runtime configuration. Aggregates env-var consumers across
+ * the codebase. Named `runtime-config` (not `config`) to avoid collision
+ * with the per-community `configuration` section in `section-catalog.ts`.
+ * Created only when `serviceProfile.kind` is `service` or `mixed`.
+ */
+function runtimeConfigPage(): Omit<ManifestPage, "order"> {
+  const sections: SectionSpec[] = [
+    {
+      title: "Overview",
+      purpose:
+        "One paragraph naming the configuration surface — env vars, config files, secret stores. Reference the loader entry point if there's a central config module.",
+    },
+    {
+      title: "Environment variables",
+      purpose:
+        "Single table covering every env var the service reads. Columns: Name, Required, Default, Consumer (file:line), What breaks if missing. Order alphabetically. Source from `process.env.X`, `os.getenv('X')`, `os.environ['X']`, `System.getenv('X')`, `std::env::var('X')`, etc.",
+      shape:
+        "Markdown table; one row per env var. Cite file:line for the consumer column. Mark required/optional based on whether code throws when the var is missing or has a default.",
+    },
+    {
+      title: "Config files",
+      purpose:
+        "Optional. Document non-env config sources (YAML, TOML, JSON) — name, path, what it controls, how it loads. Skip when env vars are the only config surface.",
+    },
+    {
+      title: "Secret handling",
+      purpose:
+        "Optional. Note where secrets enter (env, vault, AWS Secrets Manager, etc.) and how the code retrieves them. Skip when there's no visible secret-loading code.",
+    },
+  ];
+  return {
+    kind: "runtime-config",
+    slug: "runtime-config",
+    title: "Runtime configuration",
+    purpose:
+      "Every environment variable, config file, and secret source the service reads at runtime. Lets ops set up a new environment without grepping for `process.env` references.",
+    sections,
+    depth: "standard",
+    memberFiles: [],
+    relatedPages: [],
+  };
+}
+
+/**
  * Trace-oriented aggregate page — the narrative companion to architecture.
  * Architecture answers *what lives where*; data flows answers *what happens
  * when X is triggered*. The LLM should pick 2–4 real flows (not invent) and
@@ -418,9 +558,14 @@ function computeRelatedPages(
 ): void {
   const allPaths = Object.keys(pages);
   const communityPaths = allPaths.filter((p) => pages[p].kind === "community");
-  const aggregatePaths = [ARCHITECTURE_PATH, DATA_FLOWS_PATH, GETTING_STARTED_PATH].filter(
-    (p) => pages[p],
-  );
+  const aggregatePaths = [
+    ARCHITECTURE_PATH,
+    DATA_FLOWS_PATH,
+    GETTING_STARTED_PATH,
+    ENDPOINTS_PATH,
+    QUEUES_PATH,
+    RUNTIME_CONFIG_PATH,
+  ].filter((p) => pages[p]);
 
   // Sub-page → parent community lookup and parent community → sub-pages lookup.
   const subPagesByCommunityId = new Map<string, string[]>();
@@ -490,4 +635,7 @@ export const AGGREGATE_PAGE_PATHS = [
   ARCHITECTURE_PATH,
   DATA_FLOWS_PATH,
   GETTING_STARTED_PATH,
+  ENDPOINTS_PATH,
+  QUEUES_PATH,
+  RUNTIME_CONFIG_PATH,
 ] as const;

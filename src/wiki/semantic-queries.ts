@@ -34,6 +34,26 @@ export const SEMANTIC_QUERIES: Record<string, string[]> = {
     "CLI commands and flags",
     "known issues and troubleshooting",
   ],
+  "data-flows": [
+    "request entry points and call paths",
+    "background job triggers and workers",
+    "error retry and fallback handling",
+  ],
+  endpoints: [
+    "HTTP route handlers and controller methods",
+    "auth middleware guards and role decorators",
+    "request validation and DTO schemas",
+  ],
+  queues: [
+    "message producers and consumers",
+    "topic names and queue configuration",
+    "retry policies dead-letter and idempotency keys",
+  ],
+  "runtime-config": [
+    "process env os getenv environment variable reads",
+    "config file loaders and parsers",
+    "secrets vault and credential retrieval",
+  ],
 };
 
 export function semanticQueriesFor(kind: string): string[] {
