@@ -50,7 +50,8 @@ Doc expansion (`expandForDocs`) prevents markdown files from displacing code res
 
 ## How it works
 
-```sequenceDiagram
+```mermaid
+sequenceDiagram
     participant MCP as "MCP tool handler"
     participant hybridSrc as "src/search/hybrid.ts"
     participant embedder as "src/embeddings/embed.ts"
@@ -78,7 +79,8 @@ Both `search` and `searchChunks` fetch `topK * 4` results from each source to gi
 
 ## Dependencies and consumers
 
-```flowchart LR
+```mermaid
+flowchart LR
     configSrc["src/config/index.ts"]
     dbSrc["src/db/index.ts"]
     embedSrc["src/embeddings/embed.ts"]

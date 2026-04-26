@@ -8,7 +8,8 @@ The Search MCP Tool community is a single-file adapter between the MCP protocol 
 
 ## Dependencies and consumers
 
-```flowchart LR
+```mermaid
+flowchart LR
     dbSrc["src/db/index.ts"]
     hybridSrc["src/search/hybrid.ts"]
     toolsIdx["src/tools/index.ts"]

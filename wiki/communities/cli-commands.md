@@ -93,7 +93,8 @@ Prints index statistics: total files, total chunks, DB size, last index time, an
 
 ## How it works
 
-```sequenceDiagram
+```mermaid
+sequenceDiagram
     participant User
     participant Dispatcher as "src/cli/index.ts"
     participant Handler as "commands/<cmd>.ts"
@@ -115,7 +116,8 @@ Every command handler owns its own DB lifecycle: it opens a `RagDB` at the start
 
 ## Dependencies and consumers
 
-```flowchart LR
+```mermaid
+flowchart LR
     cmds["commands/*"]
     cliEntry["src/cli/index.ts"]
     db["src/db/index.ts"]

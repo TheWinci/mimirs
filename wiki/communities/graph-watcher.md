@@ -8,7 +8,8 @@ This community covers two tightly coupled concerns: `src/graph/resolver.ts` reso
 
 ## How it works
 
-```sequenceDiagram
+```mermaid
+sequenceDiagram
     participant Indexer as "indexer.ts"
     participant Resolver as "graph/resolver.ts"
     participant DB as RagDB
@@ -38,7 +39,8 @@ The batch `resolveImports` runs at the end of every `indexDirectory` call. The s
 
 ## Dependencies and consumers
 
-```flowchart LR
+```mermaid
+flowchart LR
     resolver["src/graph/resolver.ts"]
     watcher["src/indexing/watcher.ts"]
     db["src/db/index.ts"]

@@ -38,7 +38,8 @@ Startup failures write a crash log to `.mimirs/server-error.log` with the full s
 
 ## How it works
 
-```sequenceDiagram
+```mermaid
+sequenceDiagram
     participant Agent
     participant Server as "src/server/index.ts"
     participant Conv as "conversation/indexer.ts"
@@ -63,7 +64,8 @@ After startup, `startConversationTail` keeps the session index current: every JS
 
 ## Dependencies and consumers
 
-```flowchart LR
+```mermaid
+flowchart LR
     parser["src/conversation/parser.ts"]
     conv["src/conversation/indexer.ts"]
     server["src/server/index.ts"]

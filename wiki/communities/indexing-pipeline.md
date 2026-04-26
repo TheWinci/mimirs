@@ -61,7 +61,8 @@ The resolution logic applies `PREFIX_NAME_MAP` before falling back to `EXACT_NAM
 
 ## How it works
 
-```sequenceDiagram
+```mermaid
+sequenceDiagram
     participant Caller as "CLI / Server"
     participant indexer as "indexer.ts"
     participant guard as "dir-guard.ts"
@@ -91,7 +92,8 @@ The resolution logic applies `PREFIX_NAME_MAP` before falling back to `EXACT_NAM
 
 ## Dependencies and consumers
 
-```flowchart LR
+```mermaid
+flowchart LR
     chunker["src/indexing/chunker.ts"]
     parse["src/indexing/parse.ts"]
     idxr["src/indexing/indexer.ts"]

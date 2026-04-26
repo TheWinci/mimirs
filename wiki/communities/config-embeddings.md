@@ -8,7 +8,8 @@ The Config & Embeddings community owns two tightly coupled concerns: loading and
 
 ## How it works
 
-```sequenceDiagram
+```mermaid
+sequenceDiagram
     participant CLI as "CLI / MCP server"
     participant config as "src/config/index.ts"
     participant embed as "src/embeddings/embed.ts"
@@ -38,7 +39,8 @@ The embedding pipeline is loaded lazily on the first call to `getEmbedder()`. It
 
 ## Dependencies and consumers
 
-```flowchart LR
+```mermaid
+flowchart LR
     hf["Hugging Face Transformers"]
     configSrc["src/config/index.ts"]
     embedSrc["src/embeddings/embed.ts"]
