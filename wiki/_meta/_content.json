@@ -490,15 +490,6 @@
             "snippet": "/** Mulberry32: tiny, deterministic PRNG for Louvain's `rng` option. */\nfunction seededRng(seed: number): () => number {\n  let a = seed >>> 0;\n  return () => {\n    a = (a + 0x6d2b79f5) >>> 0;\n    let t = a;\n    t = Math.imul(t ^ (t >>> 15), t | 1);\n    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);\n    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;\n  };\n}"
           },
           {
-            "path": "/Users/winci/repos/mimirs/src/wiki/community-detection.ts",
-            "startLine": 88,
-            "endLine": 89,
-            "entityName": "MAX_SIZE_FRACTION",
-            "chunkType": "variable",
-            "score": 0.5234164980260141,
-            "snippet": " */\nconst MAX_SIZE_FRACTION = 0.18;"
-          },
-          {
             "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
             "startLine": 186,
             "endLine": 187,
@@ -515,6 +506,15 @@
             "chunkType": "variable",
             "score": 0.5133152098376367,
             "snippet": "const TUNABLE_TYPES = new Set([\"constant\", \"variable\"]);"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
+            "startLine": 180,
+            "endLine": 180,
+            "entityName": "LOW_COHESION_THRESHOLD",
+            "chunkType": "variable",
+            "score": 0.5127462770118918,
+            "snippet": "const LOW_COHESION_THRESHOLD = 0.15;"
           }
         ]
       },
@@ -1315,15 +1315,6 @@
             "snippet": "/** Mulberry32: tiny, deterministic PRNG for Louvain's `rng` option. */\nfunction seededRng(seed: number): () => number {\n  let a = seed >>> 0;\n  return () => {\n    a = (a + 0x6d2b79f5) >>> 0;\n    let t = a;\n    t = Math.imul(t ^ (t >>> 15), t | 1);\n    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);\n    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;\n  };\n}"
           },
           {
-            "path": "/Users/winci/repos/mimirs/src/wiki/community-detection.ts",
-            "startLine": 88,
-            "endLine": 89,
-            "entityName": "MAX_SIZE_FRACTION",
-            "chunkType": "variable",
-            "score": 0.5234164980260141,
-            "snippet": " */\nconst MAX_SIZE_FRACTION = 0.18;"
-          },
-          {
             "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
             "startLine": 186,
             "endLine": 187,
@@ -1340,6 +1331,15 @@
             "chunkType": "variable",
             "score": 0.5133152098376367,
             "snippet": "const TUNABLE_TYPES = new Set([\"constant\", \"variable\"]);"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
+            "startLine": 180,
+            "endLine": 180,
+            "entityName": "LOW_COHESION_THRESHOLD",
+            "chunkType": "variable",
+            "score": 0.5127462770118918,
+            "snippet": "const LOW_COHESION_THRESHOLD = 0.15;"
           }
         ]
       },
@@ -2080,15 +2080,6 @@
             "snippet": "/** Mulberry32: tiny, deterministic PRNG for Louvain's `rng` option. */\nfunction seededRng(seed: number): () => number {\n  let a = seed >>> 0;\n  return () => {\n    a = (a + 0x6d2b79f5) >>> 0;\n    let t = a;\n    t = Math.imul(t ^ (t >>> 15), t | 1);\n    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);\n    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;\n  };\n}"
           },
           {
-            "path": "/Users/winci/repos/mimirs/src/wiki/community-detection.ts",
-            "startLine": 88,
-            "endLine": 89,
-            "entityName": "MAX_SIZE_FRACTION",
-            "chunkType": "variable",
-            "score": 0.5234164980260141,
-            "snippet": " */\nconst MAX_SIZE_FRACTION = 0.18;"
-          },
-          {
             "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
             "startLine": 186,
             "endLine": 187,
@@ -2105,6 +2096,15 @@
             "chunkType": "variable",
             "score": 0.5133152098376367,
             "snippet": "const TUNABLE_TYPES = new Set([\"constant\", \"variable\"]);"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
+            "startLine": 180,
+            "endLine": 180,
+            "entityName": "LOW_COHESION_THRESHOLD",
+            "chunkType": "variable",
+            "score": 0.5127462770118918,
+            "snippet": "const LOW_COHESION_THRESHOLD = 0.15;"
           }
         ]
       },
@@ -2542,15 +2542,6 @@
             "snippet": "/** Mulberry32: tiny, deterministic PRNG for Louvain's `rng` option. */\nfunction seededRng(seed: number): () => number {\n  let a = seed >>> 0;\n  return () => {\n    a = (a + 0x6d2b79f5) >>> 0;\n    let t = a;\n    t = Math.imul(t ^ (t >>> 15), t | 1);\n    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);\n    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;\n  };\n}"
           },
           {
-            "path": "/Users/winci/repos/mimirs/src/wiki/community-detection.ts",
-            "startLine": 88,
-            "endLine": 89,
-            "entityName": "MAX_SIZE_FRACTION",
-            "chunkType": "variable",
-            "score": 0.5234164980260141,
-            "snippet": " */\nconst MAX_SIZE_FRACTION = 0.18;"
-          },
-          {
             "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
             "startLine": 186,
             "endLine": 187,
@@ -2567,6 +2558,15 @@
             "chunkType": "variable",
             "score": 0.5133152098376367,
             "snippet": "const TUNABLE_TYPES = new Set([\"constant\", \"variable\"]);"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
+            "startLine": 180,
+            "endLine": 180,
+            "entityName": "LOW_COHESION_THRESHOLD",
+            "chunkType": "variable",
+            "score": 0.5127462770118918,
+            "snippet": "const LOW_COHESION_THRESHOLD = 0.15;"
           }
         ]
       },
@@ -2992,15 +2992,6 @@
             "snippet": "/** Mulberry32: tiny, deterministic PRNG for Louvain's `rng` option. */\nfunction seededRng(seed: number): () => number {\n  let a = seed >>> 0;\n  return () => {\n    a = (a + 0x6d2b79f5) >>> 0;\n    let t = a;\n    t = Math.imul(t ^ (t >>> 15), t | 1);\n    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);\n    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;\n  };\n}"
           },
           {
-            "path": "/Users/winci/repos/mimirs/src/wiki/community-detection.ts",
-            "startLine": 88,
-            "endLine": 89,
-            "entityName": "MAX_SIZE_FRACTION",
-            "chunkType": "variable",
-            "score": 0.5234164980260141,
-            "snippet": " */\nconst MAX_SIZE_FRACTION = 0.18;"
-          },
-          {
             "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
             "startLine": 186,
             "endLine": 187,
@@ -3017,6 +3008,15 @@
             "chunkType": "variable",
             "score": 0.5133152098376367,
             "snippet": "const TUNABLE_TYPES = new Set([\"constant\", \"variable\"]);"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
+            "startLine": 180,
+            "endLine": 180,
+            "entityName": "LOW_COHESION_THRESHOLD",
+            "chunkType": "variable",
+            "score": 0.5127462770118918,
+            "snippet": "const LOW_COHESION_THRESHOLD = 0.15;"
           }
         ]
       },
@@ -3620,15 +3620,6 @@
             "snippet": "/** Mulberry32: tiny, deterministic PRNG for Louvain's `rng` option. */\nfunction seededRng(seed: number): () => number {\n  let a = seed >>> 0;\n  return () => {\n    a = (a + 0x6d2b79f5) >>> 0;\n    let t = a;\n    t = Math.imul(t ^ (t >>> 15), t | 1);\n    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);\n    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;\n  };\n}"
           },
           {
-            "path": "/Users/winci/repos/mimirs/src/wiki/community-detection.ts",
-            "startLine": 88,
-            "endLine": 89,
-            "entityName": "MAX_SIZE_FRACTION",
-            "chunkType": "variable",
-            "score": 0.5234164980260141,
-            "snippet": " */\nconst MAX_SIZE_FRACTION = 0.18;"
-          },
-          {
             "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
             "startLine": 186,
             "endLine": 187,
@@ -3645,6 +3636,15 @@
             "chunkType": "variable",
             "score": 0.5133152098376367,
             "snippet": "const TUNABLE_TYPES = new Set([\"constant\", \"variable\"]);"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
+            "startLine": 180,
+            "endLine": 180,
+            "entityName": "LOW_COHESION_THRESHOLD",
+            "chunkType": "variable",
+            "score": 0.5127462770118918,
+            "snippet": "const LOW_COHESION_THRESHOLD = 0.15;"
           }
         ]
       },
@@ -3942,15 +3942,6 @@
             "snippet": "/** Mulberry32: tiny, deterministic PRNG for Louvain's `rng` option. */\nfunction seededRng(seed: number): () => number {\n  let a = seed >>> 0;\n  return () => {\n    a = (a + 0x6d2b79f5) >>> 0;\n    let t = a;\n    t = Math.imul(t ^ (t >>> 15), t | 1);\n    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);\n    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;\n  };\n}"
           },
           {
-            "path": "/Users/winci/repos/mimirs/src/wiki/community-detection.ts",
-            "startLine": 88,
-            "endLine": 89,
-            "entityName": "MAX_SIZE_FRACTION",
-            "chunkType": "variable",
-            "score": 0.5234164980260141,
-            "snippet": " */\nconst MAX_SIZE_FRACTION = 0.18;"
-          },
-          {
             "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
             "startLine": 186,
             "endLine": 187,
@@ -3967,6 +3958,15 @@
             "chunkType": "variable",
             "score": 0.5133152098376367,
             "snippet": "const TUNABLE_TYPES = new Set([\"constant\", \"variable\"]);"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
+            "startLine": 180,
+            "endLine": 180,
+            "entityName": "LOW_COHESION_THRESHOLD",
+            "chunkType": "variable",
+            "score": 0.5127462770118918,
+            "snippet": "const LOW_COHESION_THRESHOLD = 0.15;"
           }
         ]
       },
@@ -4339,15 +4339,6 @@
             "snippet": "/** Mulberry32: tiny, deterministic PRNG for Louvain's `rng` option. */\nfunction seededRng(seed: number): () => number {\n  let a = seed >>> 0;\n  return () => {\n    a = (a + 0x6d2b79f5) >>> 0;\n    let t = a;\n    t = Math.imul(t ^ (t >>> 15), t | 1);\n    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);\n    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;\n  };\n}"
           },
           {
-            "path": "/Users/winci/repos/mimirs/src/wiki/community-detection.ts",
-            "startLine": 88,
-            "endLine": 89,
-            "entityName": "MAX_SIZE_FRACTION",
-            "chunkType": "variable",
-            "score": 0.5234164980260141,
-            "snippet": " */\nconst MAX_SIZE_FRACTION = 0.18;"
-          },
-          {
             "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
             "startLine": 186,
             "endLine": 187,
@@ -4364,6 +4355,15 @@
             "chunkType": "variable",
             "score": 0.5133152098376367,
             "snippet": "const TUNABLE_TYPES = new Set([\"constant\", \"variable\"]);"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
+            "startLine": 180,
+            "endLine": 180,
+            "entityName": "LOW_COHESION_THRESHOLD",
+            "chunkType": "variable",
+            "score": 0.5127462770118918,
+            "snippet": "const LOW_COHESION_THRESHOLD = 0.15;"
           }
         ]
       },
@@ -4569,15 +4569,6 @@
             "snippet": "/** Mulberry32: tiny, deterministic PRNG for Louvain's `rng` option. */\nfunction seededRng(seed: number): () => number {\n  let a = seed >>> 0;\n  return () => {\n    a = (a + 0x6d2b79f5) >>> 0;\n    let t = a;\n    t = Math.imul(t ^ (t >>> 15), t | 1);\n    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);\n    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;\n  };\n}"
           },
           {
-            "path": "/Users/winci/repos/mimirs/src/wiki/community-detection.ts",
-            "startLine": 88,
-            "endLine": 89,
-            "entityName": "MAX_SIZE_FRACTION",
-            "chunkType": "variable",
-            "score": 0.5234164980260141,
-            "snippet": " */\nconst MAX_SIZE_FRACTION = 0.18;"
-          },
-          {
             "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
             "startLine": 186,
             "endLine": 187,
@@ -4594,6 +4585,15 @@
             "chunkType": "variable",
             "score": 0.5133152098376367,
             "snippet": "const TUNABLE_TYPES = new Set([\"constant\", \"variable\"]);"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
+            "startLine": 180,
+            "endLine": 180,
+            "entityName": "LOW_COHESION_THRESHOLD",
+            "chunkType": "variable",
+            "score": 0.5127462770118918,
+            "snippet": "const LOW_COHESION_THRESHOLD = 0.15;"
           }
         ]
       },
@@ -4828,15 +4828,6 @@
             "snippet": "/** Mulberry32: tiny, deterministic PRNG for Louvain's `rng` option. */\nfunction seededRng(seed: number): () => number {\n  let a = seed >>> 0;\n  return () => {\n    a = (a + 0x6d2b79f5) >>> 0;\n    let t = a;\n    t = Math.imul(t ^ (t >>> 15), t | 1);\n    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);\n    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;\n  };\n}"
           },
           {
-            "path": "/Users/winci/repos/mimirs/src/wiki/community-detection.ts",
-            "startLine": 88,
-            "endLine": 89,
-            "entityName": "MAX_SIZE_FRACTION",
-            "chunkType": "variable",
-            "score": 0.5234164980260141,
-            "snippet": " */\nconst MAX_SIZE_FRACTION = 0.18;"
-          },
-          {
             "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
             "startLine": 186,
             "endLine": 187,
@@ -4853,6 +4844,15 @@
             "chunkType": "variable",
             "score": 0.5133152098376367,
             "snippet": "const TUNABLE_TYPES = new Set([\"constant\", \"variable\"]);"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
+            "startLine": 180,
+            "endLine": 180,
+            "entityName": "LOW_COHESION_THRESHOLD",
+            "chunkType": "variable",
+            "score": 0.5127462770118918,
+            "snippet": "const LOW_COHESION_THRESHOLD = 0.15;"
           }
         ]
       },
@@ -5074,15 +5074,6 @@
             "snippet": "/** Mulberry32: tiny, deterministic PRNG for Louvain's `rng` option. */\nfunction seededRng(seed: number): () => number {\n  let a = seed >>> 0;\n  return () => {\n    a = (a + 0x6d2b79f5) >>> 0;\n    let t = a;\n    t = Math.imul(t ^ (t >>> 15), t | 1);\n    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);\n    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;\n  };\n}"
           },
           {
-            "path": "/Users/winci/repos/mimirs/src/wiki/community-detection.ts",
-            "startLine": 88,
-            "endLine": 89,
-            "entityName": "MAX_SIZE_FRACTION",
-            "chunkType": "variable",
-            "score": 0.5234164980260141,
-            "snippet": " */\nconst MAX_SIZE_FRACTION = 0.18;"
-          },
-          {
             "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
             "startLine": 186,
             "endLine": 187,
@@ -5099,6 +5090,15 @@
             "chunkType": "variable",
             "score": 0.5133152098376367,
             "snippet": "const TUNABLE_TYPES = new Set([\"constant\", \"variable\"]);"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
+            "startLine": 180,
+            "endLine": 180,
+            "entityName": "LOW_COHESION_THRESHOLD",
+            "chunkType": "variable",
+            "score": 0.5127462770118918,
+            "snippet": "const LOW_COHESION_THRESHOLD = 0.15;"
           }
         ]
       },
@@ -5265,15 +5265,6 @@
             "snippet": "/** Mulberry32: tiny, deterministic PRNG for Louvain's `rng` option. */\nfunction seededRng(seed: number): () => number {\n  let a = seed >>> 0;\n  return () => {\n    a = (a + 0x6d2b79f5) >>> 0;\n    let t = a;\n    t = Math.imul(t ^ (t >>> 15), t | 1);\n    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);\n    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;\n  };\n}"
           },
           {
-            "path": "/Users/winci/repos/mimirs/src/wiki/community-detection.ts",
-            "startLine": 88,
-            "endLine": 89,
-            "entityName": "MAX_SIZE_FRACTION",
-            "chunkType": "variable",
-            "score": 0.5234164980260141,
-            "snippet": " */\nconst MAX_SIZE_FRACTION = 0.18;"
-          },
-          {
             "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
             "startLine": 186,
             "endLine": 187,
@@ -5290,6 +5281,15 @@
             "chunkType": "variable",
             "score": 0.5133152098376367,
             "snippet": "const TUNABLE_TYPES = new Set([\"constant\", \"variable\"]);"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
+            "startLine": 180,
+            "endLine": 180,
+            "entityName": "LOW_COHESION_THRESHOLD",
+            "chunkType": "variable",
+            "score": 0.5127462770118918,
+            "snippet": "const LOW_COHESION_THRESHOLD = 0.15;"
           }
         ]
       },
@@ -5496,15 +5496,6 @@
             "snippet": "/** Mulberry32: tiny, deterministic PRNG for Louvain's `rng` option. */\nfunction seededRng(seed: number): () => number {\n  let a = seed >>> 0;\n  return () => {\n    a = (a + 0x6d2b79f5) >>> 0;\n    let t = a;\n    t = Math.imul(t ^ (t >>> 15), t | 1);\n    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);\n    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;\n  };\n}"
           },
           {
-            "path": "/Users/winci/repos/mimirs/src/wiki/community-detection.ts",
-            "startLine": 88,
-            "endLine": 89,
-            "entityName": "MAX_SIZE_FRACTION",
-            "chunkType": "variable",
-            "score": 0.5234164980260141,
-            "snippet": " */\nconst MAX_SIZE_FRACTION = 0.18;"
-          },
-          {
             "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
             "startLine": 186,
             "endLine": 187,
@@ -5521,6 +5512,15 @@
             "chunkType": "variable",
             "score": 0.5133152098376367,
             "snippet": "const TUNABLE_TYPES = new Set([\"constant\", \"variable\"]);"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
+            "startLine": 180,
+            "endLine": 180,
+            "entityName": "LOW_COHESION_THRESHOLD",
+            "chunkType": "variable",
+            "score": 0.5127462770118918,
+            "snippet": "const LOW_COHESION_THRESHOLD = 0.15;"
           }
         ]
       },
@@ -5666,15 +5666,6 @@
             "snippet": "/** Mulberry32: tiny, deterministic PRNG for Louvain's `rng` option. */\nfunction seededRng(seed: number): () => number {\n  let a = seed >>> 0;\n  return () => {\n    a = (a + 0x6d2b79f5) >>> 0;\n    let t = a;\n    t = Math.imul(t ^ (t >>> 15), t | 1);\n    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);\n    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;\n  };\n}"
           },
           {
-            "path": "/Users/winci/repos/mimirs/src/wiki/community-detection.ts",
-            "startLine": 88,
-            "endLine": 89,
-            "entityName": "MAX_SIZE_FRACTION",
-            "chunkType": "variable",
-            "score": 0.5234164980260141,
-            "snippet": " */\nconst MAX_SIZE_FRACTION = 0.18;"
-          },
-          {
             "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
             "startLine": 186,
             "endLine": 187,
@@ -5691,6 +5682,15 @@
             "chunkType": "variable",
             "score": 0.5133152098376367,
             "snippet": "const TUNABLE_TYPES = new Set([\"constant\", \"variable\"]);"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
+            "startLine": 180,
+            "endLine": 180,
+            "entityName": "LOW_COHESION_THRESHOLD",
+            "chunkType": "variable",
+            "score": 0.5127462770118918,
+            "snippet": "const LOW_COHESION_THRESHOLD = 0.15;"
           }
         ]
       },
@@ -5855,15 +5855,6 @@
         "query": "every export const and tunable literal in this file",
         "results": [
           {
-            "path": "/Users/winci/repos/mimirs/src/config/index.ts",
-            "startLine": 122,
-            "endLine": 151,
-            "entityName": "loadConfig",
-            "chunkType": "function",
-            "score": 0.6575269395858487,
-            "snippet": " */\nexport async function loadConfig(projectDir: string): Promise<RagConfig> {\n  const ragDir = join(projectDir, \".mimirs\");\n  const configPath = join(ragDir, \"config.json\");\n\n  if (!existsSync(configPath)) {\n    await mkdir(ragDir, { recursive: true });\n    await writeFile(configPath, JSON.stringify(DEFAULT_CONFIG, null, 2) + \"\\n\");\n    return { ...DEFAULT_CONFIG };\n  }\n\n  const raw = await readFile(configPath, \"utf-8\");"
-          },
-          {
             "path": "/Users/winci/repos/mimirs/src/utils/log.ts",
             "startLine": 35,
             "endLine": 45,
@@ -5889,6 +5880,15 @@
             "chunkType": "interface",
             "score": 0.6076164593003585,
             "snippet": "export interface Chunk {\n  text: string;\n  index: number;\n  startLine?: number;\n  endLine?: number;\n  imports?: ChunkImport[];\n  exports?: ChunkExport[];\n  parentName?: string;\n  /** Symbol name from AST (e.g. \"emit\", \"constructor\") — available even without exports */\n  name?: string;\n  /** AST chunk type (e.g. \"method\", \"field\", \"class\") — available even without exports */\n  chunkType?: string;"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
+            "startLine": 59,
+            "endLine": 59,
+            "entityName": "BIG_FILE_EXPORTS",
+            "chunkType": "variable",
+            "score": 0.5583788592659765,
+            "snippet": "export const BIG_FILE_EXPORTS = 8;"
           }
         ]
       },
@@ -5903,15 +5903,6 @@
             "chunkType": "block",
             "score": 0.5133144741589826,
             "snippet": "\n/**\n * Single-line / arrow-fn / type-alias signatures can still ship 200+ chars\n * (long generic constraints, union types) — the brace-depth strip stops at\n * the body, not the signature boundary. Cap the result so a runaway type\n * signature can't dominate the exports table in a bundle."
-          },
-          {
-            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
-            "startLine": 604,
-            "endLine": 605,
-            "entityName": "MAX_SIGNATURE_BYTES",
-            "chunkType": "variable",
-            "score": 0.5051272934356772,
-            "snippet": " */\nconst MAX_SIGNATURE_BYTES = 240;"
           },
           {
             "path": "/Users/winci/repos/mimirs/src/wiki/sections/per-file-breakdown.md",
@@ -5948,6 +5939,24 @@
             "chunkType": null,
             "score": 0.3586889429861879,
             "snippet": "# Conventions\n\nPatterns and conventions observed across the codebase.\n\n"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/skills/wiki/SKILL.md",
+            "startLine": 216,
+            "endLine": 218,
+            "entityName": null,
+            "chunkType": null,
+            "score": 0.358366184440848,
+            "snippet": "## Signature\nThe interface / function signature.\n\n"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/.claude-plugin/skills/wiki/SKILL.md",
+            "startLine": null,
+            "endLine": null,
+            "entityName": null,
+            "chunkType": null,
+            "score": 0.340160590783148,
+            "snippet": "s suffix them.\n- Never invent function signatures, parameter names, or export lists — only\n  write what `read_relevant` or `search_symbols` actually returned."
           }
         ]
       },
@@ -6119,15 +6128,6 @@
         "query": "every export const and tunable literal in this file",
         "results": [
           {
-            "path": "/Users/winci/repos/mimirs/src/config/index.ts",
-            "startLine": 122,
-            "endLine": 151,
-            "entityName": "loadConfig",
-            "chunkType": "function",
-            "score": 0.6575269395858487,
-            "snippet": " */\nexport async function loadConfig(projectDir: string): Promise<RagConfig> {\n  const ragDir = join(projectDir, \".mimirs\");\n  const configPath = join(ragDir, \"config.json\");\n\n  if (!existsSync(configPath)) {\n    await mkdir(ragDir, { recursive: true });\n    await writeFile(configPath, JSON.stringify(DEFAULT_CONFIG, null, 2) + \"\\n\");\n    return { ...DEFAULT_CONFIG };\n  }\n\n  const raw = await readFile(configPath, \"utf-8\");"
-          },
-          {
             "path": "/Users/winci/repos/mimirs/src/utils/log.ts",
             "startLine": 35,
             "endLine": 45,
@@ -6153,6 +6153,15 @@
             "chunkType": "interface",
             "score": 0.6076164593003585,
             "snippet": "export interface Chunk {\n  text: string;\n  index: number;\n  startLine?: number;\n  endLine?: number;\n  imports?: ChunkImport[];\n  exports?: ChunkExport[];\n  parentName?: string;\n  /** Symbol name from AST (e.g. \"emit\", \"constructor\") — available even without exports */\n  name?: string;\n  /** AST chunk type (e.g. \"method\", \"field\", \"class\") — available even without exports */\n  chunkType?: string;"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
+            "startLine": 59,
+            "endLine": 59,
+            "entityName": "BIG_FILE_EXPORTS",
+            "chunkType": "variable",
+            "score": 0.5583788592659765,
+            "snippet": "export const BIG_FILE_EXPORTS = 8;"
           }
         ]
       },
@@ -6167,15 +6176,6 @@
             "chunkType": "block",
             "score": 0.5133144741589826,
             "snippet": "\n/**\n * Single-line / arrow-fn / type-alias signatures can still ship 200+ chars\n * (long generic constraints, union types) — the brace-depth strip stops at\n * the body, not the signature boundary. Cap the result so a runaway type\n * signature can't dominate the exports table in a bundle."
-          },
-          {
-            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
-            "startLine": 604,
-            "endLine": 605,
-            "entityName": "MAX_SIGNATURE_BYTES",
-            "chunkType": "variable",
-            "score": 0.5051272934356772,
-            "snippet": " */\nconst MAX_SIGNATURE_BYTES = 240;"
           },
           {
             "path": "/Users/winci/repos/mimirs/src/wiki/sections/per-file-breakdown.md",
@@ -6212,6 +6212,24 @@
             "chunkType": null,
             "score": 0.3586889429861879,
             "snippet": "# Conventions\n\nPatterns and conventions observed across the codebase.\n\n"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/skills/wiki/SKILL.md",
+            "startLine": 216,
+            "endLine": 218,
+            "entityName": null,
+            "chunkType": null,
+            "score": 0.358366184440848,
+            "snippet": "## Signature\nThe interface / function signature.\n\n"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/.claude-plugin/skills/wiki/SKILL.md",
+            "startLine": null,
+            "endLine": null,
+            "entityName": null,
+            "chunkType": null,
+            "score": 0.340160590783148,
+            "snippet": "s suffix them.\n- Never invent function signatures, parameter names, or export lists — only\n  write what `read_relevant` or `search_symbols` actually returned."
           }
         ]
       },
@@ -6317,15 +6335,6 @@
         "query": "every export const and tunable literal in this file",
         "results": [
           {
-            "path": "/Users/winci/repos/mimirs/src/config/index.ts",
-            "startLine": 122,
-            "endLine": 151,
-            "entityName": "loadConfig",
-            "chunkType": "function",
-            "score": 0.6575269395858487,
-            "snippet": " */\nexport async function loadConfig(projectDir: string): Promise<RagConfig> {\n  const ragDir = join(projectDir, \".mimirs\");\n  const configPath = join(ragDir, \"config.json\");\n\n  if (!existsSync(configPath)) {\n    await mkdir(ragDir, { recursive: true });\n    await writeFile(configPath, JSON.stringify(DEFAULT_CONFIG, null, 2) + \"\\n\");\n    return { ...DEFAULT_CONFIG };\n  }\n\n  const raw = await readFile(configPath, \"utf-8\");"
-          },
-          {
             "path": "/Users/winci/repos/mimirs/src/utils/log.ts",
             "startLine": 35,
             "endLine": 45,
@@ -6351,6 +6360,15 @@
             "chunkType": "interface",
             "score": 0.6076164593003585,
             "snippet": "export interface Chunk {\n  text: string;\n  index: number;\n  startLine?: number;\n  endLine?: number;\n  imports?: ChunkImport[];\n  exports?: ChunkExport[];\n  parentName?: string;\n  /** Symbol name from AST (e.g. \"emit\", \"constructor\") — available even without exports */\n  name?: string;\n  /** AST chunk type (e.g. \"method\", \"field\", \"class\") — available even without exports */\n  chunkType?: string;"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
+            "startLine": 59,
+            "endLine": 59,
+            "entityName": "BIG_FILE_EXPORTS",
+            "chunkType": "variable",
+            "score": 0.5583788592659765,
+            "snippet": "export const BIG_FILE_EXPORTS = 8;"
           }
         ]
       },
@@ -6365,15 +6383,6 @@
             "chunkType": "block",
             "score": 0.5133144741589826,
             "snippet": "\n/**\n * Single-line / arrow-fn / type-alias signatures can still ship 200+ chars\n * (long generic constraints, union types) — the brace-depth strip stops at\n * the body, not the signature boundary. Cap the result so a runaway type\n * signature can't dominate the exports table in a bundle."
-          },
-          {
-            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
-            "startLine": 604,
-            "endLine": 605,
-            "entityName": "MAX_SIGNATURE_BYTES",
-            "chunkType": "variable",
-            "score": 0.5051272934356772,
-            "snippet": " */\nconst MAX_SIGNATURE_BYTES = 240;"
           },
           {
             "path": "/Users/winci/repos/mimirs/src/wiki/sections/per-file-breakdown.md",
@@ -6410,6 +6419,24 @@
             "chunkType": null,
             "score": 0.3586889429861879,
             "snippet": "# Conventions\n\nPatterns and conventions observed across the codebase.\n\n"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/skills/wiki/SKILL.md",
+            "startLine": 216,
+            "endLine": 218,
+            "entityName": null,
+            "chunkType": null,
+            "score": 0.358366184440848,
+            "snippet": "## Signature\nThe interface / function signature.\n\n"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/.claude-plugin/skills/wiki/SKILL.md",
+            "startLine": null,
+            "endLine": null,
+            "entityName": null,
+            "chunkType": null,
+            "score": 0.340160590783148,
+            "snippet": "s suffix them.\n- Never invent function signatures, parameter names, or export lists — only\n  write what `read_relevant` or `search_symbols` actually returned."
           }
         ]
       },
@@ -6694,15 +6721,6 @@
         "query": "every export const and tunable literal in this file",
         "results": [
           {
-            "path": "/Users/winci/repos/mimirs/src/config/index.ts",
-            "startLine": 122,
-            "endLine": 151,
-            "entityName": "loadConfig",
-            "chunkType": "function",
-            "score": 0.6575269395858487,
-            "snippet": " */\nexport async function loadConfig(projectDir: string): Promise<RagConfig> {\n  const ragDir = join(projectDir, \".mimirs\");\n  const configPath = join(ragDir, \"config.json\");\n\n  if (!existsSync(configPath)) {\n    await mkdir(ragDir, { recursive: true });\n    await writeFile(configPath, JSON.stringify(DEFAULT_CONFIG, null, 2) + \"\\n\");\n    return { ...DEFAULT_CONFIG };\n  }\n\n  const raw = await readFile(configPath, \"utf-8\");"
-          },
-          {
             "path": "/Users/winci/repos/mimirs/src/utils/log.ts",
             "startLine": 35,
             "endLine": 45,
@@ -6728,6 +6746,15 @@
             "chunkType": "interface",
             "score": 0.6076164593003585,
             "snippet": "export interface Chunk {\n  text: string;\n  index: number;\n  startLine?: number;\n  endLine?: number;\n  imports?: ChunkImport[];\n  exports?: ChunkExport[];\n  parentName?: string;\n  /** Symbol name from AST (e.g. \"emit\", \"constructor\") — available even without exports */\n  name?: string;\n  /** AST chunk type (e.g. \"method\", \"field\", \"class\") — available even without exports */\n  chunkType?: string;"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
+            "startLine": 59,
+            "endLine": 59,
+            "entityName": "BIG_FILE_EXPORTS",
+            "chunkType": "variable",
+            "score": 0.5583788592659765,
+            "snippet": "export const BIG_FILE_EXPORTS = 8;"
           }
         ]
       },
@@ -6742,15 +6769,6 @@
             "chunkType": "block",
             "score": 0.5133144741589826,
             "snippet": "\n/**\n * Single-line / arrow-fn / type-alias signatures can still ship 200+ chars\n * (long generic constraints, union types) — the brace-depth strip stops at\n * the body, not the signature boundary. Cap the result so a runaway type\n * signature can't dominate the exports table in a bundle."
-          },
-          {
-            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
-            "startLine": 604,
-            "endLine": 605,
-            "entityName": "MAX_SIGNATURE_BYTES",
-            "chunkType": "variable",
-            "score": 0.5051272934356772,
-            "snippet": " */\nconst MAX_SIGNATURE_BYTES = 240;"
           },
           {
             "path": "/Users/winci/repos/mimirs/src/wiki/sections/per-file-breakdown.md",
@@ -6787,6 +6805,24 @@
             "chunkType": null,
             "score": 0.3586889429861879,
             "snippet": "# Conventions\n\nPatterns and conventions observed across the codebase.\n\n"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/skills/wiki/SKILL.md",
+            "startLine": 216,
+            "endLine": 218,
+            "entityName": null,
+            "chunkType": null,
+            "score": 0.358366184440848,
+            "snippet": "## Signature\nThe interface / function signature.\n\n"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/.claude-plugin/skills/wiki/SKILL.md",
+            "startLine": null,
+            "endLine": null,
+            "entityName": null,
+            "chunkType": null,
+            "score": 0.340160590783148,
+            "snippet": "s suffix them.\n- Never invent function signatures, parameter names, or export lists — only\n  write what `read_relevant` or `search_symbols` actually returned."
           }
         ]
       },
@@ -6919,15 +6955,6 @@
         "query": "every export const and tunable literal in this file",
         "results": [
           {
-            "path": "/Users/winci/repos/mimirs/src/config/index.ts",
-            "startLine": 122,
-            "endLine": 151,
-            "entityName": "loadConfig",
-            "chunkType": "function",
-            "score": 0.6575269395858487,
-            "snippet": " */\nexport async function loadConfig(projectDir: string): Promise<RagConfig> {\n  const ragDir = join(projectDir, \".mimirs\");\n  const configPath = join(ragDir, \"config.json\");\n\n  if (!existsSync(configPath)) {\n    await mkdir(ragDir, { recursive: true });\n    await writeFile(configPath, JSON.stringify(DEFAULT_CONFIG, null, 2) + \"\\n\");\n    return { ...DEFAULT_CONFIG };\n  }\n\n  const raw = await readFile(configPath, \"utf-8\");"
-          },
-          {
             "path": "/Users/winci/repos/mimirs/src/utils/log.ts",
             "startLine": 35,
             "endLine": 45,
@@ -6953,6 +6980,15 @@
             "chunkType": "interface",
             "score": 0.6076164593003585,
             "snippet": "export interface Chunk {\n  text: string;\n  index: number;\n  startLine?: number;\n  endLine?: number;\n  imports?: ChunkImport[];\n  exports?: ChunkExport[];\n  parentName?: string;\n  /** Symbol name from AST (e.g. \"emit\", \"constructor\") — available even without exports */\n  name?: string;\n  /** AST chunk type (e.g. \"method\", \"field\", \"class\") — available even without exports */\n  chunkType?: string;"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
+            "startLine": 59,
+            "endLine": 59,
+            "entityName": "BIG_FILE_EXPORTS",
+            "chunkType": "variable",
+            "score": 0.5583788592659765,
+            "snippet": "export const BIG_FILE_EXPORTS = 8;"
           }
         ]
       },
@@ -6967,15 +7003,6 @@
             "chunkType": "block",
             "score": 0.5133144741589826,
             "snippet": "\n/**\n * Single-line / arrow-fn / type-alias signatures can still ship 200+ chars\n * (long generic constraints, union types) — the brace-depth strip stops at\n * the body, not the signature boundary. Cap the result so a runaway type\n * signature can't dominate the exports table in a bundle."
-          },
-          {
-            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
-            "startLine": 604,
-            "endLine": 605,
-            "entityName": "MAX_SIGNATURE_BYTES",
-            "chunkType": "variable",
-            "score": 0.5051272934356772,
-            "snippet": " */\nconst MAX_SIGNATURE_BYTES = 240;"
           },
           {
             "path": "/Users/winci/repos/mimirs/src/wiki/sections/per-file-breakdown.md",
@@ -7012,6 +7039,24 @@
             "chunkType": null,
             "score": 0.3586889429861879,
             "snippet": "# Conventions\n\nPatterns and conventions observed across the codebase.\n\n"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/skills/wiki/SKILL.md",
+            "startLine": 216,
+            "endLine": 218,
+            "entityName": null,
+            "chunkType": null,
+            "score": 0.358366184440848,
+            "snippet": "## Signature\nThe interface / function signature.\n\n"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/.claude-plugin/skills/wiki/SKILL.md",
+            "startLine": null,
+            "endLine": null,
+            "entityName": null,
+            "chunkType": null,
+            "score": 0.340160590783148,
+            "snippet": "s suffix them.\n- Never invent function signatures, parameter names, or export lists — only\n  write what `read_relevant` or `search_symbols` actually returned."
           }
         ]
       },
@@ -7287,15 +7332,6 @@
         "query": "every export const and tunable literal in this file",
         "results": [
           {
-            "path": "/Users/winci/repos/mimirs/src/config/index.ts",
-            "startLine": 122,
-            "endLine": 151,
-            "entityName": "loadConfig",
-            "chunkType": "function",
-            "score": 0.6575269395858487,
-            "snippet": " */\nexport async function loadConfig(projectDir: string): Promise<RagConfig> {\n  const ragDir = join(projectDir, \".mimirs\");\n  const configPath = join(ragDir, \"config.json\");\n\n  if (!existsSync(configPath)) {\n    await mkdir(ragDir, { recursive: true });\n    await writeFile(configPath, JSON.stringify(DEFAULT_CONFIG, null, 2) + \"\\n\");\n    return { ...DEFAULT_CONFIG };\n  }\n\n  const raw = await readFile(configPath, \"utf-8\");"
-          },
-          {
             "path": "/Users/winci/repos/mimirs/src/utils/log.ts",
             "startLine": 35,
             "endLine": 45,
@@ -7321,6 +7357,15 @@
             "chunkType": "interface",
             "score": 0.6076164593003585,
             "snippet": "export interface Chunk {\n  text: string;\n  index: number;\n  startLine?: number;\n  endLine?: number;\n  imports?: ChunkImport[];\n  exports?: ChunkExport[];\n  parentName?: string;\n  /** Symbol name from AST (e.g. \"emit\", \"constructor\") — available even without exports */\n  name?: string;\n  /** AST chunk type (e.g. \"method\", \"field\", \"class\") — available even without exports */\n  chunkType?: string;"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
+            "startLine": 59,
+            "endLine": 59,
+            "entityName": "BIG_FILE_EXPORTS",
+            "chunkType": "variable",
+            "score": 0.5583788592659765,
+            "snippet": "export const BIG_FILE_EXPORTS = 8;"
           }
         ]
       },
@@ -7335,15 +7380,6 @@
             "chunkType": "block",
             "score": 0.5133144741589826,
             "snippet": "\n/**\n * Single-line / arrow-fn / type-alias signatures can still ship 200+ chars\n * (long generic constraints, union types) — the brace-depth strip stops at\n * the body, not the signature boundary. Cap the result so a runaway type\n * signature can't dominate the exports table in a bundle."
-          },
-          {
-            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
-            "startLine": 604,
-            "endLine": 605,
-            "entityName": "MAX_SIGNATURE_BYTES",
-            "chunkType": "variable",
-            "score": 0.5051272934356772,
-            "snippet": " */\nconst MAX_SIGNATURE_BYTES = 240;"
           },
           {
             "path": "/Users/winci/repos/mimirs/src/wiki/sections/per-file-breakdown.md",
@@ -7380,6 +7416,24 @@
             "chunkType": null,
             "score": 0.3586889429861879,
             "snippet": "# Conventions\n\nPatterns and conventions observed across the codebase.\n\n"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/skills/wiki/SKILL.md",
+            "startLine": 216,
+            "endLine": 218,
+            "entityName": null,
+            "chunkType": null,
+            "score": 0.358366184440848,
+            "snippet": "## Signature\nThe interface / function signature.\n\n"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/.claude-plugin/skills/wiki/SKILL.md",
+            "startLine": null,
+            "endLine": null,
+            "entityName": null,
+            "chunkType": null,
+            "score": 0.340160590783148,
+            "snippet": "s suffix them.\n- Never invent function signatures, parameter names, or export lists — only\n  write what `read_relevant` or `search_symbols` actually returned."
           }
         ]
       },
@@ -7506,15 +7560,6 @@
         "query": "every export const and tunable literal in this file",
         "results": [
           {
-            "path": "/Users/winci/repos/mimirs/src/config/index.ts",
-            "startLine": 122,
-            "endLine": 151,
-            "entityName": "loadConfig",
-            "chunkType": "function",
-            "score": 0.6575269395858487,
-            "snippet": " */\nexport async function loadConfig(projectDir: string): Promise<RagConfig> {\n  const ragDir = join(projectDir, \".mimirs\");\n  const configPath = join(ragDir, \"config.json\");\n\n  if (!existsSync(configPath)) {\n    await mkdir(ragDir, { recursive: true });\n    await writeFile(configPath, JSON.stringify(DEFAULT_CONFIG, null, 2) + \"\\n\");\n    return { ...DEFAULT_CONFIG };\n  }\n\n  const raw = await readFile(configPath, \"utf-8\");"
-          },
-          {
             "path": "/Users/winci/repos/mimirs/src/utils/log.ts",
             "startLine": 35,
             "endLine": 45,
@@ -7540,6 +7585,15 @@
             "chunkType": "interface",
             "score": 0.6076164593003585,
             "snippet": "export interface Chunk {\n  text: string;\n  index: number;\n  startLine?: number;\n  endLine?: number;\n  imports?: ChunkImport[];\n  exports?: ChunkExport[];\n  parentName?: string;\n  /** Symbol name from AST (e.g. \"emit\", \"constructor\") — available even without exports */\n  name?: string;\n  /** AST chunk type (e.g. \"method\", \"field\", \"class\") — available even without exports */\n  chunkType?: string;"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
+            "startLine": 59,
+            "endLine": 59,
+            "entityName": "BIG_FILE_EXPORTS",
+            "chunkType": "variable",
+            "score": 0.5583788592659765,
+            "snippet": "export const BIG_FILE_EXPORTS = 8;"
           }
         ]
       },
@@ -7554,15 +7608,6 @@
             "chunkType": "block",
             "score": 0.5133144741589826,
             "snippet": "\n/**\n * Single-line / arrow-fn / type-alias signatures can still ship 200+ chars\n * (long generic constraints, union types) — the brace-depth strip stops at\n * the body, not the signature boundary. Cap the result so a runaway type\n * signature can't dominate the exports table in a bundle."
-          },
-          {
-            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
-            "startLine": 604,
-            "endLine": 605,
-            "entityName": "MAX_SIGNATURE_BYTES",
-            "chunkType": "variable",
-            "score": 0.5051272934356772,
-            "snippet": " */\nconst MAX_SIGNATURE_BYTES = 240;"
           },
           {
             "path": "/Users/winci/repos/mimirs/src/wiki/sections/per-file-breakdown.md",
@@ -7599,6 +7644,24 @@
             "chunkType": null,
             "score": 0.3586889429861879,
             "snippet": "# Conventions\n\nPatterns and conventions observed across the codebase.\n\n"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/skills/wiki/SKILL.md",
+            "startLine": 216,
+            "endLine": 218,
+            "entityName": null,
+            "chunkType": null,
+            "score": 0.358366184440848,
+            "snippet": "## Signature\nThe interface / function signature.\n\n"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/.claude-plugin/skills/wiki/SKILL.md",
+            "startLine": null,
+            "endLine": null,
+            "entityName": null,
+            "chunkType": null,
+            "score": 0.340160590783148,
+            "snippet": "s suffix them.\n- Never invent function signatures, parameter names, or export lists — only\n  write what `read_relevant` or `search_symbols` actually returned."
           }
         ]
       },
@@ -7766,15 +7829,6 @@
         "query": "every export const and tunable literal in this file",
         "results": [
           {
-            "path": "/Users/winci/repos/mimirs/src/config/index.ts",
-            "startLine": 122,
-            "endLine": 151,
-            "entityName": "loadConfig",
-            "chunkType": "function",
-            "score": 0.6575269395858487,
-            "snippet": " */\nexport async function loadConfig(projectDir: string): Promise<RagConfig> {\n  const ragDir = join(projectDir, \".mimirs\");\n  const configPath = join(ragDir, \"config.json\");\n\n  if (!existsSync(configPath)) {\n    await mkdir(ragDir, { recursive: true });\n    await writeFile(configPath, JSON.stringify(DEFAULT_CONFIG, null, 2) + \"\\n\");\n    return { ...DEFAULT_CONFIG };\n  }\n\n  const raw = await readFile(configPath, \"utf-8\");"
-          },
-          {
             "path": "/Users/winci/repos/mimirs/src/utils/log.ts",
             "startLine": 35,
             "endLine": 45,
@@ -7800,6 +7854,15 @@
             "chunkType": "interface",
             "score": 0.6076164593003585,
             "snippet": "export interface Chunk {\n  text: string;\n  index: number;\n  startLine?: number;\n  endLine?: number;\n  imports?: ChunkImport[];\n  exports?: ChunkExport[];\n  parentName?: string;\n  /** Symbol name from AST (e.g. \"emit\", \"constructor\") — available even without exports */\n  name?: string;\n  /** AST chunk type (e.g. \"method\", \"field\", \"class\") — available even without exports */\n  chunkType?: string;"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
+            "startLine": 59,
+            "endLine": 59,
+            "entityName": "BIG_FILE_EXPORTS",
+            "chunkType": "variable",
+            "score": 0.5583788592659765,
+            "snippet": "export const BIG_FILE_EXPORTS = 8;"
           }
         ]
       },
@@ -7814,15 +7877,6 @@
             "chunkType": "block",
             "score": 0.5133144741589826,
             "snippet": "\n/**\n * Single-line / arrow-fn / type-alias signatures can still ship 200+ chars\n * (long generic constraints, union types) — the brace-depth strip stops at\n * the body, not the signature boundary. Cap the result so a runaway type\n * signature can't dominate the exports table in a bundle."
-          },
-          {
-            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
-            "startLine": 604,
-            "endLine": 605,
-            "entityName": "MAX_SIGNATURE_BYTES",
-            "chunkType": "variable",
-            "score": 0.5051272934356772,
-            "snippet": " */\nconst MAX_SIGNATURE_BYTES = 240;"
           },
           {
             "path": "/Users/winci/repos/mimirs/src/wiki/sections/per-file-breakdown.md",
@@ -7859,6 +7913,24 @@
             "chunkType": null,
             "score": 0.3586889429861879,
             "snippet": "# Conventions\n\nPatterns and conventions observed across the codebase.\n\n"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/skills/wiki/SKILL.md",
+            "startLine": 216,
+            "endLine": 218,
+            "entityName": null,
+            "chunkType": null,
+            "score": 0.358366184440848,
+            "snippet": "## Signature\nThe interface / function signature.\n\n"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/.claude-plugin/skills/wiki/SKILL.md",
+            "startLine": null,
+            "endLine": null,
+            "entityName": null,
+            "chunkType": null,
+            "score": 0.340160590783148,
+            "snippet": "s suffix them.\n- Never invent function signatures, parameter names, or export lists — only\n  write what `read_relevant` or `search_symbols` actually returned."
           }
         ]
       },
@@ -8364,7 +8436,7 @@
       "topHubs": [
         {
           "path": "src/embeddings/embed.ts",
-          "pageRank": 0.10835027046893017,
+          "pageRank": 0.10800483842837025,
           "fanIn": 77,
           "fanOut": 0,
           "bridges": [],
@@ -8380,7 +8452,7 @@
         },
         {
           "path": "src/wiki/types.ts",
-          "pageRank": 0.10214122661257057,
+          "pageRank": 0.10181559623763996,
           "fanIn": 95,
           "fanOut": 1,
           "bridges": [],
@@ -8391,7 +8463,7 @@
         },
         {
           "path": "tests/helpers.ts",
-          "pageRank": 0.08297740323326683,
+          "pageRank": 0.0827128631591969,
           "fanIn": 67,
           "fanOut": 0,
           "bridges": [],
@@ -8399,7 +8471,7 @@
         },
         {
           "path": "src/utils/log.ts",
-          "pageRank": 0.07124817091935368,
+          "pageRank": 0.07102102378892171,
           "fanIn": 27,
           "fanOut": 0,
           "bridges": [],
@@ -8415,7 +8487,7 @@
         },
         {
           "path": "src/db/index.ts",
-          "pageRank": 0.04922387418245353,
+          "pageRank": 0.049066944260306,
           "fanIn": 59,
           "fanOut": 10,
           "bridges": [
@@ -8434,7 +8506,7 @@
         },
         {
           "path": "src/config/index.ts",
-          "pageRank": 0.03895852988007147,
+          "pageRank": 0.038834327099307085,
           "fanIn": 42,
           "fanOut": 4,
           "bridges": [],
@@ -8450,7 +8522,7 @@
         },
         {
           "path": "src/search/usages.ts",
-          "pageRank": 0.03240578622160917,
+          "pageRank": 0.03230247298034564,
           "fanIn": 4,
           "fanOut": 0,
           "bridges": [],
@@ -8460,7 +8532,7 @@
         },
         {
           "path": "src/conversation/parser.ts",
-          "pageRank": 0.02315410535737929,
+          "pageRank": 0.023080287805761712,
           "fanIn": 11,
           "fanOut": 0,
           "bridges": [
@@ -8473,7 +8545,7 @@
         },
         {
           "path": "src/search/hybrid.ts",
-          "pageRank": 0.022270574670030165,
+          "pageRank": 0.0221995740164895,
           "fanIn": 21,
           "fanOut": 3,
           "bridges": [],
@@ -8485,7 +8557,7 @@
         },
         {
           "path": "src/indexing/chunker.ts",
-          "pageRank": 0.01978525690325548,
+          "pageRank": 0.019722180281165937,
           "fanIn": 17,
           "fanOut": 1,
           "bridges": [],
@@ -8495,7 +8567,7 @@
         },
         {
           "path": "src/graph/resolver.ts",
-          "pageRank": 0.01823579883330483,
+          "pageRank": 0.018177661917265223,
           "fanIn": 16,
           "fanOut": 1,
           "bridges": [],
@@ -8983,123 +9055,138 @@
         },
         {
           "path": "wiki/_update-log.md",
-          "byteSize": 348,
-          "firstLines": "# Wiki Update Log\n\nAppend-only log of wiki generation and incremental updates. Newest entries at the bottom. Emitted deterministically from the staleness report — not LLM-generated.\n\n## 2026-04-26 07:05 UTC — Full initialization (`79e963f`)\n\n22 pages generated (1 architecture, 15 community, 4 community-file, 1 data-flows, 1 getting-started).\n"
+          "byteSize": 10394,
+          "firstLines": "# Wiki Update Log\n\nChangelog-style: newest entries at the top. Per-regen \"What changed\" narratives are emitted by an LLM after writers finish, grounded in old-vs-new page diffs.\n\n## 2026-04-26 12:45 UTC — Incremental fallback regen (`79e963f` → `b47d98e`)\n\n<!-- regen:b47d98e -->\n\nFell back to forced full regen: 15/25 pages dirty (>50%). All pages regenerating across 4 commits.\n"
         },
         {
           "path": "wiki/architecture.md",
-          "byteSize": 10398,
-          "firstLines": "# Architecture\n\n> Generated from `79e963f` · 2026-04-26\n\nMimirs is a persistent project memory and RAG (Retrieval-Augmented Generation) system for AI coding agents. The codebase is organised as 15 cohesive communities under `src/`, each anchored by an entry file that re-exports a narrow surface, and a benchmark suite plus test helpers under `benchmarks/` and `tests/`.\n\n## System map\n\nThe 15 communities form a layered dependency graph. Infrastructure sits at the bottom (config, DB, embeddings), pipeline and runtime services in the middle, and CLI and MCP adapters at the top.\n"
+          "byteSize": 12961,
+          "firstLines": "# Architecture\n\n> Generated from `b47d98e` · 2026-04-26\n\nMimirs is a persistent project memory and RAG system for AI coding agents. The codebase is organised as 14 cohesive communities under `src/`, each anchored by an entry file that re-exports a narrow surface, plus a benchmark suite under `benchmarks/` and shared test helpers under `tests/`. The communities below are the Louvain partitions of mimirs' own import graph — exactly the structure the wiki pipeline produces when run against any project.\n\n## System map\n\nThe 14 communities form a layered dependency graph. Infrastructure (config, embeddings, the SQLite layer, search runtime) sits at the bottom; the pipeline and ingestion communities sit in the middle; CLI and MCP adapters sit at the top. The map below shows the load-bearing edges between communities — minor ties (weight 1–2) are omitted to stay within the diagram budget.\n"
         },
         {
           "path": "wiki/communities/cli-commands.md",
-          "byteSize": 14403,
-          "firstLines": "# CLI Commands\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nAll 19 CLI subcommand handlers live under `src/cli/commands/`. Each file exports a single async function named `<noun>Command` that receives a raw `args` array and a `getFlag` helper. They are the concrete implementations that the top-level dispatcher in `src/cli/index.ts` routes to after parsing the subcommand name.\n\n## Per-file breakdown\n"
+          "byteSize": 19880,
+          "firstLines": "# CLI Commands\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThis community holds the 19 subcommand handlers that sit behind `mimirs <subcommand>`. Each handler is a short async function that owns one verb of the public CLI surface — `index`, `search`, `serve`, `doctor`, `cleanup`, and the rest. The handlers are deliberately thin: they parse their own flags, open a `RagDB`, call into the indexing, search, conversation, git, or wiki layers, print to `cli`, and close the DB. This page is the reference for adding a new command or tracing what happens when a user runs the binary.\n\n## Per-file breakdown\n"
         },
         {
           "path": "wiki/communities/cli-entry-core.md",
-          "byteSize": 6016,
-          "firstLines": "# CLI Entry & Core Utilities\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nThe CLI entry and core utilities community is the thinnest layer in mimirs: four files that handle process start, command dispatch, cross-cutting type definitions, and the single logging abstraction every other module imports. Understanding these four files is the prerequisite for understanding how any command actually reaches its implementation.\n\n## How it works\n"
+          "byteSize": 9231,
+          "firstLines": "# CLI Entry & Core Utilities\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThe CLI entry-and-core community is the boot floor of mimirs: the shebang script `src/main.ts`, the dispatch table in `src/cli/index.ts`, the cross-cutting `EmbeddedChunk` type in `src/types.ts`, and the dual `log` / `cli` output helpers in `src/utils/log.ts`. Everything else in the codebase — every command, every MCP tool, every benchmark — depends on at least one of these four files. The community is small (only four files) but very widely consumed (28 external consumers).\n\n## How it works\n"
         },
         {
           "path": "wiki/communities/cli-setup.md",
-          "byteSize": 7525,
-          "firstLines": "# CLI Setup & IDE Integration\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\n`src/cli/setup.ts` is the first-run initialization module for mimirs. It writes MCP configuration JSON to the right location for each supported IDE, injects tool-usage instructions into agent instruction files (CLAUDE.md, Cursor rules, Windsurf rules, JetBrains guidelines, GitHub Copilot instructions), patches `.gitignore` to exclude the `.mimirs/` index directory, and ensures a valid config file exists. The reference for adding a new IDE target or debugging init failures.\n\n## Dependencies and consumers\n"
+          "byteSize": 9077,
+          "firstLines": "# CLI Setup & IDE Integration\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThe CLI Setup module is one file (`src/cli/setup.ts`) that handles first-run integration: writing `.mimirs/config.json` if absent, patching `.gitignore`, dropping per-IDE rule files (CLAUDE.md, Cursor `.mdc`, Windsurf trigger rule, Junie guideline, Copilot instructions), and upserting MCP server entries into the JSON config files those IDEs read. It is the touchpoint between mimirs and the agent harness.\n\n## Dependencies and consumers\n"
         },
         {
           "path": "wiki/communities/community-detection.md",
-          "byteSize": 9244,
-          "firstLines": "# Community Detection & Discovery\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nThis community owns the two files that translate a raw file-level import graph into a set of named `DiscoveryModule` clusters that all downstream wiki phases consume. `src/wiki/community-detection.ts` implements the Louvain clustering algorithms and dispatch-directory detection. `src/wiki/discovery.ts` orchestrates the full phase-1 discovery: it pulls the graph from the DB, calls the appropriate clustering function, attaches module metadata, and returns a `DiscoveryResult`. The output of this community is the foundational data structure every other wiki stage reads.\n\n## How it works\n"
+          "byteSize": 14071,
+          "firstLines": "# Community Detection & Discovery\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nTwo files own the wiki's \"what are this codebase's modules?\" question. `src/wiki/community-detection.ts` is a graphology + Louvain wrapper that runs both file-level and symbol-level clustering with project-specific guardrails. `src/wiki/discovery.ts` is the orchestrator that pulls the file graph from the DB, picks a clustering strategy, applies fallbacks, and packages everything into a `DiscoveryResult` for the rest of the wiki pipeline. The output of these two files is what every later phase (categorization, synthesis, page writing) reads.\n\n## Entry points\n"
         },
         {
           "path": "wiki/communities/config-embeddings.md",
-          "byteSize": 10496,
-          "firstLines": "# Config & Embeddings\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nThe Config & Embeddings community owns two tightly coupled concerns: loading and validating the project configuration from disk, and running the local transformer model that produces embedding vectors. Nearly every other mimirs community depends on at least one of these files. Understanding them is the prerequisite for changing model behavior, tuning index parameters, or debugging embedding errors.\n\n## How it works\n"
+          "byteSize": 11926,
+          "firstLines": "# Config & Embeddings\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThe Config & Embeddings community owns two tightly coupled concerns: loading and validating the project configuration from disk, and running the local transformer model that produces embedding vectors. Nearly every other mimirs community depends on at least one of these files — anything that calls `embed()`, `getEmbedder()`, or `loadConfig()` ultimately lands here.\n\n## How it works\n"
         },
         {
           "path": "wiki/communities/conversation-server.md",
-          "byteSize": 9049,
-          "firstLines": "# Conversation Indexer & MCP Server\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nThis community covers two related concerns: the JSONL conversation parsing and indexing pipeline (`src/conversation/parser.ts` and `src/conversation/indexer.ts`) and the MCP server bootstrap that wires all tool groups together (`src/server/index.ts`). The conversation subsystem ingests Claude Code session transcripts so past decisions are searchable. The server layer connects the entire mimirs capability set to an AI agent via the Model Context Protocol.\n\n## Per-file breakdown\n"
+          "byteSize": 12564,
+          "firstLines": "# Conversation Indexer & MCP Server\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThree files cooperate to ingest Claude Code transcripts and to bootstrap the MCP server: `src/conversation/parser.ts` discovers and parses JSONL session files; `src/conversation/indexer.ts` chunks, embeds, and tails them into `RagDB`; `src/server/index.ts` is the stdio MCP entry point that wires every tool group together and runs background indexing.\n\n## Per-file breakdown\n"
         },
         {
           "path": "wiki/communities/db-layer.md",
-          "byteSize": 16815,
-          "firstLines": "# Database Layer\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nThe Database Layer is the SQLite persistence core of mimirs. Every read and write — chunks, embeddings, annotations, conversation turns, checkpoints, git history, and the import graph — flows through this community. Understanding it is a prerequisite for touching indexing, search, or any feature that persists state.\n\n## Per-file breakdown\n"
+          "byteSize": 22027,
+          "firstLines": "# Database Layer\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThe database layer is the persistence floor under every other subsystem in mimirs. It owns the SQLite schema, the `bun:sqlite` extension loader (sqlite-vec), and a per-domain set of read/write modules — chunks, files, the import graph, conversation history, checkpoints, annotations, query analytics, and git commit history. The single facade class `RagDB` in `src/db/index.ts` opens the database, runs schema bootstrap and migrations, and exposes thin methods that delegate to the per-file operation modules. Every other community in the codebase (search, indexing, wiki, MCP tools, CLI) reaches storage through that facade.\n\n## Per-file breakdown\n"
         },
         {
           "path": "wiki/communities/git-indexer-progress.md",
-          "byteSize": 7793,
-          "firstLines": "# Git History Indexer & CLI Progress\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nTwo small but load-bearing files support every long-running index operation in mimirs. `src/git/indexer.ts` ingests git commit history into the RAG database — parsing the log, fetching per-commit file stats, batch-embedding commit messages alongside their changed-file context, and handling force-push recovery. `src/cli/progress.ts` provides the two progress callback styles (verbose and quiet) that any command emitting `onProgress` messages can use. Every `mimirs index` run uses both.\n\n## How it works\n"
+          "byteSize": 7971,
+          "firstLines": "# Git History Indexer & CLI Progress\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nTwo small files that always run together: `src/git/indexer.ts` ingests commit history into the DB, and `src/cli/progress.ts` is the progress reporter every long-running indexing operation calls back through.\n\n## How it works\n"
         },
         {
-          "path": "wiki/communities/graph-watcher.md",
-          "byteSize": 8417,
-          "firstLines": "# Import Graph & File Watcher\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nThis community covers two tightly coupled concerns: `src/graph/resolver.ts` resolves import edges between indexed files and can render the full dependency graph as text or JSON, and `src/indexing/watcher.ts` watches the filesystem for changes and triggers incremental re-indexing and import resolution. Together they keep the DB's import graph accurate as the codebase evolves, both at initial index time and during live development.\n\n## How it works\n"
-        },
-        {
-          "path": "wiki/communities/indexing-pipeline.md",
-          "byteSize": 12154,
-          "firstLines": "# Indexing Pipeline\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nThe indexing pipeline turns project source files into a searchable vector database. It spans four files: `src/indexing/chunker.ts` (splitting text into chunks), `src/indexing/parse.ts` (file-to-content conversion), `src/indexing/indexer.ts` (orchestration and DB upsert), and `src/utils/dir-guard.ts` (safety guard against accidentally indexing system directories).\n\n## Per-file breakdown\n"
+          "path": "wiki/communities/indexing-runtime.md",
+          "byteSize": 22216,
+          "firstLines": "# Indexing runtime\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThe indexing runtime is the loop that turns a directory of files into searchable rows in `RagDB`. Six files cooperate: `src/utils/dir-guard.ts` refuses pathological roots; `src/indexing/parse.ts` produces a `ParsedFile` with a virtual extension; `src/indexing/chunker.ts` splits the text via `@winci/bun-chunk` (AST) or a heuristic fallback; `src/indexing/indexer.ts` hashes, embeds, writes, and reconciles parent groups; `src/graph/resolver.ts` resolves import specifiers to indexed file IDs and renders the project map; `src/indexing/watcher.ts` debounces filesystem events and serializes re-indexes. Together they own every byte that moves between disk and the DB at index time.\n\n## Entry points\n"
         },
         {
           "path": "wiki/communities/mcp-tools.md",
-          "byteSize": 13206,
-          "firstLines": "# MCP Tool Handlers\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nThe MCP Tool Handlers community is the adapter layer between the MCP protocol and every domain capability mimirs exposes. Ten files each register one logical group of tools against the MCP server, and a shared barrel (`src/tools/index.ts`) wires them all together. Nothing in this layer owns business logic — every handler resolves a project directory, hands off to a DB method or business-logic module, and formats the result as MCP text content.\n\n## Per-file breakdown\n"
+          "byteSize": 19419,
+          "firstLines": "# MCP Tool Handlers\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThe MCP tool layer is the surface that an LLM client (Claude Code, Cursor, anything speaking the Model Context Protocol) actually calls. Every public capability of mimirs — search, indexing, graph queries, checkpoints, annotations, analytics, git context, server info, wiki generation — is exposed by exactly one `register*Tools` function in `src/tools/`. A single coordinator, `registerAllTools` in `src/tools/index.ts`, wires them all to a fresh `McpServer` instance during server startup. The community is intentionally shallow: each file owns one thematic group, holds no state, and delegates the real work to `RagDB`, the embeddings layer, and the wiki/graph/indexing subsystems.\n\n## Per-file breakdown\n"
         },
         {
           "path": "wiki/communities/search-runtime.md",
-          "byteSize": 12575,
-          "firstLines": "# Search Runtime\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nThe Search Runtime community is the hybrid retrieval engine at the heart of mimirs. It merges vector (semantic) and BM25 (keyword) results, applies a layered stack of ranking boosts, and provides the benchmark and eval harnesses used to measure and improve retrieval quality. Every MCP search tool call and CLI search command flows through this community before hitting the database.\n\n## Per-file breakdown\n"
+          "byteSize": 17914,
+          "firstLines": "# Search Runtime\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThe search runtime is the query-time engine that turns a natural-language string into a ranked list of files (or chunks). It owns the hybrid vector-plus-FTS merge, the symbol expansion path, the path/filename/graph boost stack, the parent-chunk grouping logic, and the benchmark and eval harnesses that measure all of it. It depends on the database layer for the underlying vec/FTS queries and on the embeddings module for the query embedding; everything else — scoring, deduplication, demotion of generated and test files, doc expansion, analytics logging — lives here.\n\n## Per-file breakdown\n"
         },
         {
           "path": "wiki/communities/search-tool.md",
-          "byteSize": 4805,
-          "firstLines": "# Search MCP Tool\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nThe Search MCP Tool community is a single-file adapter between the MCP protocol and the Search Runtime community. It registers four search-related MCP tools — `search`, `read_relevant`, `search_symbols`, and `write_relevant` — by wiring their schemas and handlers to `src/search/hybrid.ts` and the DB layer. The file contains no retrieval logic of its own; its job is input validation, filter construction, and response formatting.\n\n## Dependencies and consumers\n"
+          "byteSize": 6610,
+          "firstLines": "# Search MCP Tool\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThe Search MCP Tool community is a single-file adapter (`src/tools/search.ts`) that registers four MCP tool handlers — `search`, `read_relevant`, `search_symbols`, and `write_relevant` — against an `McpServer` instance. It owns no algorithm; the heavy lifting lives in the [Search Runtime](search-runtime.md). Its job is to translate MCP tool calls into `search`, `searchChunks`, or `searchSymbols` invocations and to format the textual response the agent sees.\n\n## Dependencies and consumers\n"
         },
         {
-          "path": "wiki/communities/wiki-orchestrator.md",
-          "byteSize": 16293,
-          "firstLines": "# Wiki Orchestrator & MCP Tools\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nThe wiki orchestrator community is the machinery that turns a `generate_wiki()` MCP call into a structured page payload. It spans five files: the MCP tool registration layer (`src/tools/wiki-tools.ts`), the barrel that composes the wiki pipeline phases (`src/wiki/index.ts`), the zero-LLM linter (`src/wiki/lint-page.ts`), the curated section-shape catalog (`src/wiki/section-catalog.ts`), and the append-only update log writer (`src/wiki/update-log.ts`). Together they orchestrate the six-phase wiki generation pipeline from the MCP side without owning any of the core algorithmic logic — that lives in the [Wiki Pipeline — Types & Internals](wiki-pipeline-internals.md) community.\n\n## Per-file breakdown\n"
+          "path": "wiki/communities/wiki-orchestration.md",
+          "byteSize": 19882,
+          "firstLines": "# Wiki orchestration\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThe wiki orchestration community is the user-visible surface of the Louvain-led wiki pipeline. It owns the public functions that callers reach when they run, resume, lint, or diff a wiki regeneration: `runWikiBundling`, `runWikiFinalPlanning`, `getPagePayload`, the synthesis prompt rendering and validation helpers, the section catalog used to seed page shapes, the cheap pattern-based linter, and the structural diff that grounds the update log narrative. Six files cover this surface — three of them (`src/wiki/index.ts`, `src/wiki/lint-page.ts`, `src/wiki/update-log.ts`, `src/tools/wiki-tools.ts`) are documented in their own sub-pages because they carry enough internal complexity to warrant a drill-down. This page covers the architecture-level prose plus inline coverage of the smaller members.\n\n## Entry points\n"
+        },
+        {
+          "path": "wiki/communities/wiki-orchestration/index.md",
+          "byteSize": 8769,
+          "firstLines": "# src/wiki/index.ts\n\n> [Architecture](../../architecture.md) › [Wiki orchestration](../wiki-orchestration.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\n## Role\n\n`src/wiki/index.ts` is the package façade for the wiki pipeline — the single entry point every external caller (the `src/tools/wiki-tools.ts` MCP layer, `scripts/regen-meta.ts`) imports from. It holds two execution drivers (`runWikiBundling` for phases 1–3, `runWikiFinalPlanning` for phases 4–5), one payload helper (`getPagePayload`), and a curated list of re-exports that pull synthesis helpers, the catalog, and shared types up from the per-phase implementation files. It depends on `runDiscovery` (`src/wiki/discovery.ts`), `runCategorization` (`src/wiki/categorization.ts`), `buildPageTree` (`src/wiki/page-tree.ts`), `prefetchContent` (`src/wiki/content-prefetch.ts`), `buildPagePayload` (`src/wiki/page-payload.ts`), and `buildCommunityBundles` (`src/wiki/community-synthesis.ts`).\n"
+        },
+        {
+          "path": "wiki/communities/wiki-orchestration/lint-page.md",
+          "byteSize": 9723,
+          "firstLines": "# src/wiki/lint-page.ts\n\n> [Architecture](../../architecture.md) › [Wiki orchestration](../wiki-orchestration.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\n## Role\n\n`src/wiki/lint-page.ts` is the zero-LLM, zero-AST, pattern-based lint that the wiki orchestration community runs over every generated page to catch the drifts that show up most often: fabricated file paths, stale constant citations, missing-but-expected coverage, line-range citations that drifted away from their enclosing symbol, hedge words, and Mermaid diagrams that silently break (reserved-keyword node IDs, unquoted labels with punctuation, HTML in participant aliases). It is consumed by `src/tools/wiki-tools.ts` to back the `wiki_lint_page` and `wiki_lint_batch` MCP tools, and by `tests/wiki/lint-page.test.ts` for regression coverage. The file leans only on plain string and regex operations — no DB, no filesystem — so it runs in milliseconds across the whole wiki.\n"
+        },
+        {
+          "path": "wiki/communities/wiki-orchestration/update-log.md",
+          "byteSize": 8718,
+          "firstLines": "# src/wiki/update-log.ts\n\n> [Architecture](../../architecture.md) › [Wiki orchestration](../wiki-orchestration.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\n## Role\n\n`src/wiki/update-log.ts` owns the changelog file `_update-log.md` at the wiki root and the matching pre-regen snapshot JSON under `wiki/_meta/`. It writes the four entry shapes the orchestration pipeline emits — full-init, incremental queued, incremental fallback, and the post-writer narrative — in a way that keeps the file changelog-style (newest entry directly under the header) and that lets a phase-2 LLM-produced narrative slot under the matching phase-1 stub via an HTML comment marker. The only project dependency is `src/wiki/types.ts` (for `PageManifest` and `PreRegenSnapshot`); the only consumers are `src/tools/wiki-tools.ts` (which calls every export from the wiki-tool surface) and the corresponding test file.\n"
+        },
+        {
+          "path": "wiki/communities/wiki-orchestration/wiki-tools.md",
+          "byteSize": 9146,
+          "firstLines": "# src/tools/wiki-tools.ts\n\n> [Architecture](../../architecture.md) › [Wiki orchestration](../wiki-orchestration.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\n## Role\n\nThis file is the MCP-tool surface of the wiki orchestration community. It registers eight server tools (`generate_wiki`, `write_synthesis`, `write_synthesis_batch`, `wiki_lint_page`, `wiki_lint_batch`, `wiki_rewrite_page`, `wiki_finalize_log`, `wiki_finalize_log_apply`) on top of the underlying engine in `src/wiki/index.ts`, and renders every payload — page, synthesis, finalize, resume, incremental, lint — into the markdown text the calling agent reads. Three exports are public; the rest are response-renderer helpers and validators that lean on `src/wiki/lint-page.ts`, `src/wiki/section-catalog.ts`, `src/wiki/staleness.ts`, `src/wiki/diff-page.ts`, and `src/wiki/update-log.ts`.\n"
         },
         {
           "path": "wiki/communities/wiki-pipeline-internals.md",
-          "byteSize": 18889,
-          "firstLines": "# Wiki Pipeline — Types & Internals\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nThis community owns the data model, algorithms, and helper modules that power mimirs' wiki generation pipeline. It spans eleven files covering type contracts (`src/wiki/types.ts`, `src/db/types.ts`), PageRank scoring (`src/wiki/pagerank.ts`), community bundling and split logic (`src/wiki/community-synthesis.ts`), doc isolation (`src/wiki/isolate-docs.ts`), categorization (`src/wiki/categorization.ts`), staleness detection (`src/wiki/staleness.ts`), page tree construction (`src/wiki/page-tree.ts`), content prefetching (`src/wiki/content-prefetch.ts`), page payload assembly (`src/wiki/page-payload.ts`), and semantic query templates (`src/wiki/semantic-queries.ts`). Read this before touching any wiki generation step.\n\n## Per-file breakdown\n"
+          "byteSize": 29670,
+          "firstLines": "# Wiki Pipeline — Types & Internals\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThis community is the algorithmic core of wiki generation: every type contract that flows between phases, the PageRank scorer that orders bundles, the bundle builder that pre-gathers everything an LLM needs to plan a page, the page-tree assembler, the staleness classifier, the per-payload payload assembler, and the kind-specific semantic-query templates. The orchestration shell lives in [Wiki orchestration](wiki-orchestration.md); this is what it calls.\n\n## Per-file breakdown\n"
         },
         {
           "path": "wiki/communities/wiki-pipeline-internals/community-synthesis.md",
-          "byteSize": 8136,
-          "firstLines": "# src/wiki/community-synthesis.ts\n\n> [Architecture](../../architecture.md) › [Wiki Pipeline — Types & Internals](../wiki-pipeline-internals.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\n## Role\n\n`src/wiki/community-synthesis.ts` owns everything between \"here is a list of community member files\" and \"here is the bundle the LLM reads to name and structure the community page.\" It builds community bundles deterministically from the DB and file graph, classifies members as big or small for split decisions, computes the required sections whose predicates have fired, and renders the synthesis prompt. It depends on `src/wiki/pagerank.ts` for intra-community ranking, `src/wiki/isolate-docs.ts` for nearby prose, `src/wiki/section-catalog.ts` for section metadata, and `src/wiki/types.ts` for all data shapes.\n"
+          "byteSize": 9690,
+          "firstLines": "# src/wiki/community-synthesis.ts\n\n> [Architecture](../../architecture.md) › [Wiki Pipeline — Types & Internals](../wiki-pipeline-internals.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\n## Role\n\n`src/wiki/community-synthesis.ts` is Phase 3 of the wiki pipeline: it turns a `DiscoveryResult` plus a `ClassifiedInventory` into a deterministic `CommunityBundle[]`, one bundle per community. The file owns every threshold and cap that shapes a synthesis prompt — exports, tunables, member previews, nearby docs, recent commits — and the helpers that decide whether a community warrants sub-pages. It leans on `src/wiki/pagerank.ts` for per-community ranking, `src/wiki/isolate-docs.ts` for nearby-doc attachment, `src/wiki/section-catalog.ts` for required-section lookup, and `src/db/index.ts` for the batched DB queries that feed every bundle in one pass.\n"
         },
         {
           "path": "wiki/communities/wiki-pipeline-internals/content-prefetch.md",
-          "byteSize": 7089,
-          "firstLines": "# src/wiki/content-prefetch.ts\n\n> [Architecture](../../architecture.md) › [Wiki Pipeline — Types & Internals](../wiki-pipeline-internals.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\n`src/wiki/content-prefetch.ts` is the bundle-assembly and semantic-query pre-run layer for the wiki generation pipeline. It takes the community bundles produced by earlier pipeline phases and wires them into the per-page content cache that `generate_wiki(page: N)` serves to writer agents. It also runs semantic search queries in advance so each writer's first `read_relevant` call is already answered before the agent starts.\n\n## Role\n"
+          "byteSize": 10595,
+          "firstLines": "# src/wiki/content-prefetch.ts\n\n> [Architecture](../../architecture.md) › [Wiki Pipeline — Types & Internals](../wiki-pipeline-internals.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\n## Role\n\n`src/wiki/content-prefetch.ts` is the phase-5 worker of the wiki pipeline: it takes the page manifest produced by `runWikiFinalPlanning`, the per-community bundles built earlier in synthesis, and the raw discovery/classification artifacts, and folds them into a `ContentCache` keyed by wiki path. The cache is what `getPagePayload` later reads from to return a focused payload to the writer agent. The file owns three jobs: (1) build the architecture and getting-started bundles that depend on the final synthesis output, (2) scope a community bundle down to the subset of files belonging to a `community-file` sub-page, and (3) pre-run the semantic queries each writer would otherwise issue as their first `read_relevant` call. It depends on `src/wiki/community-detection.ts` for `isTestOrBench`, `src/wiki/pagerank.ts` for `computePageRank`, `src/wiki/semantic-queries.ts` for `semanticQueriesFor`, `src/search/hybrid.ts` for `searchChunks`, and the type module `src/wiki/types.ts`.\n"
         },
         {
           "path": "wiki/communities/wiki-pipeline-internals/src-db-types-ts.md",
-          "byteSize": 5096,
-          "firstLines": "# src/db/types.ts\n\n> [Architecture](../../architecture.md) › [Wiki Pipeline — Types & Internals](../wiki-pipeline-internals.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\n## Role\n\n`src/db/types.ts` defines the raw database row shapes and query result interfaces that the DB layer returns and the wiki pipeline consumes. It is a pure type file — no logic, no imports — that acts as the boundary contract between SQLite persistence and everything above it.\n"
+          "byteSize": 7185,
+          "firstLines": "# src/db/types.ts\n\n> [Architecture](../../architecture.md) › [Wiki Pipeline — Types & Internals](../wiki-pipeline-internals.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\n## Role\n\n`src/db/types.ts` is the typed contract between the SQLite layer (`src/db/index.ts`) and every consumer that reads from it — search handlers, the wiki categorizer, and the wiki's internal type module. It declares twelve flat interfaces (no enums, no helper types, no defaults) that together describe the row and search-result shapes the database returns. The file is pure type declarations: no runtime code, no imports, no exports beyond the interfaces themselves. Consumers either map a SQLite row into one of these shapes inside `src/db/index.ts` or accept a typed result downstream.\n"
         },
         {
           "path": "wiki/communities/wiki-pipeline-internals/src-wiki-types-ts.md",
-          "byteSize": 8525,
-          "firstLines": "# src/wiki/types.ts\n\n> [Architecture](../../architecture.md) › [Wiki Pipeline — Types & Internals](../wiki-pipeline-internals.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\n## Role\n\n`src/wiki/types.ts` is the shared type contract for the entire wiki generation pipeline. It defines every interface that crosses a phase boundary — from discovery output through categorization, community bundling, synthesis payloads, the page manifest, and the final per-page payload handed to writer agents. Every other wiki module imports from this file; it has no runtime logic of its own.\n"
+          "byteSize": 11433,
+          "firstLines": "# src/wiki/types.ts\n\n> [Architecture](../../architecture.md) › [Wiki Pipeline — Types & Internals](../wiki-pipeline-internals.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\n## Role\n\n`src/wiki/types.ts` is the data contract that every other wiki-pipeline file imports. It defines no logic — only `interface`s and `type` aliases that describe phase outputs (`DiscoveryResult`, `ClassifiedInventory`, `CommunityBundle`, `PageManifest`), LLM hand-offs (`SynthesisPayload`, `PagePayload`), per-page caches (`PageContentCache`, `ContentCache`), and update-log artefacts (`PreRegenSnapshot`, `PageDiff`). The only external dependency is `SymbolResult` re-imported from `src/db/types.ts`. Every member of this community plus the orchestrator barrel and MCP tool layer depends on this file — it is the busiest interior import in the wiki package.\n"
         },
         {
           "path": "wiki/data-flows.md",
-          "byteSize": 12985,
-          "firstLines": "# Data flows\n\n> [Architecture](architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\n## Overview\n\nMimirs has four primary triggers, each with its own call path through the community stack. The `search` / `read_relevant` MCP tool call is the most frequent: an agent issues a query, the [Search MCP Tool](communities/search-tool.md) receives it, the [Search Runtime](communities/search-runtime.md) embeds and merges vector + FTS results, and ranked hits come back over the wire. File indexing runs on two triggers: the `index_files` MCP tool call (batch, invoked by agents or the CLI `index` subcommand) and the [Import Graph & File Watcher](communities/graph-watcher.md) (incremental, running in the background during `mimirs watch`). A fourth flow — wiki generation — is triggered by `generate_wiki()` and fans out through [Community Detection & Discovery](communities/community-detection.md) and the [Wiki Pipeline — Types & Internals](communities/wiki-pipeline-internals.md) to produce page payloads.\n"
+          "byteSize": 12639,
+          "firstLines": "# Data flows\n\n> [Architecture](architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\n## Overview\n\nMimirs has three primary runtime flows. **Search** (the `search` and `read_relevant` MCP tools) is the highest-frequency path — every agent query enters here. **Indexing** runs in two modes: batch on `index_files` and incremental via the file watcher. **Wiki generation** is the heaviest flow, a multi-phase pipeline triggered by `generate_wiki()` that fans out across community detection, content prefetch, and per-page payload assembly. The architecture page shows where these communities live; this page shows what runs in what order when each flow fires.\n"
         },
         {
           "path": "wiki/getting-started.md",
-          "byteSize": 5086,
-          "firstLines": "# Getting started\n\n> [Architecture](architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\n## What this is\n\nMimirs is a local-first, persistent project memory layer for AI coding agents. It runs as an MCP server inside your project directory, indexing your code with AST-aware chunking (tree-sitter grammars across 24 languages), embedding each chunk in-process using all-MiniLM-L6-v2 via Transformers.js and ONNX, and storing everything in a single SQLite file under `.mimirs/`. When your agent issues a `search` or `read_relevant` call, mimirs blends vector similarity and BM25, boosts results by dependency-graph centrality, and returns exact line ranges — not file paths. It also tails Claude Code's conversation transcripts in real time, so checkpoints and past decisions remain searchable across sessions. No API keys, no cloud, no daemon: Bun and SQLite are the only runtime requirements. On one real codebase, switching from raw grep-and-read to mimirs cut prompt token usage from 380K to 91K tokens per query — a 76% reduction.\n"
+          "byteSize": 7080,
+          "firstLines": "# Getting started\n\n> [Architecture](architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\n## What this is\n\nMimirs is a local-first persistent memory layer for AI coding agents. It runs as an MCP server inside your project directory, indexing source files with AST-aware chunking (tree-sitter grammars across 24 languages via `@winci/bun-chunk`), embedding each chunk in-process with all-MiniLM-L6-v2 through `@huggingface/transformers` and ONNX, and storing everything in a single SQLite file under `.mimirs/`. When the agent issues a `search` or `read_relevant` call, mimirs blends vector similarity with BM25, boosts results by dependency-graph centrality and path heuristics, and returns ranked chunks with exact line ranges (`path:start-end`) instead of whole files. It also tails Claude Code's JSONL transcripts in real time so checkpoints and past discussions remain searchable across sessions. There are no API keys, no cloud, no daemon, and no Docker — Bun and SQLite are the only runtime requirements. On one real codebase the README cites a drop from roughly 380K tokens and 12 seconds per prompt to 91K tokens and 3 seconds — a 76% reduction — once retrieval moved from raw grep-and-read to mimirs.\n"
         },
         {
           "path": "wiki/index.md",
-          "byteSize": 2975,
-          "firstLines": "# mimirs\n\nLocal-first MCP server that gives AI coding assistants a persistent, searchable memory of your codebase: AST-aware chunking, hybrid vector+BM25 retrieval, and a wiki generation pipeline.\n\n## Quick Links\n\n- [Getting Started](getting-started.md) — install, first run, project layout\n- [Architecture](architecture.md) — system map, hubs, design decisions\n- [Data Flows](data-flows.md) — indexing, search, watcher, wiki generation end-to-end\n"
+          "byteSize": 2847,
+          "firstLines": "# mimirs\n\nLocal-first MCP server that gives AI coding assistants a persistent, searchable memory of your codebase: AST-aware chunking, hybrid vector+BM25 retrieval, and a wiki generation pipeline.\n\n## Quick Links\n\n- [Getting Started](getting-started.md) — install, first run, project layout\n- [Architecture](architecture.md) — system map, hubs, design decisions\n- [Data Flows](data-flows.md) — search, indexing, and wiki generation end-to-end\n"
         }
       ]
     },
@@ -9149,13 +9236,13 @@
         "query": "cross-cutting dependencies and shared hubs",
         "results": [
           {
-            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
-            "startLine": 221,
-            "endLine": 227,
+            "path": "/Users/winci/repos/mimirs/wiki/_update-log.md",
+            "startLine": null,
+            "endLine": null,
             "entityName": null,
-            "chunkType": "block",
-            "score": 0.5174623476754832,
-            "snippet": "\n/**\n * Per-file cap for `consumersByFile` / `dependenciesByFile` lists. A hub\n * file can have 50+ importers; shipping the full list inflates `_bundles.json`\n * (and every cached payload reads) for data the renderer slices to 8 anyway.\n * 30 leaves headroom for sub-page scoping (which unions per-file values into\n * a scoped `externalConsumers`) without truncating real fan-in coverage."
+            "chunkType": null,
+            "score": 0.5023711610095973,
+            "snippet": "/search/usages.ts`, `src/conversation/parser.ts`, `src/indexing/chunker.ts`, `src/graph/resolver.ts`, and the entry-points list enumerates seven concrete `benchmarks/*.ts` files. Triggered by the Louvain re-cluster which changed which files anchor each community.\n- **`wiki/data-flows.md`** — Restructured into three named flows (Search and `read_relevant`, Indexing batch+incremental, Wiki generation), each with its own sequenceDiagram and numbered walkthrough; the prior `Cross-cutting dependencies` section a"
           },
           {
             "path": "/Users/winci/repos/mimirs/src/wiki/sections/cross-cutting-inventory.md",
@@ -9183,33 +9270,6 @@
             "chunkType": null,
             "score": 0.3982446140536232,
             "snippet": "## Hubs\n\nFiles that many others depend on — changes here ripple widely.\n\n| File | Fan-in | Fan-out | What it exposes |\n|------|--------|---------|-----------------|\n| `<path>` | <n> | <n> | <bridges list or short summary> |\n\n<One-paragraph call-out: name the top hub and why it is architecturally\ncentral.>\n\n<!-- Reuse section: cross-cutting-inventory. Only keep if prefetched"
-          },
-          {
-            "path": "/Users/winci/repos/mimirs/src/wiki/exemplars/architecture.md",
-            "startLine": 89,
-            "endLine": 97,
-            "entityName": null,
-            "chunkType": null,
-            "score": 0.38443045357739214,
-            "snippet": "## Modules\n\n| Module | Files | Exports | Fan-in | Fan-out | Entry file |\n|--------|-------|---------|--------|---------|------------|\n| [<Name>](modules/<name>/index.md) | <n> | <n> | <n> | <n> | `<path>` |\n\n<!-- Reuse section: hub-analysis. Only keep if prefetched hubs list is\n     non-empty. -->\n\n"
-          },
-          {
-            "path": "/Users/winci/repos/mimirs/src/wiki/exemplars/architecture.md",
-            "startLine": 34,
-            "endLine": 47,
-            "entityName": null,
-            "chunkType": null,
-            "score": 0.3790165762111218,
-            "snippet": ", shared utils) do NOT appear\n     in this diagram at all — not even as edgeless nodes. They get their\n     own small Mermaid block under \"## Cross-cutting dependencies\" further\n     down. If the real dependency graph has more than 18 edges, draw a\n     slice (e.g. \"control flow, excluding cross-cutters\") and name the\n     slice in the caption. -->\n\n```mermaid\nflowchart TD\n  subgraph Layer1[\"<Layer 1 name>\"]\n    entry_node[\"<entry file or external trigger>\"]\n  end"
-          },
-          {
-            "path": "/Users/winci/repos/mimirs/src/wiki/exemplars/architecture.md",
-            "startLine": 72,
-            "endLine": 88,
-            "entityName": null,
-            "chunkType": null,
-            "score": 0.3764625970315699,
-            "snippet": "## Cross-cutting dependencies\n\n```mermaid\nflowchart LR\n  <crosscutter_a>[\"<crosscutter name>\"]\n  <crosscutter_b>[\"<crosscutter name>\"]\n  <crosscutter_a> --> <consumer_1>\n  <crosscutter_a> --> <consumer_2>\n  <crosscutter_b> --> <consumer_3>\n```\n\n<One sentence naming why these live outside the main map — e.g. \"used"
           }
         ]
       },
@@ -9224,6 +9284,15 @@
             "chunkType": "class",
             "score": 0.6604229340841181,
             "snippet": "\n  // ── Annotation operations ─────────────────────────────────────\n"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/src/wiki/community-synthesis.ts",
+            "startLine": 30,
+            "endLine": 43,
+            "entityName": "DEPTH_PROFILE",
+            "chunkType": "variable",
+            "score": 0.5092023775588026,
+            "snippet": " */\nconst DEPTH_PROFILE = {\n  perFile: { minFiles: 3, minExports: 5 },\n  flow: { minFiles: 2 },\n  internals: { minLoc: 400, minTunables: 8, minFiles: 10 },\n  depGraph: { minEdges: 3 },\n  /**\n   * Deep-community profile: a bundle large enough that the default 5-section\n   * template shallows out. When either threshold fires, `design-rationale`,\n   * `trade-offs`, and `common-gotchas` are added so the writer has room to\n   * explain the shape of the thing rather than just enumerate its parts.\n   */"
           },
           {
             "path": "/Users/winci/repos/mimirs/src/wiki/discovery.ts",
@@ -9251,24 +9320,6 @@
             "chunkType": null,
             "score": 0.37496219656578345,
             "snippet": "## Cross-Cutting Symbols\n\nSymbols referenced from 3+ modules. These are the project's shared\nvocabulary.\n\n| Symbol | Type | Defined in | Used in |\n|--------|------|------------|---------|\n| `<Name>` | <type> | `<path>` | `<mod>`, `<mod>`, `<mod>` (+N more) |\n\n"
-          },
-          {
-            "path": "/Users/winci/repos/mimirs/src/wiki/exemplars/conventions.md",
-            "startLine": 41,
-            "endLine": 45,
-            "entityName": null,
-            "chunkType": null,
-            "score": 0.36247828293609724,
-            "snippet": "## Common Patterns\n\n<!-- adapt: include only patterns that repeat across ≥3 modules. Skip\n     if nothing qualifies. -->\n\n"
-          },
-          {
-            "path": "/Users/winci/repos/mimirs/src/wiki/exemplars/getting-started.md",
-            "startLine": 52,
-            "endLine": 60,
-            "entityName": null,
-            "chunkType": null,
-            "score": 0.3596465020810765,
-            "snippet": "## Key Concepts\n\n<!-- adapt: 3-5 domain concepts a newcomer should understand first.\n     Pull from cross-cutting symbols and module names. Skip this section\n     if the domain is self-evident from the module names. -->\n\n- **<Concept>** — <1-sentence definition, linking to the primary page\n  where it's documented>.\n\n"
           }
         ]
       }
@@ -9733,7 +9784,7 @@
       "topHubs": [
         {
           "path": "src/embeddings/embed.ts",
-          "pageRank": 0.10835027046893017,
+          "pageRank": 0.10800483842837025,
           "fanIn": 77,
           "fanOut": 0,
           "bridges": [],
@@ -9749,7 +9800,7 @@
         },
         {
           "path": "src/wiki/types.ts",
-          "pageRank": 0.10214122661257057,
+          "pageRank": 0.10181559623763996,
           "fanIn": 95,
           "fanOut": 1,
           "bridges": [],
@@ -9760,7 +9811,7 @@
         },
         {
           "path": "tests/helpers.ts",
-          "pageRank": 0.08297740323326683,
+          "pageRank": 0.0827128631591969,
           "fanIn": 67,
           "fanOut": 0,
           "bridges": [],
@@ -9768,7 +9819,7 @@
         },
         {
           "path": "src/utils/log.ts",
-          "pageRank": 0.07124817091935368,
+          "pageRank": 0.07102102378892171,
           "fanIn": 27,
           "fanOut": 0,
           "bridges": [],
@@ -9784,7 +9835,7 @@
         },
         {
           "path": "src/db/index.ts",
-          "pageRank": 0.04922387418245353,
+          "pageRank": 0.049066944260306,
           "fanIn": 59,
           "fanOut": 10,
           "bridges": [
@@ -9803,7 +9854,7 @@
         },
         {
           "path": "src/config/index.ts",
-          "pageRank": 0.03895852988007147,
+          "pageRank": 0.038834327099307085,
           "fanIn": 42,
           "fanOut": 4,
           "bridges": [],
@@ -9819,7 +9870,7 @@
         },
         {
           "path": "src/search/usages.ts",
-          "pageRank": 0.03240578622160917,
+          "pageRank": 0.03230247298034564,
           "fanIn": 4,
           "fanOut": 0,
           "bridges": [],
@@ -9829,7 +9880,7 @@
         },
         {
           "path": "src/conversation/parser.ts",
-          "pageRank": 0.02315410535737929,
+          "pageRank": 0.023080287805761712,
           "fanIn": 11,
           "fanOut": 0,
           "bridges": [
@@ -9842,7 +9893,7 @@
         },
         {
           "path": "src/search/hybrid.ts",
-          "pageRank": 0.022270574670030165,
+          "pageRank": 0.0221995740164895,
           "fanIn": 21,
           "fanOut": 3,
           "bridges": [],
@@ -9854,7 +9905,7 @@
         },
         {
           "path": "src/indexing/chunker.ts",
-          "pageRank": 0.01978525690325548,
+          "pageRank": 0.019722180281165937,
           "fanIn": 17,
           "fanOut": 1,
           "bridges": [],
@@ -9864,7 +9915,7 @@
         },
         {
           "path": "src/graph/resolver.ts",
-          "pageRank": 0.01823579883330483,
+          "pageRank": 0.018177661917265223,
           "fanIn": 16,
           "fanOut": 1,
           "bridges": [],
@@ -10352,123 +10403,138 @@
         },
         {
           "path": "wiki/_update-log.md",
-          "byteSize": 348,
-          "firstLines": "# Wiki Update Log\n\nAppend-only log of wiki generation and incremental updates. Newest entries at the bottom. Emitted deterministically from the staleness report — not LLM-generated.\n\n## 2026-04-26 07:05 UTC — Full initialization (`79e963f`)\n\n22 pages generated (1 architecture, 15 community, 4 community-file, 1 data-flows, 1 getting-started).\n"
+          "byteSize": 10394,
+          "firstLines": "# Wiki Update Log\n\nChangelog-style: newest entries at the top. Per-regen \"What changed\" narratives are emitted by an LLM after writers finish, grounded in old-vs-new page diffs.\n\n## 2026-04-26 12:45 UTC — Incremental fallback regen (`79e963f` → `b47d98e`)\n\n<!-- regen:b47d98e -->\n\nFell back to forced full regen: 15/25 pages dirty (>50%). All pages regenerating across 4 commits.\n"
         },
         {
           "path": "wiki/architecture.md",
-          "byteSize": 10398,
-          "firstLines": "# Architecture\n\n> Generated from `79e963f` · 2026-04-26\n\nMimirs is a persistent project memory and RAG (Retrieval-Augmented Generation) system for AI coding agents. The codebase is organised as 15 cohesive communities under `src/`, each anchored by an entry file that re-exports a narrow surface, and a benchmark suite plus test helpers under `benchmarks/` and `tests/`.\n\n## System map\n\nThe 15 communities form a layered dependency graph. Infrastructure sits at the bottom (config, DB, embeddings), pipeline and runtime services in the middle, and CLI and MCP adapters at the top.\n"
+          "byteSize": 12961,
+          "firstLines": "# Architecture\n\n> Generated from `b47d98e` · 2026-04-26\n\nMimirs is a persistent project memory and RAG system for AI coding agents. The codebase is organised as 14 cohesive communities under `src/`, each anchored by an entry file that re-exports a narrow surface, plus a benchmark suite under `benchmarks/` and shared test helpers under `tests/`. The communities below are the Louvain partitions of mimirs' own import graph — exactly the structure the wiki pipeline produces when run against any project.\n\n## System map\n\nThe 14 communities form a layered dependency graph. Infrastructure (config, embeddings, the SQLite layer, search runtime) sits at the bottom; the pipeline and ingestion communities sit in the middle; CLI and MCP adapters sit at the top. The map below shows the load-bearing edges between communities — minor ties (weight 1–2) are omitted to stay within the diagram budget.\n"
         },
         {
           "path": "wiki/communities/cli-commands.md",
-          "byteSize": 14403,
-          "firstLines": "# CLI Commands\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nAll 19 CLI subcommand handlers live under `src/cli/commands/`. Each file exports a single async function named `<noun>Command` that receives a raw `args` array and a `getFlag` helper. They are the concrete implementations that the top-level dispatcher in `src/cli/index.ts` routes to after parsing the subcommand name.\n\n## Per-file breakdown\n"
+          "byteSize": 19880,
+          "firstLines": "# CLI Commands\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThis community holds the 19 subcommand handlers that sit behind `mimirs <subcommand>`. Each handler is a short async function that owns one verb of the public CLI surface — `index`, `search`, `serve`, `doctor`, `cleanup`, and the rest. The handlers are deliberately thin: they parse their own flags, open a `RagDB`, call into the indexing, search, conversation, git, or wiki layers, print to `cli`, and close the DB. This page is the reference for adding a new command or tracing what happens when a user runs the binary.\n\n## Per-file breakdown\n"
         },
         {
           "path": "wiki/communities/cli-entry-core.md",
-          "byteSize": 6016,
-          "firstLines": "# CLI Entry & Core Utilities\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nThe CLI entry and core utilities community is the thinnest layer in mimirs: four files that handle process start, command dispatch, cross-cutting type definitions, and the single logging abstraction every other module imports. Understanding these four files is the prerequisite for understanding how any command actually reaches its implementation.\n\n## How it works\n"
+          "byteSize": 9231,
+          "firstLines": "# CLI Entry & Core Utilities\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThe CLI entry-and-core community is the boot floor of mimirs: the shebang script `src/main.ts`, the dispatch table in `src/cli/index.ts`, the cross-cutting `EmbeddedChunk` type in `src/types.ts`, and the dual `log` / `cli` output helpers in `src/utils/log.ts`. Everything else in the codebase — every command, every MCP tool, every benchmark — depends on at least one of these four files. The community is small (only four files) but very widely consumed (28 external consumers).\n\n## How it works\n"
         },
         {
           "path": "wiki/communities/cli-setup.md",
-          "byteSize": 7525,
-          "firstLines": "# CLI Setup & IDE Integration\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\n`src/cli/setup.ts` is the first-run initialization module for mimirs. It writes MCP configuration JSON to the right location for each supported IDE, injects tool-usage instructions into agent instruction files (CLAUDE.md, Cursor rules, Windsurf rules, JetBrains guidelines, GitHub Copilot instructions), patches `.gitignore` to exclude the `.mimirs/` index directory, and ensures a valid config file exists. The reference for adding a new IDE target or debugging init failures.\n\n## Dependencies and consumers\n"
+          "byteSize": 9077,
+          "firstLines": "# CLI Setup & IDE Integration\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThe CLI Setup module is one file (`src/cli/setup.ts`) that handles first-run integration: writing `.mimirs/config.json` if absent, patching `.gitignore`, dropping per-IDE rule files (CLAUDE.md, Cursor `.mdc`, Windsurf trigger rule, Junie guideline, Copilot instructions), and upserting MCP server entries into the JSON config files those IDEs read. It is the touchpoint between mimirs and the agent harness.\n\n## Dependencies and consumers\n"
         },
         {
           "path": "wiki/communities/community-detection.md",
-          "byteSize": 9244,
-          "firstLines": "# Community Detection & Discovery\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nThis community owns the two files that translate a raw file-level import graph into a set of named `DiscoveryModule` clusters that all downstream wiki phases consume. `src/wiki/community-detection.ts` implements the Louvain clustering algorithms and dispatch-directory detection. `src/wiki/discovery.ts` orchestrates the full phase-1 discovery: it pulls the graph from the DB, calls the appropriate clustering function, attaches module metadata, and returns a `DiscoveryResult`. The output of this community is the foundational data structure every other wiki stage reads.\n\n## How it works\n"
+          "byteSize": 14071,
+          "firstLines": "# Community Detection & Discovery\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nTwo files own the wiki's \"what are this codebase's modules?\" question. `src/wiki/community-detection.ts` is a graphology + Louvain wrapper that runs both file-level and symbol-level clustering with project-specific guardrails. `src/wiki/discovery.ts` is the orchestrator that pulls the file graph from the DB, picks a clustering strategy, applies fallbacks, and packages everything into a `DiscoveryResult` for the rest of the wiki pipeline. The output of these two files is what every later phase (categorization, synthesis, page writing) reads.\n\n## Entry points\n"
         },
         {
           "path": "wiki/communities/config-embeddings.md",
-          "byteSize": 10496,
-          "firstLines": "# Config & Embeddings\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nThe Config & Embeddings community owns two tightly coupled concerns: loading and validating the project configuration from disk, and running the local transformer model that produces embedding vectors. Nearly every other mimirs community depends on at least one of these files. Understanding them is the prerequisite for changing model behavior, tuning index parameters, or debugging embedding errors.\n\n## How it works\n"
+          "byteSize": 11926,
+          "firstLines": "# Config & Embeddings\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThe Config & Embeddings community owns two tightly coupled concerns: loading and validating the project configuration from disk, and running the local transformer model that produces embedding vectors. Nearly every other mimirs community depends on at least one of these files — anything that calls `embed()`, `getEmbedder()`, or `loadConfig()` ultimately lands here.\n\n## How it works\n"
         },
         {
           "path": "wiki/communities/conversation-server.md",
-          "byteSize": 9049,
-          "firstLines": "# Conversation Indexer & MCP Server\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nThis community covers two related concerns: the JSONL conversation parsing and indexing pipeline (`src/conversation/parser.ts` and `src/conversation/indexer.ts`) and the MCP server bootstrap that wires all tool groups together (`src/server/index.ts`). The conversation subsystem ingests Claude Code session transcripts so past decisions are searchable. The server layer connects the entire mimirs capability set to an AI agent via the Model Context Protocol.\n\n## Per-file breakdown\n"
+          "byteSize": 12564,
+          "firstLines": "# Conversation Indexer & MCP Server\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThree files cooperate to ingest Claude Code transcripts and to bootstrap the MCP server: `src/conversation/parser.ts` discovers and parses JSONL session files; `src/conversation/indexer.ts` chunks, embeds, and tails them into `RagDB`; `src/server/index.ts` is the stdio MCP entry point that wires every tool group together and runs background indexing.\n\n## Per-file breakdown\n"
         },
         {
           "path": "wiki/communities/db-layer.md",
-          "byteSize": 16815,
-          "firstLines": "# Database Layer\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nThe Database Layer is the SQLite persistence core of mimirs. Every read and write — chunks, embeddings, annotations, conversation turns, checkpoints, git history, and the import graph — flows through this community. Understanding it is a prerequisite for touching indexing, search, or any feature that persists state.\n\n## Per-file breakdown\n"
+          "byteSize": 22027,
+          "firstLines": "# Database Layer\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThe database layer is the persistence floor under every other subsystem in mimirs. It owns the SQLite schema, the `bun:sqlite` extension loader (sqlite-vec), and a per-domain set of read/write modules — chunks, files, the import graph, conversation history, checkpoints, annotations, query analytics, and git commit history. The single facade class `RagDB` in `src/db/index.ts` opens the database, runs schema bootstrap and migrations, and exposes thin methods that delegate to the per-file operation modules. Every other community in the codebase (search, indexing, wiki, MCP tools, CLI) reaches storage through that facade.\n\n## Per-file breakdown\n"
         },
         {
           "path": "wiki/communities/git-indexer-progress.md",
-          "byteSize": 7793,
-          "firstLines": "# Git History Indexer & CLI Progress\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nTwo small but load-bearing files support every long-running index operation in mimirs. `src/git/indexer.ts` ingests git commit history into the RAG database — parsing the log, fetching per-commit file stats, batch-embedding commit messages alongside their changed-file context, and handling force-push recovery. `src/cli/progress.ts` provides the two progress callback styles (verbose and quiet) that any command emitting `onProgress` messages can use. Every `mimirs index` run uses both.\n\n## How it works\n"
+          "byteSize": 7971,
+          "firstLines": "# Git History Indexer & CLI Progress\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nTwo small files that always run together: `src/git/indexer.ts` ingests commit history into the DB, and `src/cli/progress.ts` is the progress reporter every long-running indexing operation calls back through.\n\n## How it works\n"
         },
         {
-          "path": "wiki/communities/graph-watcher.md",
-          "byteSize": 8417,
-          "firstLines": "# Import Graph & File Watcher\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nThis community covers two tightly coupled concerns: `src/graph/resolver.ts` resolves import edges between indexed files and can render the full dependency graph as text or JSON, and `src/indexing/watcher.ts` watches the filesystem for changes and triggers incremental re-indexing and import resolution. Together they keep the DB's import graph accurate as the codebase evolves, both at initial index time and during live development.\n\n## How it works\n"
-        },
-        {
-          "path": "wiki/communities/indexing-pipeline.md",
-          "byteSize": 12154,
-          "firstLines": "# Indexing Pipeline\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nThe indexing pipeline turns project source files into a searchable vector database. It spans four files: `src/indexing/chunker.ts` (splitting text into chunks), `src/indexing/parse.ts` (file-to-content conversion), `src/indexing/indexer.ts` (orchestration and DB upsert), and `src/utils/dir-guard.ts` (safety guard against accidentally indexing system directories).\n\n## Per-file breakdown\n"
+          "path": "wiki/communities/indexing-runtime.md",
+          "byteSize": 22216,
+          "firstLines": "# Indexing runtime\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThe indexing runtime is the loop that turns a directory of files into searchable rows in `RagDB`. Six files cooperate: `src/utils/dir-guard.ts` refuses pathological roots; `src/indexing/parse.ts` produces a `ParsedFile` with a virtual extension; `src/indexing/chunker.ts` splits the text via `@winci/bun-chunk` (AST) or a heuristic fallback; `src/indexing/indexer.ts` hashes, embeds, writes, and reconciles parent groups; `src/graph/resolver.ts` resolves import specifiers to indexed file IDs and renders the project map; `src/indexing/watcher.ts` debounces filesystem events and serializes re-indexes. Together they own every byte that moves between disk and the DB at index time.\n\n## Entry points\n"
         },
         {
           "path": "wiki/communities/mcp-tools.md",
-          "byteSize": 13206,
-          "firstLines": "# MCP Tool Handlers\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nThe MCP Tool Handlers community is the adapter layer between the MCP protocol and every domain capability mimirs exposes. Ten files each register one logical group of tools against the MCP server, and a shared barrel (`src/tools/index.ts`) wires them all together. Nothing in this layer owns business logic — every handler resolves a project directory, hands off to a DB method or business-logic module, and formats the result as MCP text content.\n\n## Per-file breakdown\n"
+          "byteSize": 19419,
+          "firstLines": "# MCP Tool Handlers\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThe MCP tool layer is the surface that an LLM client (Claude Code, Cursor, anything speaking the Model Context Protocol) actually calls. Every public capability of mimirs — search, indexing, graph queries, checkpoints, annotations, analytics, git context, server info, wiki generation — is exposed by exactly one `register*Tools` function in `src/tools/`. A single coordinator, `registerAllTools` in `src/tools/index.ts`, wires them all to a fresh `McpServer` instance during server startup. The community is intentionally shallow: each file owns one thematic group, holds no state, and delegates the real work to `RagDB`, the embeddings layer, and the wiki/graph/indexing subsystems.\n\n## Per-file breakdown\n"
         },
         {
           "path": "wiki/communities/search-runtime.md",
-          "byteSize": 12575,
-          "firstLines": "# Search Runtime\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nThe Search Runtime community is the hybrid retrieval engine at the heart of mimirs. It merges vector (semantic) and BM25 (keyword) results, applies a layered stack of ranking boosts, and provides the benchmark and eval harnesses used to measure and improve retrieval quality. Every MCP search tool call and CLI search command flows through this community before hitting the database.\n\n## Per-file breakdown\n"
+          "byteSize": 17914,
+          "firstLines": "# Search Runtime\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThe search runtime is the query-time engine that turns a natural-language string into a ranked list of files (or chunks). It owns the hybrid vector-plus-FTS merge, the symbol expansion path, the path/filename/graph boost stack, the parent-chunk grouping logic, and the benchmark and eval harnesses that measure all of it. It depends on the database layer for the underlying vec/FTS queries and on the embeddings module for the query embedding; everything else — scoring, deduplication, demotion of generated and test files, doc expansion, analytics logging — lives here.\n\n## Per-file breakdown\n"
         },
         {
           "path": "wiki/communities/search-tool.md",
-          "byteSize": 4805,
-          "firstLines": "# Search MCP Tool\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nThe Search MCP Tool community is a single-file adapter between the MCP protocol and the Search Runtime community. It registers four search-related MCP tools — `search`, `read_relevant`, `search_symbols`, and `write_relevant` — by wiring their schemas and handlers to `src/search/hybrid.ts` and the DB layer. The file contains no retrieval logic of its own; its job is input validation, filter construction, and response formatting.\n\n## Dependencies and consumers\n"
+          "byteSize": 6610,
+          "firstLines": "# Search MCP Tool\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThe Search MCP Tool community is a single-file adapter (`src/tools/search.ts`) that registers four MCP tool handlers — `search`, `read_relevant`, `search_symbols`, and `write_relevant` — against an `McpServer` instance. It owns no algorithm; the heavy lifting lives in the [Search Runtime](search-runtime.md). Its job is to translate MCP tool calls into `search`, `searchChunks`, or `searchSymbols` invocations and to format the textual response the agent sees.\n\n## Dependencies and consumers\n"
         },
         {
-          "path": "wiki/communities/wiki-orchestrator.md",
-          "byteSize": 16293,
-          "firstLines": "# Wiki Orchestrator & MCP Tools\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nThe wiki orchestrator community is the machinery that turns a `generate_wiki()` MCP call into a structured page payload. It spans five files: the MCP tool registration layer (`src/tools/wiki-tools.ts`), the barrel that composes the wiki pipeline phases (`src/wiki/index.ts`), the zero-LLM linter (`src/wiki/lint-page.ts`), the curated section-shape catalog (`src/wiki/section-catalog.ts`), and the append-only update log writer (`src/wiki/update-log.ts`). Together they orchestrate the six-phase wiki generation pipeline from the MCP side without owning any of the core algorithmic logic — that lives in the [Wiki Pipeline — Types & Internals](wiki-pipeline-internals.md) community.\n\n## Per-file breakdown\n"
+          "path": "wiki/communities/wiki-orchestration.md",
+          "byteSize": 19882,
+          "firstLines": "# Wiki orchestration\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThe wiki orchestration community is the user-visible surface of the Louvain-led wiki pipeline. It owns the public functions that callers reach when they run, resume, lint, or diff a wiki regeneration: `runWikiBundling`, `runWikiFinalPlanning`, `getPagePayload`, the synthesis prompt rendering and validation helpers, the section catalog used to seed page shapes, the cheap pattern-based linter, and the structural diff that grounds the update log narrative. Six files cover this surface — three of them (`src/wiki/index.ts`, `src/wiki/lint-page.ts`, `src/wiki/update-log.ts`, `src/tools/wiki-tools.ts`) are documented in their own sub-pages because they carry enough internal complexity to warrant a drill-down. This page covers the architecture-level prose plus inline coverage of the smaller members.\n\n## Entry points\n"
+        },
+        {
+          "path": "wiki/communities/wiki-orchestration/index.md",
+          "byteSize": 8769,
+          "firstLines": "# src/wiki/index.ts\n\n> [Architecture](../../architecture.md) › [Wiki orchestration](../wiki-orchestration.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\n## Role\n\n`src/wiki/index.ts` is the package façade for the wiki pipeline — the single entry point every external caller (the `src/tools/wiki-tools.ts` MCP layer, `scripts/regen-meta.ts`) imports from. It holds two execution drivers (`runWikiBundling` for phases 1–3, `runWikiFinalPlanning` for phases 4–5), one payload helper (`getPagePayload`), and a curated list of re-exports that pull synthesis helpers, the catalog, and shared types up from the per-phase implementation files. It depends on `runDiscovery` (`src/wiki/discovery.ts`), `runCategorization` (`src/wiki/categorization.ts`), `buildPageTree` (`src/wiki/page-tree.ts`), `prefetchContent` (`src/wiki/content-prefetch.ts`), `buildPagePayload` (`src/wiki/page-payload.ts`), and `buildCommunityBundles` (`src/wiki/community-synthesis.ts`).\n"
+        },
+        {
+          "path": "wiki/communities/wiki-orchestration/lint-page.md",
+          "byteSize": 9723,
+          "firstLines": "# src/wiki/lint-page.ts\n\n> [Architecture](../../architecture.md) › [Wiki orchestration](../wiki-orchestration.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\n## Role\n\n`src/wiki/lint-page.ts` is the zero-LLM, zero-AST, pattern-based lint that the wiki orchestration community runs over every generated page to catch the drifts that show up most often: fabricated file paths, stale constant citations, missing-but-expected coverage, line-range citations that drifted away from their enclosing symbol, hedge words, and Mermaid diagrams that silently break (reserved-keyword node IDs, unquoted labels with punctuation, HTML in participant aliases). It is consumed by `src/tools/wiki-tools.ts` to back the `wiki_lint_page` and `wiki_lint_batch` MCP tools, and by `tests/wiki/lint-page.test.ts` for regression coverage. The file leans only on plain string and regex operations — no DB, no filesystem — so it runs in milliseconds across the whole wiki.\n"
+        },
+        {
+          "path": "wiki/communities/wiki-orchestration/update-log.md",
+          "byteSize": 8718,
+          "firstLines": "# src/wiki/update-log.ts\n\n> [Architecture](../../architecture.md) › [Wiki orchestration](../wiki-orchestration.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\n## Role\n\n`src/wiki/update-log.ts` owns the changelog file `_update-log.md` at the wiki root and the matching pre-regen snapshot JSON under `wiki/_meta/`. It writes the four entry shapes the orchestration pipeline emits — full-init, incremental queued, incremental fallback, and the post-writer narrative — in a way that keeps the file changelog-style (newest entry directly under the header) and that lets a phase-2 LLM-produced narrative slot under the matching phase-1 stub via an HTML comment marker. The only project dependency is `src/wiki/types.ts` (for `PageManifest` and `PreRegenSnapshot`); the only consumers are `src/tools/wiki-tools.ts` (which calls every export from the wiki-tool surface) and the corresponding test file.\n"
+        },
+        {
+          "path": "wiki/communities/wiki-orchestration/wiki-tools.md",
+          "byteSize": 9146,
+          "firstLines": "# src/tools/wiki-tools.ts\n\n> [Architecture](../../architecture.md) › [Wiki orchestration](../wiki-orchestration.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\n## Role\n\nThis file is the MCP-tool surface of the wiki orchestration community. It registers eight server tools (`generate_wiki`, `write_synthesis`, `write_synthesis_batch`, `wiki_lint_page`, `wiki_lint_batch`, `wiki_rewrite_page`, `wiki_finalize_log`, `wiki_finalize_log_apply`) on top of the underlying engine in `src/wiki/index.ts`, and renders every payload — page, synthesis, finalize, resume, incremental, lint — into the markdown text the calling agent reads. Three exports are public; the rest are response-renderer helpers and validators that lean on `src/wiki/lint-page.ts`, `src/wiki/section-catalog.ts`, `src/wiki/staleness.ts`, `src/wiki/diff-page.ts`, and `src/wiki/update-log.ts`.\n"
         },
         {
           "path": "wiki/communities/wiki-pipeline-internals.md",
-          "byteSize": 18889,
-          "firstLines": "# Wiki Pipeline — Types & Internals\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\nThis community owns the data model, algorithms, and helper modules that power mimirs' wiki generation pipeline. It spans eleven files covering type contracts (`src/wiki/types.ts`, `src/db/types.ts`), PageRank scoring (`src/wiki/pagerank.ts`), community bundling and split logic (`src/wiki/community-synthesis.ts`), doc isolation (`src/wiki/isolate-docs.ts`), categorization (`src/wiki/categorization.ts`), staleness detection (`src/wiki/staleness.ts`), page tree construction (`src/wiki/page-tree.ts`), content prefetching (`src/wiki/content-prefetch.ts`), page payload assembly (`src/wiki/page-payload.ts`), and semantic query templates (`src/wiki/semantic-queries.ts`). Read this before touching any wiki generation step.\n\n## Per-file breakdown\n"
+          "byteSize": 29670,
+          "firstLines": "# Wiki Pipeline — Types & Internals\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThis community is the algorithmic core of wiki generation: every type contract that flows between phases, the PageRank scorer that orders bundles, the bundle builder that pre-gathers everything an LLM needs to plan a page, the page-tree assembler, the staleness classifier, the per-payload payload assembler, and the kind-specific semantic-query templates. The orchestration shell lives in [Wiki orchestration](wiki-orchestration.md); this is what it calls.\n\n## Per-file breakdown\n"
         },
         {
           "path": "wiki/communities/wiki-pipeline-internals/community-synthesis.md",
-          "byteSize": 8136,
-          "firstLines": "# src/wiki/community-synthesis.ts\n\n> [Architecture](../../architecture.md) › [Wiki Pipeline — Types & Internals](../wiki-pipeline-internals.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\n## Role\n\n`src/wiki/community-synthesis.ts` owns everything between \"here is a list of community member files\" and \"here is the bundle the LLM reads to name and structure the community page.\" It builds community bundles deterministically from the DB and file graph, classifies members as big or small for split decisions, computes the required sections whose predicates have fired, and renders the synthesis prompt. It depends on `src/wiki/pagerank.ts` for intra-community ranking, `src/wiki/isolate-docs.ts` for nearby prose, `src/wiki/section-catalog.ts` for section metadata, and `src/wiki/types.ts` for all data shapes.\n"
+          "byteSize": 9690,
+          "firstLines": "# src/wiki/community-synthesis.ts\n\n> [Architecture](../../architecture.md) › [Wiki Pipeline — Types & Internals](../wiki-pipeline-internals.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\n## Role\n\n`src/wiki/community-synthesis.ts` is Phase 3 of the wiki pipeline: it turns a `DiscoveryResult` plus a `ClassifiedInventory` into a deterministic `CommunityBundle[]`, one bundle per community. The file owns every threshold and cap that shapes a synthesis prompt — exports, tunables, member previews, nearby docs, recent commits — and the helpers that decide whether a community warrants sub-pages. It leans on `src/wiki/pagerank.ts` for per-community ranking, `src/wiki/isolate-docs.ts` for nearby-doc attachment, `src/wiki/section-catalog.ts` for required-section lookup, and `src/db/index.ts` for the batched DB queries that feed every bundle in one pass.\n"
         },
         {
           "path": "wiki/communities/wiki-pipeline-internals/content-prefetch.md",
-          "byteSize": 7089,
-          "firstLines": "# src/wiki/content-prefetch.ts\n\n> [Architecture](../../architecture.md) › [Wiki Pipeline — Types & Internals](../wiki-pipeline-internals.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\n`src/wiki/content-prefetch.ts` is the bundle-assembly and semantic-query pre-run layer for the wiki generation pipeline. It takes the community bundles produced by earlier pipeline phases and wires them into the per-page content cache that `generate_wiki(page: N)` serves to writer agents. It also runs semantic search queries in advance so each writer's first `read_relevant` call is already answered before the agent starts.\n\n## Role\n"
+          "byteSize": 10595,
+          "firstLines": "# src/wiki/content-prefetch.ts\n\n> [Architecture](../../architecture.md) › [Wiki Pipeline — Types & Internals](../wiki-pipeline-internals.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\n## Role\n\n`src/wiki/content-prefetch.ts` is the phase-5 worker of the wiki pipeline: it takes the page manifest produced by `runWikiFinalPlanning`, the per-community bundles built earlier in synthesis, and the raw discovery/classification artifacts, and folds them into a `ContentCache` keyed by wiki path. The cache is what `getPagePayload` later reads from to return a focused payload to the writer agent. The file owns three jobs: (1) build the architecture and getting-started bundles that depend on the final synthesis output, (2) scope a community bundle down to the subset of files belonging to a `community-file` sub-page, and (3) pre-run the semantic queries each writer would otherwise issue as their first `read_relevant` call. It depends on `src/wiki/community-detection.ts` for `isTestOrBench`, `src/wiki/pagerank.ts` for `computePageRank`, `src/wiki/semantic-queries.ts` for `semanticQueriesFor`, `src/search/hybrid.ts` for `searchChunks`, and the type module `src/wiki/types.ts`.\n"
         },
         {
           "path": "wiki/communities/wiki-pipeline-internals/src-db-types-ts.md",
-          "byteSize": 5096,
-          "firstLines": "# src/db/types.ts\n\n> [Architecture](../../architecture.md) › [Wiki Pipeline — Types & Internals](../wiki-pipeline-internals.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\n## Role\n\n`src/db/types.ts` defines the raw database row shapes and query result interfaces that the DB layer returns and the wiki pipeline consumes. It is a pure type file — no logic, no imports — that acts as the boundary contract between SQLite persistence and everything above it.\n"
+          "byteSize": 7185,
+          "firstLines": "# src/db/types.ts\n\n> [Architecture](../../architecture.md) › [Wiki Pipeline — Types & Internals](../wiki-pipeline-internals.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\n## Role\n\n`src/db/types.ts` is the typed contract between the SQLite layer (`src/db/index.ts`) and every consumer that reads from it — search handlers, the wiki categorizer, and the wiki's internal type module. It declares twelve flat interfaces (no enums, no helper types, no defaults) that together describe the row and search-result shapes the database returns. The file is pure type declarations: no runtime code, no imports, no exports beyond the interfaces themselves. Consumers either map a SQLite row into one of these shapes inside `src/db/index.ts` or accept a typed result downstream.\n"
         },
         {
           "path": "wiki/communities/wiki-pipeline-internals/src-wiki-types-ts.md",
-          "byteSize": 8525,
-          "firstLines": "# src/wiki/types.ts\n\n> [Architecture](../../architecture.md) › [Wiki Pipeline — Types & Internals](../wiki-pipeline-internals.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\n## Role\n\n`src/wiki/types.ts` is the shared type contract for the entire wiki generation pipeline. It defines every interface that crosses a phase boundary — from discovery output through categorization, community bundling, synthesis payloads, the page manifest, and the final per-page payload handed to writer agents. Every other wiki module imports from this file; it has no runtime logic of its own.\n"
+          "byteSize": 11433,
+          "firstLines": "# src/wiki/types.ts\n\n> [Architecture](../../architecture.md) › [Wiki Pipeline — Types & Internals](../wiki-pipeline-internals.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\n## Role\n\n`src/wiki/types.ts` is the data contract that every other wiki-pipeline file imports. It defines no logic — only `interface`s and `type` aliases that describe phase outputs (`DiscoveryResult`, `ClassifiedInventory`, `CommunityBundle`, `PageManifest`), LLM hand-offs (`SynthesisPayload`, `PagePayload`), per-page caches (`PageContentCache`, `ContentCache`), and update-log artefacts (`PreRegenSnapshot`, `PageDiff`). The only external dependency is `SymbolResult` re-imported from `src/db/types.ts`. Every member of this community plus the orchestrator barrel and MCP tool layer depends on this file — it is the busiest interior import in the wiki package.\n"
         },
         {
           "path": "wiki/data-flows.md",
-          "byteSize": 12985,
-          "firstLines": "# Data flows\n\n> [Architecture](architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\n## Overview\n\nMimirs has four primary triggers, each with its own call path through the community stack. The `search` / `read_relevant` MCP tool call is the most frequent: an agent issues a query, the [Search MCP Tool](communities/search-tool.md) receives it, the [Search Runtime](communities/search-runtime.md) embeds and merges vector + FTS results, and ranked hits come back over the wire. File indexing runs on two triggers: the `index_files` MCP tool call (batch, invoked by agents or the CLI `index` subcommand) and the [Import Graph & File Watcher](communities/graph-watcher.md) (incremental, running in the background during `mimirs watch`). A fourth flow — wiki generation — is triggered by `generate_wiki()` and fans out through [Community Detection & Discovery](communities/community-detection.md) and the [Wiki Pipeline — Types & Internals](communities/wiki-pipeline-internals.md) to produce page payloads.\n"
+          "byteSize": 12639,
+          "firstLines": "# Data flows\n\n> [Architecture](architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\n## Overview\n\nMimirs has three primary runtime flows. **Search** (the `search` and `read_relevant` MCP tools) is the highest-frequency path — every agent query enters here. **Indexing** runs in two modes: batch on `index_files` and incremental via the file watcher. **Wiki generation** is the heaviest flow, a multi-phase pipeline triggered by `generate_wiki()` that fans out across community detection, content prefetch, and per-page payload assembly. The architecture page shows where these communities live; this page shows what runs in what order when each flow fires.\n"
         },
         {
           "path": "wiki/getting-started.md",
-          "byteSize": 5086,
-          "firstLines": "# Getting started\n\n> [Architecture](architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\n## What this is\n\nMimirs is a local-first, persistent project memory layer for AI coding agents. It runs as an MCP server inside your project directory, indexing your code with AST-aware chunking (tree-sitter grammars across 24 languages), embedding each chunk in-process using all-MiniLM-L6-v2 via Transformers.js and ONNX, and storing everything in a single SQLite file under `.mimirs/`. When your agent issues a `search` or `read_relevant` call, mimirs blends vector similarity and BM25, boosts results by dependency-graph centrality, and returns exact line ranges — not file paths. It also tails Claude Code's conversation transcripts in real time, so checkpoints and past decisions remain searchable across sessions. No API keys, no cloud, no daemon: Bun and SQLite are the only runtime requirements. On one real codebase, switching from raw grep-and-read to mimirs cut prompt token usage from 380K to 91K tokens per query — a 76% reduction.\n"
+          "byteSize": 7080,
+          "firstLines": "# Getting started\n\n> [Architecture](architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\n## What this is\n\nMimirs is a local-first persistent memory layer for AI coding agents. It runs as an MCP server inside your project directory, indexing source files with AST-aware chunking (tree-sitter grammars across 24 languages via `@winci/bun-chunk`), embedding each chunk in-process with all-MiniLM-L6-v2 through `@huggingface/transformers` and ONNX, and storing everything in a single SQLite file under `.mimirs/`. When the agent issues a `search` or `read_relevant` call, mimirs blends vector similarity with BM25, boosts results by dependency-graph centrality and path heuristics, and returns ranked chunks with exact line ranges (`path:start-end`) instead of whole files. It also tails Claude Code's JSONL transcripts in real time so checkpoints and past discussions remain searchable across sessions. There are no API keys, no cloud, no daemon, and no Docker — Bun and SQLite are the only runtime requirements. On one real codebase the README cites a drop from roughly 380K tokens and 12 seconds per prompt to 91K tokens and 3 seconds — a 76% reduction — once retrieval moved from raw grep-and-read to mimirs.\n"
         },
         {
           "path": "wiki/index.md",
-          "byteSize": 2975,
-          "firstLines": "# mimirs\n\nLocal-first MCP server that gives AI coding assistants a persistent, searchable memory of your codebase: AST-aware chunking, hybrid vector+BM25 retrieval, and a wiki generation pipeline.\n\n## Quick Links\n\n- [Getting Started](getting-started.md) — install, first run, project layout\n- [Architecture](architecture.md) — system map, hubs, design decisions\n- [Data Flows](data-flows.md) — indexing, search, watcher, wiki generation end-to-end\n"
+          "byteSize": 2847,
+          "firstLines": "# mimirs\n\nLocal-first MCP server that gives AI coding assistants a persistent, searchable memory of your codebase: AST-aware chunking, hybrid vector+BM25 retrieval, and a wiki generation pipeline.\n\n## Quick Links\n\n- [Getting Started](getting-started.md) — install, first run, project layout\n- [Architecture](architecture.md) — system map, hubs, design decisions\n- [Data Flows](data-flows.md) — search, indexing, and wiki generation end-to-end\n"
         }
       ]
     }
@@ -10478,7 +10544,7 @@
       "readme": "<div align=\"center\">\n  <img src=\"mimirs-logo-2.png\" alt=\"mimirs logo\" width=\"200\">\n  <h1>MIMIRS</h1>\n  <p><i>Named after <a href=\"https://en.wikipedia.org/wiki/M%C3%ADmir\">Mímir</a>, the Norse god of wisdom and knowledge.</i></p>\n  <p>Persistent project memory for AI coding agents. One command to set up, nothing to maintain.</p>\n  <p>\n    <a href=\"https://www.npmjs.com/package/mimirs\"><img src=\"https://img.shields.io/npm/v/mimirs\" alt=\"npm\"></a>\n    <a href=\"LICENSE\"><img src=\"https://img.shields.io/npm/l/mimirs\" alt=\"license\"></a>\n  </p>\n</div>\n\nYour agent starts every session blind — guessing filenames, grepping for keywords, burning context on irrelevant files, and forgetting everything you discussed yesterday.\n\nOn one real project, a typical prompt was burning **380K tokens and ~12 seconds end-to-end**.\n\nAfter indexing with mimirs: **91K tokens, ~3 seconds** — a 76% drop on that codebase. Your numbers will vary with repo size, query, and model.\n\n\n<div align=\"center\">\n  <h3>No API keys. No cloud. No Docker.<br />Just bun and SQLite.</h3>\n  <h3>\n    <a href=\"wiki/modules/search/index.md\">Semantic Search</a> &nbsp;·&nbsp;\n    <a href=\"wiki/index.md\">Auto-generated Wiki</a>\n    <br>\n    <a href=\"wiki/modules/conversation/index.md\">Cross-session Memory</a> &nbsp;·&nbsp;\n    <a href=\"wiki/modules/graph/index.md\">Dependency Graphs</a> &nbsp;·&nbsp;\n    <a href=\"docs/tools.md#\">Annotations</a>\n  </h3>\n  <span>Works with: Claude Code &nbsp;·&nbsp; Cursor &nbsp;·&nbsp; Windsurf &nbsp;·&nbsp; JetBrains (Junie) &nbsp;·&nbsp; GitHub Copilot &nbsp;·&nbsp; any MCP client</span>\n</div>\n\n## Quick start\n\n### 1. Install SQLite (macOS)\n\nApple's bundled SQLite doesn't support extensions:\n\n```bash\nbrew install sqlite\n```\n\n### 2. Set up your editor\n\n```bash\nbunx mimirs init --ide claude   # or: cursor, windsurf, copilot, jetbrains, all\n```\n\nThis creates the MCP server config, editor rules, `.mimirs/config.json`, and `.gitignore` entry. Run with `--ide all` to set up every supported editor at once.\n\n### 3. Try the demo (optional)\n\n```bash\nbunx mimirs demo\n```\n\n## Search quality\n\n90–98% Recall@10. Benchmarked on four real codebases across three languages (120 queries total) — from 97 files to 8,553 — with known expected results per query. Full methodology in [BENCHMARKS.md](BENCHMARKS.md).\n\n| Codebase | Language | Files | Queries | Recall@10 | MRR | Zero-miss |\n|---|---|---|---|---|---|---|\n| mimirs | TypeScript | 97 | 30 | 98.3% | 0.683 | 0.0% |\n| Excalidraw | TypeScript | 693 | 30 | 96.7% | 0.442 | 3.3% |\n| Django | Python | 3,090 | 30 | 93.3% | 0.688 | 6.7% |\n| Kubernetes | Go | 8,553 | 30 | 90.0% | 0.589 | 10.0% |\n\nKubernetes excludes test files and demotes generated files. With `searchTopK: 15`, recall reaches 100%. See [Kubernetes benchmarks](BENCHMARKS.md#kubernetes-8553-files-30-queries) for details.\n\n## How it compares\n\n|  | mimirs | No tool (grep + Read) | Context stuffing | Cloud RAG services |\n|---|---|---|---|---|\n| Setup | One command | Nothing | Nothing | API keys, accounts |\n| Token cost | ~91K/prompt | ~380K/prompt | Entire codebase | Varies |\n| Search quality | 90–98% Recall@10 | Depends on keywords | N/A (everything loaded) | Varies |\n| Code understanding | AST-aware (24 langs) | Line-level | None | Usually line-level |\n| Cross-session memory | Conversations + checkpoints | None | None | Some |\n| Privacy | Fully local | Local | Local | Data leaves your machine |\n| Price | Free | Free | High token bills | $10-50/mo + tokens |\n\n## Why not an existing tool?\n\n- **Continue.dev's `@codebase`** — closest overlap (local RAG, open source), but retrieval lives inside the editor extension. Mimirs is a standalone MCP server with explicit tools (`search`, `read_relevant`, `project_map`, `search_conversation`, `annotate`) the agent can plan around, plus conversation tailing and a wiki generator built in.\n- **Aider's repo-map** — static tree-sitter summary of the repo, no embeddings. Clever and lightweight, but a summary isn't retrieval — mimirs ranks chunks per query with vector + BM25 and boosts by graph centrality.\n- **Sourcegraph Cody / OpenCtx** — excellent at code search, but indexing leans on cloud infra and an account. Mimirs is one `bunx` away and never leaves your machine.\n- **llama-index / LangChain / roll-your-own** — those are libraries. Mimirs is batteries-included: AST-aware chunking, hybrid retrieval, file watcher, conversation tail, and annotations already wired together.\n\n## How it works\n\n1. **Parse & chunk** — Splits content using type-matched strategies: function/class boundaries for code (via tree-sitter across 24 languages), headings for markdown, top-level keys for YAML/JSON. Chunks that exceed the embedding model's token limit are windowed and merged.\n\n2. **Embed** — Each chunk becomes a 384-dimensional vector using all-MiniLM-L6-v2 (in-process via Transformers.js + ONNX, no API calls). Vectors are stored in sqlite-vec.\n\n3. **Build dependency graph** — Import specifiers and exported symbols are captured during AST chunking, then resolved to build a file-level dependency graph.\n\n4. **Hybrid search** — Queries run vector similarity and BM25 in parallel, blended by configurable weight. Results are boosted by dependency graph centrality and path heuristics. `read_relevant` returns individual chunks with entity names and exact line ranges (`path:start-end`).\n\n5. **Watch & re-index** — File changes are detected with a 2-second debounce. Changed files are re-indexed; deleted files are pruned.\n\n6. **Conversation & checkpoints** — Tails Claude Code's JSONL transcripts in real time. Agents can create checkpoints at important moments for future sessions to search.\n\n7. **Annotations** — Notes attached to files or symbols surface as `[NOTE]` blocks inline in `read_relevant` results.\n\n8. **Analytics** — Every query is logged. Analytics surface zero-result queries, low-relevance queries, and period-over-period trends.\n\n## Supported languages\n\nAST-aware chunking via [bun-chunk](https://github.com/TheWinci/bun-chunk) with tree-sitter grammars:\n\nTypeScript/JavaScript, Python, Go, Rust, Java, C, C++, C#, Ruby, PHP, Scala, Kotlin, Lua, Zig, Elixir, Haskell, OCaml, Dart, Bash/Zsh, TOML, YAML, HTML, CSS/SCSS/LESS\n\nAlso indexes: Markdown, JSON, XML, SQL, GraphQL, Protobuf, Terraform, Dockerfiles, Makefiles, and more. Files without a known extension fall back to paragraph splitting.\n\n## Documentation\n\n- [Example tool outputs](docs/examples.md) — what your agent actually receives over MCP\n- [MCP tools, CLI & analytics](docs/tools.md)\n- [Configuration & examples](docs/configuration.md)\n- [Benchmarks](BENCHMARKS.md)\n\n## Stack\n\n| Layer | Choice |\n|---|---|\n| Runtime | Bun (built-in SQLite, fast TS) |\n| AST chunking | [bun-chunk](https://github.com/TheWinci/bun-chunk) — tree-sitter grammars for 24 languages |\n| Embeddings | Transformers.js + ONNX (in-process, no daemon) |\n| Embedding model | all-MiniLM-L6-v2 (~23MB, 384 dimensions) — [configurable](docs/configuration.md) |\n| Vector store | sqlite-vec (single `.db` file) |\n| MCP | @modelcontextprotocol/sdk (stdio transport) |\n| Plugin | Claude Code plugin with skills + hooks |\n\nAll data lives in `.mimirs/` inside your project — add it to `.gitignore`.",
       "packageManifest": {
         "name": "mimirs",
-        "version": "1.2.0",
+        "version": "1.2.1",
         "description": "Persistent project memory for AI coding agents — semantic search, AST-aware chunking, dependency graphs, and conversation history",
         "type": "module",
         "license": "Apache-2.0",
@@ -10612,15 +10678,6 @@
             "snippet": "## Prerequisites\n\n<!-- adapt: actual runtime + versions from .nvmrc, .tool-versions,\n     package.json engines, go.mod, Cargo.toml, etc. -->\n\n- <runtime> <version> — <why required>\n- <tool> — <why required>\n\n"
           },
           {
-            "path": "/Users/winci/repos/mimirs/wiki/communities/cli-setup.md",
-            "startLine": 1,
-            "endLine": 7,
-            "entityName": null,
-            "chunkType": null,
-            "score": 0.3641659473623737,
-            "snippet": "# CLI Setup & IDE Integration\n\n> [Architecture](../architecture.md)\n>\n> Generated from `79e963f` · 2026-04-26\n\n`src/cli/setup.ts` is the first-run initialization module for mimirs. It writes MCP configuration JSON to the right location for each supported IDE, injects tool-usage instructions into agent instruction files (CLAUDE.md, Cursor rules, Windsurf rules, JetBrains guidelines, GitHub Copilot instructions), patches `.gitignore` to exclude the `.mimirs/` index directory, and ensures a valid config file e"
-          },
-          {
             "path": "/Users/winci/repos/mimirs/src/wiki/exemplars/testing.md",
             "startLine": 57,
             "endLine": 60,
@@ -10637,6 +10694,15 @@
             "chunkType": null,
             "score": 0.3603867624056069,
             "snippet": "## Quick Links\n\n<!-- adapt: include when the wiki has > 10 pages. Pick the 3-5\n     highest-traffic pages for newcomers. -->\n\n- [Getting Started](guides/getting-started.md) — setup and first run\n- [Architecture](architecture.md) — high-level system design\n- [<top module>](modules/<name>/index.md) — <one-line>\n\n"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/src/wiki/exemplars/getting-started.md",
+            "startLine": 6,
+            "endLine": 10,
+            "entityName": null,
+            "chunkType": null,
+            "score": 0.356653127136689,
+            "snippet": "# Getting Started\n\n<!-- adapt: one paragraph describing what the project is and who should\n     read this page — a newcomer opening the repo for the first time. -->\n\n"
           }
         ]
       },
@@ -10671,13 +10737,22 @@
             "snippet": "import { cli } from \"../utils/log\";"
           },
           {
-            "path": "/Users/winci/repos/mimirs/src/wiki/content-prefetch.ts",
-            "startLine": 172,
-            "endLine": 172,
-            "entityName": "CLI_NAME_PATTERN",
-            "chunkType": "variable",
-            "score": 0.46872720446521593,
-            "snippet": "const CLI_NAME_PATTERN = /(cli|bin|main|server|entry)/i;"
+            "path": "/Users/winci/repos/mimirs/wiki/communities/cli-commands.md",
+            "startLine": 171,
+            "endLine": 175,
+            "entityName": null,
+            "chunkType": null,
+            "score": 0.47531686506415405,
+            "snippet": "## Trade-offs\n\nThe flag parser is a thin loop, not a library. The gain is that every flag — its name, its default, its parser — is visible in the handler that uses it; the cost is that flags that should behave consistently (like the `--dir`/positional `dir` dance) are reimplemented per-file with subtle drift. `--ext` / `--extensions` aliases live in `src/cli/commands/search-cmd.ts` only; `--days` lives in `src/cli/commands/analytics.ts` only; there is no shared schema and no `--help` per command.\n\nThe hybri"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/wiki/communities/cli-commands.md",
+            "startLine": 1,
+            "endLine": 7,
+            "entityName": null,
+            "chunkType": null,
+            "score": 0.4693720631341052,
+            "snippet": "# CLI Commands\n\n> [Architecture](../architecture.md)\n>\n> Generated from `b47d98e` · 2026-04-26\n\nThis community holds the 19 subcommand handlers that sit behind `mimirs <subcommand>`. Each handler is a short async function that owns one verb of the public CLI surface — `index`, `search`, `serve`, `doctor`, `cleanup`, and the rest. The handlers are deliberately thin: they parse their own flags, open a `RagDB`, call into the indexing, search, conversation, git, or wiki layers, print to `cli`, and close the DB."
           }
         ]
       },
@@ -10694,13 +10769,13 @@
             "snippet": "known-issues\n## Known Issues\n\n- **<Issue title>** — <1-2 sentences: the surface symptom, the underlying\n  cause if known, and the file/commit where it's tracked>."
           },
           {
-            "path": "/Users/winci/repos/mimirs/src/wiki/section-catalog.ts",
-            "startLine": 140,
-            "endLine": 154,
-            "entityName": "SECTION_CATALOG",
-            "chunkType": "variable",
-            "score": 0.45076567340150264,
-            "snippet": "      \"Bulleted list. Each bullet opens with the chosen property in bold, then a `Cost:` clause naming what was given up and why it's acceptable here.\",\n    exampleBody:\n      \"- **Hybrid vector + FTS ranking.** Cost: two queries per search instead of one; we accept the latency to recover keyword matches the embedding alone loses.\\n- **Louvain over directory layout.** Cost: community labels drift if the import graph changes meaningfully between runs. Directory names are stable but encode authorship, not cohesion.\\n- **Per-query symbol expansion.** Cost: up to 20 extra `getFileByPath` calls on a `topK * 4` pool. Indexing call sites would be faster but doubles storage.\",\n  },\n  {\n    id: \"common-gotchas\",\n    title: \"Common gotchas\",\n    purpose:\n      \"Things a first-time reader of this community will get wrong. Shorter and more pragmatic than `known-issues`: these aren't bugs, they're counter-intuitive facts about how the code behaves. Think: \\\"I spent two hours on X before realising Y.\\\" Required for deep/high-LOC communities where the signatures don't reveal the whole story.\",\n    shape:\n      \"Bulleted list. Each bullet: short bold claim (often a symbol or behavior), then 1–2 sentences of elaboration. Cite file:line or constant. Keep each gotcha under three sentences.\",\n    exampleBody:"
+            "path": "/Users/winci/repos/mimirs/wiki/_update-log.md",
+            "startLine": 24,
+            "endLine": 25,
+            "entityName": null,
+            "chunkType": null,
+            "score": 0.4165712563157179,
+            "snippet": "mmunities/git-indexer-progress.md`** — Tightened `How it works`, `Entry points`, `Internals`, and `Failure modes` without adding material; the `sinceRef..HEAD` and `progress.ts` citations were dropped in favour of a cleaner `cli.log` + `.git` framing.\n- **`wiki/communities/cli-setup.md`** — `Tuning`, `Entry points`, `How it works`, and `Failure modes` were tightened; references to `node:fs/promises`, `~/.codeium/`, `.junie/guidelines/`, and `.github/copilot-instructions.md` were dropped in favour of `fs/pro"
           },
           {
             "path": "/Users/winci/repos/mimirs/src/wiki/exemplars/getting-started.md",
@@ -10721,15 +10796,6 @@
             "snippet": "// Permanent (non-retryable) init errors — filesystem permission failures, missing\n// native libs, etc. Transient errors like \"database is locked\" are NOT cached here\n// so the next tool call can retry.\nlet permanentError: string | null = null;"
           },
           {
-            "path": "/Users/winci/repos/mimirs/src/server/index.ts",
-            "startLine": 148,
-            "endLine": 207,
-            "entityName": "startServer.startServer",
-            "chunkType": "function",
-            "score": 0.35197211088729696,
-            "snippet": "\n  // Register signal/stdin handlers immediately so crashes during startup\n  // still write \"interrupted\" instead of leaving stale status.\n  process.stdin.on(\"end\", () => {\n    log.debug(\"stdin closed (IDE window likely closed)\", \"shutdown\");\n    cleanup(\"stdin closed\");\n  });\n  process.stdin.on(\"error\", () => {\n    cleanup(\"stdin error\");\n  });\n  process.on(\"SIGINT\", () => cleanup(\"SIGINT\"));\n  process.on(\"SIGTERM\", () => cleanup(\"SIGTERM\"));"
-          },
-          {
             "path": "/Users/winci/repos/mimirs/CHANGELOG.md",
             "startLine": 91,
             "endLine": 100,
@@ -10737,6 +10803,24 @@
             "chunkType": null,
             "score": 0.32948183540108655,
             "snippet": "### Added\n- `doctor` command for diagnosing MCP server startup issues\n- `find_usages` tool for discovering call sites before refactoring\n- `git_context` tool showing uncommitted changes with index status\n- `annotate` / `get_annotations` tools for persistent notes on files/symbols\n- `search_symbols` and `write_relevant` tools\n- Batch indexing and `bunx init` setup command\n- Checkpoints (decision, milestone, blocker, direction_change, handoff)\n- Conversation search across Claude Code sessions\n- Server info an"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/wiki/communities/conversation-server.md",
+            "startLine": null,
+            "endLine": null,
+            "entityName": null,
+            "chunkType": null,
+            "score": 0.3275198588725758,
+            "snippet": "ed server isn't clobbered.\n- **Server-startup crash** — `writeStartupError` logs to `.mimirs/server-error.log` with the stack and the hint `To diagnose: bunx mimirs doctor`; the `phase: …` token in `.mimirs/status` records how far startup got (`creating server`, `tools registered`, `connecting transport`, `transport connected`).\n- **Transient DB lock at startup** — `getDB` failures matching `database is locked` or `SQLITE_BUSY` are *not* cached; `permanentError` stays null, the next tool call retries `getDB"
+          },
+          {
+            "path": "/Users/winci/repos/mimirs/.claude/projects/-Users-winci-repos-claude-skills-local-rag/memory/project_plugin_cr.md",
+            "startLine": 8,
+            "endLine": 14,
+            "entityName": null,
+            "chunkType": null,
+            "score": 0.3273798409159459,
+            "snippet": "### Blockers (must fix)\n\n1. **~~`.DS_Store` in plugin directory~~** ✅ FIXED — Removed file, fixed `.gitignore` casing (`.DS_STORE` → `.DS_Store`).\n\n2. **`@latest` tag in plugin.json mcpServers** — `@winci/local-rag@latest` means users auto-upgrade with no pinning. Reviewer may require pinned or caret version (`@^0.3`).\n\n3. **~~Bun not installed = silent failure~~** ✅ FIXED — Hook scripts now check `command -v bun` and session-start prints install link. MCP server can't be fixed (OS-level `bunx` not found).\n"
           }
         ]
       }

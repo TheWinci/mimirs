@@ -2,6 +2,18 @@
 
 Changelog-style: newest entries at the top. Per-regen "What changed" narratives are emitted by an LLM after writers finish, grounded in old-vs-new page diffs.
 
+## 2026-04-26 15:20 UTC — Incremental regen queued (`b47d98e` → `6a2d580`)
+
+<!-- regen:6a2d580 -->
+
+39 files changed across 2 commits. 3 regenerated, 0 added, 0 removed.
+
+### What changed in this regen
+
+- **`wiki/architecture.md`** — Refreshed the generation stamp to `6a2d580`; the System map, Load-bearing files (PageRank table), Entry points, Cross-cutting dependencies, and Design decisions sections were left intact with no diff. The 1.2.1 release plus the prior incremental log update touched no architecture-level facts — community membership, hub fanIn/fanOut, and meta-graph weights all match the previous regen.
+- **`wiki/data-flows.md`** — Refreshed the generation stamp to `6a2d580`; Flow 1 (Search and `read_relevant`), Flow 2 (Indexing batch and incremental), and Flow 3 (Wiki generation) keep their three sequenceDiagrams and call-step lists unchanged. The triggering commits (`1.2.1` version bump, prior log finalize) shipped no runtime call-graph changes, so the prose held.
+- **`wiki/getting-started.md`** — Refreshed the generation stamp to `6a2d580`; the What this is, Installation (`brew install sqlite`, `bunx mimirs init`), First run (`bunx mimirs demo`, `bunx mimirs doctor`), and Where to look next sections were not rewritten. The window was version-bump-only, so the install and first-run instructions remain accurate.
+
 ## 2026-04-26 12:45 UTC — Incremental fallback regen (`79e963f` → `b47d98e`)
 
 <!-- regen:b47d98e -->

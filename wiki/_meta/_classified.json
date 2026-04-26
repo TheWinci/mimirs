@@ -5135,7 +5135,7 @@
       "path": ".ai/smoke-test.txt",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5144,7 +5144,7 @@
       "path": ".claude-plugin/skills/mimirs/SKILL.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5153,7 +5153,7 @@
       "path": ".claude-plugin/skills/wiki/SKILL.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5162,7 +5162,7 @@
       "path": ".claude/projects/-Users-winci-repos-claude-skills-local-rag/memory/MEMORY.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5171,7 +5171,7 @@
       "path": ".claude/projects/-Users-winci-repos-claude-skills-local-rag/memory/feedback_use_bun.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5180,7 +5180,7 @@
       "path": ".claude/projects/-Users-winci-repos-claude-skills-local-rag/memory/project_plugin_cr.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5189,7 +5189,7 @@
       "path": ".junie/guidelines/mimirs.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5198,7 +5198,7 @@
       "path": "BENCHMARKS.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5207,7 +5207,7 @@
       "path": "CHANGELOG.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5216,7 +5216,7 @@
       "path": "CLAUDE.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5225,7 +5225,7 @@
       "path": "README.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5234,7 +5234,7 @@
       "path": "benchmarks/ast-truncation-analysis.ts",
       "fanIn": 0,
       "fanOut": 7,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5243,7 +5243,7 @@
       "path": "benchmarks/collect-files-bench.ts",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5252,7 +5252,7 @@
       "path": "benchmarks/count-grouping-sim.ts",
       "fanIn": 0,
       "fanOut": 4,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5261,7 +5261,7 @@
       "path": "benchmarks/excalidraw-parent-bench.ts",
       "fanIn": 0,
       "fanOut": 5,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5270,7 +5270,7 @@
       "path": "benchmarks/indexing-bench-v2.ts",
       "fanIn": 0,
       "fanOut": 9,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5279,7 +5279,7 @@
       "path": "benchmarks/indexing-bench.ts",
       "fanIn": 0,
       "fanOut": 13,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5288,7 +5288,7 @@
       "path": "benchmarks/large-json.bench.test.ts",
       "fanIn": 0,
       "fanOut": 8,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5297,7 +5297,7 @@
       "path": "benchmarks/parent-promotion-bench.ts",
       "fanIn": 0,
       "fanOut": 4,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5306,7 +5306,7 @@
       "path": "benchmarks/quality-bench-worker.ts",
       "fanIn": 0,
       "fanOut": 11,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5315,7 +5315,7 @@
       "path": "benchmarks/quality-bench.ts",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5324,7 +5324,7 @@
       "path": "benchmarks/subchunk-impact.ts",
       "fanIn": 0,
       "fanOut": 11,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5333,7 +5333,7 @@
       "path": "docs/configuration.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5342,7 +5342,7 @@
       "path": "docs/examples.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5351,7 +5351,7 @@
       "path": "docs/tools.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5360,7 +5360,7 @@
       "path": "hooks/scripts/reindex-file.sh",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5369,7 +5369,7 @@
       "path": "hooks/scripts/session-end.sh",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5378,7 +5378,7 @@
       "path": "hooks/scripts/session-start.sh",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5387,7 +5387,7 @@
       "path": "scripts/bump-version.sh",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5396,7 +5396,7 @@
       "path": "scripts/regen-meta.ts",
       "fanIn": 0,
       "fanOut": 2,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5405,7 +5405,7 @@
       "path": "skills/mimirs/SKILL.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5414,7 +5414,7 @@
       "path": "skills/wiki/SKILL.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -5423,7 +5423,7 @@
       "path": "src/cli/commands/analytics.ts",
       "fanIn": 1,
       "fanOut": 2,
-      "pageRank": 0.0016036689178855316,
+      "pageRank": 0.0015985562645872786,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5434,7 +5434,7 @@
       "path": "src/cli/commands/annotations.ts",
       "fanIn": 1,
       "fanOut": 2,
-      "pageRank": 0.0016036689178855316,
+      "pageRank": 0.0015985562645872786,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5445,7 +5445,7 @@
       "path": "src/cli/commands/benchmark-models.ts",
       "fanIn": 1,
       "fanOut": 11,
-      "pageRank": 0.0012369105554991544,
+      "pageRank": 0.0012329671637175423,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5456,7 +5456,7 @@
       "path": "src/cli/commands/benchmark.ts",
       "fanIn": 1,
       "fanOut": 6,
-      "pageRank": 0.0013081418544269514,
+      "pageRank": 0.0013039713703001921,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5467,7 +5467,7 @@
       "path": "src/cli/commands/checkpoint.ts",
       "fanIn": 1,
       "fanOut": 4,
-      "pageRank": 0.0013846940455638126,
+      "pageRank": 0.001380279505567329,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5478,7 +5478,7 @@
       "path": "src/cli/commands/cleanup.ts",
       "fanIn": 1,
       "fanOut": 2,
-      "pageRank": 0.0016036689178855316,
+      "pageRank": 0.0015985562645872786,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5489,7 +5489,7 @@
       "path": "src/cli/commands/conversation.ts",
       "fanIn": 1,
       "fanOut": 6,
-      "pageRank": 0.0013081418544269514,
+      "pageRank": 0.0013039713703001921,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5500,7 +5500,7 @@
       "path": "src/cli/commands/demo.ts",
       "fanIn": 1,
       "fanOut": 8,
-      "pageRank": 0.0012691612908419239,
+      "pageRank": 0.0012651150805629383,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5511,7 +5511,7 @@
       "path": "src/cli/commands/doctor.ts",
       "fanIn": 1,
       "fanOut": 1,
-      "pageRank": 0.001998775752726895,
+      "pageRank": 0.0019924034602102313,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5522,7 +5522,7 @@
       "path": "src/cli/commands/eval.ts",
       "fanIn": 1,
       "fanOut": 7,
-      "pageRank": 0.001285925659097023,
+      "pageRank": 0.001281826002373016,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5533,7 +5533,7 @@
       "path": "src/cli/commands/history.ts",
       "fanIn": 1,
       "fanOut": 8,
-      "pageRank": 0.0012691612908419239,
+      "pageRank": 0.0012651150805629383,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5544,7 +5544,7 @@
       "path": "src/cli/commands/index-cmd.ts",
       "fanIn": 1,
       "fanOut": 7,
-      "pageRank": 0.001285925659097023,
+      "pageRank": 0.001281826002373016,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5555,7 +5555,7 @@
       "path": "src/cli/commands/init.ts",
       "fanIn": 1,
       "fanOut": 10,
-      "pageRank": 0.00124554252571405,
+      "pageRank": 0.0012415716143674596,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5566,7 +5566,7 @@
       "path": "src/cli/commands/map.ts",
       "fanIn": 1,
       "fanOut": 3,
-      "pageRank": 0.0014594235654831293,
+      "pageRank": 0.0014547707804709626,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5577,7 +5577,7 @@
       "path": "src/cli/commands/remove.ts",
       "fanIn": 1,
       "fanOut": 2,
-      "pageRank": 0.0016036689178855316,
+      "pageRank": 0.0015985562645872786,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5588,7 +5588,7 @@
       "path": "src/cli/commands/search-cmd.ts",
       "fanIn": 2,
       "fanOut": 6,
-      "pageRank": 0.0015650717899840948,
+      "pageRank": 0.0015600821881031684,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5600,7 +5600,7 @@
       "path": "src/cli/commands/serve.ts",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5611,7 +5611,7 @@
       "path": "src/cli/commands/session-context.ts",
       "fanIn": 1,
       "fanOut": 2,
-      "pageRank": 0.0016036689178855316,
+      "pageRank": 0.0015985562645872786,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5622,7 +5622,7 @@
       "path": "src/cli/commands/status.ts",
       "fanIn": 1,
       "fanOut": 2,
-      "pageRank": 0.0016036689178855316,
+      "pageRank": 0.0015985562645872786,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5633,7 +5633,7 @@
       "path": "src/cli/index.ts",
       "fanIn": 1,
       "fanOut": 20,
-      "pageRank": 0.0020554794266879,
+      "pageRank": 0.002048926357314826,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5644,7 +5644,7 @@
       "path": "src/cli/progress.ts",
       "fanIn": 8,
       "fanOut": 1,
-      "pageRank": 0.008228097077092513,
+      "pageRank": 0.00820186513723784,
       "isTopHub": false,
       "bridges": [
         "createQuietProgress"
@@ -5657,7 +5657,7 @@
       "path": "src/cli/setup.ts",
       "fanIn": 6,
       "fanOut": 1,
-      "pageRank": 0.007323611647298873,
+      "pageRank": 0.0073002632664390206,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5680,7 +5680,7 @@
       "path": "src/config/index.ts",
       "fanIn": 42,
       "fanOut": 4,
-      "pageRank": 0.03895852988007147,
+      "pageRank": 0.038834327099307085,
       "isTopHub": true,
       "bridges": [],
       "entities": [
@@ -5693,7 +5693,7 @@
       "path": "src/conversation/indexer.ts",
       "fanIn": 4,
       "fanOut": 5,
-      "pageRank": 0.0024154994109583765,
+      "pageRank": 0.0024077985626768943,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5705,7 +5705,7 @@
       "path": "src/conversation/parser.ts",
       "fanIn": 11,
       "fanOut": 0,
-      "pageRank": 0.02315410535737929,
+      "pageRank": 0.023080287805761712,
       "isTopHub": true,
       "bridges": [
         "parseTurns"
@@ -5725,7 +5725,7 @@
       "path": "src/db/analytics.ts",
       "fanIn": 1,
       "fanOut": 0,
-      "pageRank": 0.011149826684659952,
+      "pageRank": 0.011114279823719627,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5738,7 +5738,7 @@
       "path": "src/db/annotations.ts",
       "fanIn": 1,
       "fanOut": 0,
-      "pageRank": 0.011149826684659952,
+      "pageRank": 0.011114279823719627,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5753,7 +5753,7 @@
       "path": "src/db/checkpoints.ts",
       "fanIn": 1,
       "fanOut": 0,
-      "pageRank": 0.011149826684659952,
+      "pageRank": 0.011114279823719627,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5767,7 +5767,7 @@
       "path": "src/db/conversation.ts",
       "fanIn": 1,
       "fanOut": 1,
-      "pageRank": 0.0029086608507035714,
+      "pageRank": 0.002899387776318287,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5784,7 +5784,7 @@
       "path": "src/db/files.ts",
       "fanIn": 1,
       "fanOut": 0,
-      "pageRank": 0.011149826684659952,
+      "pageRank": 0.011114279823719627,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5810,7 +5810,7 @@
       "path": "src/db/git-history.ts",
       "fanIn": 1,
       "fanOut": 1,
-      "pageRank": 0.0029086608507035714,
+      "pageRank": 0.002899387776318287,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5832,7 +5832,7 @@
       "path": "src/db/graph.ts",
       "fanIn": 3,
       "fanOut": 0,
-      "pageRank": 0.014137916838608502,
+      "pageRank": 0.014092843654116286,
       "isTopHub": false,
       "bridges": [
         "getSubgraph"
@@ -5857,7 +5857,7 @@
       "path": "src/db/index.ts",
       "fanIn": 59,
       "fanOut": 10,
-      "pageRank": 0.04922387418245353,
+      "pageRank": 0.049066944260306,
       "isTopHub": true,
       "bridges": [
         "RagDB"
@@ -5868,7 +5868,7 @@
       "path": "src/db/search.ts",
       "fanIn": 1,
       "fanOut": 2,
-      "pageRank": 0.0023336926711199106,
+      "pageRank": 0.002326252645580122,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5884,7 +5884,7 @@
       "path": "src/db/types.ts",
       "fanIn": 3,
       "fanOut": 0,
-      "pageRank": 0.01794924458890376,
+      "pageRank": 0.017892014640958912,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5906,7 +5906,7 @@
       "path": "src/embeddings/embed.ts",
       "fanIn": 77,
       "fanOut": 0,
-      "pageRank": 0.10835027046893017,
+      "pageRank": 0.10800483842837025,
       "isTopHub": true,
       "bridges": [],
       "entities": [
@@ -5929,7 +5929,7 @@
       "path": "src/git/indexer.ts",
       "fanIn": 2,
       "fanOut": 2,
-      "pageRank": 0.0022876836191805796,
+      "pageRank": 0.0022803902601396214,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5941,7 +5941,7 @@
       "path": "src/graph/resolver.ts",
       "fanIn": 16,
       "fanOut": 1,
-      "pageRank": 0.01823579883330483,
+      "pageRank": 0.018177661917265223,
       "isTopHub": true,
       "bridges": [],
       "entities": [
@@ -5957,7 +5957,7 @@
       "path": "src/indexing/chunker.ts",
       "fanIn": 17,
       "fanOut": 1,
-      "pageRank": 0.01978525690325548,
+      "pageRank": 0.019722180281165937,
       "isTopHub": true,
       "bridges": [],
       "entities": [
@@ -5971,7 +5971,7 @@
       "path": "src/indexing/indexer.ts",
       "fanIn": 17,
       "fanOut": 10,
-      "pageRank": 0.007013701510714415,
+      "pageRank": 0.006991341144580391,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5984,7 +5984,7 @@
       "path": "src/indexing/parse.ts",
       "fanIn": 7,
       "fanOut": 0,
-      "pageRank": 0.017717946650655327,
+      "pageRank": 0.017661460104478964,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -5996,7 +5996,7 @@
       "path": "src/indexing/watcher.ts",
       "fanIn": 2,
       "fanOut": 4,
-      "pageRank": 0.0017605832210136271,
+      "pageRank": 0.0017549703095757522,
       "isTopHub": false,
       "bridges": [
         "startWatcher"
@@ -6009,7 +6009,7 @@
       "path": "src/main.ts",
       "fanIn": 0,
       "fanOut": 1,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6018,7 +6018,7 @@
       "path": "src/search/benchmark.ts",
       "fanIn": 12,
       "fanOut": 3,
-      "pageRank": 0.0073420213534378794,
+      "pageRank": 0.007318614272141159,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6034,7 +6034,7 @@
       "path": "src/search/eval.ts",
       "fanIn": 8,
       "fanOut": 3,
-      "pageRank": 0.00527833598887426,
+      "pageRank": 0.005261508137695868,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6052,7 +6052,7 @@
       "path": "src/search/hybrid.ts",
       "fanIn": 21,
       "fanOut": 3,
-      "pageRank": 0.022270574670030165,
+      "pageRank": 0.0221995740164895,
       "isTopHub": true,
       "bridges": [],
       "entities": [
@@ -6067,7 +6067,7 @@
       "path": "src/search/usages.ts",
       "fanIn": 4,
       "fanOut": 0,
-      "pageRank": 0.03240578622160917,
+      "pageRank": 0.03230247298034564,
       "isTopHub": true,
       "bridges": [],
       "entities": [
@@ -6079,7 +6079,7 @@
       "path": "src/server/index.ts",
       "fanIn": 0,
       "fanOut": 11,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [
         "startServer"
@@ -6092,7 +6092,7 @@
       "path": "src/tools/analytics-tools.ts",
       "fanIn": 1,
       "fanOut": 1,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6103,7 +6103,7 @@
       "path": "src/tools/annotation-tools.ts",
       "fanIn": 1,
       "fanOut": 2,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6114,7 +6114,7 @@
       "path": "src/tools/checkpoint-tools.ts",
       "fanIn": 1,
       "fanOut": 3,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6125,7 +6125,7 @@
       "path": "src/tools/conversation-tools.ts",
       "fanIn": 1,
       "fanOut": 3,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6136,7 +6136,7 @@
       "path": "src/tools/git-history-tools.ts",
       "fanIn": 1,
       "fanOut": 2,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6147,7 +6147,7 @@
       "path": "src/tools/git-tools.ts",
       "fanIn": 3,
       "fanOut": 1,
-      "pageRank": 0.0020490994568662982,
+      "pageRank": 0.002042566727460817,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6160,7 +6160,7 @@
       "path": "src/tools/graph-tools.ts",
       "fanIn": 1,
       "fanOut": 2,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6171,7 +6171,7 @@
       "path": "src/tools/index-tools.ts",
       "fanIn": 1,
       "fanOut": 2,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6182,7 +6182,7 @@
       "path": "src/tools/index.ts",
       "fanIn": 12,
       "fanOut": 14,
-      "pageRank": 0.014065215222908909,
+      "pageRank": 0.014020373941646729,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6196,7 +6196,7 @@
       "path": "src/tools/search.ts",
       "fanIn": 1,
       "fanOut": 3,
-      "pageRank": 0.0034534726411924056,
+      "pageRank": 0.0034424626327724996,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6207,7 +6207,7 @@
       "path": "src/tools/server-info-tools.ts",
       "fanIn": 1,
       "fanOut": 3,
-      "pageRank": 0.0034534726411924056,
+      "pageRank": 0.0034424626327724996,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6219,7 +6219,7 @@
       "path": "src/tools/wiki-tools.ts",
       "fanIn": 3,
       "fanOut": 36,
-      "pageRank": 0.002572488329573801,
+      "pageRank": 0.002564286985271372,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6232,7 +6232,7 @@
       "path": "src/types.ts",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6243,7 +6243,7 @@
       "path": "src/utils/dir-guard.ts",
       "fanIn": 2,
       "fanOut": 0,
-      "pageRank": 0.009128534010069985,
+      "pageRank": 0.009099431351164342,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6255,7 +6255,7 @@
       "path": "src/utils/log.ts",
       "fanIn": 27,
       "fanOut": 0,
-      "pageRank": 0.07124817091935368,
+      "pageRank": 0.07102102378892171,
       "isTopHub": true,
       "bridges": [],
       "entities": [
@@ -6267,7 +6267,7 @@
       "path": "src/wiki/categorization.ts",
       "fanIn": 2,
       "fanOut": 9,
-      "pageRank": 0.0014987065026548666,
+      "pageRank": 0.0014939284797983764,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6278,7 +6278,7 @@
       "path": "src/wiki/community-detection.ts",
       "fanIn": 9,
       "fanOut": 4,
-      "pageRank": 0.004875133917176591,
+      "pageRank": 0.004859591513616948,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6295,7 +6295,7 @@
       "path": "src/wiki/community-synthesis.ts",
       "fanIn": 7,
       "fanOut": 11,
-      "pageRank": 0.002940828238187723,
+      "pageRank": 0.002931452590244527,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6320,7 +6320,7 @@
       "path": "src/wiki/content-prefetch.ts",
       "fanIn": 2,
       "fanOut": 16,
-      "pageRank": 0.0017883970326124142,
+      "pageRank": 0.001782695448023859,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6334,7 +6334,7 @@
       "path": "src/wiki/diff-page.ts",
       "fanIn": 2,
       "fanOut": 1,
-      "pageRank": 0.002798731087507834,
+      "pageRank": 0.0027898084591738595,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6345,7 +6345,7 @@
       "path": "src/wiki/discovery.ts",
       "fanIn": 3,
       "fanOut": 11,
-      "pageRank": 0.0017075634836109877,
+      "pageRank": 0.0017021196042796111,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6356,7 +6356,7 @@
       "path": "src/wiki/exemplars/architecture.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6365,7 +6365,7 @@
       "path": "src/wiki/exemplars/conventions.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6374,7 +6374,7 @@
       "path": "src/wiki/exemplars/data-flows.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6383,7 +6383,7 @@
       "path": "src/wiki/exemplars/getting-started.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6392,7 +6392,7 @@
       "path": "src/wiki/exemplars/index.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6401,7 +6401,7 @@
       "path": "src/wiki/exemplars/testing.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6410,7 +6410,7 @@
       "path": "src/wiki/index.ts",
       "fanIn": 8,
       "fanOut": 15,
-      "pageRank": 0.002714083962519703,
+      "pageRank": 0.0027054311974958095,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6435,7 +6435,7 @@
       "path": "src/wiki/isolate-docs.ts",
       "fanIn": 4,
       "fanOut": 2,
-      "pageRank": 0.004146772279907596,
+      "pageRank": 0.004133551964456519,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6450,7 +6450,7 @@
       "path": "src/wiki/lint-page.ts",
       "fanIn": 2,
       "fanOut": 0,
-      "pageRank": 0.013522323354866701,
+      "pageRank": 0.013479212865956392,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6466,7 +6466,7 @@
       "path": "src/wiki/page-payload.ts",
       "fanIn": 2,
       "fanOut": 6,
-      "pageRank": 0.001768821620576257,
+      "pageRank": 0.00176318244431513,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6477,7 +6477,7 @@
       "path": "src/wiki/page-tree.ts",
       "fanIn": 2,
       "fanOut": 11,
-      "pageRank": 0.0015156294416849472,
+      "pageRank": 0.001510797466844301,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6489,7 +6489,7 @@
       "path": "src/wiki/pagerank.ts",
       "fanIn": 3,
       "fanOut": 0,
-      "pageRank": 0.009368211643610095,
+      "pageRank": 0.009338344868975838,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6502,7 +6502,7 @@
       "path": "src/wiki/section-catalog.ts",
       "fanIn": 3,
       "fanOut": 0,
-      "pageRank": 0.008780697548518082,
+      "pageRank": 0.008752703826259235,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6518,7 +6518,7 @@
       "path": "src/wiki/sections/configuration.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6527,7 +6527,7 @@
       "path": "src/wiki/sections/cross-cutting-inventory.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6536,7 +6536,7 @@
       "path": "src/wiki/sections/dependency-graph.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6545,7 +6545,7 @@
       "path": "src/wiki/sections/dependency-table.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6554,7 +6554,7 @@
       "path": "src/wiki/sections/entry-points.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6563,7 +6563,7 @@
       "path": "src/wiki/sections/how-it-works-sequence.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6572,7 +6572,7 @@
       "path": "src/wiki/sections/hub-analysis.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6581,7 +6581,7 @@
       "path": "src/wiki/sections/internals.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6590,7 +6590,7 @@
       "path": "src/wiki/sections/key-exports-table.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6599,7 +6599,7 @@
       "path": "src/wiki/sections/known-issues.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6608,7 +6608,7 @@
       "path": "src/wiki/sections/module-inventory.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6617,7 +6617,7 @@
       "path": "src/wiki/sections/overview.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6626,7 +6626,7 @@
       "path": "src/wiki/sections/per-file-breakdown.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6635,7 +6635,7 @@
       "path": "src/wiki/sections/public-api.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6644,7 +6644,7 @@
       "path": "src/wiki/sections/see-also.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6653,7 +6653,7 @@
       "path": "src/wiki/sections/test-structure.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6662,7 +6662,7 @@
       "path": "src/wiki/sections/usage-examples.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6671,7 +6671,7 @@
       "path": "src/wiki/semantic-queries.ts",
       "fanIn": 3,
       "fanOut": 0,
-      "pageRank": 0.010131494227194419,
+      "pageRank": 0.010099194033058832,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6683,7 +6683,7 @@
       "path": "src/wiki/staleness.ts",
       "fanIn": 2,
       "fanOut": 4,
-      "pageRank": 0.00181870019739704,
+      "pageRank": 0.001812902003356466,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6696,7 +6696,7 @@
       "path": "src/wiki/types.ts",
       "fanIn": 95,
       "fanOut": 1,
-      "pageRank": 0.10214122661257057,
+      "pageRank": 0.10181559623763996,
       "isTopHub": true,
       "bridges": [],
       "entities": [
@@ -6737,7 +6737,7 @@
       "path": "src/wiki/update-log.ts",
       "fanIn": 15,
       "fanOut": 2,
-      "pageRank": 0.008595856982123654,
+      "pageRank": 0.008568452585930073,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6758,7 +6758,7 @@
       "path": "tests/cli/cli.test.ts",
       "fanIn": 0,
       "fanOut": 3,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6767,7 +6767,7 @@
       "path": "tests/config/config.test.ts",
       "fanIn": 0,
       "fanOut": 3,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6776,7 +6776,7 @@
       "path": "tests/conversation/conversation-index.test.ts",
       "fanIn": 0,
       "fanOut": 8,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6785,7 +6785,7 @@
       "path": "tests/conversation/conversation.test.ts",
       "fanIn": 0,
       "fanOut": 3,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6794,7 +6794,7 @@
       "path": "tests/db/db.test.ts",
       "fanIn": 0,
       "fanOut": 5,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6803,7 +6803,7 @@
       "path": "tests/embeddings/embed.test.ts",
       "fanIn": 0,
       "fanOut": 5,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6812,7 +6812,7 @@
       "path": "tests/features/annotations.test.ts",
       "fanIn": 0,
       "fanOut": 5,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6821,7 +6821,7 @@
       "path": "tests/features/checkpoint.test.ts",
       "fanIn": 0,
       "fanOut": 5,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6830,7 +6830,7 @@
       "path": "tests/features/git-context.test.ts",
       "fanIn": 0,
       "fanOut": 3,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6839,7 +6839,7 @@
       "path": "tests/features/git-history.test.ts",
       "fanIn": 0,
       "fanOut": 7,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6848,7 +6848,7 @@
       "path": "tests/fixtures/frontmatter-only.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6857,7 +6857,7 @@
       "path": "tests/fixtures/large.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6866,7 +6866,7 @@
       "path": "tests/fixtures/no-frontmatter.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6875,7 +6875,7 @@
       "path": "tests/fixtures/sample.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6884,7 +6884,7 @@
       "path": "tests/fixtures/sample.ts",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": [
@@ -6896,7 +6896,7 @@
       "path": "tests/fixtures/sample.txt",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6905,7 +6905,7 @@
       "path": "tests/graph/graph.test.ts",
       "fanIn": 0,
       "fanOut": 9,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6914,7 +6914,7 @@
       "path": "tests/helpers.ts",
       "fanIn": 67,
       "fanOut": 0,
-      "pageRank": 0.08297740323326683,
+      "pageRank": 0.0827128631591969,
       "isTopHub": true,
       "bridges": [],
       "entities": [
@@ -6927,7 +6927,7 @@
       "path": "tests/indexing/chunker.test.ts",
       "fanIn": 0,
       "fanOut": 1,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6936,7 +6936,7 @@
       "path": "tests/indexing/indexer.test.ts",
       "fanIn": 0,
       "fanOut": 7,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6945,7 +6945,7 @@
       "path": "tests/indexing/line-numbers.test.ts",
       "fanIn": 0,
       "fanOut": 8,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6954,7 +6954,7 @@
       "path": "tests/indexing/parse.test.ts",
       "fanIn": 0,
       "fanOut": 1,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6963,7 +6963,7 @@
       "path": "tests/indexing/watcher.test.ts",
       "fanIn": 0,
       "fanOut": 8,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6972,7 +6972,7 @@
       "path": "tests/search/analytics.test.ts",
       "fanIn": 0,
       "fanOut": 3,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6981,7 +6981,7 @@
       "path": "tests/search/benchmark.test.ts",
       "fanIn": 0,
       "fanOut": 9,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6990,7 +6990,7 @@
       "path": "tests/search/eval.test.ts",
       "fanIn": 0,
       "fanOut": 9,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -6999,7 +6999,7 @@
       "path": "tests/search/find-usages.test.ts",
       "fanIn": 0,
       "fanOut": 5,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7008,7 +7008,7 @@
       "path": "tests/search/fts-special-chars.test.ts",
       "fanIn": 0,
       "fanOut": 10,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7017,7 +7017,7 @@
       "path": "tests/search/hybrid-search.test.ts",
       "fanIn": 0,
       "fanOut": 6,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7026,7 +7026,7 @@
       "path": "tests/search/read-relevant.test.ts",
       "fanIn": 0,
       "fanOut": 6,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7035,7 +7035,7 @@
       "path": "tests/search/scoped-search.test.ts",
       "fanIn": 0,
       "fanOut": 7,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7044,7 +7044,7 @@
       "path": "tests/search/search-symbols.test.ts",
       "fanIn": 0,
       "fanOut": 7,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7053,7 +7053,7 @@
       "path": "tests/search/search.test.ts",
       "fanIn": 0,
       "fanOut": 6,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7062,7 +7062,7 @@
       "path": "tests/tools/page-assist.test.ts",
       "fanIn": 0,
       "fanOut": 5,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7071,7 +7071,7 @@
       "path": "tests/tools/server.test.ts",
       "fanIn": 0,
       "fanOut": 3,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7080,7 +7080,7 @@
       "path": "tests/tools/wiki-tools.test.ts",
       "fanIn": 0,
       "fanOut": 3,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7089,7 +7089,7 @@
       "path": "tests/wiki/categorization.test.ts",
       "fanIn": 0,
       "fanOut": 9,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7098,7 +7098,7 @@
       "path": "tests/wiki/community-detection.test.ts",
       "fanIn": 0,
       "fanOut": 7,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7107,7 +7107,7 @@
       "path": "tests/wiki/content-prefetch-scope.test.ts",
       "fanIn": 0,
       "fanOut": 2,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7116,7 +7116,7 @@
       "path": "tests/wiki/discovery.test.ts",
       "fanIn": 0,
       "fanOut": 7,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7125,7 +7125,7 @@
       "path": "tests/wiki/isolate-docs.test.ts",
       "fanIn": 0,
       "fanOut": 4,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7134,7 +7134,7 @@
       "path": "tests/wiki/lint-page.test.ts",
       "fanIn": 0,
       "fanOut": 1,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7143,7 +7143,7 @@
       "path": "tests/wiki/page-payload.test.ts",
       "fanIn": 0,
       "fanOut": 4,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7152,7 +7152,7 @@
       "path": "tests/wiki/page-tree.test.ts",
       "fanIn": 0,
       "fanOut": 6,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7161,7 +7161,7 @@
       "path": "tests/wiki/staleness.test.ts",
       "fanIn": 0,
       "fanOut": 5,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7170,7 +7170,7 @@
       "path": "tests/wiki/synthesis-prompt.test.ts",
       "fanIn": 0,
       "fanOut": 6,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7179,7 +7179,7 @@
       "path": "tests/wiki/update-log.test.ts",
       "fanIn": 0,
       "fanOut": 10,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7188,7 +7188,7 @@
       "path": "wiki/_meta/writing-rules.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7197,7 +7197,7 @@
       "path": "wiki/_update-log.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7206,7 +7206,7 @@
       "path": "wiki/architecture.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7215,7 +7215,7 @@
       "path": "wiki/communities/cli-commands.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7224,7 +7224,7 @@
       "path": "wiki/communities/cli-entry-core.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7233,7 +7233,7 @@
       "path": "wiki/communities/cli-setup.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7242,7 +7242,7 @@
       "path": "wiki/communities/community-detection.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7251,7 +7251,7 @@
       "path": "wiki/communities/config-embeddings.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7260,7 +7260,7 @@
       "path": "wiki/communities/conversation-server.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7269,7 +7269,7 @@
       "path": "wiki/communities/db-layer.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7278,25 +7278,16 @@
       "path": "wiki/communities/git-indexer-progress.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
     },
     {
-      "path": "wiki/communities/graph-watcher.md",
+      "path": "wiki/communities/indexing-runtime.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
-      "isTopHub": false,
-      "bridges": [],
-      "entities": []
-    },
-    {
-      "path": "wiki/communities/indexing-pipeline.md",
-      "fanIn": 0,
-      "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7305,7 +7296,7 @@
       "path": "wiki/communities/mcp-tools.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7314,7 +7305,7 @@
       "path": "wiki/communities/search-runtime.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7323,16 +7314,52 @@
       "path": "wiki/communities/search-tool.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
     },
     {
-      "path": "wiki/communities/wiki-orchestrator.md",
+      "path": "wiki/communities/wiki-orchestration.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/communities/wiki-orchestration/index.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.001062699256110521,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/communities/wiki-orchestration/lint-page.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.001062699256110521,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/communities/wiki-orchestration/update-log.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.001062699256110521,
+      "isTopHub": false,
+      "bridges": [],
+      "entities": []
+    },
+    {
+      "path": "wiki/communities/wiki-orchestration/wiki-tools.md",
+      "fanIn": 0,
+      "fanOut": 0,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7341,7 +7368,7 @@
       "path": "wiki/communities/wiki-pipeline-internals.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7350,7 +7377,7 @@
       "path": "wiki/communities/wiki-pipeline-internals/community-synthesis.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7359,7 +7386,7 @@
       "path": "wiki/communities/wiki-pipeline-internals/content-prefetch.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7368,7 +7395,7 @@
       "path": "wiki/communities/wiki-pipeline-internals/src-db-types-ts.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7377,7 +7404,7 @@
       "path": "wiki/communities/wiki-pipeline-internals/src-wiki-types-ts.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7386,7 +7413,7 @@
       "path": "wiki/data-flows.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7395,7 +7422,7 @@
       "path": "wiki/getting-started.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
@@ -7404,7 +7431,7 @@
       "path": "wiki/index.md",
       "fanIn": 0,
       "fanOut": 0,
-      "pageRank": 0.0010660980810234541,
+      "pageRank": 0.001062699256110521,
       "isTopHub": false,
       "bridges": [],
       "entities": []
