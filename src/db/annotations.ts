@@ -65,6 +65,39 @@ export function upsertAnnotation(
   return annotationId;
 }
 
+/**
+ * Batch-fetch annotations for many paths in a single SQL pass. Returns
+ * raw rows including `path` so the caller can group per file. Empty input
+ * returns empty output. Used by the wiki bundle builder.
+ */
+export function getAnnotationsForPaths(db: Database, paths: string[]): AnnotationRow[] {
+  if (paths.length === 0) return [];
+  const BATCH = 499;
+  const out: AnnotationRow[] = [];
+  for (let i = 0; i < paths.length; i += BATCH) {
+    const batch = paths.slice(i, i + BATCH);
+    const ph = batch.map(() => "?").join(",");
+    const rows = db
+      .query<
+        { id: number; path: string; symbol_name: string | null; note: string; author: string | null; created_at: string; updated_at: string },
+        string[]
+      >(`SELECT * FROM annotations WHERE path IN (${ph}) ORDER BY updated_at DESC`)
+      .all(...batch);
+    for (const r of rows) {
+      out.push({
+        id: r.id,
+        path: r.path,
+        symbolName: r.symbol_name,
+        note: r.note,
+        author: r.author,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+      });
+    }
+  }
+  return out;
+}
+
 export function getAnnotations(db: Database, path?: string, symbolName?: string | null): AnnotationRow[] {
   let sql = "SELECT * FROM annotations WHERE 1=1";
   const params: (string | null)[] = [];

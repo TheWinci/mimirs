@@ -428,6 +428,9 @@ export class RagDB {
   getFileByPath(path: string) {
     return fileOps.getFileByPath(this.db, path);
   }
+  getFilesByPaths(paths: string[]) {
+    return fileOps.getFilesByPaths(this.db, paths);
+  }
   upsertFileStart(path: string, hash: string) {
     return fileOps.upsertFileStart(this.db, path, hash);
   }
@@ -442,6 +445,9 @@ export class RagDB {
   }
   getChunkById(chunkId: number) {
     return fileOps.getChunkById(this.db, chunkId);
+  }
+  getFileChunkRanges(filePath: string) {
+    return fileOps.getFileChunkRanges(this.db, filePath);
   }
   upsertFile(path: string, hash: string, chunks: EmbeddedChunk[]) {
     fileOps.upsertFile(this.db, path, hash, chunks);
@@ -525,8 +531,17 @@ export class RagDB {
   getDependedOnBy(fileId: number) {
     return graphOps.getDependedOnBy(this.db, fileId);
   }
+  getDependsOnForFiles(fileIds: number[]) {
+    return graphOps.getDependsOnForFiles(this.db, fileIds);
+  }
+  getDependedOnByForFiles(fileIds: number[]) {
+    return graphOps.getDependedOnByForFiles(this.db, fileIds);
+  }
   getSymbolGraphData() {
     return graphOps.getSymbolGraphData(this.db);
+  }
+  getProjectConstants() {
+    return graphOps.getProjectConstants(this.db);
   }
 
   // ── Conversation operations ───────────────────────────────────
@@ -596,6 +611,9 @@ export class RagDB {
   ) {
     return annotationOps.upsertAnnotation(this.db, path, note, embedding, symbolName, author);
   }
+  getAnnotationsForPaths(paths: string[]) {
+    return annotationOps.getAnnotationsForPaths(this.db, paths);
+  }
   getAnnotations(path?: string, symbolName?: string | null) {
     return annotationOps.getAnnotations(this.db, path, symbolName);
   }
@@ -625,6 +643,9 @@ export class RagDB {
   }
   getFileHistory(filePath: string, topK?: number, since?: string) {
     return gitHistoryOps.getFileHistory(this.db, filePath, topK, since);
+  }
+  getFileHistoryForPaths(filePaths: string[], topK?: number) {
+    return gitHistoryOps.getFileHistoryForPaths(this.db, filePaths, topK);
   }
   getAllCommitHashes() {
     return gitHistoryOps.getAllCommitHashes(this.db);

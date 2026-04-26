@@ -1,0 +1,1155 @@
+{
+  "version": 3,
+  "generatedAt": "2026-04-26T07:05:28.633Z",
+  "lastGitRef": "79e963f",
+  "pageCount": 22,
+  "pages": {
+    "wiki/communities/cli-commands.md": {
+      "kind": "community",
+      "slug": "cli-commands",
+      "title": "CLI Commands",
+      "purpose": "Documents all 19 CLI subcommand handlers: what each command does, its flags, and the DB/service calls it makes. The reference for adding new commands or tracing what happens when a user runs mimirs <subcommand>.",
+      "sections": [
+        {
+          "title": "Per-file breakdown",
+          "purpose": "Give each load-bearing file its own prose section — role, key exports, flags accepted, and the non-obvious behavior a reader would miss from signatures alone.",
+          "shape": "per-file-breakdown"
+        },
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow from CLI entry (cli/index.ts) through argument dispatch to a concrete command handler and its DB calls.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface the insider knowledge that's not obvious from signatures — shared setup patterns, session-context helper, flag parsing conventions.",
+          "shape": "internals"
+        },
+        {
+          "title": "Why it's built this way",
+          "purpose": "Explain non-obvious structural decisions and the alternatives rejected.",
+          "shape": "design-rationale"
+        },
+        {
+          "title": "Trade-offs",
+          "purpose": "Name the gains and costs of the current design so a future maintainer can tell whether a constraint is load-bearing.",
+          "shape": "trade-offs"
+        },
+        {
+          "title": "Common gotchas",
+          "purpose": "Things a first-time reader of this community will get wrong.",
+          "shape": "common-gotchas"
+        }
+      ],
+      "depth": "full",
+      "memberFiles": [
+        "src/cli/commands/analytics.ts",
+        "src/cli/commands/annotations.ts",
+        "src/cli/commands/benchmark-models.ts",
+        "src/cli/commands/benchmark.ts",
+        "src/cli/commands/checkpoint.ts",
+        "src/cli/commands/cleanup.ts",
+        "src/cli/commands/conversation.ts",
+        "src/cli/commands/demo.ts",
+        "src/cli/commands/doctor.ts",
+        "src/cli/commands/eval.ts",
+        "src/cli/commands/history.ts",
+        "src/cli/commands/index-cmd.ts",
+        "src/cli/commands/init.ts",
+        "src/cli/commands/map.ts",
+        "src/cli/commands/remove.ts",
+        "src/cli/commands/search-cmd.ts",
+        "src/cli/commands/serve.ts",
+        "src/cli/commands/session-context.ts",
+        "src/cli/commands/status.ts"
+      ],
+      "communityId": "4c12fb311da81d20",
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/cli-entry-core.md",
+        "wiki/communities/config-embeddings.md",
+        "wiki/communities/db-layer.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 0
+    },
+    "wiki/communities/wiki-pipeline-internals.md": {
+      "kind": "community",
+      "slug": "wiki-pipeline-internals",
+      "title": "Wiki Pipeline — Types & Internals",
+      "purpose": "Documents the data model, algorithms, and helper modules that power the wiki generation pipeline: type contracts, PageRank scoring, community bundling, staleness detection, page tree construction, and semantic query templates. Read this before touching any wiki generation step.",
+      "sections": [
+        {
+          "title": "Per-file breakdown",
+          "purpose": "Give each load-bearing file its own prose section — role, key exports, constants worth citing, and the non-obvious behavior a reader would miss from signatures alone.",
+          "shape": "per-file-breakdown"
+        },
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow across the community's files — from discovery input through categorization, PageRank, bundle construction, and page payload assembly.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Data shapes",
+          "purpose": "Define the core types — PageManifest, CommunityBundle, PagePayload, SynthesisPayload — that all wiki pipeline stages hand off between each other.",
+          "shape": "data-shapes"
+        },
+        {
+          "title": "Tuning",
+          "purpose": "Parameters or config flags that change behavior without code edits.",
+          "shape": "tuning-knobs"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface the insider knowledge that's not obvious from signatures — tuning knobs masquerading as constants, silent fallbacks, heuristics with blind spots.",
+          "shape": "internals"
+        },
+        {
+          "title": "Why it's built this way",
+          "purpose": "Explain non-obvious structural decisions and the alternatives rejected.",
+          "shape": "design-rationale"
+        },
+        {
+          "title": "Trade-offs",
+          "purpose": "Name the gains and costs of the current design so a future maintainer can tell whether a constraint is load-bearing.",
+          "shape": "trade-offs"
+        },
+        {
+          "title": "Common gotchas",
+          "purpose": "Things a first-time reader of this community will get wrong.",
+          "shape": "common-gotchas"
+        },
+        {
+          "title": "Sub-pages",
+          "purpose": "One bullet per big-member sub-page in the link map: `- [sub-page title](./<slug>/<sub-slug>.md) — <1-line role>`. Omit the section entirely if the link map has no sub-pages. Small members are NOT listed here — they live inline in the per-file-breakdown section.",
+          "shape": "bulleted list: [sub-page](relative link) — 1-line role"
+        }
+      ],
+      "depth": "full",
+      "memberFiles": [
+        "src/db/types.ts",
+        "src/wiki/categorization.ts",
+        "src/wiki/community-synthesis.ts",
+        "src/wiki/content-prefetch.ts",
+        "src/wiki/isolate-docs.ts",
+        "src/wiki/page-payload.ts",
+        "src/wiki/page-tree.ts",
+        "src/wiki/pagerank.ts",
+        "src/wiki/semantic-queries.ts",
+        "src/wiki/staleness.ts",
+        "src/wiki/types.ts"
+      ],
+      "communityId": "7f610002b13109b4",
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/community-detection.md",
+        "wiki/communities/db-layer.md",
+        "wiki/communities/wiki-orchestrator.md",
+        "wiki/communities/wiki-pipeline-internals/community-synthesis.md",
+        "wiki/communities/wiki-pipeline-internals/content-prefetch.md",
+        "wiki/communities/wiki-pipeline-internals/src-db-types-ts.md",
+        "wiki/communities/wiki-pipeline-internals/src-wiki-types-ts.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 1
+    },
+    "wiki/communities/db-layer.md": {
+      "kind": "community",
+      "slug": "db-layer",
+      "title": "Database Layer",
+      "purpose": "Documents the SQLite persistence layer: all read/write operations for chunks, files, annotations, checkpoints, conversations, git history, and the import graph. The central reference for anyone touching DB schemas or query behavior.",
+      "sections": [
+        {
+          "title": "Per-file breakdown",
+          "purpose": "Give each load-bearing file its own prose section — role, key exports, constants worth citing, and the non-obvious behavior a reader would miss from signatures alone.",
+          "shape": "per-file-breakdown"
+        },
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow across the community's files — from db/index.ts initialization through domain-specific modules to the search layer.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface the insider knowledge that's not obvious from signatures — silent behaviors, schema gotchas, path normalization requirements.",
+          "shape": "internals"
+        },
+        {
+          "title": "Why it's built this way",
+          "purpose": "Explain non-obvious structural decisions and the alternatives rejected.",
+          "shape": "design-rationale"
+        },
+        {
+          "title": "Trade-offs",
+          "purpose": "Name the gains and costs of the current design so a future maintainer can tell whether a constraint is load-bearing.",
+          "shape": "trade-offs"
+        },
+        {
+          "title": "Common gotchas",
+          "purpose": "Things a first-time reader of this community will get wrong.",
+          "shape": "common-gotchas"
+        },
+        {
+          "title": "Invariants",
+          "purpose": "State the rules the module relies on internally and that callers must preserve.",
+          "shape": "key-invariants"
+        }
+      ],
+      "depth": "full",
+      "memberFiles": [
+        "scripts/regen-meta.ts",
+        "src/db/analytics.ts",
+        "src/db/annotations.ts",
+        "src/db/checkpoints.ts",
+        "src/db/conversation.ts",
+        "src/db/files.ts",
+        "src/db/git-history.ts",
+        "src/db/graph.ts",
+        "src/db/index.ts",
+        "src/db/search.ts"
+      ],
+      "communityId": "44d308c0756b9438",
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/cli-commands.md",
+        "wiki/communities/search-runtime.md",
+        "wiki/communities/wiki-pipeline-internals.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 2
+    },
+    "wiki/communities/mcp-tools.md": {
+      "kind": "community",
+      "slug": "mcp-tools",
+      "title": "MCP Tool Handlers",
+      "purpose": "Documents the MCP server tool registration layer: how each domain tool group (analytics, annotations, checkpoints, conversations, git, graph, indexing, server info) is wired to the MCP server and delegates into the DB and business logic layers.",
+      "sections": [
+        {
+          "title": "Per-file breakdown",
+          "purpose": "Give each load-bearing file its own prose section — role, key exports, constants worth citing, and the non-obvious behavior a reader would miss from signatures alone.",
+          "shape": "per-file-breakdown"
+        },
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow from MCP server startup through tool registration to a concrete tool invocation and DB call.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface the insider knowledge that's not obvious from signatures — resolveProject behavior, GetDB/WriteStatus conventions, silent fallbacks.",
+          "shape": "internals"
+        },
+        {
+          "title": "Why it's built this way",
+          "purpose": "Explain non-obvious structural decisions and the alternatives rejected.",
+          "shape": "design-rationale"
+        },
+        {
+          "title": "Trade-offs",
+          "purpose": "Name the gains and costs of the current design so a future maintainer can tell whether a constraint is load-bearing.",
+          "shape": "trade-offs"
+        },
+        {
+          "title": "Common gotchas",
+          "purpose": "Things a first-time reader of this community will get wrong.",
+          "shape": "common-gotchas"
+        }
+      ],
+      "depth": "full",
+      "memberFiles": [
+        "src/tools/analytics-tools.ts",
+        "src/tools/annotation-tools.ts",
+        "src/tools/checkpoint-tools.ts",
+        "src/tools/conversation-tools.ts",
+        "src/tools/git-history-tools.ts",
+        "src/tools/git-tools.ts",
+        "src/tools/graph-tools.ts",
+        "src/tools/index-tools.ts",
+        "src/tools/index.ts",
+        "src/tools/server-info-tools.ts"
+      ],
+      "communityId": "a553198a20e68c7a",
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/config-embeddings.md",
+        "wiki/communities/conversation-server.md",
+        "wiki/communities/wiki-orchestrator.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 3
+    },
+    "wiki/communities/wiki-orchestrator.md": {
+      "kind": "community",
+      "slug": "wiki-orchestrator",
+      "title": "Wiki Orchestrator & MCP Tools",
+      "purpose": "Documents the wiki orchestration layer: the generate_wiki MCP tool handlers, the wiki/index.ts barrel, the lint-page validator, the section catalog registry, and the update log writer. Read this to understand how a generate_wiki() call becomes a page payload.",
+      "sections": [
+        {
+          "title": "Per-file breakdown",
+          "purpose": "Give each load-bearing file its own prose section — role, key exports, constants worth citing, and the non-obvious behavior a reader would miss from signatures alone.",
+          "shape": "per-file-breakdown"
+        },
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow from an MCP generate_wiki call through the orchestrator phases to the page payload returned to the caller.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Tuning",
+          "purpose": "Parameters or config flags that change behavior without code edits — section catalog entries, lint rule thresholds, split community triggers.",
+          "shape": "tuning-knobs"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface the insider knowledge that's not obvious from signatures — lint warning kinds, breadcrumb vs. suggested-query distinction, section catalog lookup mechanics.",
+          "shape": "internals"
+        },
+        {
+          "title": "Why it's built this way",
+          "purpose": "Explain non-obvious structural decisions and the alternatives rejected.",
+          "shape": "design-rationale"
+        },
+        {
+          "title": "Trade-offs",
+          "purpose": "Name the gains and costs of the current design so a future maintainer can tell whether a constraint is load-bearing.",
+          "shape": "trade-offs"
+        },
+        {
+          "title": "Common gotchas",
+          "purpose": "Things a first-time reader of this community will get wrong.",
+          "shape": "common-gotchas"
+        }
+      ],
+      "depth": "full",
+      "memberFiles": [
+        "src/tools/wiki-tools.ts",
+        "src/wiki/index.ts",
+        "src/wiki/lint-page.ts",
+        "src/wiki/section-catalog.ts",
+        "src/wiki/update-log.ts"
+      ],
+      "communityId": "bef3a1fcc8697bd9",
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/db-layer.md",
+        "wiki/communities/mcp-tools.md",
+        "wiki/communities/wiki-pipeline-internals.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 4
+    },
+    "wiki/communities/cli-entry-core.md": {
+      "kind": "community",
+      "slug": "cli-entry-core",
+      "title": "CLI Entry & Core Utilities",
+      "purpose": "Documents the process entry point, top-level type definitions, and shared logging utilities that every other module depends on. The central reference for how mimirs boots and what core primitives it exposes.",
+      "sections": [
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow from process start through CLI dispatch to the logging sink.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Tuning",
+          "purpose": "Parameters or config flags that change behavior without code edits.",
+          "shape": "tuning-knobs"
+        },
+        {
+          "title": "Entry points",
+          "purpose": "List the public surface a consumer reaches first.",
+          "shape": "entry-points"
+        },
+        {
+          "title": "Data shapes",
+          "purpose": "Define the core types or records that flow through the module — EmbeddedChunk and other cross-cutting types.",
+          "shape": "data-shapes"
+        }
+      ],
+      "depth": "standard",
+      "memberFiles": [
+        "src/cli/index.ts",
+        "src/main.ts",
+        "src/types.ts",
+        "src/utils/log.ts"
+      ],
+      "communityId": "718520a518b7c78a",
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/cli-commands.md",
+        "wiki/communities/git-indexer-progress.md",
+        "wiki/communities/indexing-pipeline.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 5
+    },
+    "wiki/communities/indexing-pipeline.md": {
+      "kind": "community",
+      "slug": "indexing-pipeline",
+      "title": "Indexing Pipeline",
+      "purpose": "Documents the file ingestion pipeline: directory validation, file parsing, AST-aware chunking, embedding, and DB upsert. The authoritative reference for adding new language support or tuning chunk behavior.",
+      "sections": [
+        {
+          "title": "Per-file breakdown",
+          "purpose": "Give each load-bearing file its own prose section — role, key exports, constants worth citing, and the non-obvious behavior a reader would miss from signatures alone.",
+          "shape": "per-file-breakdown"
+        },
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow from indexDirectory() entry through parse, chunk, embed, and DB upsert.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Tuning",
+          "purpose": "Parameters or config flags that change behavior without code edits — KNOWN_EXTENSIONS set, chunk size limits.",
+          "shape": "tuning-knobs"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface the insider knowledge that's not obvious from signatures — extension detection fallbacks, parent chunk mechanics, incremental hash checks.",
+          "shape": "internals"
+        },
+        {
+          "title": "Failure modes",
+          "purpose": "Call out how things break, what the module does about it, and what callers must handle.",
+          "shape": "failure-modes"
+        }
+      ],
+      "depth": "full",
+      "memberFiles": [
+        "src/indexing/chunker.ts",
+        "src/indexing/indexer.ts",
+        "src/indexing/parse.ts",
+        "src/utils/dir-guard.ts"
+      ],
+      "communityId": "af79ae68a38bcfd5",
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/cli-commands.md",
+        "wiki/communities/config-embeddings.md",
+        "wiki/communities/conversation-server.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 6
+    },
+    "wiki/communities/search-runtime.md": {
+      "kind": "community",
+      "slug": "search-runtime",
+      "title": "Search Runtime",
+      "purpose": "Documents the hybrid search engine: vector + FTS merging, ranking boosts, usage lookup helpers, and the benchmark/eval harness used to measure retrieval quality. The central reference for anyone tuning search relevance.",
+      "sections": [
+        {
+          "title": "Per-file breakdown",
+          "purpose": "Give each load-bearing file its own prose section — role, key exports, constants worth citing, and the non-obvious behavior a reader would miss from signatures alone.",
+          "shape": "per-file-breakdown"
+        },
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow from a search() call through embedding, vector + FTS queries, score merging, and ranking boosts.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface the insider knowledge that's not obvious from signatures — tuning constants, FTS fallback behavior, score boost mechanics.",
+          "shape": "internals"
+        },
+        {
+          "title": "Invariants",
+          "purpose": "State the rules the module relies on internally and that callers must preserve.",
+          "shape": "key-invariants"
+        },
+        {
+          "title": "Failure modes",
+          "purpose": "Call out how things break, what the module does about it, and what callers must handle.",
+          "shape": "failure-modes"
+        }
+      ],
+      "depth": "full",
+      "memberFiles": [
+        "src/search/benchmark.ts",
+        "src/search/eval.ts",
+        "src/search/hybrid.ts",
+        "src/search/usages.ts"
+      ],
+      "communityId": "1051c07f09ccf18d",
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/cli-commands.md",
+        "wiki/communities/config-embeddings.md",
+        "wiki/communities/db-layer.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 7
+    },
+    "wiki/communities/conversation-server.md": {
+      "kind": "community",
+      "slug": "conversation-server",
+      "title": "Conversation Indexer & MCP Server",
+      "purpose": "Documents the JSONL conversation parsing and indexing pipeline, plus the MCP server bootstrap that wires all tool groups together. The reference for understanding how Claude Code session history is ingested and how the server starts.",
+      "sections": [
+        {
+          "title": "Per-file breakdown",
+          "purpose": "Give each load-bearing file its own prose section — role, key exports, constants worth citing, and the non-obvious behavior a reader would miss from signatures alone.",
+          "shape": "per-file-breakdown"
+        },
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow from server start through conversation tail-indexing to a searchable turn in the DB.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Data shapes",
+          "purpose": "Define the core types — JournalEntry, ParsedTurn, ContentBlock, SessionInfo — that the parser and indexer hand between them.",
+          "shape": "data-shapes"
+        },
+        {
+          "title": "Failure modes",
+          "purpose": "Call out how things break, what the module does about it, and what callers must handle.",
+          "shape": "failure-modes"
+        }
+      ],
+      "depth": "brief",
+      "memberFiles": [
+        "src/conversation/indexer.ts",
+        "src/conversation/parser.ts",
+        "src/server/index.ts"
+      ],
+      "communityId": "789b8f6140ce3ef8",
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/cli-commands.md",
+        "wiki/communities/config-embeddings.md",
+        "wiki/communities/indexing-pipeline.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 8
+    },
+    "wiki/communities/community-detection.md": {
+      "kind": "community",
+      "slug": "community-detection",
+      "title": "Community Detection & Discovery",
+      "purpose": "Documents the Louvain-based community detection and the discovery orchestrator that feeds it: how the file-level import graph is extracted, how communities are assigned, and how the DiscoveryResult is built for downstream wiki stages.",
+      "sections": [
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow from runDiscovery() through graph extraction, detectFileCommunities() Louvain clustering, and DiscoveryResult construction.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface the insider knowledge that's not obvious from signatures — Louvain resolution parameter, dispatch-directory seed groups, test/bench file exclusion via isTestOrBench(), symbol-mode vs file-mode clustering.",
+          "shape": "internals"
+        },
+        {
+          "title": "Entry points",
+          "purpose": "List the public surface a consumer reaches first.",
+          "shape": "entry-points"
+        },
+        {
+          "title": "Invariants",
+          "purpose": "State the rules the module relies on internally and that callers must preserve.",
+          "shape": "key-invariants"
+        }
+      ],
+      "depth": "full",
+      "memberFiles": [
+        "src/wiki/community-detection.ts",
+        "src/wiki/discovery.ts"
+      ],
+      "communityId": "bdd263ea000a4c36",
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/db-layer.md",
+        "wiki/communities/wiki-orchestrator.md",
+        "wiki/communities/wiki-pipeline-internals.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 9
+    },
+    "wiki/communities/config-embeddings.md": {
+      "kind": "community",
+      "slug": "config-embeddings",
+      "title": "Config & Embeddings",
+      "purpose": "Documents the embedding singleton and config loader: how the local transformer model is initialized, how batch embedding works, and how the YAML config file overrides model and dimension defaults. The reference before touching anything that calls embed() or loadConfig().",
+      "sections": [
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow from loadConfig() through applyEmbeddingConfig() to a getEmbedder() call and the embedding pipeline.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it — nearly every module is a consumer.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Tuning",
+          "purpose": "Parameters or config flags that change behavior without code edits — model ID, embedding dimension, batch sizes.",
+          "shape": "tuning-knobs"
+        },
+        {
+          "title": "Entry points",
+          "purpose": "List the public surface a consumer reaches first.",
+          "shape": "entry-points"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface non-obvious behavior: lazy singleton initialization, configureEmbedder() override window, mergeEmbeddings mean-pooling, resetEmbedder() test-only contract."
+        },
+        {
+          "title": "Failure modes",
+          "purpose": "Call out how things break, what the module does about it, and what callers must handle.",
+          "shape": "failure-modes"
+        }
+      ],
+      "depth": "brief",
+      "memberFiles": [
+        "src/config/index.ts",
+        "src/embeddings/embed.ts"
+      ],
+      "communityId": "43ab45b714f2aed7",
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/cli-commands.md",
+        "wiki/communities/mcp-tools.md",
+        "wiki/communities/search-runtime.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 10
+    },
+    "wiki/communities/git-indexer-progress.md": {
+      "kind": "community",
+      "slug": "git-indexer-progress",
+      "title": "Git History Indexer & CLI Progress",
+      "purpose": "Documents the git commit history ingestion module and the CLI progress reporter used during long-running index operations. Small but high-impact: every index command uses both.",
+      "sections": [
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow from a CLI index command through git log parsing, commit batch insertion, and progress reporting.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Entry points",
+          "purpose": "List the public surface a consumer reaches first — cliProgress, createQuietProgress, indexGitHistory.",
+          "shape": "entry-points"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface non-obvious behavior: incremental commit detection, purge of orphaned commits, quiet-vs-verbose progress selection."
+        },
+        {
+          "title": "Failure modes",
+          "purpose": "Call out how things break, what the module does about it, and what callers must handle.",
+          "shape": "failure-modes"
+        }
+      ],
+      "depth": "brief",
+      "memberFiles": [
+        "src/cli/progress.ts",
+        "src/git/indexer.ts"
+      ],
+      "communityId": "39016e3c10cf6e96",
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/cli-commands.md",
+        "wiki/communities/cli-entry-core.md",
+        "wiki/communities/config-embeddings.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 11
+    },
+    "wiki/communities/graph-watcher.md": {
+      "kind": "community",
+      "slug": "graph-watcher",
+      "title": "Import Graph & File Watcher",
+      "purpose": "Documents the static import graph resolver and the filesystem watcher: how inter-file dependencies are extracted and persisted, and how file-change events trigger incremental re-indexing. The reference for understanding dependency tracking and live-index updates.",
+      "sections": [
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow from resolveImports() through per-file import resolution and DB upsert, and the parallel path where startWatcher() responds to fs events.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface the insider knowledge that's not obvious from signatures — path-to-id map construction, import resolution heuristics, watcher debounce mechanics.",
+          "shape": "internals"
+        },
+        {
+          "title": "Entry points",
+          "purpose": "List the public surface a consumer reaches first.",
+          "shape": "entry-points"
+        },
+        {
+          "title": "Failure modes",
+          "purpose": "Call out how things break, what the module does about it, and what callers must handle.",
+          "shape": "failure-modes"
+        }
+      ],
+      "depth": "full",
+      "memberFiles": [
+        "src/graph/resolver.ts",
+        "src/indexing/watcher.ts"
+      ],
+      "communityId": "eb1906b45cbc92a9",
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/cli-commands.md",
+        "wiki/communities/db-layer.md",
+        "wiki/communities/indexing-pipeline.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 12
+    },
+    "wiki/communities/cli-setup.md": {
+      "kind": "community",
+      "slug": "cli-setup",
+      "title": "CLI Setup & IDE Integration",
+      "purpose": "Documents the first-run setup module: how mimirs writes MCP config files for supported IDEs, injects .gitignore entries, detects agent hints, and ensures a valid config file exists. The reference for adding a new IDE target or debugging init failures.",
+      "sections": [
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Tuning",
+          "purpose": "Parameters or config flags that change behavior without code edits — KNOWN_IDES list.",
+          "shape": "tuning-knobs"
+        },
+        {
+          "title": "Entry points",
+          "purpose": "List the public surface a consumer reaches first — runSetup(), ensureMcpJson(), ensureAgentInstructions().",
+          "shape": "entry-points"
+        },
+        {
+          "title": "How it works",
+          "purpose": "Walk through the runSetup() flow: config check, gitignore patch, MCP JSON write, agent instructions write.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Failure modes",
+          "purpose": "Call out how things break, what the module does about it, and what callers must handle.",
+          "shape": "failure-modes"
+        }
+      ],
+      "depth": "brief",
+      "memberFiles": [
+        "src/cli/setup.ts"
+      ],
+      "communityId": "55ae76c84c3f2f21",
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/cli-commands.md",
+        "wiki/communities/config-embeddings.md",
+        "wiki/communities/conversation-server.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 13
+    },
+    "wiki/communities/search-tool.md": {
+      "kind": "community",
+      "slug": "search-tool",
+      "title": "Search MCP Tool",
+      "purpose": "Documents the MCP search tool registration: how registerSearchTools() wires the search, read_relevant, project_map, and related MCP tools to the hybrid search engine and dependency graph. The thin adapter between the MCP protocol and the search-runtime community.",
+      "sections": [
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Entry points",
+          "purpose": "List the public surface a consumer reaches first — registerSearchTools().",
+          "shape": "entry-points"
+        },
+        {
+          "title": "How it works",
+          "purpose": "Describe how registerSearchTools() registers each tool handler and what DB/search calls each handler makes."
+        }
+      ],
+      "depth": "brief",
+      "memberFiles": [
+        "src/tools/search.ts"
+      ],
+      "communityId": "aa3360856c186019",
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/mcp-tools.md",
+        "wiki/communities/search-runtime.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 14
+    },
+    "wiki/communities/wiki-pipeline-internals/src-db-types-ts.md": {
+      "kind": "community-file",
+      "slug": "wiki-pipeline-internals/src-db-types-ts",
+      "title": "src/db/types.ts",
+      "purpose": "Per-file detail for `src/db/types.ts` — a member of the Wiki Pipeline — Types & Internals community.",
+      "sections": [
+        {
+          "title": "Role",
+          "purpose": "1-2 sentences naming the file's role in the parent community: what concern it owns, what other members it leans on.",
+          "shape": "short prose paragraph"
+        },
+        {
+          "title": "Exports",
+          "purpose": "Every export from this file with signature + 1-sentence description of what it does (not just types). Quote constants verbatim (e.g. `DEFAULT_WEIGHT = 0.7`).",
+          "shape": "markdown table: Name | Kind | Signature | What it does"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Non-obvious behavior a reader would miss from signatures alone — silent fallbacks, tuning knobs disguised as constants, defensive guards, heuristics with blind spots. Skip if the file is pure signature glue.",
+          "shape": "bulleted list: bold claim, then 1-3 sentences of elaboration with file:line references"
+        }
+      ],
+      "depth": "standard",
+      "memberFiles": [
+        "src/db/types.ts"
+      ],
+      "communityId": "7f610002b13109b4",
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/wiki-pipeline-internals.md",
+        "wiki/communities/wiki-pipeline-internals/community-synthesis.md",
+        "wiki/communities/wiki-pipeline-internals/content-prefetch.md",
+        "wiki/communities/wiki-pipeline-internals/src-wiki-types-ts.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 15
+    },
+    "wiki/communities/wiki-pipeline-internals/community-synthesis.md": {
+      "kind": "community-file",
+      "slug": "wiki-pipeline-internals/community-synthesis",
+      "title": "src/wiki/community-synthesis.ts",
+      "purpose": "Per-file detail for `src/wiki/community-synthesis.ts` — a member of the Wiki Pipeline — Types & Internals community.",
+      "sections": [
+        {
+          "title": "Role",
+          "purpose": "1-2 sentences naming the file's role in the parent community: what concern it owns, what other members it leans on.",
+          "shape": "short prose paragraph"
+        },
+        {
+          "title": "Exports",
+          "purpose": "Every export from this file with signature + 1-sentence description of what it does (not just types). Quote constants verbatim (e.g. `DEFAULT_WEIGHT = 0.7`).",
+          "shape": "markdown table: Name | Kind | Signature | What it does"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Non-obvious behavior a reader would miss from signatures alone — silent fallbacks, tuning knobs disguised as constants, defensive guards, heuristics with blind spots. Skip if the file is pure signature glue.",
+          "shape": "bulleted list: bold claim, then 1-3 sentences of elaboration with file:line references"
+        }
+      ],
+      "depth": "standard",
+      "memberFiles": [
+        "src/wiki/community-synthesis.ts"
+      ],
+      "communityId": "7f610002b13109b4",
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/wiki-pipeline-internals.md",
+        "wiki/communities/wiki-pipeline-internals/content-prefetch.md",
+        "wiki/communities/wiki-pipeline-internals/src-db-types-ts.md",
+        "wiki/communities/wiki-pipeline-internals/src-wiki-types-ts.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 16
+    },
+    "wiki/communities/wiki-pipeline-internals/content-prefetch.md": {
+      "kind": "community-file",
+      "slug": "wiki-pipeline-internals/content-prefetch",
+      "title": "src/wiki/content-prefetch.ts",
+      "purpose": "Per-file detail for `src/wiki/content-prefetch.ts` — a member of the Wiki Pipeline — Types & Internals community.",
+      "sections": [
+        {
+          "title": "Role",
+          "purpose": "1-2 sentences naming the file's role in the parent community: what concern it owns, what other members it leans on.",
+          "shape": "short prose paragraph"
+        },
+        {
+          "title": "Exports",
+          "purpose": "Every export from this file with signature + 1-sentence description of what it does (not just types). Quote constants verbatim (e.g. `DEFAULT_WEIGHT = 0.7`).",
+          "shape": "markdown table: Name | Kind | Signature | What it does"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Non-obvious behavior a reader would miss from signatures alone — silent fallbacks, tuning knobs disguised as constants, defensive guards, heuristics with blind spots. Skip if the file is pure signature glue.",
+          "shape": "bulleted list: bold claim, then 1-3 sentences of elaboration with file:line references"
+        }
+      ],
+      "depth": "standard",
+      "memberFiles": [
+        "src/wiki/content-prefetch.ts"
+      ],
+      "communityId": "7f610002b13109b4",
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/wiki-pipeline-internals.md",
+        "wiki/communities/wiki-pipeline-internals/community-synthesis.md",
+        "wiki/communities/wiki-pipeline-internals/src-db-types-ts.md",
+        "wiki/communities/wiki-pipeline-internals/src-wiki-types-ts.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 17
+    },
+    "wiki/communities/wiki-pipeline-internals/src-wiki-types-ts.md": {
+      "kind": "community-file",
+      "slug": "wiki-pipeline-internals/src-wiki-types-ts",
+      "title": "src/wiki/types.ts",
+      "purpose": "Per-file detail for `src/wiki/types.ts` — a member of the Wiki Pipeline — Types & Internals community.",
+      "sections": [
+        {
+          "title": "Role",
+          "purpose": "1-2 sentences naming the file's role in the parent community: what concern it owns, what other members it leans on.",
+          "shape": "short prose paragraph"
+        },
+        {
+          "title": "Exports",
+          "purpose": "Every export from this file with signature + 1-sentence description of what it does (not just types). Quote constants verbatim (e.g. `DEFAULT_WEIGHT = 0.7`).",
+          "shape": "markdown table: Name | Kind | Signature | What it does"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Non-obvious behavior a reader would miss from signatures alone — silent fallbacks, tuning knobs disguised as constants, defensive guards, heuristics with blind spots. Skip if the file is pure signature glue.",
+          "shape": "bulleted list: bold claim, then 1-3 sentences of elaboration with file:line references"
+        }
+      ],
+      "depth": "standard",
+      "memberFiles": [
+        "src/wiki/types.ts"
+      ],
+      "communityId": "7f610002b13109b4",
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/wiki-pipeline-internals.md",
+        "wiki/communities/wiki-pipeline-internals/community-synthesis.md",
+        "wiki/communities/wiki-pipeline-internals/content-prefetch.md",
+        "wiki/communities/wiki-pipeline-internals/src-db-types-ts.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 18
+    },
+    "wiki/architecture.md": {
+      "kind": "architecture",
+      "slug": "architecture",
+      "title": "Architecture",
+      "purpose": "Bird's-eye view of how the codebase is organised — communities, their relationships, and the load-bearing files that anchor everything.",
+      "sections": [
+        {
+          "title": "System map",
+          "purpose": "Mermaid diagram showing how communities relate to each other at a high level"
+        },
+        {
+          "title": "Load-bearing files",
+          "purpose": "Short list of the top PageRank files and what they anchor"
+        },
+        {
+          "title": "Entry points",
+          "purpose": "Files with no incoming edges — the graph sinks / true entry points"
+        },
+        {
+          "title": "Cross-cutting dependencies",
+          "purpose": "Communities or modules that everything depends on, pulled out of the main map"
+        },
+        {
+          "title": "Design decisions",
+          "purpose": "3–6 numbered structural choices that shaped the codebase — each one paragraph: the decision, the alternative it beat, and the reason. Source from architectural annotations, the top-community `design-rationale` sections, and root docs (README, ARCHITECTURE, ADRs). Do not fabricate — skip the section only if the bundle truly has no material.",
+          "shape": "numbered list of bold decision titles, each followed by a short paragraph (decision → alternative → reason)"
+        }
+      ],
+      "depth": "standard",
+      "memberFiles": [],
+      "relatedPages": [
+        "wiki/communities/cli-commands.md",
+        "wiki/communities/cli-entry-core.md",
+        "wiki/communities/cli-setup.md",
+        "wiki/communities/community-detection.md",
+        "wiki/communities/config-embeddings.md",
+        "wiki/communities/conversation-server.md",
+        "wiki/communities/db-layer.md",
+        "wiki/communities/git-indexer-progress.md",
+        "wiki/communities/graph-watcher.md",
+        "wiki/communities/indexing-pipeline.md",
+        "wiki/communities/mcp-tools.md",
+        "wiki/communities/search-runtime.md",
+        "wiki/communities/search-tool.md",
+        "wiki/communities/wiki-orchestrator.md",
+        "wiki/communities/wiki-pipeline-internals.md",
+        "wiki/data-flows.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 19
+    },
+    "wiki/data-flows.md": {
+      "kind": "data-flows",
+      "slug": "data-flows",
+      "title": "Data flows",
+      "purpose": "How a request travels end-to-end for each of the project's primary triggers. Pairs with the architecture page: architecture shows where things live, this shows what runs in what order.",
+      "sections": [
+        {
+          "title": "Overview",
+          "purpose": "One paragraph naming the flows and where each is triggered (CLI command, HTTP handler, library entry, watcher event)."
+        },
+        {
+          "title": "Flow 1",
+          "purpose": "Pick the most-run flow. Start with a `sequenceDiagram` tracing the call path across communities, then a numbered step list citing the specific files/functions. Include an `### Error paths` subsection when the flow has real error handling (retries, fallbacks, graceful degradation)."
+        },
+        {
+          "title": "Flow 2",
+          "purpose": "Second most-used flow, same shape as Flow 1. Prefer sequence diagrams; only fall back to flowchart if the flow is a pipeline with no caller/callee relationship."
+        },
+        {
+          "title": "Additional flows",
+          "purpose": "If the codebase has a third or fourth named flow (e.g. background sync, incremental update, pre-flight validation), cover it here. Omit the section entirely when there are no additional flows — do not stub."
+        }
+      ],
+      "depth": "full",
+      "memberFiles": [],
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/cli-commands.md",
+        "wiki/communities/cli-entry-core.md",
+        "wiki/communities/cli-setup.md",
+        "wiki/communities/community-detection.md",
+        "wiki/communities/config-embeddings.md",
+        "wiki/communities/conversation-server.md",
+        "wiki/communities/db-layer.md",
+        "wiki/communities/git-indexer-progress.md",
+        "wiki/communities/graph-watcher.md",
+        "wiki/communities/indexing-pipeline.md",
+        "wiki/communities/mcp-tools.md",
+        "wiki/communities/search-runtime.md",
+        "wiki/communities/search-tool.md",
+        "wiki/communities/wiki-orchestrator.md",
+        "wiki/communities/wiki-pipeline-internals.md",
+        "wiki/getting-started.md"
+      ],
+      "order": 20
+    },
+    "wiki/getting-started.md": {
+      "kind": "getting-started",
+      "slug": "getting-started",
+      "title": "Getting started",
+      "purpose": "Fastest path from zero to a working install. Points onward into the architecture page and the most-used community.",
+      "sections": [
+        {
+          "title": "What this is",
+          "purpose": "One-paragraph summary of the project from the README"
+        },
+        {
+          "title": "Installation",
+          "purpose": "How to install dependencies and build"
+        },
+        {
+          "title": "First run",
+          "purpose": "The shortest path to seeing something work — command, expected output"
+        },
+        {
+          "title": "Where to look next",
+          "purpose": "Pointer to the top community page and the architecture page"
+        }
+      ],
+      "depth": "standard",
+      "memberFiles": [],
+      "relatedPages": [
+        "wiki/architecture.md",
+        "wiki/communities/cli-commands.md",
+        "wiki/communities/cli-entry-core.md",
+        "wiki/communities/cli-setup.md",
+        "wiki/communities/community-detection.md",
+        "wiki/communities/config-embeddings.md",
+        "wiki/communities/conversation-server.md",
+        "wiki/communities/db-layer.md",
+        "wiki/communities/git-indexer-progress.md",
+        "wiki/communities/graph-watcher.md",
+        "wiki/communities/indexing-pipeline.md",
+        "wiki/communities/mcp-tools.md",
+        "wiki/communities/search-runtime.md",
+        "wiki/communities/search-tool.md",
+        "wiki/communities/wiki-orchestrator.md",
+        "wiki/communities/wiki-pipeline-internals.md",
+        "wiki/data-flows.md"
+      ],
+      "order": 21
+    }
+  },
+  "warnings": [],
+  "cluster": "files"
+}

@@ -133,6 +133,38 @@ describe("startWatcher", () => {
     watcher.close();
   });
 
+  test("detects edit to existing file and re-indexes it", async () => {
+    // Pre-index a file
+    const filePath = join(tempDir, "edit-me.md");
+    await writeFixture(tempDir, "edit-me.md", "# Version 1\n\nOriginal content.");
+    const config = await loadConfig(tempDir);
+    await indexFile(filePath, db, config);
+    const before = db.getFileByPath(filePath);
+    expect(before).not.toBeNull();
+    const originalHash = before!.hash;
+
+    const events: string[] = [];
+    const watcher = startWatcher(tempDir, db, config, (msg) => events.push(msg));
+
+    // Mutate file content after watcher is running
+    await writeFixture(tempDir, "edit-me.md", "# Version 2\n\nCompletely different content with new info.");
+
+    // Poll for hash change (debounce + processing varies)
+    let reindexed = false;
+    for (let i = 0; i < 10; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      const after = db.getFileByPath(filePath);
+      if (after && after.hash !== originalHash) {
+        reindexed = true;
+        break;
+      }
+    }
+
+    expect(reindexed).toBe(true);
+
+    watcher.close();
+  });
+
   test("ignores excluded paths", async () => {
     const config = await loadConfig(tempDir);
     config.exclude = [...config.exclude, "**/*.log"];

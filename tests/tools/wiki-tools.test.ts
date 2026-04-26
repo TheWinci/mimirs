@@ -11,7 +11,6 @@ let transport: StdioClientTransport;
 beforeAll(async () => {
   tempDir = await createTempDir();
 
-  // Seed a few files so the index isn't empty
   await writeFixture(
     tempDir,
     "src/db.ts",
@@ -47,7 +46,6 @@ export function search(query: string, db: Database) {
   client = new Client({ name: "wiki-test-client", version: "1.0" });
   await client.connect(transport);
 
-  // Index the test files first
   await client.callTool({
     name: "index_files",
     arguments: { directory: tempDir },
@@ -63,90 +61,158 @@ function getText(result: any): string {
   return (result.content as Array<{ type: string; text: string }>)[0].text;
 }
 
+/** Parse the pending-synthesis checklist to extract community ids. */
+function parsePendingIds(text: string): string[] {
+  const ids: string[] = [];
+  for (const line of text.split("\n")) {
+    const m = line.match(/^-\s+`([a-f0-9]+)`/);
+    if (m) ids.push(m[1]);
+  }
+  return ids;
+}
+
+/** Walk init → synthesis → write_synthesis → init until the manifest exists. */
+async function runFullWikiFlow(dir: string): Promise<string> {
+  const first = await client.callTool({
+    name: "generate_wiki",
+    arguments: { directory: dir },
+  });
+  const firstText = getText(first);
+  const ids = parsePendingIds(firstText);
+
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i];
+    await client.callTool({
+      name: "write_synthesis",
+      arguments: {
+        directory: dir,
+        communityId: id,
+        payload: {
+          communityId: id,
+          name: `Community ${i}`,
+          slug: `community-${i}`,
+          purpose: `Auto-generated synthesis for test community ${i}.`,
+          kind: "community",
+          sections: [
+            { title: "Overview", purpose: "Describe what this community does." },
+          ],
+        },
+      },
+    });
+  }
+
+  const second = await client.callTool({
+    name: "generate_wiki",
+    arguments: { directory: dir },
+  });
+  return getText(second);
+}
+
 describe("generate_wiki", () => {
   test("tool is listed in available tools", async () => {
     const tools = await client.listTools();
     const names = tools.tools.map((t) => t.name);
     expect(names).toContain("generate_wiki");
+    expect(names).toContain("write_synthesis");
   });
 
-  test("init mode returns page list and writing rules", async () => {
+  test("first call returns pending synthesis checklist", async () => {
     const result = await client.callTool({
       name: "generate_wiki",
       arguments: { directory: tempDir },
     });
 
     const text = getText(result);
-    // Should contain the computed page count
+    expect(text).toContain("Step 1 complete");
+    expect(text).toContain("Pending synthesis");
+    expect(text).toContain("generate_wiki(synthesis:");
+    expect(text).toContain("write_synthesis");
+  });
+
+  test("synthesis mode returns per-community prompt", async () => {
+    const initResult = await client.callTool({
+      name: "generate_wiki",
+      arguments: { directory: tempDir },
+    });
+    const ids = parsePendingIds(getText(initResult));
+    expect(ids.length).toBeGreaterThan(0);
+
+    const synthResult = await client.callTool({
+      name: "generate_wiki",
+      arguments: { directory: tempDir, synthesis: ids[0] },
+    });
+    const synthText = getText(synthResult);
+    expect(synthText.length).toBeGreaterThan(50);
+    expect(synthText).toContain(ids[0]);
+  });
+
+  test("write_synthesis rejects invalid slug", async () => {
+    const initResult = await client.callTool({
+      name: "generate_wiki",
+      arguments: { directory: tempDir },
+    });
+    const ids = parsePendingIds(getText(initResult));
+    if (ids.length === 0) return;
+
+    const result = await client.callTool({
+      name: "write_synthesis",
+      arguments: {
+        directory: tempDir,
+        communityId: ids[0],
+        payload: {
+          communityId: ids[0],
+          name: "Bad",
+          slug: "Not Kebab Case",
+          purpose: "x",
+          sections: [{ title: "Overview", purpose: "y" }],
+        },
+      },
+    });
+    const text = getText(result);
+    expect(text).toContain("rejected");
+  });
+
+  test("after all syntheses stored, init returns manifest plan", async () => {
+    const text = await runFullWikiFlow(tempDir);
     expect(text).toContain("Wiki Generation Plan");
     expect(text).toContain("Computed");
     expect(text).toContain("pages");
-    // Should contain writing rules
-    expect(text).toContain("Writing Rules");
-    expect(text).toContain("Kebab-case");
-    expect(text).toContain("Mermaid");
-    expect(text).toContain("No guessing");
-    // Should contain instructions
+    expect(text).toContain("Writing rules");
+    expect(text).toContain("wiki/_meta/writing-rules.md");
     expect(text).toContain("generate_wiki(page: N)");
   });
 
-  test("init mode writes JSON artifacts", async () => {
+  test("manifest + content artifacts written to disk", async () => {
     const { existsSync } = require("fs");
-    // Init was already called in the previous test — artifacts should exist
-    expect(existsSync(join(tempDir, "wiki", "_manifest.json"))).toBe(true);
-    expect(existsSync(join(tempDir, "wiki", "_content.json"))).toBe(true);
-    expect(existsSync(join(tempDir, "wiki", "_classified.json"))).toBe(true);
-    expect(existsSync(join(tempDir, "wiki", "_discovery.json"))).toBe(true);
+    expect(existsSync(join(tempDir, "wiki", "_meta", "_manifest.json"))).toBe(true);
+    expect(existsSync(join(tempDir, "wiki", "_meta", "_content.json"))).toBe(true);
+    expect(existsSync(join(tempDir, "wiki", "_meta", "_classified.json"))).toBe(true);
+    expect(existsSync(join(tempDir, "wiki", "_meta", "_discovery.json"))).toBe(true);
+    expect(existsSync(join(tempDir, "wiki", "_meta", "_syntheses.json"))).toBe(true);
+    expect(existsSync(join(tempDir, "wiki", "_meta", "_bundles.json"))).toBe(true);
     expect(existsSync(join(tempDir, "wiki", "_update-log.md"))).toBe(true);
   });
 
-  test("page mode returns lightweight summary with sections", async () => {
+  test("page mode returns payload with sections", async () => {
     const result = await client.callTool({
       name: "generate_wiki",
       arguments: { directory: tempDir, page: 0 },
     });
 
     const text = getText(result);
-    // Should have page metadata
     expect(text).toContain("Page:");
     expect(text).toContain("**Path:**");
     expect(text).toContain("**Kind:**");
-    // Should have either candidate sections (module/file) or an exemplar (aggregate)
-    const hasCandidates = text.includes("Candidate sections");
-    const hasExemplar = text.includes("**Exemplar:**");
-    expect(hasCandidates || hasExemplar).toBe(true);
-    // Should have available sections manifest
-    expect(text).toContain("Available sections");
+    expect(text).toContain("Sections to write");
   });
 
-  test("page mode with section returns section data", async () => {
-    // First find a page that has an overview section
+  test("page mode with out-of-range index returns error", async () => {
     const result = await client.callTool({
       name: "generate_wiki",
-      arguments: { directory: tempDir, page: 0 },
+      arguments: { directory: tempDir, page: 999 },
     });
-    const summary = getText(result);
-
-    // Try fetching a section — overview or exports if available
-    if (summary.includes("**overview**")) {
-      const sectionResult = await client.callTool({
-        name: "generate_wiki",
-        arguments: { directory: tempDir, page: 0, section: "overview" },
-      });
-      const sectionText = getText(sectionResult);
-      expect(sectionText).toContain("# Overview");
-    }
-  });
-
-  test("page mode with invalid section returns error", async () => {
-    const result = await client.callTool({
-      name: "generate_wiki",
-      arguments: { directory: tempDir, page: 0, section: "nonexistent" },
-    });
-
     const text = getText(result);
-    expect(text).toContain("Unknown section");
-    expect(text).toContain("Valid sections");
+    expect(text.toLowerCase()).toMatch(/out of range|invalid|not found/);
   });
 
   test("warns about empty index for unindexed directory", async () => {
@@ -163,7 +229,6 @@ describe("generate_wiki", () => {
   });
 
   test("resume mode reports remaining pages", async () => {
-    // Init was already called — all pages should be remaining (none written yet)
     const result = await client.callTool({
       name: "generate_wiki",
       arguments: { directory: tempDir, resume: true },
@@ -172,10 +237,11 @@ describe("generate_wiki", () => {
     const text = getText(result);
     expect(text).toContain("Wiki Resume");
     expect(text).toContain("Remaining");
-    expect(text).toContain("Writing Rules");
+    expect(text).toContain("Writing rules");
+    expect(text).toContain("wiki/_meta/writing-rules.md");
   });
 
-  test("page mode without init returns error", async () => {
+  test("page mode without manifest returns error", async () => {
     const emptyDir = await createTempDir();
     const result = await client.callTool({
       name: "generate_wiki",
@@ -183,7 +249,53 @@ describe("generate_wiki", () => {
     });
 
     const text = getText(result);
-    expect(text).toContain("No manifest found");
+    expect(text).toContain("No manifest");
     await cleanupTempDir(emptyDir);
+  });
+
+  test("wiki_lint_page flags missing file reference", async () => {
+    const { writeFileSync, mkdirSync } = require("fs");
+    const badPage = join(tempDir, "wiki", "communities", "bad.md");
+    mkdirSync(join(tempDir, "wiki", "communities"), { recursive: true });
+    writeFileSync(badPage, "# Bad\n\nSee `src/ghost.ts` for details.\n");
+
+    const result = await client.callTool({
+      name: "wiki_lint_page",
+      arguments: { directory: tempDir, path: "wiki/communities/bad.md" },
+    });
+    const text = getText(result);
+    expect(text).toContain("missing-file");
+    expect(text).toContain("src/ghost.ts");
+  });
+
+  test("wiki_lint_page on clean page reports clean", async () => {
+    const { writeFileSync } = require("fs");
+    const goodPage = join(tempDir, "wiki", "communities", "good.md");
+    writeFileSync(goodPage, "# Good\n\nReferences `src/db.ts` which exists.\n");
+
+    const result = await client.callTool({
+      name: "wiki_lint_page",
+      arguments: { directory: tempDir, path: "wiki/communities/good.md" },
+    });
+    const text = getText(result);
+    expect(text.toLowerCase()).toContain("lint clean");
+  });
+
+  test("wiki_rewrite_page returns same shape as generate_wiki(page)", async () => {
+    const viaGenerate = await client.callTool({
+      name: "generate_wiki",
+      arguments: { directory: tempDir, page: 0 },
+    });
+    const viaRewrite = await client.callTool({
+      name: "wiki_rewrite_page",
+      arguments: { directory: tempDir, page: 0 },
+    });
+    const genText = getText(viaGenerate);
+    const rewriteText = getText(viaRewrite);
+    expect(rewriteText).toContain("Page:");
+    expect(rewriteText).toContain("**Path:**");
+    // Same path + kind — content may differ by timestamp-like fields but structure matches.
+    const pathLine = (s: string) => (s.match(/\*\*Path:\*\*.*$/m) ?? [""])[0];
+    expect(pathLine(rewriteText)).toBe(pathLine(genText));
   });
 });

@@ -10,6 +10,30 @@ export function getFileByPath(db: Database, path: string): StoredFile | null {
     .get(path);
 }
 
+/**
+ * Batch-fetch many files by path in a single SQL pass. Returns only the
+ * rows that exist; missing paths are silently omitted (caller should diff).
+ * Used by the wiki bundle builder so a 1k-member community needs one query
+ * instead of N round-trips.
+ */
+export function getFilesByPaths(db: Database, paths: string[]): StoredFile[] {
+  if (paths.length === 0) return [];
+  const BATCH = 499;
+  const out: StoredFile[] = [];
+  for (let i = 0; i < paths.length; i += BATCH) {
+    const batch = paths.slice(i, i + BATCH);
+    const ph = batch.map(() => "?").join(",");
+    out.push(
+      ...db
+        .query<StoredFile, string[]>(
+          `SELECT id, path, hash, indexed_at as indexedAt FROM files WHERE path IN (${ph})`,
+        )
+        .all(...batch),
+    );
+  }
+  return out;
+}
+
 export function upsertFileStart(db: Database, path: string, hash: string): number {
   const existing = getFileByPath(db, path);
   if (existing) {
@@ -97,6 +121,75 @@ export function insertChunkReturningId(
     [chunkId, new Uint8Array(embedding.buffer)]
   );
   return chunkId;
+}
+
+/**
+ * Return the tree-sitter chunk ranges for a file, sorted by `start_line`
+ * ascending. Drives the line-range verification lint: given a cited
+ * `path:L1-L2`, find the chunk whose range covers L1 and compare against
+ * the stored `[start_line, end_line]`. Language-agnostic — bun-chunk
+ * populates these for every indexed file.
+ *
+ * Same-entity chunks are coalesced into one logical range. Bun-chunk
+ * splits large symbols (a 100-LOC function gets two chunks) and ships
+ * each piece with the same `entity_name`. A citation that points at the
+ * symbol — `src/search/hybrid.ts:313-397` for `search()` — should match
+ * the union, not the first split. Without this fold, the lint accepts
+ * the first chunk's range as authoritative and drift goes uncaught.
+ *
+ * Anonymous chunks (`entity_name IS NULL`) stay as individual rows: they
+ * have no logical-grouping key and pass through one-to-one.
+ */
+export function getFileChunkRanges(
+  db: Database,
+  filePath: string,
+): { entityName: string | null; chunkType: string | null; startLine: number; endLine: number }[] {
+  const raw = db
+    .query<
+      {
+        entity_name: string | null;
+        chunk_type: string | null;
+        start_line: number | null;
+        end_line: number | null;
+      },
+      [string]
+    >(
+      `SELECT c.entity_name, c.chunk_type, c.start_line, c.end_line
+       FROM chunks c JOIN files f ON f.id = c.file_id
+       WHERE f.path = ?
+         AND c.start_line IS NOT NULL
+         AND c.end_line IS NOT NULL
+       ORDER BY c.start_line ASC`,
+    )
+    .all(filePath);
+
+  type Range = { entityName: string | null; chunkType: string | null; startLine: number; endLine: number };
+  const grouped = new Map<string, Range>();
+  const anonymous: Range[] = [];
+
+  for (const row of raw) {
+    const r: Range = {
+      entityName: row.entity_name,
+      chunkType: row.chunk_type,
+      startLine: row.start_line as number,
+      endLine: row.end_line as number,
+    };
+    if (!r.entityName) {
+      anonymous.push(r);
+      continue;
+    }
+    const existing = grouped.get(r.entityName);
+    if (!existing) {
+      grouped.set(r.entityName, r);
+    } else {
+      existing.startLine = Math.min(existing.startLine, r.startLine);
+      existing.endLine = Math.max(existing.endLine, r.endLine);
+    }
+  }
+
+  return [...grouped.values(), ...anonymous].sort(
+    (a, b) => a.startLine - b.startLine || a.endLine - b.endLine,
+  );
 }
 
 /** Fetch a chunk by its DB id (for parent chunk lookup at query time). */

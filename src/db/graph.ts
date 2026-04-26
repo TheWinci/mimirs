@@ -255,6 +255,59 @@ export function getDependedOnBy(db: Database, fileId: number): { path: string; s
     .all(fileId);
 }
 
+/**
+ * Batch-fetch dependencies for many files in a single SQL pass. Returns
+ * `{ fromFileId, toPath }` rows so the caller can group per source file.
+ * Used by the wiki bundle builder to avoid N round-trips per community on
+ * 1k+ file projects.
+ */
+export function getDependsOnForFiles(
+  db: Database,
+  fileIds: number[],
+): { fromFileId: number; toPath: string }[] {
+  if (fileIds.length === 0) return [];
+  const BATCH = 499;
+  const out: { fromFileId: number; toPath: string }[] = [];
+  for (let i = 0; i < fileIds.length; i += BATCH) {
+    const batch = fileIds.slice(i, i + BATCH);
+    const ph = batch.map(() => "?").join(",");
+    const rows = db
+      .query<{ fromFileId: number; toPath: string }, number[]>(
+        `SELECT fi.file_id AS fromFileId, f.path AS toPath
+         FROM file_imports fi
+         JOIN files f ON f.id = fi.resolved_file_id
+         WHERE fi.file_id IN (${ph}) AND fi.resolved_file_id IS NOT NULL`,
+      )
+      .all(...batch);
+    out.push(...rows);
+  }
+  return out;
+}
+
+/** Batch reverse-dependency fetch — symmetric to {@link getDependsOnForFiles}. */
+export function getDependedOnByForFiles(
+  db: Database,
+  fileIds: number[],
+): { toFileId: number; fromPath: string }[] {
+  if (fileIds.length === 0) return [];
+  const BATCH = 499;
+  const out: { toFileId: number; fromPath: string }[] = [];
+  for (let i = 0; i < fileIds.length; i += BATCH) {
+    const batch = fileIds.slice(i, i + BATCH);
+    const ph = batch.map(() => "?").join(",");
+    const rows = db
+      .query<{ toFileId: number; fromPath: string }, number[]>(
+        `SELECT fi.resolved_file_id AS toFileId, f.path AS fromPath
+         FROM file_imports fi
+         JOIN files f ON f.id = fi.file_id
+         WHERE fi.resolved_file_id IN (${ph})`,
+      )
+      .all(...batch);
+    out.push(...rows);
+  }
+  return out;
+}
+
 export interface SymbolGraphData {
   files: { id: number; path: string }[];
   imports: { fileId: number; names: string; resolvedFileId: number; isNamespace: boolean }[];
@@ -305,4 +358,79 @@ export function getSymbolGraphData(db: Database): SymbolGraphData {
     }));
 
   return { files, imports, exports, chunks };
+}
+
+/**
+ * Top-level variable-like declarations visible in the project — the union of
+ * exported variables/constants/enums (via `file_exports`) AND file-local
+ * declarations picked up by the chunker (via `chunks` where
+ * `chunk_type='variable'`). Language-agnostic: bun-chunk emits
+ * `chunk_type='variable'` for JS/TS `const`/`let`/`var`, Python module-level
+ * assignments, Rust `const`/`static`, Go `const`/`var`, Java `static final`,
+ * and equivalents across its 26 supported languages — the semantics of
+ * "top-level named value" collapse to one chunk type.
+ *
+ * The lint previously pulled only from `file_exports`, which caused
+ * `constant-missing` false-positives on any prose that correctly cited a
+ * real-but-unexported declaration (logged in the Wave 1 review). A citation
+ * is valid if the name exists as a declaration *anywhere* in the codebase —
+ * export status doesn't change whether the literal is real.
+ *
+ * No case filter in SQL: lowercase entries are returned too. The consuming
+ * lint regex restricts to SCREAMING_SNAKE_CASE on its own (prose only cites
+ * literal tunables by upper-case name), so lowercase rows sit in the map
+ * unused rather than missing.
+ *
+ * When a name exists in both sources, the export entry wins (canonical file,
+ * value comes from the export-matching chunk).
+ */
+export function getProjectConstants(
+  db: Database,
+): Map<string, { name: string; value: string; file: string }> {
+  const out = new Map<string, { name: string; value: string; file: string }>();
+
+  const exportRows = db
+    .query<
+      { name: string; type: string; path: string; snippet: string | null },
+      []
+    >(
+      `SELECT fe.name, fe.type, f.path, c.snippet
+         FROM file_exports fe
+         JOIN files f ON f.id = fe.file_id
+         LEFT JOIN chunks c
+           ON c.file_id = fe.file_id
+          AND LOWER(c.entity_name) = LOWER(fe.name)
+        WHERE fe.type IN ('constant', 'variable', 'enum')`,
+    )
+    .all();
+
+  for (const r of exportRows) {
+    if (!r.snippet) continue;
+    if (out.has(r.name)) continue;
+    out.set(r.name, { name: r.name, value: r.snippet, file: r.path });
+  }
+
+  // Second pass: file-local `const FOO = ...` declarations the chunker picked
+  // up but aren't exported. Skip names already present from the export pass
+  // so exports remain canonical.
+  const localRows = db
+    .query<
+      { name: string; path: string; snippet: string },
+      []
+    >(
+      `SELECT c.entity_name AS name, f.path, c.snippet
+         FROM chunks c
+         JOIN files f ON f.id = c.file_id
+        WHERE c.chunk_type = 'variable'
+          AND c.entity_name IS NOT NULL
+          AND c.snippet IS NOT NULL`,
+    )
+    .all();
+
+  for (const r of localRows) {
+    if (out.has(r.name)) continue;
+    out.set(r.name, { name: r.name, value: r.snippet, file: r.path });
+  }
+
+  return out;
 }

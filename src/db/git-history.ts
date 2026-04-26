@@ -224,6 +224,46 @@ export function textSearchGitCommits(
   return results.slice(0, topK);
 }
 
+/**
+ * Batch variant of {@link getFileHistory}: fetch the top-K commits per
+ * file across many paths in a single SQL pass + JS group. Avoids N
+ * round-trips when the wiki bundle builder needs history for every member
+ * file in a community. Uses exact-match on `git_commit_files.file_path`,
+ * which assumes the indexer stores project-relative paths consistently
+ * with the wiki pipeline's path style. Returns one entry per requested
+ * path (empty array if no commits matched).
+ */
+export function getFileHistoryForPaths(
+  db: Database,
+  filePaths: string[],
+  topK: number = 20,
+): Map<string, GitCommitRow[]> {
+  const out = new Map<string, GitCommitRow[]>();
+  for (const p of filePaths) out.set(p, []);
+  if (filePaths.length === 0) return out;
+  const BATCH = 499;
+  for (let i = 0; i < filePaths.length; i += BATCH) {
+    const batch = filePaths.slice(i, i + BATCH);
+    const ph = batch.map(() => "?").join(",");
+    const rows = db
+      .query<RawRow & { matched_path: string }, string[]>(
+        `SELECT gc.*, gcf.file_path AS matched_path
+         FROM git_commit_files gcf
+         JOIN git_commits gc ON gc.id = gcf.commit_id
+         WHERE gcf.file_path IN (${ph})
+         ORDER BY gc.date DESC`,
+      )
+      .all(...batch);
+    for (const r of rows) {
+      const path = r.matched_path;
+      const arr = out.get(path);
+      if (!arr || arr.length >= topK) continue;
+      arr.push(parseRow(r));
+    }
+  }
+  return out;
+}
+
 export function getFileHistory(
   db: Database,
   filePath: string,
