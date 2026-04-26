@@ -10,6 +10,7 @@ import type {
   ClassifiedSymbol,
   CommunityBundle,
   FileLevelGraph,
+  ServiceProfile,
 } from "./types";
 import { computePageRank } from "./pagerank";
 import {
@@ -18,6 +19,7 @@ import {
   type NearbyDoc,
 } from "./isolate-docs";
 import { catalogEntry, type SectionCatalogEntry } from "./section-catalog";
+import { extractServiceSignals } from "./service-extraction";
 
 /**
  * Thresholds for mandatory sections. Mirrors the v1.1.6 `section-selector`
@@ -172,6 +174,50 @@ export function requiredSectionsFor(
     push("trade-offs", deepReason);
     push("common-gotchas", deepReason);
   }
+
+  // Role-aware backend sections (Phase 4). Injection is data-driven — the
+  // `serviceSignals` bundle carries the role tag and the evidence; if a list
+  // is non-empty, its corresponding section is required. Empty lists yield
+  // nothing so library communities and service-shaped communities without
+  // matched signals stay on the existing template.
+  const ss = bundle.serviceSignals;
+  if (ss) {
+    if (ss.routes.length > 0) {
+      push(
+        "endpoint-catalog",
+        `${ss.routes.length} HTTP route${ss.routes.length === 1 ? "" : "s"} detected — enumerate them with handler + file:line`,
+      );
+      // Request flow only when there's a non-trivial number of routes — a
+      // single route doesn't warrant a sequence diagram.
+      if (ss.routes.length >= 2) {
+        push(
+          "request-flow",
+          `${ss.routes.length} routes — pick top 1-3 by call-depth and trace handler → service → DB / external`,
+        );
+      }
+    }
+    if (ss.queueOps.length > 0) {
+      push(
+        "queue-topology",
+        `${ss.queueOps.length} queue op${ss.queueOps.length === 1 ? "" : "s"} — surface producers/consumers + topic`,
+      );
+      // Pair message-shapes with topology when there are produce ops the
+      // writer can document the payload for.
+      if (ss.queueOps.some((q) => q.kind === "produce")) {
+        push("message-shapes", `community produces messages — document the payload schema per topic`);
+      }
+    }
+    if (ss.dataOps.length > 0) {
+      push("data-stores", `${ss.dataOps.length} data op${ss.dataOps.length === 1 ? "" : "s"} — show stores, models, read/write boundaries`);
+    }
+    if (ss.externalCalls.length > 0) {
+      push("external-services", `${ss.externalCalls.length} external call${ss.externalCalls.length === 1 ? "" : "s"} — document SDK + retry/timeout config`);
+    }
+    if (ss.scheduledJobs.length > 0) {
+      push("scheduled-jobs", `${ss.scheduledJobs.length} scheduled job${ss.scheduledJobs.length === 1 ? "" : "s"} — schedule, handler, failure mode`);
+    }
+  }
+
   return out;
 }
 
@@ -337,6 +383,7 @@ export function buildCommunityBundles(
       projectDir,
       byCommunityId.get(communityIds[i]) ?? [],
       lookups,
+      discovery.serviceProfile,
     ),
   );
   return { bundles, unmatchedDocs: unmatched };
@@ -359,6 +406,7 @@ function buildOneBundle(
   projectDir: string,
   nearbyDocs: NearbyDoc[],
   lookups: BundleLookups,
+  serviceProfile: ServiceProfile | undefined,
 ): CommunityBundle {
   const memberFiles = [...community.files].sort();
   const memberSet = new Set(memberFiles);
@@ -406,11 +454,17 @@ function buildOneBundle(
   const tunableCount = tunablesAll.length;
   const tunables = tunablesAll.slice(0, MAX_TUNABLES);
 
+  // Read each member file once. Content cache is reused for service-signal
+  // extraction below — bundle building used to read the same files twice
+  // (here for LOC, then again in service-extraction for regex). Cache is
+  // dropped at the end of buildOneBundle so it doesn't persist past use.
+  const memberContent = new Map<string, string>();
   const memberLoc: Record<string, number> = {};
   let topMemberLoc = 0;
   for (const file of memberFiles) {
     try {
       const content = readFileSync(resolve(projectDir, file), "utf-8");
+      memberContent.set(file, content);
       const loc = content.split("\n").length;
       memberLoc[file] = loc;
       if (loc > topMemberLoc) topMemberLoc = loc;
@@ -486,6 +540,13 @@ function buildOneBundle(
     projectDir,
   );
 
+  const serviceSignals = extractServiceSignals(
+    memberFiles,
+    serviceProfile,
+    community.path,
+    memberContent,
+  );
+
   return {
     communityId,
     memberFiles,
@@ -506,6 +567,7 @@ function buildOneBundle(
     pageRank: Object.fromEntries(pageRank),
     cohesion: community.cohesion,
     nearbyDocs,
+    serviceSignals,
   };
 }
 
@@ -643,6 +705,26 @@ function flattenModules(modules: DiscoveryModule[]): DiscoveryModule[] {
 }
 
 /**
+ * Header text for a service-signal list. When `total` is set and exceeds
+ * the shown count, the header reads `N shown of M` so the writer LLM
+ * sees the truncation up front rather than discovering it via missing
+ * references.
+ */
+function signalListHeader(shown: number, total: number | undefined): string {
+  if (total === undefined || total === shown) return `${shown}`;
+  return `${shown} shown of ${total}`;
+}
+
+/**
+ * Append `… N more` overflow line when the rendered list was truncated.
+ * No-op when total is unknown or matches shown count.
+ */
+function appendOverflow(lines: string[], shown: number, total: number | undefined): void {
+  if (total === undefined || total <= shown) return;
+  lines.push(`- … (+${total - shown} more — call \`find_usages\` on a member symbol to surface the rest)`);
+}
+
+/**
  * Render the step-4 prompt for one community. Includes the bundle data and
  * the section catalog as building blocks.
  */
@@ -759,6 +841,60 @@ export function renderSynthesisPrompt(
       lines.push("");
       totalBytes += Buffer.byteLength(preview, "utf-8");
       shown++;
+    }
+  }
+
+  if (bundle.serviceSignals) {
+    const ss = bundle.serviceSignals;
+    lines.push(`## Service signals (role: \`${ss.role}\`)`);
+    lines.push(
+      "This community holds backend-service evidence. The role tag is one of `http | messaging | data-access | scheduler | shared | other` — drives which catalog sections (endpoint-catalog, queue-topology, data-stores, scheduled-jobs) are required below. When you ship those sections, populate them from the lists below verbatim — do not paraphrase file:line citations.",
+    );
+    lines.push("");
+    if (ss.routes.length > 0) {
+      lines.push(`**Routes (${signalListHeader(ss.routes.length, ss.totals?.routes)}):**`);
+      for (const r of ss.routes) {
+        const handler = r.handlerSymbol ? ` → \`${r.handlerSymbol}\`` : "";
+        lines.push(`- \`${r.method} ${r.path}\`${handler} — \`${r.file}:${r.line}\``);
+      }
+      appendOverflow(lines, ss.routes.length, ss.totals?.routes);
+      lines.push("");
+    }
+    if (ss.queueOps.length > 0) {
+      lines.push(`**Queue ops (${signalListHeader(ss.queueOps.length, ss.totals?.queueOps)}):**`);
+      for (const q of ss.queueOps) {
+        lines.push(`- ${q.kind} \`${q.topic}\` — \`${q.file}:${q.line}\``);
+      }
+      appendOverflow(lines, ss.queueOps.length, ss.totals?.queueOps);
+      lines.push("");
+    }
+    if (ss.dataOps.length > 0) {
+      lines.push(`**Data ops (${signalListHeader(ss.dataOps.length, ss.totals?.dataOps)}):**`);
+      for (const d of ss.dataOps) {
+        const model = d.model ? ` \`${d.model}\`` : "";
+        lines.push(`- ${d.op}${model} (${d.store}) — \`${d.file}:${d.line}\``);
+      }
+      appendOverflow(lines, ss.dataOps.length, ss.totals?.dataOps);
+      lines.push("");
+    }
+    if (ss.externalCalls.length > 0) {
+      lines.push(`**External calls (${signalListHeader(ss.externalCalls.length, ss.totals?.externalCalls)}):**`);
+      for (const e of ss.externalCalls) {
+        const sdk = e.sdk ? `[${e.sdk}] ` : "";
+        const host = e.host ? `\`${e.host}\` ` : "";
+        lines.push(`- ${sdk}${host}— \`${e.file}:${e.line}\``);
+      }
+      appendOverflow(lines, ss.externalCalls.length, ss.totals?.externalCalls);
+      lines.push("");
+    }
+    if (ss.scheduledJobs.length > 0) {
+      lines.push(`**Scheduled jobs (${signalListHeader(ss.scheduledJobs.length, ss.totals?.scheduledJobs)}):**`);
+      for (const j of ss.scheduledJobs) {
+        const handler = j.handler ? ` → \`${j.handler}\`` : "";
+        lines.push(`- \`${j.schedule}\`${handler} — \`${j.file}:${j.line}\``);
+      }
+      appendOverflow(lines, ss.scheduledJobs.length, ss.totals?.scheduledJobs);
+      lines.push("");
     }
   }
 
