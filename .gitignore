@@ -5,6 +5,8 @@ node_modules/
 .claude/
 .idea/
 .next/
+.ai/
+.junie/
 
 .mcp.json
 
@@ -20,3 +22,5 @@ CLAUDE.md
 ROADMAP.md
 PROCESS.md
 posts.md
+
+wiki/_meta/_pre-regen-snapshot.json
