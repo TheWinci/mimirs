@@ -2,92 +2,84 @@
 
 > [Architecture](../architecture.md)
 >
-> Generated from `79e963f` · 2026-04-26
+> Generated from `b47d98e` · 2026-04-26
 
-Two small but load-bearing files support every long-running index operation in mimirs. `src/git/indexer.ts` ingests git commit history into the RAG database — parsing the log, fetching per-commit file stats, batch-embedding commit messages alongside their changed-file context, and handling force-push recovery. `src/cli/progress.ts` provides the two progress callback styles (verbose and quiet) that any command emitting `onProgress` messages can use. Every `mimirs index` run uses both.
+Two small files that always run together: `src/git/indexer.ts` ingests commit history into the DB, and `src/cli/progress.ts` is the progress reporter every long-running indexing operation calls back through.
 
 ## How it works
 
 ```mermaid
 sequenceDiagram
-  participant cli as "CLI Command"
-  participant prog as "progress.ts"
-  participant idx as "indexGitHistory"
-  participant git as "git subprocess"
-  participant embed as "embedBatchMerged"
-  participant db as "RagDB"
-
-  cli->>prog: createQuietProgress
-  cli->>idx: indexGitHistory
-  idx->>git: "rev-parse show-toplevel"
-  git-->>idx: gitRoot
-  idx->>db: getLastIndexedCommit
-  db-->>idx: "lastHash or null"
-  idx->>git: "git log sinceRef..HEAD"
-  git-->>idx: "raw log output"
-  idx->>git: "diff-tree numstat per batch"
-  git-->>idx: "file change stats"
-  idx->>embed: embedBatchMerged
-  embed-->>idx: "Float32Array[]"
-  idx->>db: insertCommitBatch
-  db-->>idx: done
-  idx-->>cli: GitIndexResult
+    participant cmd as "history index command"
+    participant indexerMod as "indexGitHistory"
+    participant gitProc as "git via Bun.spawn"
+    participant embedFn as "embedBatchMerged"
+    participant ragdb as "RagDB"
+    participant prog as "cliProgress or createQuietProgress"
+    cmd->>indexerMod: "projectDir db onProgress"
+    indexerMod->>gitProc: "rev-parse show-toplevel"
+    indexerMod->>ragdb: "getLastIndexedCommit"
+    indexerMod->>gitProc: "merge-base is-ancestor"
+    indexerMod->>gitProc: "log all sinceRef..HEAD"
+    indexerMod->>indexerMod: "parseGitLog using ASCII separators"
+    indexerMod->>ragdb: "filter via hasCommit"
+    indexerMod->>gitProc: "diff-tree numstat per hash"
+    indexerMod->>gitProc: "log no-walk for parent counts"
+    indexerMod->>embedFn: "batch embed messages plus file context"
+    indexerMod->>ragdb: "insertCommitBatch in groups of 100"
+    indexerMod-->>cmd: "GitIndexResult indexed skipped total"
+    cmd->>prog: "render lines and final summary"
 ```
 
-1. `indexGitHistory` resolves the git root via `git rev-parse --show-toplevel`. If the directory is not a git repository, it calls `onProgress` with an informational message and returns early with zero counts.
-2. It reads `db.getLastIndexedCommit()` to find the last indexed hash. If that hash is still a valid ancestor (`git merge-base --is-ancestor`), it uses `sinceRef..HEAD` to fetch only new commits. If the hash is no longer reachable (force push), `handleForcePush` purges orphaned commits from the DB and recovers the latest surviving hash.
-3. Git log is parsed using ASCII delimiters — `FIELD_SEP = "\x1f"` (unit separator) and `RECORD_SEP = "\x1e"` (record separator) — to avoid conflicts with commit message content.
-4. File changes are fetched via `git diff-tree --no-commit-id -r --numstat` in batches of 50 commits at a time to stay within argument-list limits.
-5. Each commit's embeddable text combines the commit message with a list of changed files and a set of top-level directory names (`modules affected`). This gives the vector search better recall for queries about which subsystem a commit touched.
-6. `embedBatchMerged` batches the embeddings. Inserts are committed to the DB in batches of 100 rows. Progress is reported via `onProgress` as transient messages (overwrite-in-place) so the terminal doesn't scroll.
+`indexGitHistory` finds the git root via `git rev-parse --show-toplevel`, then determines the range. With no explicit `since`, it asks `db.getLastIndexedCommit()` and runs `git merge-base --is-ancestor <last> HEAD`: when that succeeds, the last indexed hash becomes `sinceRef`; when it fails (force push, branch rewrite), control passes to `handleForcePush`, which lists every reachable hash via `git log --format=%H --all`, calls `db.purgeOrphanedCommits(reachable)` to drop indexed commits that no longer exist, and resumes from the latest survivor — or, if none survive, calls `db.clearGitHistory()` and rebuilds. The internal `FIELD_SEP = "\x1f"` and `RECORD_SEP = "\x1e"` ASCII separators are used in the `git log --format` template so commit messages containing newlines, pipes, or quotes parse cleanly. `getFileChanges` runs `git diff-tree --numstat` per hash in batches of 50; `getParentCounts` runs one `git log --format="%H %P" --no-walk <hashes>` for the whole batch and counts space-separated parent hashes. The internal `buildEmbeddableText` concatenates the commit message with a `Files changed: ...` and `Modules affected: ...` summary so vector retrieval can match against module-level intent. `buildDiffSummary` caps at 20 files and appends `... and N more files`. Inserts run through `db.insertCommitBatch` in groups of 100 (the internal `DB_BATCH` constant).
+
+`cliProgress` and `createQuietProgress` are the two progress callbacks. `cliProgress` writes transient messages with `\r` and a column-truncated, padded line so the next persistent message doesn't leave artefacts; persistent messages clear the transient line first via `clearTransient()`, then call `cli.log`. The `file:start` and `file:done` bookkeeping prefixes used by the file indexer are silently dropped in verbose mode. `createQuietProgress(totalFiles)` is the closure factory: it tracks `processed`, `currentFile`, `fileChunksProcessed`, `fileChunksTotal`, parses `file:start <name>` and `Embedded N/M chunks` messages, and renders a single updating `Indexing: P/T files (X%) | a/b — file` line. Only `Found `, `Pruned `, and `Resolved ` summary messages are allowed through as persistent output; everything else is suppressed.
 
 ## Dependencies and consumers
 
 ```mermaid
 flowchart LR
-  subgraph Upstream["Depends on"]
-    db["src/db/index.ts"]
-    embed["src/embeddings/embed.ts"]
-    logUtil["src/utils/log.ts"]
-  end
-  gitIdx["Git Indexer & Progress"]
-  subgraph Downstream["Depended on by"]
-    cliCmds["CLI Commands"]
-    indexing["Indexing Pipeline"]
-  end
-  db --> gitIdx
-  embed --> gitIdx
-  logUtil --> gitIdx
-  gitIdx --> cliCmds
-  gitIdx --> indexing
+    indexerMod["src/git/indexer.ts"]
+    progMod["src/cli/progress.ts"]
+    ragdb["RagDB · src/db/index.ts"]
+    embedMod["src/embeddings/embed.ts"]
+    logMod["src/utils/log.ts"]
+    historyCmd["src/cli/commands/history.ts"]
+    indexCmd["src/cli/commands/index-cmd.ts"]
+    indexerMod --> ragdb
+    indexerMod --> embedMod
+    indexerMod --> logMod
+    progMod --> logMod
+    historyCmd --> indexerMod
+    historyCmd --> progMod
+    indexCmd --> progMod
 ```
 
-Depends on: `src/db/index.ts` (commit insertion and retrieval), `src/embeddings/embed.ts` (batch embedding via `embedBatchMerged`), `src/utils/log.ts` (the `cli` logger in `progress.ts`).
-
-Depended on by: CLI command files that call `indexGitHistory` with a progress callback, and the indexing pipeline's batch-indexing path that wires progress to the active display mode.
+`indexGitHistory` reaches the DB layer (`RagDB.getLastIndexedCommit`, `hasCommit`, `purgeOrphanedCommits`, `clearGitHistory`, `insertCommitBatch`), the embedder (`embedBatchMerged`), and the diagnostic logger. `cliProgress` only depends on `cli` from `src/utils/log.ts`. The two CLI commands that import them are `history` (calls `indexGitHistory` directly) and `index` (uses `cliProgress` / `createQuietProgress` to surface file-indexing progress).
 
 ## Entry points
 
-- `indexGitHistory(projectDir, db, options?)` — the primary entry point. Options: `since` (override the auto-detected start ref), `onProgress` (progress callback, matches the `cliProgress`/`createQuietProgress` signature), `threads` (forwarded to `embedBatchMerged`). Returns `GitIndexResult { indexed, skipped, total }`.
-- `cliProgress(msg, opts?)` — verbose progress callback. Renders transient messages (batch progress, per-file names) as overwrite-in-place terminal lines. Persistent messages (summaries, errors) print on a new line. Silently drops `file:start` / `file:done` bookkeeping messages that the quiet mode handles internally.
-- `createQuietProgress(totalFiles)` — factory that returns a progress callback for quiet mode. Tracks `processed` count, current file name, and per-file chunk embedding progress, rendering a single updating line: `Indexing: X/N files (pct%) | chunksProcessed/chunksTotal — currentFile`. Passes through `"Found ..."`, `"Pruned ..."`, and `"Resolved ..."` summary messages as persistent output; suppresses everything else.
+`indexGitHistory(projectDir, db, options?)` is the one async function callers invoke. The optional `since` overrides the auto-detected `sinceRef`; `onProgress` receives every status message; `threads` is forwarded to `embedBatchMerged` for parallel embedding. The return type `GitIndexResult` carries `indexed`, `skipped`, and `total` so callers can print a summary.
+
+`cliProgress(msg, opts?)` is the verbose-mode callback. Pass `opts: { transient: true }` for an over-writable line; omit it for a persistent line. `createQuietProgress(totalFiles)` returns a callback with the same signature but suppresses per-file output and renders a single rolling progress line. The CLI picks one or the other from the `-v` / `--verbose` flag.
 
 ## Internals
 
-**Incremental commit detection.** The indexer checks `db.hasCommit(hash)` for each parsed commit before adding it to the new-commits list. This means a partial index run (interrupted mid-batch) is safe to resume: already-indexed commits are skipped at the per-hash level, not solely at the `sinceRef` level. `result.skipped` reflects how many commits were in the log range but already in the DB.
+Incremental indexing is the default. With no `since` argument, `db.getLastIndexedCommit()` returns the most recent indexed hash and `merge-base --is-ancestor` decides whether the index can be extended (linear history) or has to be repaired (force push). The repair path is `handleForcePush`: it calls `db.purgeOrphanedCommits(reachable)` with the set of hashes still reachable from any ref, then trusts `getLastIndexedCommit` to return the latest survivor — there is no separate "find fork point" walk because `purgeOrphanedCommits` plus `getLastIndexedCommit` already converge on the right answer.
 
-**Force-push recovery.** When `git merge-base --is-ancestor` returns non-null for the last indexed hash, it means the indexed hash exists in current history and the incremental path is safe. When it returns `null`, a force push is assumed: `handleForcePush` fetches all reachable hashes via `git log --format=%H --all`, calls `db.purgeOrphanedCommits(reachable)` to remove unreachable commits, and reads the new `db.getLastIndexedCommit()` as the recovery point. If no indexed commits survive, `db.clearGitHistory()` triggers a full re-index.
+Quiet mode interprets `file:start <name>`, `Embedded N/M chunks for ...`, and the bare `file:done` token as control messages. Anything else that doesn't match the `Found `/`Pruned `/`Resolved ` prefix is silently dropped — verbose-only chatter never leaks into the quiet rendering. The `Indexing ` (no colon) legacy prefix is also recognised so older callers keep working.
 
-**Quiet-vs-verbose selection.** The caller decides which progress mode to use. `cliProgress` is appropriate when the command is already verbose (e.g. the user passed `--verbose`). `createQuietProgress(totalFiles)` is appropriate for normal-mode index commands where a single progress line is less noisy. The `totalFiles` parameter must be known in advance; for git history indexing (where total is determined after parsing the log), the count is reported via `onProgress("Found N commits to index")` but the quiet-progress `render()` uses an internal counter.
-
-**Transient vs. persistent output.** The `opts?.transient` flag on `onProgress` calls determines whether a message overwrites the current terminal line (`\r`) or starts a new line. `clearTransient()` in `cliProgress` and `createQuietProgress` ensures that a persistent message (like a summary) clears any in-progress transient line before printing, preventing visual overlap.
+The `\r` line trick in `writeTransient` reads the current `process.stdout.columns` (default 80) and truncates with `...` when the message exceeds the available width minus one. The padding to `cols - 1` is what prevents a long previous line from showing through a short replacement.
 
 ## Failure modes
 
-- **Not a git repository.** `findGitRoot` returns `null` if the directory has no git root. `indexGitHistory` calls `onProgress` with an explanatory message and returns `{ indexed: 0, skipped: 0, total: 0 }`. The caller is not expected to treat this as an error.
-- **`git log` returns no output.** Treated as "no commits found" and returns early with zero counts. This can happen on a brand-new repo with no commits, or when `sinceRef..HEAD` is already up to date.
-- **Embedding failure.** `embedBatchMerged` throws on persistent embedding errors. The indexer does not catch this — the caller's try/catch or process exit handles it. Any commits embedded before the failure are not inserted (the insert batch hasn't been called yet for that window).
-- **DB batch insert failure.** Inserts are done in batches of 100 rows. A failure mid-batch leaves the DB in a partially-inserted state for that window. The per-hash `skipped` counter means a clean retry will skip already-inserted commits and re-attempt only the failed window.
+`runGit(args, cwd)` swallows every error and returns `null` — every git invocation in this module checks for null and degrades. A missing `git` binary, an invalid commit range, a permission failure on `.git`: each surfaces as `null` and is handled by the caller. `findGitRoot` returning `null` short-circuits `indexGitHistory` to a no-op with a `Not a git repository` progress message.
+
+`handleForcePush` returns `null` when no commits are reachable (a freshly orphaned index), and the caller responds by clearing the entire git history and rebuilding from scratch. This is the only path that drops indexed data.
+
+`getFileChanges` tolerates the binary-file `-` marker in numstat output by treating it as zero insertions/deletions. A line that fails to parse is dropped silently.
+
+The embed step runs against the entire `newCommits` text array; a failure inside `embedBatchMerged` propagates up and aborts the run before any rows are written. Partial-progress recovery happens on the next run because `db.insertCommitBatch` uses `INSERT OR IGNORE` and re-running picks up where the previous attempt failed.
 
 ## See also
 

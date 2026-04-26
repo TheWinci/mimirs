@@ -2,64 +2,83 @@
 
 > [Architecture](../architecture.md)
 >
-> Generated from `79e963f` · 2026-04-26
+> Generated from `b47d98e` · 2026-04-26
 
-The Search MCP Tool community is a single-file adapter between the MCP protocol and the Search Runtime community. It registers four search-related MCP tools — `search`, `read_relevant`, `search_symbols`, and `write_relevant` — by wiring their schemas and handlers to `src/search/hybrid.ts` and the DB layer. The file contains no retrieval logic of its own; its job is input validation, filter construction, and response formatting.
+The Search MCP Tool community is a single-file adapter (`src/tools/search.ts`) that registers four MCP tool handlers — `search`, `read_relevant`, `search_symbols`, and `write_relevant` — against an `McpServer` instance. It owns no algorithm; the heavy lifting lives in the [Search Runtime](search-runtime.md). Its job is to translate MCP tool calls into `search`, `searchChunks`, or `searchSymbols` invocations and to format the textual response the agent sees.
 
 ## Dependencies and consumers
 
 ```mermaid
 flowchart LR
-    dbSrc["src/db/index.ts"]
-    hybridSrc["src/search/hybrid.ts"]
+  subgraph Upstream["Depends on"]
+    zod["zod"]
+    mcpSdk["modelcontextprotocol/sdk"]
+    pathMod["node:path"]
+    db["src/db/index.ts"]
+    hybridMod["src/search/hybrid.ts"]
     toolsIdx["src/tools/index.ts"]
-    mcpSdk["McpServer"]
-
-    searchToolSrc["src/tools/search.ts"]
-
-    mcpSdk --> searchToolSrc
-    dbSrc --> searchToolSrc
-    hybridSrc --> searchToolSrc
-    toolsIdx --> searchToolSrc
-
-    searchToolSrc --> toolsReg["src/tools/index.ts"]
+  end
+  searchTool["src/tools/search.ts"]
+  subgraph Downstream["Depended on by"]
+    toolsRegistry["src/tools/index.ts"]
+  end
+  zod --> searchTool
+  mcpSdk --> searchTool
+  pathMod --> searchTool
+  db --> searchTool
+  hybridMod --> searchTool
+  toolsIdx --> searchTool
+  searchTool --> toolsRegistry
 ```
 
-`src/tools/search.ts` is consumed by `src/tools/index.ts`, which calls `registerSearchTools(server, getDB)` once at startup alongside the other tool registration functions. Its only dependencies are the MCP SDK, the DB facade, `src/search/hybrid.ts` (for `search` and `searchChunks`), and `src/tools/index.ts` (for `resolveProject` and the `GetDB` type).
+The module imports `z` from `zod` (for input schemas), the `McpServer` type from the `@modelcontextprotocol/sdk` package, `relative` and `resolve` from `node:path`, the `AnnotationRow` and `PathFilter` types from `src/db/index.ts`, the `search` and `searchChunks` functions from `src/search/hybrid.ts`, and `GetDB` plus `resolveProject` from `src/tools/index.ts`. Downstream, the tool registry under `src/tools/index.ts` calls `registerSearchTools` to wire the four handlers into the MCP server.
 
 ## Entry points
 
-`registerSearchTools` is the single export:
+`registerSearchTools(server: McpServer, getDB: GetDB)` is the only export. It registers four `server.tool(...)` handlers in sequence and returns nothing — calling it once is the entire setup. The four tools are:
 
-```ts
-export function registerSearchTools(server: McpServer, getDB: GetDB)
-```
+- **`search`** — natural-language or symbol-name query against the hybrid lexical+semantic index. Returns ranked file paths with snippet previews. Inputs: `query` (1–2000 chars), optional `directory`, `top`, `extensions`, `dirs`, `excludeDirs`. Default `top = config.searchTopK`.
+- **`read_relevant`** — like `search` but returns full chunk contents with entity names and line ranges. Inputs add a `threshold` knob (default `0.3`); default `top = 8`. Surfaces matching annotations inline as `[NOTE]` blocks.
+- **`search_symbols`** — name-based lookup against the pre-built symbol index. Inputs: optional `symbol`, optional `exact` (default false → substring), optional `type` (one of `function | class | interface | type | enum | export`), optional `directory`, optional `top` (default 20 when searching, 200 when listing). Returns each symbol's path, type, child count, reference counts, and re-export flag.
+- **`write_relevant`** — semantic insertion-point finder. Inputs: `content` (1–5000 chars), optional `directory`, `top` (default 3), `threshold` (default 0.3). Internally fetches `topN * 3` chunks from `searchChunks` then dedupes to the highest-scoring chunk per file before slicing to `topN`.
 
-It takes the live MCP server instance and a `GetDB` factory function (a closure that returns the `RagDB` singleton for a given project directory). All tool registrations happen synchronously inside the function body — there is no async initialization.
+Every handler resolves the project directory through `resolveProject(directory, getDB)`, which threads the optional `directory` arg through `RAG_PROJECT_DIR` env and `cwd()` and returns `{ projectDir, db, config }`. None of the handlers are exported individually — they're only reachable through MCP after `registerSearchTools` has run.
 
 ## How it works
 
-`registerSearchTools` calls `server.tool(name, description, schema, handler)` four times. Each handler follows the same pattern: call `resolveProject(directory, getDB)` to obtain `projectDir`, `db`, and `config`, then build a `PathFilter` if scoping parameters are present, then delegate to the search layer.
+```mermaid
+sequenceDiagram
+  participant agent as "MCP client"
+  participant srv as "McpServer"
+  participant handler as "search handler"
+  participant proj as "resolveProject"
+  participant filterFn as "buildFilter"
+  participant hybrid as "search.hybrid"
+  participant ragDb as "RagDB"
 
-### `search` — File-level semantic search
+  agent->>srv: "search tool call"
+  srv->>handler: "params"
+  handler->>proj: "directory + getDB"
+  proj-->>handler: "projectDir + db + config"
+  handler->>filterFn: "extensions + dirs"
+  filterFn-->>handler: "PathFilter or undefined"
+  handler->>hybrid: "search query"
+  hybrid->>ragDb: "DB queries"
+  ragDb-->>hybrid: "ranked rows"
+  hybrid-->>handler: "results"
+  handler-->>srv: "formatted text content"
+  srv-->>agent: "text response"
+```
 
-The `search` tool calls `search(query, ragDb, top ?? config.searchTopK, 0, config.hybridWeight, config.generated, filter)` and formats results as `score  path\n  snippet...` lines, capped at 400 characters per snippet. The threshold is hardcoded to `0` (no minimum score), so all returned results appear regardless of quality. The tool appends a footer tip suggesting `read_relevant` as the next step.
+The `search` handler measures wall time with `performance.now()`, calls `search(query, ragDb, top ?? config.searchTopK, 0, config.hybridWeight, config.generated, filter)`, and formats `results.length` rows as `score.toFixed(4)  path` followed by the first snippet (sliced to 400 chars). The header reports total indexed file count via `ragDb.getStatus().totalFiles` and the elapsed milliseconds. Empty results return a friendly message that suggests calling `index_files` first.
 
-### `read_relevant` — Chunk-level semantic search
+`read_relevant` calls `searchChunks` with the same hybrid weight and config, defaults `top = 8` and `threshold = 0.3`, then enriches the response with annotations. It batch-fetches `ragDb.getAnnotations(relPath)` for every unique result path (avoiding an N+1 query loop) and surfaces matching annotations as `[NOTE]` blocks above each chunk — an annotation matches when its `symbolName` is null (file-wide) or equals the chunk's `entityName`. The footer's tip pulls the first non-empty `entityName` from the result set so the suggestion (`call find_usages("<name>")`) is concrete rather than placeholder.
 
-The `read_relevant` tool calls `searchChunks(query, ragDb, top ?? 8, threshold ?? 0.3, config.hybridWeight, config.generated, filter)`. Unlike `search`, it has a default threshold of `0.3` to filter low-quality matches. The response includes exact line ranges (`path:startLine-endLine`) when available, the entity name (function or class), and any annotations stored for the file/symbol. Annotations are batch-fetched for all unique result paths using `ragDb.getAnnotations(relPath)` — one query per unique path rather than per chunk — and filtered to chunks matching the entity name. The footer suggests `find_usages` for the top entity name.
+`search_symbols` is a thin wrapper over `ragDb.searchSymbols(symbol, exact, type, top)`. The result formatter shows the symbol's type plus optional child counts, reference counts, and a "re-export" tag, and slices any attached snippet to 300 characters. The footer's `find_usages` and `read_relevant` tips use the first result's symbol name.
 
-### `search_symbols` — Exact symbol lookup
+`write_relevant` runs `searchChunks(content, ragDb, topN * 3, threshold ?? 0.3, hybridWeight, config.generated)` — the 3× over-fetch lets the per-file dedupe (a `Map<path, chunk>` keeping the highest-scoring chunk per path) still return `topN` distinct files. For each candidate it builds an "Insert after `<entityName>`" or "Insert after chunk N" hint and trails the last 150 chars of the chunk content as an anchor.
 
-The `search_symbols` tool delegates to `ragDb.searchSymbols(symbol, exact ?? false, type, top)`. It formats results with enrichment metadata: symbol type, child count (for classes/interfaces), reference count and module count (for widely-used symbols), and re-export flag. The tool supports listing all exports by omitting the `symbol` parameter, filtered by `type` — which is how the wiki bundle builder discovers all symbols in a community.
-
-### `write_relevant` — Insertion point finder
-
-The `write_relevant` tool calls `searchChunks(content, ragDb, topN * 3, threshold ?? 0.3, ...)` with the content to insert (not a search query), deduplicates to the best-scoring chunk per file, and returns the top N candidates. Each result includes the chunk's entity name and the last 150 characters of its content as an anchor for the insertion point. This tool is used by developers to find the right file and position before adding new code.
-
-### Filter construction
-
-`buildFilter` (a module-private function) constructs a `PathFilter` from the optional `extensions`, `dirs`, and `excludeDirs` parameters. Directory paths are resolved to absolute using `resolve(projectDir, d)` because the DB stores absolute paths — passing relative dirs would produce empty results silently. If none of the three parameters are populated, `buildFilter` returns `undefined` and no filtering is applied.
+`buildFilter(projectDir, extensions, dirs, excludeDirs)` is the only private helper. It returns `undefined` when none of the three filter fields are populated (so the underlying search isn't slowed by an empty filter object), otherwise it resolves each `dirs` and `excludeDirs` entry against `projectDir` so the filter's absolute paths line up with what's stored in the index.
 
 ## See also
 

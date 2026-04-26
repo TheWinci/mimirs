@@ -2,94 +2,109 @@
 
 > [Architecture](../architecture.md)
 >
-> Generated from `79e963f` · 2026-04-26
+> Generated from `b47d98e` · 2026-04-26
 
-`src/cli/setup.ts` is the first-run initialization module for mimirs. It writes MCP configuration JSON to the right location for each supported IDE, injects tool-usage instructions into agent instruction files (CLAUDE.md, Cursor rules, Windsurf rules, JetBrains guidelines, GitHub Copilot instructions), patches `.gitignore` to exclude the `.mimirs/` index directory, and ensures a valid config file exists. The reference for adding a new IDE target or debugging init failures.
+The CLI Setup module is one file (`src/cli/setup.ts`) that handles first-run integration: writing `.mimirs/config.json` if absent, patching `.gitignore`, dropping per-IDE rule files (CLAUDE.md, Cursor `.mdc`, Windsurf trigger rule, Junie guideline, Copilot instructions), and upserting MCP server entries into the JSON config files those IDEs read. It is the touchpoint between mimirs and the agent harness.
 
 ## Dependencies and consumers
 
 ```mermaid
 flowchart LR
   subgraph Upstream["Depends on"]
-    config["src/config/index.ts"]
-    nodeFs["node:fs"]
-    nodeOs["node:os"]
+    fs["node:fs"]
+    fsp["node:fs/promises"]
+    pathMod["node:path"]
+    osMod["node:os"]
+    readlineMod["node:readline"]
+    cfg["src/config/index.ts"]
   end
-  cliSetup["cli/setup.ts"]
+  setup["src/cli/setup.ts"]
   subgraph Downstream["Depended on by"]
-    cliCmds["CLI Commands"]
+    cliEntry["src/cli/index.ts"]
+    cmds["src/cli/commands"]
   end
-  config --> cliSetup
-  nodeFs --> cliSetup
-  nodeOs --> cliSetup
-  cliSetup --> cliCmds
+  fs --> setup
+  fsp --> setup
+  pathMod --> setup
+  osMod --> setup
+  readlineMod --> setup
+  cfg --> setup
+  setup --> cliEntry
+  setup --> cmds
 ```
 
-Depends on: `src/config/index.ts` (the `loadConfig` function, which auto-creates `.mimirs/config.json` when absent), `node:fs` and `node:fs/promises` for file existence checks and writes, `node:os` for `homedir()` (Windsurf writes to `~/.codeium/`), and `node:readline` for the interactive `confirm` prompt.
-
-Depended on by: CLI command files that invoke `runSetup` or individual ensure-* functions directly.
+The module reads and writes through the standard Node `fs` / `fs/promises` / `path` / `os` / `readline` surfaces and pulls `loadConfig` from `src/config/index.ts` for the auto-create behaviour. Downstream, the CLI entry (`src/cli/index.ts`) and command handlers under `src/cli/commands` import `runSetup`, `parseIdeFlag`, and `mcpConfigSnippet`.
 
 ## Tuning
 
-The set of supported IDEs is controlled by a single exported constant:
+| Knob | Value | Effect |
+|------|-------|--------|
+| `KNOWN_IDES` | `["claude", "cursor", "windsurf", "copilot", "jetbrains"]` | The closed set of IDE targets. `parseIdeFlag("all")` expands to this list verbatim; any value not in this set is reported via `unknownIdes` so the CLI can warn. |
 
-```
-KNOWN_IDES: KnownIDE[] = ["claude", "cursor", "windsurf", "copilot", "jetbrains"]
-```
-
-Adding a new IDE means: (1) extending the `KnownIDE` union type, (2) adding the new string to `KNOWN_IDES`, (3) adding the corresponding write logic inside `ensureAgentInstructions` and `ensureMcpJson`. All validation in `parseIdeFlag` and `unknownIdes` derives from `KNOWN_IDES` automatically — no additional changes needed there.
-
-The `MARKER = "<!-- mimirs -->"` constant is used to detect whether a file already has mimirs content before writing. Changing this string would cause setup to re-inject instructions into files that already have them under the old marker.
-
-The MCP server entry written to all JSON config files uses `bunx mimirs@latest serve` with `RAG_PROJECT_DIR` set to the absolute project path. The `mcpConfigSnippet(projectDir)` function returns this snippet as a formatted JSON string for display in CLI output.
+The `MARKER` constant `<!-- mimirs -->` is the idempotency token written into every injected markdown rule file; subsequent runs that find the marker (or the literal `## Using mimirs tools` heading) skip the file. There are no other tunables — the path layout for each IDE is hardcoded inside `ensureAgentInstructions` and `ensureMcpJson`.
 
 ## Entry points
 
-- `runSetup(projectDir, ides?)` — the top-level orchestrator. Calls `ensureConfig`, `ensureAgentInstructions`, `ensureMcpJson`, and `ensureGitignore` in sequence and returns `SetupResult { actions: string[], unknownIdes: string[] }`. Actions is the list of files created or modified; unknownIdes is the list of IDE names passed by the user that weren't in `KNOWN_IDES`.
-- `ensureMcpJson(projectDir, ides?)` — writes the `bunx mimirs@latest serve` MCP server entry to IDE-specific JSON config files. Always writes Claude Code's `.mcp.json`; conditionally writes Cursor's `.cursor/mcp.json` and JetBrains' `.junie/mcp.json` based on directory existence or explicit `ides` flag. Windsurf writes to `~/.codeium/windsurf/mcp_config.json` and `~/.codeium/mcp_config.json` (global, not project-local).
-- `ensureAgentInstructions(projectDir, ides?)` — injects the `INSTRUCTIONS_BLOCK` into agent instruction files. Always writes `CLAUDE.md`. Cursor gets a `.mdc` file with frontmatter (`alwaysApply: true`); Windsurf gets a `.md` file with `trigger: always_on` frontmatter; JetBrains gets a plain markdown file in `.junie/guidelines/`; GitHub Copilot gets `.github/copilot-instructions.md`.
-- `ensureConfig(projectDir)` — calls `loadConfig(projectDir)`, which auto-creates `.mimirs/config.json` if it doesn't exist. Returns a human-readable action string if a file was created, `null` if it already existed.
-- `ensureGitignore(projectDir)` — creates `.gitignore` with `.mimirs/` if it doesn't exist, or appends `.mimirs/` if the file exists but doesn't already contain it.
-- `detectAgentHints(projectDir)` — probes for IDE configuration directories (`.mcp.json`, `.cursor/`, `.junie/`, `.windsurf/`) and returns human-readable instructions for how to add mimirs to each detected IDE's MCP config.
-- `parseIdeFlag(value)` — parses a comma-separated IDE flag string into a list of IDE names. The special value `"all"` expands to all entries in `KNOWN_IDES`.
-- `confirm(question)` — interactive yes/no prompt over stdin. Returns `true` for any answer that isn't `"n"` (note: the default is yes).
+`runSetup(projectDir, ides?)` is the top-level orchestrator. It chains `ensureConfig`, `ensureAgentInstructions`, `ensureMcpJson`, and `ensureGitignore` in that order, accumulates the action strings each helper returns, and returns a `SetupResult { actions, unknownIdes }`. The `actions` list is what the CLI prints to stdout so the user sees exactly what changed.
+
+`ensureConfig(projectDir)` returns `"Created .mimirs/config.json"` on first run (delegating to `loadConfig`, which writes the defaults) or `null` if the file already exists. `ensureGitignore(projectDir)` writes a fresh `.gitignore` with `# mimirs index\n.mimirs/\n` when none exists; otherwise it appends only if no line trims to `.mimirs/` or `.mimirs`.
+
+`ensureAgentInstructions(projectDir, ides?)` is the rule-file writer. It always touches `CLAUDE.md` (Claude Code is the primary target), conditionally writes the Cursor `.mdc`, the Windsurf `.md` trigger rule, the Junie guideline, and the Copilot instructions file. Each helper short-circuits when the marker is already present.
+
+`ensureMcpJson(projectDir, ides?)` upserts the `mimirs` entry inside `mcpServers` for every IDE config it finds (or that's forced via `ides`). The entry is `{ command: "bunx", args: ["mimirs@latest", "serve"], env: { RAG_PROJECT_DIR: <abs> } }`. `mcpConfigSnippet(projectDir)` returns the same shape as a JSON string for users who want to paste it manually.
+
+`detectAgentHints(projectDir)` returns one help line per IDE config it sees on disk (`.mcp.json`, `.cursor/`, `.junie/`, `.windsurf/`); when nothing is detected it returns the generic `"Add to your agent's MCP config under mcpServers:"` line.
+
+`parseIdeFlag(value)` accepts `"all"` (which expands to `KNOWN_IDES`) or a comma-separated list of names; lowercases each token. `confirm(question)` is a thin readline wrapper that resolves true unless the user types `n` or `N`.
 
 ## How it works
 
 ```mermaid
 sequenceDiagram
-  participant cmd as "CLI Command"
+  participant cli as "cli command"
   participant setup as "runSetup"
-  participant config as "ensureConfig"
-  participant instructions as "ensureAgentInstructions"
+  participant cfgFn as "ensureConfig"
+  participant agent as "ensureAgentInstructions"
   participant mcp as "ensureMcpJson"
-  participant gitignore as "ensureGitignore"
+  participant gi as "ensureGitignore"
 
-  cmd->>setup: runSetup
-  setup->>config: ensureConfig
-  config-->>setup: "action or null"
-  setup->>instructions: ensureAgentInstructions
-  instructions-->>setup: "actions[]"
-  setup->>mcp: ensureMcpJson
-  mcp-->>setup: "actions[]"
-  setup->>gitignore: ensureGitignore
-  gitignore-->>setup: "action or null"
-  setup-->>cmd: "SetupResult with actions"
+  cli->>setup: "projectDir + ides"
+  setup->>cfgFn: projectDir
+  cfgFn-->>setup: "config action or null"
+  setup->>agent: "projectDir + ides"
+  agent-->>setup: "list of actions"
+  setup->>mcp: "projectDir + ides"
+  mcp-->>setup: "list of actions"
+  setup->>gi: projectDir
+  gi-->>setup: "gitignore action or null"
+  setup-->>cli: "SetupResult"
 ```
 
-Each step is idempotent. `ensureConfig` returns `null` if `.mimirs/config.json` already exists. `injectMarkdown` checks for `MARKER` or the `"## Using mimirs tools"` heading before writing, so re-running setup on an already-initialized project produces no actions. `upsertMcpJson` checks for `raw.mcpServers?.["mimirs"]` before modifying a JSON file.
+1. `ensureConfig` checks `.mimirs/config.json`. If absent, it calls `loadConfig(projectDir)` which writes the defaults; the action `"Created .mimirs/config.json"` is recorded. If present, returns `null`.
+2. `ensureAgentInstructions` injects the `INSTRUCTIONS_BLOCK` (a long markdown block listing every mimirs MCP tool with usage guidance) into each IDE's rule file. The Claude Code path (`CLAUDE.md` at project root) is unconditional; the others are gated on either an existing IDE directory (`.cursor/`, `.windsurf/`, `.junie/`, `.github/`) or the IDE being explicitly forced via the `ides` flag, in which case the directory is created first. Cursor uses `MDC_BLOCK` (frontmatter `description: mimirs tool usage instructions` and `alwaysApply: true`); Windsurf uses `WINDSURF_BLOCK` (frontmatter `trigger: always_on`); the rest use plain markdown via `MARKDOWN_BLOCK`.
+3. `ensureMcpJson` upserts `mcpServers.mimirs` into `.mcp.json` (always), `.cursor/mcp.json`, `.junie/mcp.json`, and Windsurf's two global configs at `~/.codeium/windsurf/mcp_config.json` (standalone) and `~/.codeium/mcp_config.json` (JetBrains plugin). `upsertMcpJson` parses the existing JSON, returns `null` if `mcpServers.mimirs` is already set, otherwise writes the merged config back.
+4. `ensureGitignore` patches `.gitignore` last so failures upstream don't leave `.mimirs/` un-ignored.
+5. The accumulated `actions` array plus any unknown IDE names returned by `unknownIdes(ides)` are wrapped into `SetupResult` and returned.
 
-The `ides` parameter controls which optional IDE targets are written. When a directory for an IDE doesn't exist and the IDE isn't in the `ides` set, that IDE is skipped entirely. This means running `mimirs init` in a Cursor project (with `.cursor/` present) automatically includes Cursor without requiring `--ide cursor`.
-
-Windsurf is the only IDE that writes to global config (`~/.codeium/`) rather than the project directory. This is intentional — Windsurf's MCP config is user-scoped, not project-scoped.
+The order matters: config first (so the directory exists and downstream code can read settings), then rule files (cheap, idempotent), then MCP JSON (which may need a created directory from the rule-file step for forced IDEs), and finally gitignore.
 
 ## Failure modes
 
-- **Corrupt `.cursor/mcp.json` or `.junie/mcp.json`.** `upsertMcpJson` wraps the JSON parse in a try/catch. If parsing fails, it returns a message like `"Skipped [path] (invalid JSON — fix it manually or delete it)"` rather than overwriting the file. This prevents silently clobbering a corrupt config.
-- **`ensureGitignore` on a path without write permission.** `writeFile` throws an OS error. Setup does not catch this — the command-level error handler is expected to surface it to the user.
-- **`detectAgentHints` finds no IDE markers.** Returns a single fallback entry: `"Add to your agent's MCP config under mcpServers:"`. This is informational, not an error — the function always returns at least one string.
-- **`confirm` called non-interactively (e.g. in CI).** readline reads from stdin; if stdin is closed or returns EOF, the promise may never resolve. Callers should avoid `confirm` in non-interactive contexts or pipe `"y\n"` to stdin.
-- **Unknown IDE names.** `parseIdeFlag` passes unknown names through; `unknownIdes` filters them and returns them in `SetupResult.unknownIdes`. The CLI command surfaces these as warnings. Unknown names are silently skipped in `ensureAgentInstructions` and `ensureMcpJson`.
+**Existing rule file with no marker.** `injectMarkdown` and `injectMdc` check both for the literal `<!-- mimirs -->` marker and (for markdown) the `## Using mimirs tools` heading. If neither is present, the block is appended after a trimmed double-newline. If the user has manually written a `## Using mimirs tools` section without the marker, the helper still skips them — preserving user content.
+
+**Invalid JSON in an MCP config.** `upsertMcpJson` wraps `JSON.parse` in a try/catch. On parse failure it returns `"Skipped <path> (invalid JSON — fix it manually or delete it)"` rather than overwriting. The user keeps their broken file and the action list shows the skip.
+
+**Missing IDE directory without an `--ide` flag.** The Cursor, Windsurf, Junie, and Copilot paths are all guarded by `existsSync(...)`. Users who don't have those IDEs installed see no surprise files; users who do want a target without the directory pass the IDE name through `parseIdeFlag` and the helper creates the directory first.
+
+**Unknown IDE names.** `parseIdeFlag` accepts arbitrary strings and lowercases them; `unknownIdes` returns the subset that is not in `KNOWN_IDES`. The CLI prints these so the user knows about the typo. Note that unknown names do not abort setup — the known ones still run.
+
+**Concurrent runs.** No locking. The helpers each read-then-write JSON files, so two simultaneous `runSetup` invocations could lose changes. In practice the CLI is one-shot and this hasn't been a problem.
+
+**Path resolution.** `mcpServerEntry` calls `resolve(projectDir)` to embed an absolute path in the MCP env, so a relative `projectDir` is resolved against `cwd()`. Symlinks are not normalised — if `projectDir` is itself a symlink, the symlink path is what gets written into `RAG_PROJECT_DIR`.
+
+**`ensureGitignore` doesn't dedupe broadly.** The check is `content.split("\n").some(line => line.trim() === ".mimirs/" || line.trim() === ".mimirs")`. A pattern like `*.mimirs` or `**/.mimirs/` won't match, so a hand-edited gitignore with a slightly different pattern still gets a second `.mimirs/` entry appended.
+
+**Windsurf has two MCP configs.** Standalone Windsurf reads `~/.codeium/windsurf/mcp_config.json`; the JetBrains plugin reads `~/.codeium/mcp_config.json`. `ensureMcpJson` writes to both, so a user who runs only one of them sees a redundant write — there's no detection of which is in use, by design (the writes are idempotent and harmless).
 
 ## See also
 

@@ -1,7 +1,7 @@
 {
-  "fileCount": 180,
-  "chunkCount": 2184,
-  "lastIndexed": "2026-04-26T06:24:31.147Z",
+  "fileCount": 207,
+  "chunkCount": 2967,
+  "lastIndexed": "2026-04-26T12:43:47.874Z",
   "modules": [
     {
       "name": "src",
@@ -117,9 +117,12 @@
             "GettingStartedBundle",
             "ContentCache",
             "PagePayload",
-            "WikiPlanResult"
+            "WikiPlanResult",
+            "PreRegenSnapshotPage",
+            "PreRegenSnapshot",
+            "PageDiff"
           ],
-          "fanIn": 66,
+          "fanIn": 72,
           "fanOut": 7,
           "internalEdges": 53,
           "cohesion": 0.9636363636363636
@@ -255,11 +258,50 @@
           "cohesion": 0.4
         },
         {
+          "name": "indexing",
+          "path": "src/indexing",
+          "entryFile": "src/indexing/indexer.ts",
+          "files": [
+            "src/graph/resolver.ts",
+            "src/indexing/chunker.ts",
+            "src/indexing/indexer.ts",
+            "src/indexing/parse.ts",
+            "src/indexing/watcher.ts",
+            "src/utils/dir-guard.ts"
+          ],
+          "exports": [
+            "resolveImports",
+            "resolveImportsForFile",
+            "buildPathToIdMap",
+            "buildIdToPathMap",
+            "GraphOptions",
+            "generateProjectMap",
+            "Chunk",
+            "KNOWN_EXTENSIONS",
+            "ChunkTextResult",
+            "chunkText",
+            "IndexResult",
+            "indexFile",
+            "indexDirectory",
+            "ParsedFile",
+            "parseFile",
+            "Watcher",
+            "startWatcher",
+            "DirCheckResult",
+            "checkIndexDir"
+          ],
+          "fanIn": 52,
+          "fanOut": 7,
+          "internalEdges": 9,
+          "cohesion": 0.6
+        },
+        {
           "name": "wiki",
           "path": "src/wiki",
           "entryFile": "src/wiki/index.ts",
           "files": [
             "src/tools/wiki-tools.ts",
+            "src/wiki/diff-page.ts",
             "src/wiki/index.ts",
             "src/wiki/lint-page.ts",
             "src/wiki/section-catalog.ts",
@@ -269,6 +311,7 @@
             "registerWikiTools",
             "communityReadBreadcrumbs",
             "suggestedQueriesFor",
+            "diffPage",
             "runDiscovery",
             "runCategorization",
             "buildPageTree",
@@ -296,41 +339,22 @@
             "paletteEntries",
             "paletteForRequired",
             "catalogEntry",
+            "SNAPSHOT_FILENAME",
             "appendInitLog",
-            "appendIncrementalLog"
+            "CommitEntry",
+            "appendFallbackLog",
+            "appendQueueStub",
+            "appendNarrative",
+            "snapshotPath",
+            "writeSnapshot",
+            "readSnapshot",
+            "deleteSnapshot",
+            "migrateHeader"
           ],
-          "fanIn": 6,
-          "fanOut": 31,
-          "internalEdges": 12,
-          "cohesion": 1.2
-        },
-        {
-          "name": "indexing",
-          "path": "src/indexing",
-          "entryFile": "src/indexing/indexer.ts",
-          "files": [
-            "src/indexing/chunker.ts",
-            "src/indexing/indexer.ts",
-            "src/indexing/parse.ts",
-            "src/utils/dir-guard.ts"
-          ],
-          "exports": [
-            "Chunk",
-            "KNOWN_EXTENSIONS",
-            "ChunkTextResult",
-            "chunkText",
-            "IndexResult",
-            "indexFile",
-            "indexDirectory",
-            "ParsedFile",
-            "parseFile",
-            "DirCheckResult",
-            "checkIndexDir"
-          ],
-          "fanIn": 39,
-          "fanOut": 7,
-          "internalEdges": 4,
-          "cohesion": 0.6666666666666666
+          "fanIn": 14,
+          "fanOut": 35,
+          "internalEdges": 19,
+          "cohesion": 1.2666666666666666
         },
         {
           "name": "search",
@@ -500,29 +524,6 @@
           ],
           "fanIn": 116,
           "fanOut": 1,
-          "internalEdges": 3,
-          "cohesion": 3
-        },
-        {
-          "name": "graph",
-          "path": "src/graph",
-          "entryFile": "src/graph/resolver.ts",
-          "files": [
-            "src/graph/resolver.ts",
-            "src/indexing/watcher.ts"
-          ],
-          "exports": [
-            "resolveImports",
-            "resolveImportsForFile",
-            "buildPathToIdMap",
-            "buildIdToPathMap",
-            "GraphOptions",
-            "generateProjectMap",
-            "Watcher",
-            "startWatcher"
-          ],
-          "fanIn": 15,
-          "fanOut": 2,
           "internalEdges": 3,
           "cohesion": 3
         },
@@ -2118,7 +2119,7 @@
             }
           ],
           "fanIn": 3,
-          "fanOut": 26,
+          "fanOut": 36,
           "isEntryPoint": false
         },
         {
@@ -2303,6 +2304,18 @@
           ],
           "fanIn": 2,
           "fanOut": 16,
+          "isEntryPoint": false
+        },
+        {
+          "path": "src/wiki/diff-page.ts",
+          "exports": [
+            {
+              "name": "diffPage",
+              "type": "function"
+            }
+          ],
+          "fanIn": 2,
+          "fanOut": 1,
           "isEntryPoint": false
         },
         {
@@ -2718,7 +2731,7 @@
               "type": "function"
             }
           ],
-          "fanIn": 3,
+          "fanIn": 2,
           "fanOut": 4,
           "isEntryPoint": false
         },
@@ -2836,9 +2849,21 @@
             {
               "name": "WikiPlanResult",
               "type": "interface"
+            },
+            {
+              "name": "PreRegenSnapshotPage",
+              "type": "interface"
+            },
+            {
+              "name": "PreRegenSnapshot",
+              "type": "interface"
+            },
+            {
+              "name": "PageDiff",
+              "type": "interface"
             }
           ],
-          "fanIn": 88,
+          "fanIn": 95,
           "fanOut": 1,
           "isEntryPoint": false
         },
@@ -2846,15 +2871,51 @@
           "path": "src/wiki/update-log.ts",
           "exports": [
             {
+              "name": "SNAPSHOT_FILENAME",
+              "type": "variable"
+            },
+            {
               "name": "appendInitLog",
               "type": "function"
             },
             {
-              "name": "appendIncrementalLog",
+              "name": "CommitEntry",
+              "type": "interface"
+            },
+            {
+              "name": "appendFallbackLog",
+              "type": "function"
+            },
+            {
+              "name": "appendQueueStub",
+              "type": "function"
+            },
+            {
+              "name": "appendNarrative",
+              "type": "function"
+            },
+            {
+              "name": "snapshotPath",
+              "type": "function"
+            },
+            {
+              "name": "writeSnapshot",
+              "type": "function"
+            },
+            {
+              "name": "readSnapshot",
+              "type": "function"
+            },
+            {
+              "name": "deleteSnapshot",
+              "type": "function"
+            },
+            {
+              "name": "migrateHeader",
               "type": "function"
             }
           ],
-          "fanIn": 2,
+          "fanIn": 15,
           "fanOut": 2,
           "isEntryPoint": false
         },
@@ -3200,6 +3261,188 @@
           "exports": [],
           "fanIn": 0,
           "fanOut": 6,
+          "isEntryPoint": true
+        },
+        {
+          "path": "tests/wiki/update-log.test.ts",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 10,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/_meta/writing-rules.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/_update-log.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/architecture.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/communities/cli-commands.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/communities/cli-entry-core.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/communities/cli-setup.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/communities/community-detection.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/communities/config-embeddings.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/communities/conversation-server.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/communities/db-layer.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/communities/git-indexer-progress.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/communities/graph-watcher.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/communities/indexing-pipeline.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/communities/mcp-tools.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/communities/search-runtime.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/communities/search-tool.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/communities/wiki-orchestrator.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/communities/wiki-pipeline-internals.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/communities/wiki-pipeline-internals/community-synthesis.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/communities/wiki-pipeline-internals/content-prefetch.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/communities/wiki-pipeline-internals/src-db-types-ts.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/communities/wiki-pipeline-internals/src-wiki-types-ts.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/data-flows.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/getting-started.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/index.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
           "isEntryPoint": true
         }
       ],
@@ -4905,16 +5148,6 @@
           "source": "./pagerank"
         },
         {
-          "from": "src/wiki/update-log.ts",
-          "to": "src/wiki/types.ts",
-          "source": "./types"
-        },
-        {
-          "from": "src/wiki/update-log.ts",
-          "to": "src/wiki/staleness.ts",
-          "source": "./staleness"
-        },
-        {
           "from": "src/wiki/isolate-docs.ts",
           "to": "src/wiki/types.ts",
           "source": "./types"
@@ -6135,6 +6368,11 @@
           "source": "../db/types"
         },
         {
+          "from": "src/wiki/diff-page.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
           "from": "src/tools/wiki-tools.ts",
           "to": "src/tools/index.ts",
           "source": "./index"
@@ -6221,6 +6459,56 @@
         },
         {
           "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/update-log.ts",
+          "source": "../wiki/update-log"
+        },
+        {
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/update-log.ts",
+          "source": "../wiki/update-log"
+        },
+        {
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/update-log.ts",
+          "source": "../wiki/update-log"
+        },
+        {
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/update-log.ts",
+          "source": "../wiki/update-log"
+        },
+        {
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/update-log.ts",
+          "source": "../wiki/update-log"
+        },
+        {
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/update-log.ts",
+          "source": "../wiki/update-log"
+        },
+        {
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/diff-page.ts",
+          "source": "../wiki/diff-page"
+        },
+        {
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../wiki/types"
+        },
+        {
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../wiki/types"
+        },
+        {
+          "from": "src/tools/wiki-tools.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../wiki/types"
+        },
+        {
+          "from": "src/tools/wiki-tools.ts",
           "to": "src/wiki/types.ts",
           "source": "../wiki/types"
         },
@@ -6263,6 +6551,66 @@
           "from": "src/tools/wiki-tools.ts",
           "to": "src/db/index.ts",
           "source": "../db"
+        },
+        {
+          "from": "src/wiki/update-log.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "src/wiki/update-log.ts",
+          "to": "src/wiki/types.ts",
+          "source": "./types"
+        },
+        {
+          "from": "tests/wiki/update-log.test.ts",
+          "to": "src/wiki/update-log.ts",
+          "source": "../../src/wiki/update-log"
+        },
+        {
+          "from": "tests/wiki/update-log.test.ts",
+          "to": "src/wiki/update-log.ts",
+          "source": "../../src/wiki/update-log"
+        },
+        {
+          "from": "tests/wiki/update-log.test.ts",
+          "to": "src/wiki/update-log.ts",
+          "source": "../../src/wiki/update-log"
+        },
+        {
+          "from": "tests/wiki/update-log.test.ts",
+          "to": "src/wiki/update-log.ts",
+          "source": "../../src/wiki/update-log"
+        },
+        {
+          "from": "tests/wiki/update-log.test.ts",
+          "to": "src/wiki/update-log.ts",
+          "source": "../../src/wiki/update-log"
+        },
+        {
+          "from": "tests/wiki/update-log.test.ts",
+          "to": "src/wiki/update-log.ts",
+          "source": "../../src/wiki/update-log"
+        },
+        {
+          "from": "tests/wiki/update-log.test.ts",
+          "to": "src/wiki/update-log.ts",
+          "source": "../../src/wiki/update-log"
+        },
+        {
+          "from": "tests/wiki/update-log.test.ts",
+          "to": "src/wiki/diff-page.ts",
+          "source": "../../src/wiki/diff-page"
+        },
+        {
+          "from": "tests/wiki/update-log.test.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../../src/wiki/types"
+        },
+        {
+          "from": "tests/wiki/update-log.test.ts",
+          "to": "src/wiki/types.ts",
+          "source": "../../src/wiki/types"
         }
       ]
     },
@@ -6600,12 +6948,13 @@
         },
         {
           "path": "src/wiki",
-          "fileCount": 16,
+          "fileCount": 17,
           "files": [
             "categorization.ts",
             "community-detection.ts",
             "community-synthesis.ts",
             "content-prefetch.ts",
+            "diff-page.ts",
             "discovery.ts",
             "index.ts",
             "isolate-docs.ts",
@@ -6619,7 +6968,7 @@
             "types.ts",
             "update-log.ts"
           ],
-          "totalExports": 101,
+          "totalExports": 114,
           "fanIn": 4,
           "fanOut": 4
         },
@@ -6810,7 +7159,7 @@
         },
         {
           "path": "tests/wiki",
-          "fileCount": 10,
+          "fileCount": 11,
           "files": [
             "categorization.test.ts",
             "community-detection.test.ts",
@@ -6821,11 +7170,73 @@
             "page-payload.test.ts",
             "page-tree.test.ts",
             "staleness.test.ts",
-            "synthesis-prompt.test.ts"
+            "synthesis-prompt.test.ts",
+            "update-log.test.ts"
           ],
           "totalExports": 0,
           "fanIn": 0,
           "fanOut": 6
+        },
+        {
+          "path": "wiki/_meta",
+          "fileCount": 1,
+          "files": [
+            "writing-rules.md"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 0
+        },
+        {
+          "path": "wiki",
+          "fileCount": 5,
+          "files": [
+            "_update-log.md",
+            "architecture.md",
+            "data-flows.md",
+            "getting-started.md",
+            "index.md"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 0
+        },
+        {
+          "path": "wiki/communities",
+          "fileCount": 15,
+          "files": [
+            "cli-commands.md",
+            "cli-entry-core.md",
+            "cli-setup.md",
+            "community-detection.md",
+            "config-embeddings.md",
+            "conversation-server.md",
+            "db-layer.md",
+            "git-indexer-progress.md",
+            "graph-watcher.md",
+            "indexing-pipeline.md",
+            "mcp-tools.md",
+            "search-runtime.md",
+            "search-tool.md",
+            "wiki-orchestrator.md",
+            "wiki-pipeline-internals.md"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 0
+        },
+        {
+          "path": "wiki/communities/wiki-pipeline-internals",
+          "fileCount": 4,
+          "files": [
+            "community-synthesis.md",
+            "content-prefetch.md",
+            "src-db-types-ts.md",
+            "src-wiki-types-ts.md"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 0
         }
       ],
       "edges": [
@@ -6982,7 +7393,7 @@
         {
           "from": "tests/wiki",
           "to": "src/wiki",
-          "importCount": 37
+          "importCount": 47
         },
         {
           "from": "tests/wiki",
@@ -7337,7 +7748,7 @@
         {
           "from": "src/tools",
           "to": "src/wiki",
-          "importCount": 22
+          "importCount": 32
         }
       ]
     }
