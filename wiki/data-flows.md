@@ -2,7 +2,7 @@
 
 > [Architecture](architecture.md)
 >
-> Generated from `b47d98e` · 2026-04-26
+> Generated from `6a2d580` · 2026-04-26
 
 ## Overview
 

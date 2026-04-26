@@ -1,6 +1,6 @@
 # Architecture
 
-> Generated from `b47d98e` · 2026-04-26
+> Generated from `6a2d580` · 2026-04-26
 
 Mimirs is a persistent project memory and RAG system for AI coding agents. The codebase is organised as 14 cohesive communities under `src/`, each anchored by an entry file that re-exports a narrow surface, plus a benchmark suite under `benchmarks/` and shared test helpers under `tests/`. The communities below are the Louvain partitions of mimirs' own import graph — exactly the structure the wiki pipeline produces when run against any project.
 

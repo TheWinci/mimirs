@@ -1,7 +1,7 @@
 {
-  "fileCount": 207,
-  "chunkCount": 2967,
-  "lastIndexed": "2026-04-26T12:43:47.874Z",
+  "fileCount": 210,
+  "chunkCount": 3232,
+  "lastIndexed": "2026-04-26T14:46:59.176Z",
   "modules": [
     {
       "name": "src",
@@ -3348,14 +3348,7 @@
           "isEntryPoint": true
         },
         {
-          "path": "wiki/communities/graph-watcher.md",
-          "exports": [],
-          "fanIn": 0,
-          "fanOut": 0,
-          "isEntryPoint": true
-        },
-        {
-          "path": "wiki/communities/indexing-pipeline.md",
+          "path": "wiki/communities/indexing-runtime.md",
           "exports": [],
           "fanIn": 0,
           "fanOut": 0,
@@ -3383,7 +3376,35 @@
           "isEntryPoint": true
         },
         {
-          "path": "wiki/communities/wiki-orchestrator.md",
+          "path": "wiki/communities/wiki-orchestration.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/communities/wiki-orchestration/index.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/communities/wiki-orchestration/lint-page.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/communities/wiki-orchestration/update-log.md",
+          "exports": [],
+          "fanIn": 0,
+          "fanOut": 0,
+          "isEntryPoint": true
+        },
+        {
+          "path": "wiki/communities/wiki-orchestration/wiki-tools.md",
           "exports": [],
           "fanIn": 0,
           "fanOut": 0,
@@ -7203,7 +7224,7 @@
         },
         {
           "path": "wiki/communities",
-          "fileCount": 15,
+          "fileCount": 14,
           "files": [
             "cli-commands.md",
             "cli-entry-core.md",
@@ -7213,13 +7234,25 @@
             "conversation-server.md",
             "db-layer.md",
             "git-indexer-progress.md",
-            "graph-watcher.md",
-            "indexing-pipeline.md",
+            "indexing-runtime.md",
             "mcp-tools.md",
             "search-runtime.md",
             "search-tool.md",
-            "wiki-orchestrator.md",
+            "wiki-orchestration.md",
             "wiki-pipeline-internals.md"
+          ],
+          "totalExports": 0,
+          "fanIn": 0,
+          "fanOut": 0
+        },
+        {
+          "path": "wiki/communities/wiki-orchestration",
+          "fileCount": 4,
+          "files": [
+            "index.md",
+            "lint-page.md",
+            "update-log.md",
+            "wiki-tools.md"
           ],
           "totalExports": 0,
           "fanIn": 0,
