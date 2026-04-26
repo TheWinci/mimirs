@@ -2,6 +2,7 @@ import { basename, dirname } from "path";
 import type { RagDB } from "../db";
 import { generateProjectMap } from "../graph/resolver";
 import {
+  detectDispatchDirectories,
   detectFileCommunities,
   detectSymbolCommunities,
   type ClusterMode,
@@ -95,6 +96,19 @@ export function runDiscovery(
 
   // Detect modules. Louvain is the default; directory heuristic is kept as
   // a fallback for sparse graphs where Louvain returns nothing useful.
+  //
+  // Auto-detected dispatch directories (sibling files sharing a parent but
+  // not each other) are seeded into a single community so Louvain can't
+  // scatter them across unrelated clusters. Generic, no per-project config.
+  const seedGroups = detectDispatchDirectories(fileGraph);
+  if (seedGroups.length > 0) {
+    warnings.push(
+      `Dispatch-directory heuristic seeded ${seedGroups.length} community group${
+        seedGroups.length === 1 ? "" : "s"
+      }: ${seedGroups.map((g) => g.label).join(", ")}`,
+    );
+  }
+
   let modules: DiscoveryModule[] = [];
 
   if (cluster === "symbols") {
@@ -102,10 +116,10 @@ export function runDiscovery(
     modules = detectSymbolCommunities(symbolData, fileGraph, projectDir);
     if (modules.length === 0) {
       warnings.push("Symbol graph too sparse — falling back to file-level Louvain");
-      modules = detectFileCommunities(fileGraph);
+      modules = detectFileCommunities(fileGraph, { seedGroups });
     }
   } else {
-    modules = detectFileCommunities(fileGraph);
+    modules = detectFileCommunities(fileGraph, { seedGroups });
   }
 
   if (modules.length === 0) {
@@ -233,6 +247,7 @@ function buildModuleFromDir(
     fanIn: dir.fanIn,
     fanOut: dir.fanOut,
     internalEdges,
+    cohesion: moduleCohesion(files.length, internalEdges),
   };
 }
 
@@ -275,7 +290,14 @@ function buildModuleFromFiles(
     fanIn: Math.max(0, fanIn),
     fanOut: Math.max(0, fanOut),
     internalEdges,
+    cohesion: moduleCohesion(files.length, internalEdges),
   };
+}
+
+function moduleCohesion(fileCount: number, internalEdges: number): number {
+  if (fileCount <= 1) return 1;
+  const possible = (fileCount * (fileCount - 1)) / 2;
+  return possible === 0 ? 0 : internalEdges / possible;
 }
 
 function flatProjectFallback(
@@ -341,6 +363,7 @@ function flatProjectFallback(
       fanIn: 0,
       fanOut: 0,
       internalEdges: 0,
+      cohesion: 0,
     });
   }
 
@@ -372,16 +395,21 @@ function nestModules(modules: DiscoveryModule[]): DiscoveryModule[] {
     (a, b) => b.path.split("/").length - a.path.split("/").length
   );
 
-  const nested = new Set<string>();
+  // Track nesting by module instance, not by path. Multiple Louvain
+  // communities can resolve to the same `commonDirPrefix` (e.g., several
+  // sibling clusters all rooted at `src/wiki`). Keying on path caused every
+  // module sharing that prefix to be filtered as "nested" once any single
+  // one was attached, silently dropping the rest along with their files.
+  const nested = new Set<DiscoveryModule>();
   for (let i = 0; i < sorted.length; i++) {
     for (let j = i + 1; j < sorted.length; j++) {
-      if (sorted[i].path.startsWith(sorted[j].path + "/") && !nested.has(sorted[i].path)) {
+      if (sorted[i].path.startsWith(sorted[j].path + "/") && !nested.has(sorted[i])) {
         if (!sorted[j].children) sorted[j].children = [];
         sorted[j].children!.push(sorted[i]);
-        nested.add(sorted[i].path);
+        nested.add(sorted[i]);
       }
     }
   }
 
-  return sorted.filter((m) => !nested.has(m.path));
+  return sorted.filter((m) => !nested.has(m));
 }

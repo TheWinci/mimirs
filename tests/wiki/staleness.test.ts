@@ -3,19 +3,20 @@ import { classifyStaleness } from "../../src/wiki/staleness";
 import type {
   PageManifest,
   ManifestPage,
-  ClassifiedInventory,
-  ClassifiedModule,
-  ClassifiedFile,
+  CommunityBundle,
+  SynthesesFile,
 } from "../../src/wiki/types";
 
 function makePage(overrides: Partial<ManifestPage> = {}): ManifestPage {
   return {
-    kind: overrides.kind ?? "module",
-    focus: overrides.focus,
-    tier: overrides.tier ?? "module",
-    title: overrides.title ?? "m",
+    kind: overrides.kind ?? "community",
+    slug: overrides.slug ?? "test",
+    title: overrides.title ?? "Test",
+    purpose: overrides.purpose ?? "",
+    sections: overrides.sections ?? [],
     depth: overrides.depth ?? "standard",
-    sourceFiles: overrides.sourceFiles ?? [],
+    memberFiles: overrides.memberFiles ?? [],
+    communityId: overrides.communityId,
     relatedPages: overrides.relatedPages ?? [],
     order: overrides.order ?? 0,
   };
@@ -26,7 +27,7 @@ function makeManifest(
   lastGitRef = "abc",
 ): PageManifest {
   return {
-    version: 2,
+    version: 3,
     generatedAt: "2026-01-01T00:00:00Z",
     lastGitRef,
     pageCount: Object.keys(pages).length,
@@ -35,264 +36,188 @@ function makeManifest(
   };
 }
 
-function makeModule(overrides: Partial<ClassifiedModule> = {}): ClassifiedModule {
+function makeBundle(id: string, files: string[]): CommunityBundle {
   return {
-    name: overrides.name ?? "m",
-    path: overrides.path ?? "src/m",
-    entryFile: overrides.entryFile ?? "src/m/index.ts",
-    files: overrides.files ?? ["src/m/index.ts"],
-    qualifiesAsModulePage: true,
-    reason: "",
-    hubs: [],
-    bridges: [],
-    entityCount: 0,
-    fileCount: overrides.fileCount ?? 1,
-    exportCount: 1,
-    fanIn: 1,
-    fanOut: 1,
-    value: 1,
+    communityId: id,
+    memberFiles: files,
+    exports: [],
+    tunables: [],
+    topMemberLoc: 0,
+    memberLoc: {},
+    tunableCount: 0,
+    exportCount: 0,
+    externalConsumers: [],
+    externalDependencies: [],
+    consumersByFile: {},
+    dependenciesByFile: {},
+    recentCommits: [],
+    annotations: [],
+    topRankedFile: files[0] ?? null,
+    memberPreviews: [],
+    pageRank: {},
+    cohesion: 1,
+    nearbyDocs: [],
   };
 }
 
-function makeClassified(
-  modules: ClassifiedModule[] = [],
-  files: ClassifiedFile[] = [],
-): ClassifiedInventory {
-  return { symbols: [], files, modules, warnings: [] };
+function makeSyntheses(ids: string[], members: Record<string, string[]> = {}): SynthesesFile {
+  const out: SynthesesFile = { version: 1, payloads: {}, memberSets: {} };
+  for (const id of ids) {
+    out.payloads[id] = {
+      communityId: id,
+      name: id,
+      slug: id,
+      purpose: "",
+      sections: [{ title: "x", purpose: "y" }],
+      kind: "community",
+    };
+    out.memberSets[id] = members[id] ?? [];
+  }
+  return out;
 }
 
 describe("classifyStaleness", () => {
-  test("module-file page stale when its source file changes", () => {
+  test("community page stale when one of its member files changes", () => {
     const old = makeManifest({
-      "wiki/modules/m/foo.md": makePage({
-        kind: "file",
-        focus: "module-file",
-        sourceFiles: ["src/m/foo.ts"],
-        depth: "standard",
-      }),
+      "wiki/communities/alpha.md": makePage({ slug: "alpha", communityId: "a", memberFiles: ["src/a.ts", "src/b.ts"] }),
     });
-    const fresh = makeManifest({
-      "wiki/modules/m/foo.md": makePage({
-        kind: "file",
-        focus: "module-file",
-        sourceFiles: ["src/m/foo.ts"],
-        depth: "standard",
-      }),
-    });
+    const fresh = old;
+    const bundles = [makeBundle("a", ["src/a.ts", "src/b.ts"])];
     const report = classifyStaleness(
-      old,
-      fresh,
-      makeClassified(),
-      new Set(),
-      new Set(["src/m/foo.ts"]),
+      old, fresh, bundles, makeSyntheses(["a"]),
+      new Set(), new Set(), new Set(["src/b.ts"]),
     );
     expect(report.stale).toHaveLength(1);
-    expect(report.stale[0].wikiPath).toBe("wiki/modules/m/foo.md");
-    expect(report.stale[0].triggers).toContain("src/m/foo.ts");
+    expect(report.stale[0].wikiPath).toBe("wiki/communities/alpha.md");
+    expect(report.stale[0].triggers).toContain("src/b.ts");
   });
 
-  test("module-file page fresh when an unrelated file changes", () => {
+  test("community page fresh when an unrelated file changes", () => {
     const old = makeManifest({
-      "wiki/modules/m/foo.md": makePage({
-        kind: "file",
-        focus: "module-file",
-        sourceFiles: ["src/m/foo.ts"],
-      }),
+      "wiki/communities/alpha.md": makePage({ slug: "alpha", communityId: "a", memberFiles: ["src/a.ts"] }),
     });
+    const bundles = [makeBundle("a", ["src/a.ts"])];
     const report = classifyStaleness(
-      old,
-      old,
-      makeClassified(),
-      new Set(),
-      new Set(["src/other/bar.ts"]),
+      old, old, bundles, makeSyntheses(["a"]),
+      new Set(), new Set(), new Set(["src/other.ts"]),
     );
     expect(report.stale).toHaveLength(0);
   });
 
-  test("module page stale when any file in its module changes (not just entry)", () => {
+  test("architecture page stale when community set shifts", () => {
     const old = makeManifest({
-      "wiki/modules/m.md": makePage({
-        kind: "module",
-        title: "m",
-        sourceFiles: ["src/m/index.ts"],
-      }),
-    });
-    const report = classifyStaleness(
-      old,
-      old,
-      makeClassified([
-        makeModule({
-          name: "m",
-          files: ["src/m/index.ts", "src/m/helper.ts"],
-        }),
-      ]),
-      new Set(),
-      new Set(["src/m/helper.ts"]),
-    );
-    expect(report.stale).toHaveLength(1);
-    expect(report.stale[0].triggers).toContain("src/m/helper.ts");
-  });
-
-  test("module page stale when depth changes", () => {
-    const old = makeManifest({
-      "wiki/modules/m.md": makePage({
-        kind: "module",
-        title: "m",
-        sourceFiles: ["src/m/index.ts"],
-        depth: "brief",
-      }),
+      "wiki/communities/alpha.md": makePage({ slug: "alpha", communityId: "a" }),
+      "wiki/architecture.md": makePage({ kind: "architecture", slug: "architecture", title: "Architecture" }),
     });
     const fresh = makeManifest({
-      "wiki/modules/m.md": makePage({
-        kind: "module",
-        title: "m",
-        sourceFiles: ["src/m/index.ts"],
-        depth: "full",
-      }),
+      "wiki/beta.md": makePage({ slug: "beta", communityId: "b" }),
+      "wiki/architecture.md": makePage({ kind: "architecture", slug: "architecture", title: "Architecture" }),
     });
+    const bundles = [makeBundle("b", ["src/b.ts"])];
     const report = classifyStaleness(
-      old,
-      fresh,
-      makeClassified([makeModule({ name: "m" })]),
-      new Set(),
-      new Set(),
-    );
-    expect(report.stale).toHaveLength(1);
-    expect(report.stale[0].triggers[0]).toMatch(/depth changed/);
-  });
-
-  test("aggregate page fresh when only an interior module file changes", () => {
-    const modulePage = makePage({
-      kind: "module",
-      title: "m",
-      sourceFiles: ["src/m/index.ts"],
-    });
-    const aggregatePage = makePage({
-      kind: "aggregate",
-      focus: "architecture",
-      tier: "aggregate",
-      title: "Architecture",
-      sourceFiles: [],
-    });
-    const old = makeManifest({
-      "wiki/modules/m.md": modulePage,
-      "wiki/architecture.md": aggregatePage,
-    });
-    const report = classifyStaleness(
-      old,
-      old,
-      makeClassified(
-        [makeModule({ name: "m", files: ["src/m/index.ts", "src/m/helper.ts"] })],
-        // helper.ts is NOT a hub
-        [{ path: "src/m/helper.ts", fanIn: 0, fanOut: 0, isHub: false, bridges: [], entities: [] }],
-      ),
-      new Set(), // no entry points
-      new Set(["src/m/helper.ts"]),
-    );
-    const agg = report.stale.find((s) => s.wikiPath === "wiki/architecture.md");
-    expect(agg).toBeUndefined();
-  });
-
-  test("aggregate page stale when a hub file changes", () => {
-    const aggregatePage = makePage({
-      kind: "aggregate",
-      focus: "architecture",
-      tier: "aggregate",
-      title: "Architecture",
-      sourceFiles: [],
-    });
-    const old = makeManifest({ "wiki/architecture.md": aggregatePage });
-    const report = classifyStaleness(
-      old,
-      old,
-      makeClassified(
-        [],
-        [{ path: "src/core.ts", fanIn: 20, fanOut: 5, isHub: true, bridges: [], entities: [] }],
-      ),
-      new Set(),
-      new Set(["src/core.ts"]),
-    );
-    expect(report.stale).toHaveLength(1);
-    expect(report.stale[0].wikiPath).toBe("wiki/architecture.md");
-    expect(report.stale[0].triggers).toContain("src/core.ts");
-  });
-
-  test("aggregate page stale when an entry point file changes", () => {
-    const aggregatePage = makePage({
-      kind: "aggregate",
-      focus: "architecture",
-      tier: "aggregate",
-      title: "Architecture",
-    });
-    const old = makeManifest({ "wiki/architecture.md": aggregatePage });
-    const report = classifyStaleness(
-      old,
-      old,
-      makeClassified(),
-      new Set(["src/cli.ts"]),
-      new Set(["src/cli.ts"]),
-    );
-    expect(report.stale).toHaveLength(1);
-    expect(report.stale[0].triggers).toContain("src/cli.ts");
-  });
-
-  test("aggregate page stale when the module-page set changes", () => {
-    const aggregatePage = makePage({
-      kind: "aggregate",
-      focus: "architecture",
-      tier: "aggregate",
-      title: "Architecture",
-    });
-    const old = makeManifest({
-      "wiki/modules/gone.md": makePage({ kind: "module", title: "gone" }),
-      "wiki/architecture.md": aggregatePage,
-    });
-    const fresh = makeManifest({
-      "wiki/modules/new.md": makePage({ kind: "module", title: "new" }),
-      "wiki/architecture.md": aggregatePage,
-    });
-    const report = classifyStaleness(
-      old,
-      fresh,
-      makeClassified([makeModule({ name: "new" })]),
-      new Set(),
-      new Set(),
+      old, fresh, bundles, makeSyntheses(["b"]),
+      new Set(), new Set(), new Set(),
     );
     const agg = report.stale.find((s) => s.wikiPath === "wiki/architecture.md");
     expect(agg).toBeDefined();
-    expect(agg?.triggers).toContain("module page set changed");
+    expect(agg?.triggers).toContain("community set changed");
   });
 
-  test("new page detected when wiki path only exists in new manifest", () => {
-    const old = makeManifest({});
-    const fresh = makeManifest({
-      "wiki/modules/new.md": makePage({ kind: "module", title: "new", order: 3 }),
+  test("architecture page stale when a top-hub file changes", () => {
+    const old = makeManifest({
+      "wiki/architecture.md": makePage({ kind: "architecture", slug: "architecture", title: "Architecture" }),
     });
     const report = classifyStaleness(
-      old,
-      fresh,
-      makeClassified([makeModule({ name: "new" })]),
-      new Set(),
-      new Set(),
+      old, old, [], makeSyntheses([]),
+      new Set(["src/core.ts"]), new Set(),
+      new Set(["src/core.ts"]),
     );
-    expect(report.added).toHaveLength(1);
-    expect(report.added[0].wikiPath).toBe("wiki/modules/new.md");
-    expect(report.stale).toHaveLength(0);
+    const agg = report.stale.find((s) => s.wikiPath === "wiki/architecture.md");
+    expect(agg).toBeDefined();
+    expect(agg?.triggers).toContain("src/core.ts");
   });
 
-  test("removed page detected when wiki path only exists in old manifest", () => {
+  test("data-flows page stale when community set shifts", () => {
     const old = makeManifest({
-      "wiki/modules/gone.md": makePage({ kind: "module", title: "gone" }),
+      "wiki/data-flows.md": makePage({ kind: "data-flows", slug: "data-flows", title: "Data flows" }),
+      "wiki/communities/alpha.md": makePage({ slug: "alpha", communityId: "a" }),
+    });
+    const fresh = makeManifest({
+      "wiki/data-flows.md": makePage({ kind: "data-flows", slug: "data-flows", title: "Data flows" }),
+      "wiki/communities/beta.md": makePage({ slug: "beta", communityId: "b" }),
+    });
+    const bundles = [makeBundle("b", ["src/b.ts"])];
+    const report = classifyStaleness(
+      old, fresh, bundles, makeSyntheses(["b"]),
+      new Set(), new Set(), new Set(),
+    );
+    const flows = report.stale.find((s) => s.wikiPath === "wiki/data-flows.md");
+    expect(flows).toBeDefined();
+    expect(flows?.triggers).toContain("community set changed");
+  });
+
+  test("data-flows page stale when a top-hub file changes", () => {
+    const old = makeManifest({
+      "wiki/data-flows.md": makePage({ kind: "data-flows", slug: "data-flows", title: "Data flows" }),
+    });
+    const report = classifyStaleness(
+      old, old, [], makeSyntheses([]),
+      new Set(["src/core.ts"]), new Set(),
+      new Set(["src/core.ts"]),
+    );
+    const flows = report.stale.find((s) => s.wikiPath === "wiki/data-flows.md");
+    expect(flows).toBeDefined();
+    expect(flows?.triggers).toContain("src/core.ts");
+  });
+
+  test("architecture page stale when an entry point changes", () => {
+    const old = makeManifest({
+      "wiki/architecture.md": makePage({ kind: "architecture", slug: "architecture", title: "Architecture" }),
+    });
+    const report = classifyStaleness(
+      old, old, [], makeSyntheses([]),
+      new Set(), new Set(["src/cli.ts"]),
+      new Set(["src/cli.ts"]),
+    );
+    const agg = report.stale.find((s) => s.wikiPath === "wiki/architecture.md");
+    expect(agg).toBeDefined();
+    expect(agg?.triggers).toContain("src/cli.ts");
+  });
+
+  test("new page detected when wiki path only in new manifest", () => {
+    const old = makeManifest({});
+    const fresh = makeManifest({
+      "wiki/new.md": makePage({ slug: "new", communityId: "new", order: 3 }),
+    });
+    const report = classifyStaleness(
+      old, fresh, [makeBundle("new", ["src/x.ts"])], makeSyntheses(["new"]),
+      new Set(), new Set(), new Set(),
+    );
+    expect(report.added).toHaveLength(1);
+    expect(report.added[0].wikiPath).toBe("wiki/new.md");
+  });
+
+  test("removed page detected when wiki path only in old manifest", () => {
+    const old = makeManifest({
+      "wiki/gone.md": makePage({ slug: "gone", communityId: "gone", title: "Gone" }),
     });
     const fresh = makeManifest({});
     const report = classifyStaleness(
-      old,
-      fresh,
-      makeClassified(),
-      new Set(),
-      new Set(),
+      old, fresh, [], makeSyntheses([]),
+      new Set(), new Set(), new Set(),
     );
     expect(report.removed).toHaveLength(1);
-    expect(report.removed[0].wikiPath).toBe("wiki/modules/gone.md");
+    expect(report.removed[0].wikiPath).toBe("wiki/gone.md");
+  });
+
+  test("missingSyntheses lists communities absent from SynthesesFile", () => {
+    const old = makeManifest({});
+    const fresh = makeManifest({});
+    const bundles = [makeBundle("a", ["src/a.ts"]), makeBundle("b", ["src/b.ts"])];
+    const report = classifyStaleness(
+      old, fresh, bundles, makeSyntheses(["a"]),
+      new Set(), new Set(), new Set(),
+    );
+    expect(report.missingSyntheses).toEqual(["b"]);
   });
 });

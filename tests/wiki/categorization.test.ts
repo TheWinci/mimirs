@@ -25,7 +25,6 @@ afterEach(async () => {
   await cleanupTempDir(tempDir);
 });
 
-/** Index a TypeScript file with full chunking for accurate hasChildren detection. */
 async function indexFile(relativePath: string, content: string) {
   const fullPath = join(tempDir, relativePath);
   const { chunks, fileImports, fileExports } = await chunkText(content, ".ts", 2000, 50, fullPath);
@@ -52,7 +51,6 @@ async function indexFile(relativePath: string, content: string) {
 }
 
 async function seedProject() {
-  // Class with methods → bridge
   await indexFile("src/db/index.ts", `
 export class Database {
   query(sql: string): any[] { return []; }
@@ -69,7 +67,6 @@ export function createDB(config: Config): Database {
 }
 `);
 
-  // Simple types and functions → entities
   await indexFile("src/types.ts", `
 export type SearchResult = {
   path: string;
@@ -89,7 +86,6 @@ export enum LogLevel {
 }
 `);
 
-  // Imports from db → gives db fanIn
   await indexFile("src/search.ts", `
 import { Database, Config } from "./db/index";
 
@@ -98,7 +94,6 @@ export function search(db: Database, query: string): string[] {
 }
 `);
 
-  // Imports from both → hub candidate for db/index.ts (fanIn ≥ 2)
   await indexFile("src/server.ts", `
 import { Database, createDB } from "./db/index";
 import { search } from "./search";
@@ -109,7 +104,6 @@ export function startServer(): void {
 }
 `);
 
-  // Another importer to push db/index.ts into hub territory
   await indexFile("src/cli.ts", `
 import { Database, createDB } from "./db/index";
 
@@ -130,8 +124,6 @@ describe("runCategorization", () => {
 
     const database = classified.symbols.find((s) => s.name === "Database");
     expect(database).toBeDefined();
-    // The chunker may or may not produce parent-child chunks for small classes.
-    // If hasChildren is true → bridge, if false → entity. Test the rule is applied correctly.
     if (database!.hasChildren) {
       expect(database!.tier).toBe("bridge");
     } else {
@@ -159,12 +151,10 @@ describe("runCategorization", () => {
     const discovery = runDiscovery(db, tempDir);
     const classified = runCategorization(db, discovery, tempDir);
 
-    // Database is imported from multiple directories → should have referenceModuleCount > 1
     const database = classified.symbols.find((s) => s.name === "Database");
     expect(database).toBeDefined();
     expect(database!.referenceModuleCount).toBeGreaterThan(0);
 
-    // Scope should follow thresholds
     if (database!.referenceModuleCount >= 3) {
       expect(database!.scope).toBe("cross-cutting");
     } else if (database!.referenceModuleCount === 2) {
@@ -179,7 +169,6 @@ describe("runCategorization", () => {
     const discovery = runDiscovery(db, tempDir);
     const classified = runCategorization(db, discovery, tempDir);
 
-    // Each symbol should appear at most once per file
     const seen = new Set<string>();
     for (const s of classified.symbols) {
       const key = `${s.name}:${s.file}`;
@@ -188,53 +177,49 @@ describe("runCategorization", () => {
     }
   });
 
-  test("classifies files as hubs via Path A (crossroads)", async () => {
+  test("every classified file has a numeric pageRank", async () => {
     await seedProject();
     const discovery = runDiscovery(db, tempDir);
     const classified = runCategorization(db, discovery, tempDir);
 
-    // db/index.ts has: fanIn >= 2 (imported by search, server, cli), fanOut >= 0,
-    // and contains a bridge (Database class)
+    expect(classified.files.length).toBeGreaterThan(0);
+    for (const f of classified.files) {
+      expect(typeof f.pageRank).toBe("number");
+      expect(f.pageRank).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  test("isTopHub marks the top slice by PageRank", async () => {
+    await seedProject();
+    const discovery = runDiscovery(db, tempDir);
+    const classified = runCategorization(db, discovery, tempDir);
+
+    const hubs = classified.files.filter((f) => f.isTopHub);
+    expect(hubs.length).toBeGreaterThan(0);
+
+    // Top hubs must have PageRank >= every non-hub
+    const nonHubMax = Math.max(
+      0,
+      ...classified.files.filter((f) => !f.isTopHub).map((f) => f.pageRank),
+    );
+    for (const h of hubs) {
+      expect(h.pageRank).toBeGreaterThanOrEqual(nonHubMax);
+    }
+  });
+
+  test("files expose fanIn/fanOut and bridge/entity symbols", async () => {
+    await seedProject();
+    const discovery = runDiscovery(db, tempDir);
+    const classified = runCategorization(db, discovery, tempDir);
+
     const dbFile = classified.files.find((f) => f.path.includes("db/index"));
-    if (dbFile && dbFile.fanIn >= 2 && dbFile.fanOut >= 2 && dbFile.bridges.length >= 1) {
-      expect(dbFile.isHub).toBe(true);
-      expect(dbFile.hubPath).toBe("A");
-    }
-  });
-
-  test("classifies files as hubs via Path B (foundational, fanIn >= 5)", async () => {
-    await seedProject();
-    const discovery = runDiscovery(db, tempDir);
-    const classified = runCategorization(db, discovery, tempDir);
-
-    // With only 3 importers, db/index.ts might not hit fanIn >= 5
-    // But we can check that Path B logic exists by checking any file with high fanIn
-    const highFanIn = classified.files.filter((f) => f.fanIn >= 5);
-    for (const f of highFanIn) {
-      expect(f.isHub).toBe(true);
-      // If Path A doesn't apply, hubPath should be B
-      if (!(f.fanIn >= 2 && f.fanOut >= 2 && f.bridges.length >= 1)) {
-        expect(f.hubPath).toBe("B");
-      }
-    }
-  });
-
-  test("classifies modules with entry file", async () => {
-    await seedProject();
-    const discovery = runDiscovery(db, tempDir);
-    const classified = runCategorization(db, discovery, tempDir);
-
-    // db module has index.ts (entry file)
-    const dbModule = classified.modules.find((m) => m.name === "db");
-    if (dbModule) {
-      expect(dbModule.entryFile).toContain("index.ts");
-      expect(dbModule.fileCount).toBeGreaterThan(0);
-      expect(dbModule.files.length).toBe(dbModule.fileCount);
-    }
+    expect(dbFile).toBeDefined();
+    expect(dbFile!.fanIn).toBeGreaterThanOrEqual(2);
+    expect(Array.isArray(dbFile!.bridges)).toBe(true);
+    expect(Array.isArray(dbFile!.entities)).toBe(true);
   });
 
   test("returns warnings when no symbols found", async () => {
-    // Seed a file with no exports
     const emb = await embed("placeholder");
     db.upsertFile(join(tempDir, "src/empty.ts"), "hash-empty", [
       { snippet: "// empty", embedding: emb },
@@ -245,73 +230,5 @@ describe("runCategorization", () => {
 
     expect(classified.warnings).toContain("No exported symbols found — classification will be empty");
     expect(classified.symbols).toHaveLength(0);
-  });
-
-  test("classified modules include files array", async () => {
-    await seedProject();
-    const discovery = runDiscovery(db, tempDir);
-    const classified = runCategorization(db, discovery, tempDir);
-
-    for (const mod of classified.modules) {
-      expect(Array.isArray(mod.files)).toBe(true);
-      expect(mod.files.length).toBe(mod.fileCount);
-    }
-  });
-
-  test("modules have value score computed from fanIn, exports, and files", async () => {
-    await seedProject();
-    const discovery = runDiscovery(db, tempDir);
-    const classified = runCategorization(db, discovery, tempDir);
-
-    for (const mod of classified.modules) {
-      expect(typeof mod.value).toBe("number");
-      expect(mod.value).toBe(mod.fanIn * 2 + mod.exportCount + mod.fileCount);
-    }
-  });
-
-  test("qualification: value >= 8 always qualifies", async () => {
-    await seedProject();
-    const discovery = runDiscovery(db, tempDir);
-    const classified = runCategorization(db, discovery, tempDir);
-
-    // value >= 8 → qualifies (other modules may qualify via structural overrides)
-    for (const mod of classified.modules) {
-      if (mod.value >= 8) {
-        expect(mod.qualifiesAsModulePage).toBe(true);
-      }
-    }
-  });
-
-  test("qualification reason reflects rule used", async () => {
-    await seedProject();
-    const discovery = runDiscovery(db, tempDir);
-    const classified = runCategorization(db, discovery, tempDir);
-
-    for (const mod of classified.modules) {
-      if (!mod.qualifiesAsModulePage) continue;
-      // Reason should indicate either the value path or a structural override
-      const matchesValueRule = /^value \d+/.test(mod.reason);
-      const matchesStructural = mod.reason.startsWith("structural:");
-      expect(matchesValueRule || matchesStructural).toBe(true);
-    }
-  });
-
-  test("trivial single-file module does not qualify", async () => {
-    // A module with 1 file, 1 export, 0 fanIn → value = 0 + 1 + 1 = 2
-    // Override paths require fileCount >= 2, so this should not qualify.
-    await indexFile("src/trivial/index.ts", `
-export const PLACEHOLDER = true;
-`);
-    resolveImports(db, tempDir);
-
-    const discovery = runDiscovery(db, tempDir);
-    const classified = runCategorization(db, discovery, tempDir);
-
-    const trivial = classified.modules.find((m) => m.name === "trivial");
-    if (trivial) {
-      expect(trivial.value).toBeLessThan(8);
-      expect(trivial.fileCount).toBeLessThan(2);
-      expect(trivial.qualifiesAsModulePage).toBe(false);
-    }
   });
 });

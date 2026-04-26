@@ -1,0 +1,699 @@
+{
+  "version": 1,
+  "payloads": {
+    "718520a518b7c78a": {
+      "communityId": "718520a518b7c78a",
+      "name": "CLI Entry & Core Utilities",
+      "slug": "cli-entry-core",
+      "purpose": "Documents the process entry point, top-level type definitions, and shared logging utilities that every other module depends on. The central reference for how mimirs boots and what core primitives it exposes.",
+      "sections": [
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow from process start through CLI dispatch to the logging sink.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Tuning",
+          "purpose": "Parameters or config flags that change behavior without code edits.",
+          "shape": "tuning-knobs"
+        },
+        {
+          "title": "Entry points",
+          "purpose": "List the public surface a consumer reaches first.",
+          "shape": "entry-points"
+        },
+        {
+          "title": "Data shapes",
+          "purpose": "Define the core types or records that flow through the module — EmbeddedChunk and other cross-cutting types.",
+          "shape": "data-shapes"
+        }
+      ],
+      "kind": "community"
+    },
+    "7f610002b13109b4": {
+      "communityId": "7f610002b13109b4",
+      "name": "Wiki Pipeline — Types & Internals",
+      "slug": "wiki-pipeline-internals",
+      "purpose": "Documents the data model, algorithms, and helper modules that power the wiki generation pipeline: type contracts, PageRank scoring, community bundling, staleness detection, page tree construction, and semantic query templates. Read this before touching any wiki generation step.",
+      "sections": [
+        {
+          "title": "Per-file breakdown",
+          "purpose": "Give each load-bearing file its own prose section — role, key exports, constants worth citing, and the non-obvious behavior a reader would miss from signatures alone.",
+          "shape": "per-file-breakdown"
+        },
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow across the community's files — from discovery input through categorization, PageRank, bundle construction, and page payload assembly.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Data shapes",
+          "purpose": "Define the core types — PageManifest, CommunityBundle, PagePayload, SynthesisPayload — that all wiki pipeline stages hand off between each other.",
+          "shape": "data-shapes"
+        },
+        {
+          "title": "Tuning",
+          "purpose": "Parameters or config flags that change behavior without code edits.",
+          "shape": "tuning-knobs"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface the insider knowledge that's not obvious from signatures — tuning knobs masquerading as constants, silent fallbacks, heuristics with blind spots.",
+          "shape": "internals"
+        },
+        {
+          "title": "Why it's built this way",
+          "purpose": "Explain non-obvious structural decisions and the alternatives rejected.",
+          "shape": "design-rationale"
+        },
+        {
+          "title": "Trade-offs",
+          "purpose": "Name the gains and costs of the current design so a future maintainer can tell whether a constraint is load-bearing.",
+          "shape": "trade-offs"
+        },
+        {
+          "title": "Common gotchas",
+          "purpose": "Things a first-time reader of this community will get wrong.",
+          "shape": "common-gotchas"
+        }
+      ],
+      "kind": "community"
+    },
+    "44d308c0756b9438": {
+      "communityId": "44d308c0756b9438",
+      "name": "Database Layer",
+      "slug": "db-layer",
+      "purpose": "Documents the SQLite persistence layer: all read/write operations for chunks, files, annotations, checkpoints, conversations, git history, and the import graph. The central reference for anyone touching DB schemas or query behavior.",
+      "sections": [
+        {
+          "title": "Per-file breakdown",
+          "purpose": "Give each load-bearing file its own prose section — role, key exports, constants worth citing, and the non-obvious behavior a reader would miss from signatures alone.",
+          "shape": "per-file-breakdown"
+        },
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow across the community's files — from db/index.ts initialization through domain-specific modules to the search layer.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface the insider knowledge that's not obvious from signatures — silent behaviors, schema gotchas, path normalization requirements.",
+          "shape": "internals"
+        },
+        {
+          "title": "Why it's built this way",
+          "purpose": "Explain non-obvious structural decisions and the alternatives rejected.",
+          "shape": "design-rationale"
+        },
+        {
+          "title": "Trade-offs",
+          "purpose": "Name the gains and costs of the current design so a future maintainer can tell whether a constraint is load-bearing.",
+          "shape": "trade-offs"
+        },
+        {
+          "title": "Common gotchas",
+          "purpose": "Things a first-time reader of this community will get wrong.",
+          "shape": "common-gotchas"
+        },
+        {
+          "title": "Invariants",
+          "purpose": "State the rules the module relies on internally and that callers must preserve.",
+          "shape": "key-invariants"
+        }
+      ],
+      "kind": "community"
+    },
+    "a553198a20e68c7a": {
+      "communityId": "a553198a20e68c7a",
+      "name": "MCP Tool Handlers",
+      "slug": "mcp-tools",
+      "purpose": "Documents the MCP server tool registration layer: how each domain tool group (analytics, annotations, checkpoints, conversations, git, graph, indexing, server info) is wired to the MCP server and delegates into the DB and business logic layers.",
+      "sections": [
+        {
+          "title": "Per-file breakdown",
+          "purpose": "Give each load-bearing file its own prose section — role, key exports, constants worth citing, and the non-obvious behavior a reader would miss from signatures alone.",
+          "shape": "per-file-breakdown"
+        },
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow from MCP server startup through tool registration to a concrete tool invocation and DB call.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface the insider knowledge that's not obvious from signatures — resolveProject behavior, GetDB/WriteStatus conventions, silent fallbacks.",
+          "shape": "internals"
+        },
+        {
+          "title": "Why it's built this way",
+          "purpose": "Explain non-obvious structural decisions and the alternatives rejected.",
+          "shape": "design-rationale"
+        },
+        {
+          "title": "Trade-offs",
+          "purpose": "Name the gains and costs of the current design so a future maintainer can tell whether a constraint is load-bearing.",
+          "shape": "trade-offs"
+        },
+        {
+          "title": "Common gotchas",
+          "purpose": "Things a first-time reader of this community will get wrong.",
+          "shape": "common-gotchas"
+        }
+      ],
+      "kind": "community"
+    },
+    "bef3a1fcc8697bd9": {
+      "communityId": "bef3a1fcc8697bd9",
+      "name": "Wiki Orchestrator & MCP Tools",
+      "slug": "wiki-orchestrator",
+      "purpose": "Documents the wiki orchestration layer: the generate_wiki MCP tool handlers, the wiki/index.ts barrel, the lint-page validator, the section catalog registry, and the update log writer. Read this to understand how a generate_wiki() call becomes a page payload.",
+      "sections": [
+        {
+          "title": "Per-file breakdown",
+          "purpose": "Give each load-bearing file its own prose section — role, key exports, constants worth citing, and the non-obvious behavior a reader would miss from signatures alone.",
+          "shape": "per-file-breakdown"
+        },
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow from an MCP generate_wiki call through the orchestrator phases to the page payload returned to the caller.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Tuning",
+          "purpose": "Parameters or config flags that change behavior without code edits — section catalog entries, lint rule thresholds, split community triggers.",
+          "shape": "tuning-knobs"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface the insider knowledge that's not obvious from signatures — lint warning kinds, breadcrumb vs. suggested-query distinction, section catalog lookup mechanics.",
+          "shape": "internals"
+        },
+        {
+          "title": "Why it's built this way",
+          "purpose": "Explain non-obvious structural decisions and the alternatives rejected.",
+          "shape": "design-rationale"
+        },
+        {
+          "title": "Trade-offs",
+          "purpose": "Name the gains and costs of the current design so a future maintainer can tell whether a constraint is load-bearing.",
+          "shape": "trade-offs"
+        },
+        {
+          "title": "Common gotchas",
+          "purpose": "Things a first-time reader of this community will get wrong.",
+          "shape": "common-gotchas"
+        }
+      ],
+      "kind": "community"
+    },
+    "af79ae68a38bcfd5": {
+      "communityId": "af79ae68a38bcfd5",
+      "name": "Indexing Pipeline",
+      "slug": "indexing-pipeline",
+      "purpose": "Documents the file ingestion pipeline: directory validation, file parsing, AST-aware chunking, embedding, and DB upsert. The authoritative reference for adding new language support or tuning chunk behavior.",
+      "sections": [
+        {
+          "title": "Per-file breakdown",
+          "purpose": "Give each load-bearing file its own prose section — role, key exports, constants worth citing, and the non-obvious behavior a reader would miss from signatures alone.",
+          "shape": "per-file-breakdown"
+        },
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow from indexDirectory() entry through parse, chunk, embed, and DB upsert.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Tuning",
+          "purpose": "Parameters or config flags that change behavior without code edits — KNOWN_EXTENSIONS set, chunk size limits.",
+          "shape": "tuning-knobs"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface the insider knowledge that's not obvious from signatures — extension detection fallbacks, parent chunk mechanics, incremental hash checks.",
+          "shape": "internals"
+        },
+        {
+          "title": "Failure modes",
+          "purpose": "Call out how things break, what the module does about it, and what callers must handle.",
+          "shape": "failure-modes"
+        }
+      ],
+      "kind": "community"
+    },
+    "1051c07f09ccf18d": {
+      "communityId": "1051c07f09ccf18d",
+      "name": "Search Runtime",
+      "slug": "search-runtime",
+      "purpose": "Documents the hybrid search engine: vector + FTS merging, ranking boosts, usage lookup helpers, and the benchmark/eval harness used to measure retrieval quality. The central reference for anyone tuning search relevance.",
+      "sections": [
+        {
+          "title": "Per-file breakdown",
+          "purpose": "Give each load-bearing file its own prose section — role, key exports, constants worth citing, and the non-obvious behavior a reader would miss from signatures alone.",
+          "shape": "per-file-breakdown"
+        },
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow from a search() call through embedding, vector + FTS queries, score merging, and ranking boosts.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface the insider knowledge that's not obvious from signatures — tuning constants, FTS fallback behavior, score boost mechanics.",
+          "shape": "internals"
+        },
+        {
+          "title": "Invariants",
+          "purpose": "State the rules the module relies on internally and that callers must preserve.",
+          "shape": "key-invariants"
+        },
+        {
+          "title": "Failure modes",
+          "purpose": "Call out how things break, what the module does about it, and what callers must handle.",
+          "shape": "failure-modes"
+        }
+      ],
+      "kind": "community"
+    },
+    "789b8f6140ce3ef8": {
+      "communityId": "789b8f6140ce3ef8",
+      "name": "Conversation Indexer & MCP Server",
+      "slug": "conversation-server",
+      "purpose": "Documents the JSONL conversation parsing and indexing pipeline, plus the MCP server bootstrap that wires all tool groups together. The reference for understanding how Claude Code session history is ingested and how the server starts.",
+      "sections": [
+        {
+          "title": "Per-file breakdown",
+          "purpose": "Give each load-bearing file its own prose section — role, key exports, constants worth citing, and the non-obvious behavior a reader would miss from signatures alone.",
+          "shape": "per-file-breakdown"
+        },
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow from server start through conversation tail-indexing to a searchable turn in the DB.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Data shapes",
+          "purpose": "Define the core types — JournalEntry, ParsedTurn, ContentBlock, SessionInfo — that the parser and indexer hand between them.",
+          "shape": "data-shapes"
+        },
+        {
+          "title": "Failure modes",
+          "purpose": "Call out how things break, what the module does about it, and what callers must handle.",
+          "shape": "failure-modes"
+        }
+      ],
+      "kind": "community"
+    },
+    "39016e3c10cf6e96": {
+      "communityId": "39016e3c10cf6e96",
+      "name": "Git History Indexer & CLI Progress",
+      "slug": "git-indexer-progress",
+      "purpose": "Documents the git commit history ingestion module and the CLI progress reporter used during long-running index operations. Small but high-impact: every index command uses both.",
+      "sections": [
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow from a CLI index command through git log parsing, commit batch insertion, and progress reporting.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Entry points",
+          "purpose": "List the public surface a consumer reaches first — cliProgress, createQuietProgress, indexGitHistory.",
+          "shape": "entry-points"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface non-obvious behavior: incremental commit detection, purge of orphaned commits, quiet-vs-verbose progress selection."
+        },
+        {
+          "title": "Failure modes",
+          "purpose": "Call out how things break, what the module does about it, and what callers must handle.",
+          "shape": "failure-modes"
+        }
+      ],
+      "kind": "community"
+    },
+    "4c12fb311da81d20": {
+      "communityId": "4c12fb311da81d20",
+      "name": "CLI Commands",
+      "slug": "cli-commands",
+      "purpose": "Documents all 19 CLI subcommand handlers: what each command does, its flags, and the DB/service calls it makes. The reference for adding new commands or tracing what happens when a user runs mimirs <subcommand>.",
+      "sections": [
+        {
+          "title": "Per-file breakdown",
+          "purpose": "Give each load-bearing file its own prose section — role, key exports, flags accepted, and the non-obvious behavior a reader would miss from signatures alone.",
+          "shape": "per-file-breakdown"
+        },
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow from CLI entry (cli/index.ts) through argument dispatch to a concrete command handler and its DB calls.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface the insider knowledge that's not obvious from signatures — shared setup patterns, session-context helper, flag parsing conventions.",
+          "shape": "internals"
+        },
+        {
+          "title": "Why it's built this way",
+          "purpose": "Explain non-obvious structural decisions and the alternatives rejected.",
+          "shape": "design-rationale"
+        },
+        {
+          "title": "Trade-offs",
+          "purpose": "Name the gains and costs of the current design so a future maintainer can tell whether a constraint is load-bearing.",
+          "shape": "trade-offs"
+        },
+        {
+          "title": "Common gotchas",
+          "purpose": "Things a first-time reader of this community will get wrong.",
+          "shape": "common-gotchas"
+        }
+      ],
+      "kind": "community"
+    },
+    "43ab45b714f2aed7": {
+      "communityId": "43ab45b714f2aed7",
+      "name": "Config & Embeddings",
+      "slug": "config-embeddings",
+      "purpose": "Documents the embedding singleton and config loader: how the local transformer model is initialized, how batch embedding works, and how the YAML config file overrides model and dimension defaults. The reference before touching anything that calls embed() or loadConfig().",
+      "sections": [
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow from loadConfig() through applyEmbeddingConfig() to a getEmbedder() call and the embedding pipeline.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it — nearly every module is a consumer.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Tuning",
+          "purpose": "Parameters or config flags that change behavior without code edits — model ID, embedding dimension, batch sizes.",
+          "shape": "tuning-knobs"
+        },
+        {
+          "title": "Entry points",
+          "purpose": "List the public surface a consumer reaches first.",
+          "shape": "entry-points"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface non-obvious behavior: lazy singleton initialization, configureEmbedder() override window, mergeEmbeddings mean-pooling, resetEmbedder() test-only contract."
+        },
+        {
+          "title": "Failure modes",
+          "purpose": "Call out how things break, what the module does about it, and what callers must handle.",
+          "shape": "failure-modes"
+        }
+      ],
+      "kind": "community"
+    },
+    "eb1906b45cbc92a9": {
+      "communityId": "eb1906b45cbc92a9",
+      "name": "Import Graph & File Watcher",
+      "slug": "graph-watcher",
+      "purpose": "Documents the static import graph resolver and the filesystem watcher: how inter-file dependencies are extracted and persisted, and how file-change events trigger incremental re-indexing. The reference for understanding dependency tracking and live-index updates.",
+      "sections": [
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow from resolveImports() through per-file import resolution and DB upsert, and the parallel path where startWatcher() responds to fs events.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface the insider knowledge that's not obvious from signatures — path-to-id map construction, import resolution heuristics, watcher debounce mechanics.",
+          "shape": "internals"
+        },
+        {
+          "title": "Entry points",
+          "purpose": "List the public surface a consumer reaches first.",
+          "shape": "entry-points"
+        },
+        {
+          "title": "Failure modes",
+          "purpose": "Call out how things break, what the module does about it, and what callers must handle.",
+          "shape": "failure-modes"
+        }
+      ],
+      "kind": "community"
+    },
+    "bdd263ea000a4c36": {
+      "communityId": "bdd263ea000a4c36",
+      "name": "Community Detection & Discovery",
+      "slug": "community-detection",
+      "purpose": "Documents the Louvain-based community detection and the discovery orchestrator that feeds it: how the file-level import graph is extracted, how communities are assigned, and how the DiscoveryResult is built for downstream wiki stages.",
+      "sections": [
+        {
+          "title": "How it works",
+          "purpose": "Trace the runtime flow from runDiscovery() through graph extraction, detectFileCommunities() Louvain clustering, and DiscoveryResult construction.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Internals",
+          "purpose": "Surface the insider knowledge that's not obvious from signatures — Louvain resolution parameter, dispatch-directory seed groups, test/bench file exclusion via isTestOrBench(), symbol-mode vs file-mode clustering.",
+          "shape": "internals"
+        },
+        {
+          "title": "Entry points",
+          "purpose": "List the public surface a consumer reaches first.",
+          "shape": "entry-points"
+        },
+        {
+          "title": "Invariants",
+          "purpose": "State the rules the module relies on internally and that callers must preserve.",
+          "shape": "key-invariants"
+        }
+      ],
+      "kind": "community"
+    },
+    "55ae76c84c3f2f21": {
+      "communityId": "55ae76c84c3f2f21",
+      "name": "CLI Setup & IDE Integration",
+      "slug": "cli-setup",
+      "purpose": "Documents the first-run setup module: how mimirs writes MCP config files for supported IDEs, injects .gitignore entries, detects agent hints, and ensures a valid config file exists. The reference for adding a new IDE target or debugging init failures.",
+      "sections": [
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Tuning",
+          "purpose": "Parameters or config flags that change behavior without code edits — KNOWN_IDES list.",
+          "shape": "tuning-knobs"
+        },
+        {
+          "title": "Entry points",
+          "purpose": "List the public surface a consumer reaches first — runSetup(), ensureMcpJson(), ensureAgentInstructions().",
+          "shape": "entry-points"
+        },
+        {
+          "title": "How it works",
+          "purpose": "Walk through the runSetup() flow: config check, gitignore patch, MCP JSON write, agent instructions write.",
+          "shape": "lifecycle-flow"
+        },
+        {
+          "title": "Failure modes",
+          "purpose": "Call out how things break, what the module does about it, and what callers must handle.",
+          "shape": "failure-modes"
+        }
+      ],
+      "kind": "community"
+    },
+    "aa3360856c186019": {
+      "communityId": "aa3360856c186019",
+      "name": "Search MCP Tool",
+      "slug": "search-tool",
+      "purpose": "Documents the MCP search tool registration: how registerSearchTools() wires the search, read_relevant, project_map, and related MCP tools to the hybrid search engine and dependency graph. The thin adapter between the MCP protocol and the search-runtime community.",
+      "sections": [
+        {
+          "title": "Dependencies and consumers",
+          "purpose": "Show who this community imports from and who imports it, at a glance.",
+          "shape": "dependency-graph"
+        },
+        {
+          "title": "Entry points",
+          "purpose": "List the public surface a consumer reaches first — registerSearchTools().",
+          "shape": "entry-points"
+        },
+        {
+          "title": "How it works",
+          "purpose": "Describe how registerSearchTools() registers each tool handler and what DB/search calls each handler makes."
+        }
+      ],
+      "kind": "community"
+    }
+  },
+  "memberSets": {
+    "718520a518b7c78a": [
+      "src/cli/index.ts",
+      "src/main.ts",
+      "src/types.ts",
+      "src/utils/log.ts"
+    ],
+    "7f610002b13109b4": [
+      "src/db/types.ts",
+      "src/wiki/categorization.ts",
+      "src/wiki/community-synthesis.ts",
+      "src/wiki/content-prefetch.ts",
+      "src/wiki/isolate-docs.ts",
+      "src/wiki/page-payload.ts",
+      "src/wiki/page-tree.ts",
+      "src/wiki/pagerank.ts",
+      "src/wiki/semantic-queries.ts",
+      "src/wiki/staleness.ts",
+      "src/wiki/types.ts"
+    ],
+    "44d308c0756b9438": [
+      "scripts/regen-meta.ts",
+      "src/db/analytics.ts",
+      "src/db/annotations.ts",
+      "src/db/checkpoints.ts",
+      "src/db/conversation.ts",
+      "src/db/files.ts",
+      "src/db/git-history.ts",
+      "src/db/graph.ts",
+      "src/db/index.ts",
+      "src/db/search.ts"
+    ],
+    "a553198a20e68c7a": [
+      "src/tools/analytics-tools.ts",
+      "src/tools/annotation-tools.ts",
+      "src/tools/checkpoint-tools.ts",
+      "src/tools/conversation-tools.ts",
+      "src/tools/git-history-tools.ts",
+      "src/tools/git-tools.ts",
+      "src/tools/graph-tools.ts",
+      "src/tools/index-tools.ts",
+      "src/tools/index.ts",
+      "src/tools/server-info-tools.ts"
+    ],
+    "bef3a1fcc8697bd9": [
+      "src/tools/wiki-tools.ts",
+      "src/wiki/index.ts",
+      "src/wiki/lint-page.ts",
+      "src/wiki/section-catalog.ts",
+      "src/wiki/update-log.ts"
+    ],
+    "af79ae68a38bcfd5": [
+      "src/indexing/chunker.ts",
+      "src/indexing/indexer.ts",
+      "src/indexing/parse.ts",
+      "src/utils/dir-guard.ts"
+    ],
+    "1051c07f09ccf18d": [
+      "src/search/benchmark.ts",
+      "src/search/eval.ts",
+      "src/search/hybrid.ts",
+      "src/search/usages.ts"
+    ],
+    "789b8f6140ce3ef8": [
+      "src/conversation/indexer.ts",
+      "src/conversation/parser.ts",
+      "src/server/index.ts"
+    ],
+    "39016e3c10cf6e96": [
+      "src/cli/progress.ts",
+      "src/git/indexer.ts"
+    ],
+    "4c12fb311da81d20": [
+      "src/cli/commands/analytics.ts",
+      "src/cli/commands/annotations.ts",
+      "src/cli/commands/benchmark-models.ts",
+      "src/cli/commands/benchmark.ts",
+      "src/cli/commands/checkpoint.ts",
+      "src/cli/commands/cleanup.ts",
+      "src/cli/commands/conversation.ts",
+      "src/cli/commands/demo.ts",
+      "src/cli/commands/doctor.ts",
+      "src/cli/commands/eval.ts",
+      "src/cli/commands/history.ts",
+      "src/cli/commands/index-cmd.ts",
+      "src/cli/commands/init.ts",
+      "src/cli/commands/map.ts",
+      "src/cli/commands/remove.ts",
+      "src/cli/commands/search-cmd.ts",
+      "src/cli/commands/serve.ts",
+      "src/cli/commands/session-context.ts",
+      "src/cli/commands/status.ts"
+    ],
+    "43ab45b714f2aed7": [
+      "src/config/index.ts",
+      "src/embeddings/embed.ts"
+    ],
+    "eb1906b45cbc92a9": [
+      "src/graph/resolver.ts",
+      "src/indexing/watcher.ts"
+    ],
+    "bdd263ea000a4c36": [
+      "src/wiki/community-detection.ts",
+      "src/wiki/discovery.ts"
+    ],
+    "55ae76c84c3f2f21": [
+      "src/cli/setup.ts"
+    ],
+    "aa3360856c186019": [
+      "src/tools/search.ts"
+    ]
+  }
+}

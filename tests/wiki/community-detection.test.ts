@@ -1,13 +1,30 @@
 import { describe, test, expect } from "bun:test";
 import {
+  detectDispatchDirectories,
   detectFileCommunities,
   detectSymbolCommunities,
 } from "../../src/wiki/community-detection";
 import type { FileLevelGraph, FileLevelNode, FileLevelEdge } from "../../src/wiki/types";
 import type { SymbolGraphData } from "../../src/db/graph";
 
+/**
+ * Default node has one synthetic export so the isolate filter
+ * (`fanIn===0 && fanOut===0 && exports.length===0`) doesn't drop it. Tests
+ * that specifically want an isolate should pass `exports: []` via
+ * `isolateNode` below.
+ */
 function node(path: string, fanIn = 0, fanOut = 0): FileLevelNode {
-  return { path, exports: [], fanIn, fanOut, isEntryPoint: false };
+  return {
+    path,
+    exports: [{ name: "default", type: "export" }],
+    fanIn,
+    fanOut,
+    isEntryPoint: false,
+  };
+}
+
+function isolateNode(path: string): FileLevelNode {
+  return { path, exports: [], fanIn: 0, fanOut: 0, isEntryPoint: false };
 }
 
 function edge(from: string, to: string): FileLevelEdge {
@@ -62,6 +79,48 @@ describe("detectFileCommunities", () => {
     expect(db.files.length).toBe(6);
     expect(db.files.every((f) => f.startsWith("src/db/"))).toBe(true);
     expect(db.internalEdges).toBeGreaterThan(0);
+  });
+
+  test("excludes graph isolates (no edges, no exports) before clustering", () => {
+    // Two cliques plus a pile of floating markdown-like nodes whose dir
+    // happens to match one of the cliques. If isolates leaked in, the
+    // orphan-reattach step would bundle them into the nearest cluster and
+    // pluralityDir would pick the wrong subdir.
+    const graph = twoCliques("src/db", "src/api", 6);
+    const noiseDir = "src/db";
+    for (let i = 0; i < 10; i++) {
+      graph.nodes.push(isolateNode(`${noiseDir}/README${i}.md`));
+    }
+
+    const modules = detectFileCommunities(graph);
+    const allClusteredFiles = modules.flatMap((m) => m.files);
+    for (let i = 0; i < 10; i++) {
+      expect(allClusteredFiles).not.toContain(`${noiseDir}/README${i}.md`);
+    }
+    expect(modules.length).toBe(2);
+  });
+
+  test("keeps test/bench dir filtering working on relative paths", () => {
+    const graph = twoCliques("src/db", "src/api", 6);
+    // Relative paths (no leading slash) — the old substring check missed
+    // these; the new `hasSegment` helper must catch them.
+    const leakers = [
+      "tests/fixtures/a.ts",
+      "benchmarks/b.ts",
+      "__tests__/c.ts",
+    ];
+    for (const t of leakers) {
+      graph.nodes.push(node(t));
+      graph.edges.push(edge(t, "src/db/a0.ts"));
+      graph.edges.push(edge(t, "src/api/b0.ts"));
+    }
+
+    const modules = detectFileCommunities(graph);
+    const allClusteredFiles = modules.flatMap((m) => m.files);
+    for (const t of leakers) {
+      expect(allClusteredFiles).not.toContain(t);
+    }
+    expect(modules.length).toBe(2);
   });
 
   test("excludes test and benchmark files before clustering", () => {
@@ -206,3 +265,151 @@ function symName(absPath: string): string {
   const base = absPath.split("/").pop()!;
   return base.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9]/g, "_");
 }
+
+describe("community hardening", () => {
+  test("cohesion is ~1 for cliques, bounded in [0,1]", () => {
+    const graph = twoCliques("src/x", "src/y", 6);
+    const modules = detectFileCommunities(graph);
+    expect(modules.length).toBe(2);
+    for (const m of modules) {
+      expect(m.cohesion).toBeGreaterThan(0);
+      expect(m.cohesion).toBeLessThanOrEqual(1);
+      // Clique with one bridge edge is near-fully connected internally.
+      expect(m.cohesion).toBeGreaterThan(0.8);
+    }
+  });
+
+  test("splits oversized clusters", () => {
+    // Two internally-dense subsystems weakly joined by a few cross edges.
+    // Louvain may collapse them; the split pass should separate.
+    const left = Array.from({ length: 20 }, (_, i) => `src/left/l${i}.ts`);
+    const right = Array.from({ length: 20 }, (_, i) => `src/right/r${i}.ts`);
+    const nodes = [...left, ...right].map((p) => node(p));
+    const edges: FileLevelEdge[] = [];
+    for (let i = 0; i < left.length; i++) {
+      for (let j = i + 1; j < left.length; j++) edges.push(edge(left[i], left[j]));
+    }
+    for (let i = 0; i < right.length; i++) {
+      for (let j = i + 1; j < right.length; j++) edges.push(edge(right[i], right[j]));
+    }
+    // A handful of cross edges to stress Louvain.
+    for (let i = 0; i < 5; i++) edges.push(edge(left[i], right[i]));
+
+    const modules = detectFileCommunities({ level: "file", nodes, edges });
+    expect(modules.length).toBeGreaterThanOrEqual(2);
+
+    // No single community swallows >50% of the graph.
+    for (const m of modules) {
+      expect(m.files.length).toBeLessThan(nodes.length * 0.55);
+    }
+  });
+
+  test("output is deterministic across repeated runs", () => {
+    const graph = twoCliques("src/alpha", "src/beta", 6);
+    const runs = Array.from({ length: 3 }, () => detectFileCommunities(graph));
+    const signatures = runs.map((m) =>
+      m
+        .map((mod) => [...mod.files].sort().join(","))
+        .sort()
+        .join("|"),
+    );
+    expect(signatures[0]).toBe(signatures[1]);
+    expect(signatures[1]).toBe(signatures[2]);
+  });
+
+  test("output ordered size-descending", () => {
+    // Three communities of distinct sizes. Emit must be largest-first.
+    const sizes = [10, 6, 4];
+    const nodes: FileLevelNode[] = [];
+    const edges: FileLevelEdge[] = [];
+    sizes.forEach((s, idx) => {
+      const dir = `src/c${idx}`;
+      const files = Array.from({ length: s }, (_, i) => `${dir}/f${i}.ts`);
+      files.forEach((f) => nodes.push(node(f)));
+      for (let i = 0; i < files.length; i++) {
+        for (let j = i + 1; j < files.length; j++) edges.push(edge(files[i], files[j]));
+      }
+    });
+    // Thin bridges between clusters so they're distinguishable but separate.
+    edges.push(edge("src/c0/f0.ts", "src/c1/f0.ts"));
+    edges.push(edge("src/c1/f0.ts", "src/c2/f0.ts"));
+
+    const modules = detectFileCommunities({ level: "file", nodes, edges });
+    for (let i = 1; i < modules.length; i++) {
+      expect(modules[i - 1].files.length).toBeGreaterThanOrEqual(modules[i].files.length);
+    }
+  });
+});
+
+describe("detectDispatchDirectories", () => {
+  test("fires on real dispatch pattern: shared parent, no sibling edges", () => {
+    const parent = "src/cli/router.ts";
+    const siblings = Array.from({ length: 5 }, (_, i) => `src/cli/commands/cmd${i}.ts`);
+    const nodes = [node(parent, 0, siblings.length), ...siblings.map((p) => node(p, 1, 0))];
+    const edges = siblings.map((s) => edge(parent, s));
+    const seeds = detectDispatchDirectories({ level: "file", nodes, edges });
+    expect(seeds).toHaveLength(1);
+    expect(seeds[0].files).toHaveLength(5);
+    expect(new Set(seeds[0].files)).toEqual(new Set(siblings));
+  });
+
+  test("does not fire on cohesive module (siblings import each other)", () => {
+    const files = Array.from({ length: 5 }, (_, i) => `src/module/f${i}.ts`);
+    const nodes = files.map((p) => node(p, 2, 2));
+    const edges: FileLevelEdge[] = [];
+    for (let i = 0; i < files.length; i++) {
+      for (let j = i + 1; j < files.length; j++) edges.push(edge(files[i], files[j]));
+    }
+    // Also import from a shared parent — cohesion should still disqualify.
+    const parent = "src/module/entry.ts";
+    nodes.push(node(parent, 0, files.length));
+    for (const f of files) edges.push(edge(parent, f));
+    const seeds = detectDispatchDirectories({ level: "file", nodes, edges });
+    expect(seeds).toHaveLength(0);
+  });
+
+  test("does not fire below sibling-count threshold", () => {
+    const parent = "src/cli/router.ts";
+    const siblings = ["src/cli/commands/a.ts", "src/cli/commands/b.ts", "src/cli/commands/c.ts"];
+    const nodes = [node(parent, 0, siblings.length), ...siblings.map((p) => node(p, 1, 0))];
+    const edges = siblings.map((s) => edge(parent, s));
+    const seeds = detectDispatchDirectories({ level: "file", nodes, edges });
+    expect(seeds).toHaveLength(0);
+  });
+
+  test("does not fire without a shared parent", () => {
+    const siblings = Array.from({ length: 5 }, (_, i) => `src/cli/commands/cmd${i}.ts`);
+    // Each sibling imported by a different unique parent — no single shared dispatcher.
+    const parents = siblings.map((_, i) => `src/caller${i}.ts`);
+    const nodes = [
+      ...parents.map((p) => node(p, 0, 1)),
+      ...siblings.map((p) => node(p, 1, 0)),
+    ];
+    const edges = siblings.map((s, i) => edge(parents[i], s));
+    const seeds = detectDispatchDirectories({ level: "file", nodes, edges });
+    expect(seeds).toHaveLength(0);
+  });
+
+  test("seedGroups forces scattered siblings into one community", () => {
+    // Build a 2-clique graph, then seed across the boundary.
+    const graph = twoCliques("src/cli/commands", "src/other", 5);
+    // Without seeding: Louvain finds the two cliques.
+    const baseline = detectFileCommunities(graph);
+    const cliques = baseline.filter((m) => m.files.length >= 3);
+    expect(cliques.length).toBeGreaterThanOrEqual(2);
+
+    // With seedGroups: a mixed set from both cliques collapses into one community.
+    const seededFiles = [
+      "src/cli/commands/a0.ts",
+      "src/cli/commands/a1.ts",
+      "src/other/b0.ts",
+      "src/other/b1.ts",
+    ];
+    const seeded = detectFileCommunities(graph, {
+      seedGroups: [{ label: "merged", files: seededFiles }],
+    });
+    const merged = seeded.find((m) => m.name === "merged");
+    expect(merged).toBeDefined();
+    expect(new Set(merged!.files)).toEqual(new Set(seededFiles));
+  });
+});

@@ -159,4 +159,26 @@ describe("RagDB", () => {
     expect(status.totalChunks).toBe(0);
     expect(status.lastIndexed).toBeNull();
   });
+
+  test("getFileChunkRanges aggregates chunks that share an entity name", async () => {
+    // bun-chunk splits long symbols across multiple rows. The lint relies
+    // on the symbol's full extent — drift checks must compare against the
+    // union of all chunks for one entity, not the first chunk alone.
+    const emb = await embed("split body");
+    db.upsertFile("/split.ts", "h1", [
+      { snippet: "function search() {", embedding: emb, entityName: "search", chunkType: "function", startLine: 313, endLine: 372 },
+      { snippet: "  // continued }", embedding: emb, entityName: "search", chunkType: "function", startLine: 373, endLine: 397 },
+      { snippet: "function other() {", embedding: emb, entityName: "other", chunkType: "function", startLine: 400, endLine: 420 },
+      { snippet: "// anonymous", embedding: emb, entityName: null, chunkType: null, startLine: 1, endLine: 5 },
+    ]);
+
+    const ranges = db.getFileChunkRanges("/split.ts");
+    const search = ranges.find((r) => r.entityName === "search");
+    const other = ranges.find((r) => r.entityName === "other");
+    const anon = ranges.find((r) => r.entityName === null);
+
+    expect(search).toEqual({ entityName: "search", chunkType: "function", startLine: 313, endLine: 397 });
+    expect(other).toEqual({ entityName: "other", chunkType: "function", startLine: 400, endLine: 420 });
+    expect(anon).toEqual({ entityName: null, chunkType: null, startLine: 1, endLine: 5 });
+  });
 });

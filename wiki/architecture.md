@@ -1,151 +1,152 @@
 # Architecture
 
-`mimirs` is a local RAG index for semantic code search — a Bun process that embeds a project's files into a SQLite database (with `sqlite-vec` and FTS5 loaded), exposes an MCP server for Claude Code / Cursor / Windsurf to query, and ships a CLI with the same surface. The codebase is organised as thirteen cohesive modules under `src/`, each behind an entry file that re-exports a narrow surface. The three highest-fan-in hubs that every other pipeline bottoms out at are `src/embeddings/embed.ts` (file fan-in 77 — the singleton ONNX boundary), `src/db/index.ts` (file fan-in 57 — the `RagDB` facade and the only code that opens a `Database` handle), and `src/config/index.ts` (file fan-in 40 — the `RagConfig` carrier).
+> Generated from `79e963f` · 2026-04-26
 
-Entry file for the CLI: `src/main.ts` → `src/cli/index.ts`. Entry file for the MCP server: `src/server/index.ts` (loaded dynamically from `src/cli/commands/serve.ts` so a top-level load failure in the server tree doesn't kill every other `mimirs` subcommand — `doctor` and `cleanup` must still run when `serve` is broken).
+Mimirs is a persistent project memory and RAG (Retrieval-Augmented Generation) system for AI coding agents. The codebase is organised as 15 cohesive communities under `src/`, each anchored by an entry file that re-exports a narrow surface, and a benchmark suite plus test helpers under `benchmarks/` and `tests/`.
 
-## System Map
+## System map
+
+The 15 communities form a layered dependency graph. Infrastructure sits at the bottom (config, DB, embeddings), pipeline and runtime services in the middle, and CLI and MCP adapters at the top.
 
 ```mermaid
 flowchart LR
-  subgraph Surface["Entry surfaces"]
-    cli_mod["cli/ (mimirs command)"]
-    mcp["server/ (MCP stdio)"]
-    tools_mod["tools/ (MCP registration)"]
+  subgraph Entry["Entry layer"]
+    cliEntry["CLI Entry & Core Utilities"]
+    cliCmds["CLI Commands"]
+    cliSetup["CLI Setup & IDE Integration"]
   end
-  subgraph Pipelines["Pipelines"]
-    indexing["indexing/"]
-    search_mod["search/"]
-    wiki_mod["wiki/"]
-    conv["conversation/"]
+  subgraph MCP["MCP layer"]
+    mcpTools["MCP Tool Handlers"]
+    searchTool["Search MCP Tool"]
+    wikiOrch["Wiki Orchestrator & MCP Tools"]
   end
-  subgraph Services["Services"]
-    embed["embeddings/ (MiniLM L6 v2)"]
-    graph_mod["graph/ (resolver)"]
+  subgraph Pipeline["Pipeline layer"]
+    indexing["Indexing Pipeline"]
+    convServer["Conversation Indexer & MCP Server"]
+    gitIdx["Git History Indexer & CLI Progress"]
+    graphWatch["Import Graph & File Watcher"]
+    communityDet["Community Detection & Discovery"]
+    wikiPipe["Wiki Pipeline — Types & Internals"]
   end
-  subgraph Store["Storage"]
-    db_mod["db/ (RagDB)"]
-    sqlite[("SQLite + vec0 + FTS5")]
+  subgraph Infra["Infrastructure layer"]
+    db["Database Layer"]
+    cfgEmbed["Config & Embeddings"]
+    search["Search Runtime"]
   end
 
-  mcp --> tools_mod
-  cli_mod --> indexing
-  cli_mod --> search_mod
-  tools_mod --> indexing
-  tools_mod --> search_mod
-  tools_mod --> wiki_mod
-  tools_mod --> conv
-  indexing --> embed
-  indexing --> graph_mod
-  search_mod --> embed
-  wiki_mod --> graph_mod
-  conv --> embed
-  indexing --> db_mod
-  search_mod --> db_mod
-  wiki_mod --> db_mod
-  conv --> db_mod
-  db_mod --> sqlite
+  cliEntry --> cliCmds
+  cliCmds --> cfgEmbed
+  cliCmds --> db
+  cliCmds --> search
+  cliCmds --> gitIdx
+  cliCmds --> indexing
+  mcpTools --> db
+  mcpTools --> cfgEmbed
+  searchTool --> search
+  wikiOrch --> db
+  wikiOrch --> wikiPipe
+  indexing --> cfgEmbed
+  indexing --> db
+  indexing --> graphWatch
+  convServer --> indexing
+  convServer --> db
+  communityDet --> db
+  communityDet --> wikiPipe
+  db --> search
+  db --> cfgEmbed
 ```
 
-Control flows left-to-right. State lives in one place: the SQLite database behind the `RagDB` facade. The invariant that holds everywhere is **no module outside `db/` opens a `Database` handle directly** — `embeddings`, `search`, `wiki`, `conversation`, and the graph resolver all hold a `RagDB` and call methods on it. FTS5 sync is enforced by triggers on `chunks` (`*_ai` / `*_ad` / `*_au`), so callers can't forget to update the virtual tables; vector column widths are read from `getEmbeddingDim()` at schema-init time, which is why changing the embedding model requires a DB reset. `config/` and `utils/` are used by almost every pipeline and are drawn separately below so the main map keeps its control-flow shape.
+## Load-bearing files
+
+These files have the highest PageRank scores — they sit at the structural centre of the import graph and a change here ripples across many communities.
+
+| File | Fan-in | Fan-out | What it anchors |
+|------|--------|---------|-----------------|
+| `src/embeddings/embed.ts` | 77 | 0 | Embedding singleton; imported by 7 of 15 communities. Every indexing path and search path runs through here. |
+| `src/wiki/types.ts` | 88 | 1 | Shared type contracts for the entire wiki pipeline; 2 communities depend on it directly and all wiki stages transitively. |
+| `src/utils/log.ts` | 27 | 0 | Structured logging; imported by 7 of 15 communities. Every service that emits progress or errors goes through this. |
+| `src/db/index.ts` | 59 | 10 | The `RagDB` class and all persistence operations; imported by 9 of 15 communities. The sole path to the SQLite store. |
+| `src/config/index.ts` | 42 | 4 | Config loader and model defaults; imported by 7 of 15 communities including the CLI, MCP server, and search. |
+| `src/search/hybrid.ts` | 21 | 3 | Hybrid vector+FTS ranking engine; imported by the search tool, CLI commands, and wiki pipeline. |
+
+`src/embeddings/embed.ts` is the single highest-fanIn file (77 internal imports) despite having zero outgoing edges — it is a pure leaf that everything depends on. `src/db/index.ts` is the structural bridge with both high fanIn (59) and high fanOut (10), making it the most load-bearing node in the graph: it connects Config, Search, and all pipeline stages together.
+
+## Entry points
+
+The bundle lists 56 files with no incoming edges — the true entry points of the process graph. Most are benchmark scripts and test fixtures that stand alone by design. The runtime entry points that matter are:
+
+| File | What it exports |
+|------|-----------------|
+| `src/cli/index.ts` — [CLI Entry & Core Utilities](communities/cli-entry-core.md) | Process bootstrap; parses argv, loads config, and dispatches to subcommand handlers |
+| `src/server/index.ts` — [Conversation Indexer & MCP Server](communities/conversation-server.md) | MCP server bootstrap; wires all tool groups and starts the protocol listener |
+| `benchmarks/*.ts` | Stand-alone benchmark scripts; no imports from them, no exports |
+
+Benchmark files (`benchmarks/ast-truncation-analysis.ts`, `benchmarks/indexing-bench.ts`, etc.) have no exports and are not required at runtime — they are isolated measurement harnesses.
 
 ## Cross-cutting dependencies
 
+Three modules are imported by nearly every community and are best understood as shared infrastructure rather than features.
+
 ```mermaid
 flowchart LR
-  config_mod["config/ (RagConfig)"]
-  utils_mod["utils/ (log + dir-guard)"]
-  config_mod --> indexing_c["indexing/"]
-  config_mod --> search_c["search/"]
-  config_mod --> wiki_c["wiki/"]
-  config_mod --> conv_c["conversation/"]
-  utils_mod --> cli_c["cli/"]
-  utils_mod --> tools_c["tools/"]
-  utils_mod --> indexing_c2["indexing/"]
-  utils_mod --> server_c["server/"]
+  cfgEmbed["Config & Embeddings"]
+  logUtil["src/utils/log.ts"]
+  dbLayer["Database Layer"]
+
+  cliCmds["CLI Commands"] --> cfgEmbed
+  cliCmds --> logUtil
+  cliCmds --> dbLayer
+  mcpTools["MCP Tool Handlers"] --> cfgEmbed
+  mcpTools --> dbLayer
+  indexing["Indexing Pipeline"] --> cfgEmbed
+  indexing --> logUtil
+  indexing --> dbLayer
+  convServer["Conversation Server"] --> cfgEmbed
+  convServer --> dbLayer
+  gitIdx["Git Indexer"] --> cfgEmbed
+  gitIdx --> logUtil
 ```
 
-These two modules are used transitively by every pipeline. Drawing each "used by" edge on the main System Map would obscure the control-flow shape, so they live here instead. `config/index.ts` is read at CLI / server startup (`loadConfig(projectDir)` + `applyEmbeddingConfig(config)`) and passed into every orchestrator; `utils/log.ts` provides `log` (stderr, LEVEL-gated so MCP stdio stays clean) and `cli` (stdout for the CLI surface), plus `checkIndexDir` which is imported wherever a module could be tricked into running inside a dangerous directory like `$HOME` or `/`.
+[Config & Embeddings](communities/config-embeddings.md) is imported by 7 of 15 communities. It holds the model singleton (`src/embeddings/embed.ts`) and the YAML config loader (`src/config/index.ts`) — any code path that produces or consumes vectors must go through it. [Database Layer](communities/db-layer.md) is imported by 9 of 15 communities; every read or write to the SQLite store goes through `RagDB` in `src/db/index.ts`. `src/utils/log.ts` is the shared logger, imported by 7 communities; it is a pure leaf with no outgoing edges.
 
-## Modules
+Test infrastructure: `tests/helpers.ts` is imported by 67 test files and is the shared test fixture; it is excluded from the community graph by the Louvain algorithm because it is a test-only node.
 
-| Module | Files | Exports | Fan-in | Fan-out | Entry file |
-|--------|-------|---------|--------|---------|------------|
-| [db](modules/db/index.md) | 10 | 57 | 15 | 2 | `src/db/index.ts` |
-| [wiki](modules/wiki/index.md) | 10 | 36 | 2 | 2 | `src/wiki/index.ts` |
-| [commands](modules/commands.md) | 19 | 13 | 1 | 10 | — |
-| [search](modules/search.md) | 4 | 16 | 5 | 4 | — |
-| [indexing](modules/indexing.md) | 4 | 7 | 9 | 4 | — |
-| [cli](modules/cli.md) | 3 | 14 | 3 | 3 | `src/cli/index.ts` |
-| [tools](modules/tools.md) | 12 | 7 | 1 | 9 | `src/tools/index.ts` |
-| [conversation](modules/conversation.md) | 2 | 5 | 4 | 2 | — |
-| [utils](modules/utils.md) | 2 | 3 | 8 | 0 | — |
-| [embeddings](modules/embeddings.md) | 1 | 8 | 17 | 0 | — |
-| [config](modules/config.md) | 1 | 1 | 10 | 2 | `src/config/index.ts` |
-| [graph](modules/graph.md) | 1 | 2 | 8 | 1 | — |
-| [tests](modules/tests.md) | 1 | 3 | 11 | 0 | — |
+## Design decisions
 
-## Hubs
+**1. Single SQLite file as the persistence layer.**
+Mimirs stores all chunks, embeddings, annotations, checkpoints, conversations, and the import graph in a single SQLite database via `RagDB` in `src/db/index.ts`. The alternative was a dedicated vector store (Chroma, Qdrant) plus a separate metadata store. SQLite was chosen because it ships with zero infrastructure overhead — a user running `mimirs init` gets a working index without running any server. The trade-off is that vector search is handled by a BM25+cosine hybrid rather than an ANN index, which is fast enough for project-scale corpora (tens of thousands of chunks) but would not scale to millions.
 
-Files where many other files land — changes here ripple widely.
+**2. Local transformer model with a lazy singleton.**
+The embedding model is loaded once at process start via a lazy singleton in `src/embeddings/embed.ts` (fanIn=77). The alternative of calling an external API (OpenAI, Cohere) was rejected because it would require a network round-trip per indexing batch, introduce latency, and tie the tool to an API key. The local model makes indexing fully offline and deterministic. The cost is a cold-start penalty on the first invocation, which the lazy singleton amortises across the process lifetime.
 
-| File | Fan-in | Fan-out | What it exposes |
-|------|--------|---------|-----------------|
-| `src/embeddings/embed.ts` | 77 | 0 | `embed`, `embedBatch`, `embedBatchMerged`, `configureEmbedder`, `getEmbeddingDim`, `mergeEmbeddings`, `getEmbedder`, `getTokenizer` |
-| `src/wiki/types.ts` | 67 | 1 | Every cross-phase wiki shape (`DiscoveryResult`, `ClassifiedInventory`, `PageManifest`, `ContentCache`, `PagePayload`) |
-| `tests/helpers.ts` | 67 | 0 | `createTempDir`, `writeFixture`, `cleanupTempDir` — fixture scaffolding for every test suite |
-| `src/db/index.ts` | 57 | 10 | `RagDB` facade + every row-shape type re-exported from `types.ts` |
-| `src/config/index.ts` | 40 | 4 | `loadConfig`, `applyEmbeddingConfig`, `RagConfig` |
-| `src/utils/log.ts` | 27 | 0 | `log` (stderr / LEVEL-gated) + `cli` (stdout) |
-| `src/search/hybrid.ts` | 20 | 3 | `search`, `searchChunks`, `mergeHybridScores` |
-| `src/graph/resolver.ts` | 17 | 1 | `resolveImports`, `resolveImportsForFile`, `generateProjectMap`, `buildPathToIdMap` |
-| `src/indexing/chunker.ts` | 17 | 1 | `chunkText` — the `bun-chunk` wrapper |
-| `src/indexing/indexer.ts` | 17 | 10 | `indexDirectory` — the write-path orchestrator |
-| `src/tools/index.ts` | 12 | 14 | `resolveProject`, `registerAllTools`, `findGitRoot`, `runGit` |
-| `src/search/benchmark.ts` | 12 | 3 | `runBenchmark`, `loadBenchmarkQueries`, `formatBenchmarkReport` |
-| `src/conversation/parser.ts` | 11 | 0 | `readJSONL`, `parseTurns`, `buildTurnText` |
-| `src/search/eval.ts` | 8 | 3 | `runEval`, `loadEvalTasks`, `formatEvalReport` |
-| `src/cli/progress.ts` | 7 | 1 | `cliProgress`, `createQuietProgress` |
-| `src/indexing/parse.ts` | 7 | 0 | `parseFile` |
-| `src/cli/setup.ts` | 6 | 1 | `runSetup` + the `ensure*` install helpers |
-| `src/indexing/watcher.ts` | 2 | 4 | `startWatcher` — the filesystem-watch bridge |
+**3. Louvain community detection drives wiki structure.**
+Rather than manually grouping files into modules, the wiki pipeline runs the Louvain algorithm on the import graph extracted by `src/wiki/discovery.ts` to find communities automatically. This means the wiki topology reflects the actual coupling in the code, not a developer's intuition about what belongs together. The alternative of hand-crafted module boundaries was rejected because it goes stale as the codebase evolves. The trade-off is that Louvain occasionally merges logically distinct concerns when their files happen to be tightly coupled — the bundle's `DEPTH_PROFILE` thresholds and the community synthesis stage compensate by flagging deep bundles for richer prose treatment.
 
-`embed.ts` at fan-in 77 is the single architectural centre: every indexing, search, conversation, wiki, benchmark, and test path reaches it directly or transitively. That is why `configureEmbedder(modelId, dim)` is called at app startup (via `applyEmbeddingConfig`) rather than per-call — the singleton pipeline and tokenizer would otherwise lose per-project overrides on the next reset. `src/wiki/types.ts` at fan-in 67 is the other unusual hub: a pure-types file that every phase of wiki generation imports, which is also why changing a `PageManifest` or `ContentCache` field is a breaking change for the whole pipeline.
+**4. MCP as the primary tool protocol.**
+All runtime capabilities (search, indexing, annotation, wiki generation) are exposed through the Model Context Protocol rather than a proprietary JSON-RPC surface. This means any MCP-capable client (Claude Code, Cursor, Windsurf, VS Code Copilot) gets the full tool set without a custom integration. The [MCP Tool Handlers](communities/mcp-tools.md) community is a thin adapter layer over the DB and business logic, so the protocol choice does not bleed into the core algorithms.
 
-## Cross-Cutting Symbols
+**5. Hybrid search (vector + BM25) with explicit weight tuning.**
+`src/search/hybrid.ts` merges cosine-similarity vector results with BM25 full-text results at a tunable weight (`DEFAULT_HYBRID_WEIGHT = 0.7` toward vector). Neither pure vector nor pure BM25 search alone performs well on code: vector search misses exact identifiers, BM25 misses semantic paraphrases. The hybrid approach with boosts for source path, symbol expansion, dependency-graph proximity, and filename affinity achieves measurable Recall@10 and MRR improvements over either alone (see `BENCHMARKS.md`).
 
-Symbols referenced from three or more modules — the project's shared vocabulary.
-
-| Symbol | Type | Defined in | Used in |
-|--------|------|------------|---------|
-| `RagDB` | class | `src/db/index.ts` | `benchmarks`, `commands`, `conversation`, `db`, `features`, `graph`, `indexing`, `search` (+3 more) |
-| `cleanupTempDir` | function | `tests/helpers.ts` | `benchmarks`, `cli`, `config`, `conversation`, `db`, `features`, `graph`, `indexing` (+3 more) |
-| `createTempDir` | function | `tests/helpers.ts` | `benchmarks`, `cli`, `config`, `conversation`, `db`, `features`, `graph`, `indexing` (+3 more) |
-| `embed` | function | `src/embeddings/embed.ts` | `benchmarks`, `commands`, `conversation`, `db`, `embeddings`, `features`, `graph`, `search` (+2 more) |
-| `getEmbedder` | function | `src/embeddings/embed.ts` | `benchmarks`, `conversation`, `db`, `embeddings`, `features`, `graph`, `indexing`, `search` (+1 more) |
-| `writeFixture` | function | `tests/helpers.ts` | `benchmarks`, `cli`, `conversation`, `features`, `graph`, `indexing`, `search`, `tools` |
-| `embedBatch` | function | `src/embeddings/embed.ts` | `benchmarks`, `conversation`, `indexing`, `search` |
-| `ClassifiedInventory` | interface | `src/wiki/types.ts` | `tools`, `wiki` |
-| `DiscoveryResult` | interface | `src/wiki/types.ts` | `tools`, `wiki` |
-| `PageManifest` | interface | `src/wiki/types.ts` | `tools`, `wiki` |
-| `RagConfig` | type | `src/config/index.ts` | `benchmarks`, `indexing`, `search` |
-| `formatBenchmarkReport` | function | `src/search/benchmark.ts` | `benchmarks`, `commands`, `search` |
-| `loadBenchmarkQueries` | function | `src/search/benchmark.ts` | `benchmarks`, `commands`, `search` |
-| `runBenchmark` | function | `src/search/benchmark.ts` | `benchmarks`, `commands`, `search` |
-| `parseFile` | function | `src/indexing/parse.ts` | `benchmarks`, `indexing` |
-
-## Design Decisions
-
-- **SQLite + `sqlite-vec` + FTS5, not a server DB.** mimirs is per-project and runs on the user's machine. Vector and lexical search live in the same file with no network hop. On macOS the `RagDB` constructor calls `loadCustomSQLite()` and points `bun:sqlite` at Homebrew's build because Apple's bundled SQLite can't load extensions. On Linux the constructor probes common distro paths (Debian/Ubuntu x86_64 + arm64, RHEL/Fedora, Arch/Alpine) before falling through; Windows uses bun's bundled SQLite.
-- **Hybrid ranking with a blend, not pure vector.** `src/search/hybrid.ts` computes `0.7 × normalised(vectorScore) + 0.3 × normalised(BM25Score)` so exact-name matches (`RagDB`, `embedBatch`) don't get buried under semantic drift. The ratio is tunable via `config.hybridWeight`; min-max normalisation per list keeps the two score spaces comparable.
-- **Two-pass graph resolution.** The indexer writes `file_imports` with `resolved_file_id = NULL` and `src/graph/resolver.ts` runs a second pass after every file is on disk in the DB. This removes the file-ordering dependency a single-pass resolver would require; the watcher's `resolveImportsForFile` is the incremental variant.
-- **Conversation indexing is tail-based, not one-shot.** `startConversationTail` watches the JSONL file with a 1500 ms debounce and indexes appended turns. `readOffset` is a byte offset so repeat passes are cheap. Claude Code's own `Read` / `Glob` / `Write` / `Edit` / `NotebookEdit` tool-results are skipped (`SKIP_CONTENT_TOOLS`) because the code index already has that content — only the tool name survives.
-- **Wiki generation is data-driven, not template-driven.** A 16-entry section library in `src/wiki/section-selector.ts` carries an `applies(cache, ctx)` predicate per entry; aggregate pages (like this one) also get a full exemplar under `src/wiki/exemplars/` with `<!-- adapt -->` markers. The agent decides which sections fit, the pipeline supplies signals.
+**6. Wiki generation is a multi-phase pipeline, not a single LLM call.**
+The `generate_wiki` tool runs five distinct phases: discovery → community detection → synthesis (LLM, per-community) → bundling → page rendering. Each phase writes a deterministic artifact under `wiki/_meta/` (classified JSON, syntheses JSON, bundles JSON, manifest JSON). The alternative of a single large LLM call over the entire codebase was rejected because it exceeds context limits and produces shallow output. Phased generation lets each LLM call see exactly the bundle it needs, and incremental re-runs (`incremental: true`) diff against the manifest to regenerate only stale pages.
 
 ## See also
 
-- [Data Flows](data-flows.md)
-- [Getting Started](guides/getting-started.md)
-- [Conventions](guides/conventions.md)
-- [Testing](guides/testing.md)
-- [Index](index.md)
+- [CLI Commands](communities/cli-commands.md)
+- [CLI Entry & Core Utilities](communities/cli-entry-core.md)
+- [CLI Setup & IDE Integration](communities/cli-setup.md)
+- [Community Detection & Discovery](communities/community-detection.md)
+- [Config & Embeddings](communities/config-embeddings.md)
+- [Conversation Indexer & MCP Server](communities/conversation-server.md)
+- [Data flows](data-flows.md)
+- [Database Layer](communities/db-layer.md)
+- [Getting started](getting-started.md)
+- [Git History Indexer & CLI Progress](communities/git-indexer-progress.md)
+- [Import Graph & File Watcher](communities/graph-watcher.md)
+- [Indexing Pipeline](communities/indexing-pipeline.md)
+- [MCP Tool Handlers](communities/mcp-tools.md)
+- [Search MCP Tool](communities/search-tool.md)
+- [Search Runtime](communities/search-runtime.md)
+- [Wiki Orchestrator & MCP Tools](communities/wiki-orchestrator.md)
+- [Wiki Pipeline — Types & Internals](communities/wiki-pipeline-internals.md)

@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import type { PageManifest } from "./types";
 import type { StalenessReport } from "./staleness";
 
@@ -18,11 +18,11 @@ export function appendInitLog(
 ): void {
   const counts: Record<string, number> = {};
   for (const p of Object.values(manifest.pages)) {
-    counts[p.tier] = (counts[p.tier] ?? 0) + 1;
+    counts[p.kind] = (counts[p.kind] ?? 0) + 1;
   }
   const breakdown = Object.entries(counts)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([tier, count]) => `${count} ${tier}`)
+    .map(([kind, count]) => `${count} ${kind}`)
     .join(", ");
 
   const entry =
@@ -58,8 +58,7 @@ export function appendIncrementalLog(
   if (stale.length > 0) {
     entry += `\n### Regenerated\n\n`;
     for (const d of [...stale].sort(byOrder)) {
-      const kind = d.page.focus ?? d.page.kind;
-      entry += `- \`${d.wikiPath}\` — ${d.page.title} (${kind}, ${d.page.depth})\n`;
+      entry += `- \`${d.wikiPath}\` — ${d.page.title} (${d.page.kind}, ${d.page.depth})\n`;
       entry += `  - trigger: ${d.triggers.map((t) => `\`${t}\``).join(", ")}\n`;
     }
   }
@@ -67,8 +66,7 @@ export function appendIncrementalLog(
   if (added.length > 0) {
     entry += `\n### Added\n\n`;
     for (const d of [...added].sort(byOrder)) {
-      const kind = d.page.focus ?? d.page.kind;
-      entry += `- \`${d.wikiPath}\` — ${d.page.title} (${kind}, ${d.page.depth})\n`;
+      entry += `- \`${d.wikiPath}\` — ${d.page.title} (${d.page.kind}, ${d.page.depth})\n`;
     }
   }
 
@@ -84,6 +82,7 @@ export function appendIncrementalLog(
 
 function append(wikiDir: string, entry: string): void {
   const path = join(wikiDir, LOG_FILENAME);
+  mkdirSync(dirname(path), { recursive: true });
   const prior = existsSync(path) ? readFileSync(path, "utf-8") : HEADER;
   const separator = prior.endsWith("\n\n") ? "" : prior.endsWith("\n") ? "\n" : "\n\n";
   writeFileSync(path, prior + separator + entry);

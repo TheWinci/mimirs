@@ -44,7 +44,7 @@
   "dependencies": {
     "@huggingface/transformers": "^3.4.0",
     "@modelcontextprotocol/sdk": "^1.12.0",
-    "@winci/bun-chunk": "1.0.0",
+    "@winci/bun-chunk": "1.0.2",
     "graphology": "^0.26.0",
     "graphology-communities-louvain": "^2.0.2",
     "gray-matter": "^4.0.3",
