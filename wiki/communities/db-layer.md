@@ -64,7 +64,8 @@ When a `PathFilter` is active, the queries over-fetch by a factor of `FILTER_OVE
 
 ## How it works
 
-```sequenceDiagram
+```mermaid
+sequenceDiagram
     participant Caller
     participant RagDB
     participant fileOps as "src/db/files.ts"
@@ -95,7 +96,8 @@ When a `PathFilter` is active, the queries over-fetch by a factor of `FILTER_OVE
 
 ## Dependencies and consumers
 
-```flowchart LR
+```mermaid
+flowchart LR
     sqliteVec["sqlite-vec"]
     embedDim["src/embeddings/embed.ts"]
     usages["src/search/usages.ts"]
