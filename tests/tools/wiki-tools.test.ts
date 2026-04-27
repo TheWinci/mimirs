@@ -200,7 +200,7 @@ describe("generate_wiki", () => {
     });
 
     const text = getText(result);
-    expect(text).toContain("Page:");
+    expect(text).toContain("Page payload");
     expect(text).toContain("**Path:**");
     expect(text).toContain("**Kind:**");
     expect(text).toContain("Sections to write");
@@ -292,7 +292,7 @@ describe("generate_wiki", () => {
     });
     const genText = getText(viaGenerate);
     const rewriteText = getText(viaRewrite);
-    expect(rewriteText).toContain("Page:");
+    expect(rewriteText).toContain("Page payload");
     expect(rewriteText).toContain("**Path:**");
     // Same path + kind — content may differ by timestamp-like fields but structure matches.
     const pathLine = (s: string) => (s.match(/\*\*Path:\*\*.*$/m) ?? [""])[0];

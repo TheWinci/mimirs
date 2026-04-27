@@ -46,6 +46,8 @@ import type { RagDB } from "../db";
 
 const WRITING_RULES = `## Writing Rules
 
+- **Single H1 only.** Each page starts with exactly one H1 — \`# <Title>\` from the payload. Do NOT echo the prompt's \`## Page payload\` framing block, do NOT emit a second \`# <Title>\` later in the file, do NOT use \`#\` for any other heading. All sections in the payload's "Sections to write" list become \`##\` (H2) headings. This rule fired regressions on \`endpoints.md\`, \`queues.md\`, and \`runtime-config.md\` where writers occasionally duplicated the page title at the bottom of the file.
+- **Single source of truth for aggregate-page lists.** Aggregate pages (\`endpoints\`, \`queues\`, \`runtime-config\`, and the \`*-toc\` variants) list each route / topic / env-var EXACTLY ONCE on the page. The Routes table on \`endpoints.md\` is the single place routes are enumerated; the Topology section on \`queues.md\` is the single place topics are enumerated; the Environment variables table on \`runtime-config.md\` is the single place env vars are enumerated. Overview / introductory sections must NEVER repeat the list — they are narrative wrappers. Writers that copied routes into both Overview and the Routes table produced 40-row duplicate dumps; this rule prevents that. On \`*-toc\` pages, do not list individual routes / topics at all — sub-pages own that data; the toc page only lists the sub-pages.
 - **Page header is mandatory.** Copy the payload's \`Required page header\` block verbatim as the first content below the H1 title, before any section. It carries the breadcrumb trail (sub-pages only) and the generation stamp (\`> Generated from <ref> · <date>\`). Do not rewrite the stamp — readers use it to tell if a page matches HEAD.
 - **Run the semantic queries first.** When the payload lists \`Semantic queries to run before drafting\`, call \`read_relevant(query)\` on each before writing the matching section. Skip a query only when the bundle already covers that angle in the relevant chunks — never skip all three. Queries surface error paths, call sites, and internal constants the bundle misses.
 - **Sections come from the synthesis.** The page payload lists the exact sections to write (title + purpose + optional shape). Do not add or drop sections; if the synthesis is wrong, regenerate it, do not improvise. Never stub an empty heading.
@@ -1110,7 +1112,14 @@ function renderAssistBlock(payload: PagePayload): string {
 }
 
 function renderPagePayload(payload: PagePayload): string {
-  let text = `# Page: ${payload.title}\n\n`;
+  // Prompt framing — NOT page content. Writers occasionally echoed the
+  // legacy `# Page: <title>` H1 into the actual file body (visible on
+  // sparse aggregate pages like endpoints / queues / runtime-config
+  // where the bundle is dense and the section list is short, so the
+  // writer pattern-matches on the first H1 it sees). Demoting to H2
+  // with a clear "do not echo" marker stops that.
+  let text = `## Page payload (prompt framing — do not copy verbatim into the file)\n\n`;
+  text += `**Title:** ${payload.title} — write exactly one H1 \`# ${payload.title}\` at the top of the file body. Do not duplicate it later.\n`;
   text += `**Path:** \`${payload.wikiPath}\`\n`;
   text += `**Kind:** ${payload.kind} | **Depth:** ${payload.depth}\n`;
   text += `**Slug:** \`${payload.slug}\`\n\n`;
@@ -1167,7 +1176,11 @@ function renderPagePayload(payload: PagePayload): string {
   } else if (payload.prefetched.dataFlow) {
     text += renderDataFlowBundle(payload.prefetched.dataFlow);
   } else if (payload.prefetched.serviceAggregate) {
-    text += renderServiceAggregateBundle(payload.prefetched.serviceAggregate);
+    // Toc pages (`endpoints-toc` / `queues-toc`) get a summary-only render
+    // so the writer can't echo the full route list inline — that's the
+    // sub-pages' job. Single-page kinds get the full bundle as before.
+    const isToc = payload.kind === "endpoints-toc" || payload.kind === "queues-toc";
+    text += renderServiceAggregateBundle(payload.prefetched.serviceAggregate, { tocSummary: isToc });
   }
 
   text += renderAssistBlock(payload);
@@ -1644,12 +1657,31 @@ function renderGettingStartedBundle(b: import("../wiki/types").GettingStartedBun
 
 function renderServiceAggregateBundle(
   b: import("../wiki/types").ServiceAggregateBundle,
+  opts: { tocSummary?: boolean } = {},
 ): string {
   let text = `## Service aggregate bundle\n\n`;
   text += `**Project kind:** \`${b.profile.kind}\``;
   if (b.profile.framework) text += ` (${b.profile.framework})`;
   text += `\n\n`;
   text += `_${b.profile.summary}_\n\n`;
+
+  if (opts.tocSummary) {
+    // Toc pages render a summary, never the full route/topic list. Detail
+    // pages own that data; the toc only links into them. Listing routes
+    // in both places is the duplication regression on the v1 sharding.
+    text += `**Summary (toc page — sub-pages own the detail):**\n`;
+    if (b.routes.length > 0) {
+      const byCommunity = new Map<string, number>();
+      for (const r of b.routes) byCommunity.set(r.communitySlug, (byCommunity.get(r.communitySlug) ?? 0) + 1);
+      text += `- ${b.routes.length} route${b.routes.length === 1 ? "" : "s"} across ${byCommunity.size} communit${byCommunity.size === 1 ? "y" : "ies"}\n`;
+    }
+    if (b.queueOps.length > 0) {
+      const topics = new Set(b.queueOps.map((q) => q.topic));
+      text += `- ${b.queueOps.length} queue op${b.queueOps.length === 1 ? "" : "s"} across ${topics.size} topic${topics.size === 1 ? "" : "s"}\n`;
+    }
+    text += `\nWriter: do NOT list individual routes / topics on this page. Use the manifest's "Related pages" + sub-page paths to build the table of contents. Routes belong on the per-group sub-pages; topics on per-topic sub-pages.\n\n`;
+    return text;
+  }
 
   if (b.routes.length > 0) {
     text += `**Routes (${b.routes.length}) — across all communities:**\n`;

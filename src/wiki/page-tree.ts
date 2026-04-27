@@ -34,9 +34,20 @@ const ENDPOINTS_PATH = "wiki/endpoints.md";
 const QUEUES_PATH = "wiki/queues.md";
 const RUNTIME_CONFIG_PATH = "wiki/runtime-config.md";
 
-/** Aggregate-page sharding thresholds (plans/aggregate-page-sharding.md). */
+/**
+ * Aggregate-page sharding thresholds. Tuned conservatively after the v1
+ * regression where a 40+ route service produced a single endpoints page
+ * with duplicated content — extraction missed framework-specific route
+ * shapes (Next.js file-based, tRPC procedures, Spring class-prefix
+ * controllers) so the regex undercount kept the threshold from firing.
+ *
+ * Lowered from 10 → 3: any service project with ≥ 3 detected routes
+ * gets the folder treatment. Single-page only when extraction caught 1-2
+ * routes (genuinely tiny services or pathological extraction misses,
+ * neither of which benefits from sharding overhead).
+ */
 const QUEUE_FOLDER_THRESHOLD = 3;
-const ENDPOINTS_FOLDER_THRESHOLD = 10;
+const ENDPOINTS_FOLDER_THRESHOLD = 3;
 const DATA_FLOWS_FOLDER_THRESHOLD = 3;
 
 /**
@@ -385,19 +396,21 @@ function endpointsPage(): Omit<ManifestPage, "order"> {
     {
       title: "Overview",
       purpose:
-        "One paragraph naming the primary HTTP entry surfaces (which community / module owns each prefix). Pulls from per-community `serviceSignals.routes` to identify clusters.",
+        "One paragraph framing the HTTP surface — primary frameworks, total route count, owning communities. **Do NOT list individual routes here** — they appear once in the Routes table below. Routes table is the single source of truth for the page; Overview is the narrative wrapper.",
     },
     {
-      title: "All endpoints",
+      title: "Routes",
       purpose:
-        "Single table covering every route across the repo, grouped by community. Columns: Method, Path, Handler, File:line, Owning community (linked). Order: by community, then by path.",
+        "**Single table covering every route across the repo. This is the only place routes are listed on the page.** Columns: Method, Path, Handler, File:line, Auth, Owning community (linked). Order: by owning community, then by path. One row per route — never duplicate a route across rows. Cite file:line verbatim from `bundle.serviceAggregate.routes`. Link the owning-community column to the community page.",
       shape:
-        "Markdown table with one row per route. Cite file:line verbatim from `serviceSignals.routes`. Link the owning-community column to the community page.",
+        "Markdown table with one row per route. Auth column reads `none` for unguarded routes, names the guard/middleware otherwise.",
     },
     {
-      title: "Auth surface",
+      title: "Auth tiers",
       purpose:
-        "Optional. Group routes by their middleware/guard chain when there are multiple distinct auth tiers (public, JWT, JWT+role, internal-only). Skip if every route uses the same chain.",
+        "Optional — skip when every route uses the same auth chain or there's no detectable middleware. **Summary by tier, not a route list.** Group routes by their guard/middleware chain (e.g. `public`, `JWT`, `JWT + RolesGuard('admin')`); for each tier emit one bullet: `**<tier>** — N routes (e.g. <2-3 representative paths>)`. Do NOT re-list every route — readers already saw the full list in the Routes table; this section's value is collapsing that into the small set of distinct auth surfaces.",
+      shape:
+        "bulleted list, one bullet per distinct tier with the route count and 2-3 representative path examples. No tables.",
     },
   ];
   return {
@@ -423,24 +436,24 @@ function queuesPage(): Omit<ManifestPage, "order"> {
     {
       title: "Overview",
       purpose:
-        "One paragraph naming the broker(s) in use and the rough topic count. Pull from per-community `serviceSignals.queueOps`.",
+        "One paragraph framing the messaging surface — broker(s) in use, total topic count, primary domains. **Do NOT list individual topics here** — they appear once in the Topology section. Overview is the narrative wrapper; Topology is the single source of truth.",
     },
     {
       title: "Topology",
       purpose:
-        "Single Mermaid `flowchart LR` with three subgraphs (Producers / Topics / Consumers) covering every topic the service touches. Use real file/symbol names — no placeholders.",
+        "**Single Mermaid `flowchart LR` covering every topic the service touches. This is the only place topic↔producer↔consumer relationships are listed.** Three subgraphs: Producers, Topics, Consumers. Use real file/symbol names — no placeholders. Follow the diagram with a bulleted list grouped by topic: `topic — produced by file:line; consumed by file:line`. Each topic appears exactly once.",
       shape:
-        "One Mermaid flowchart followed by a bullet list grouped by topic: `topic — produced by file:line; consumed by file:line`. Link each producer/consumer to its owning community page.",
+        "One Mermaid flowchart followed by a bullet list. Link each producer/consumer to its owning community page.",
     },
     {
       title: "Message shapes",
       purpose:
-        "Per topic the service produces, the payload schema (interface / dataclass / Avro / JSON Schema) and 1-2 sentences of intent. Pull from member-file source — do not invent shapes.",
+        "Per produced topic, the payload schema (interface / dataclass / Avro / JSON Schema) and 1-2 sentences of intent. Pull from member-file source — do not invent shapes. Skip the section when no shapes are detectable.",
     },
     {
       title: "Failure handling",
       purpose:
-        "Optional. Document retry, dead-letter, and idempotency policies when the codebase configures them. Skip when there's no visible retry config.",
+        "Optional. Document retry, dead-letter, and idempotency policies when the codebase configures them. Skip when there's no visible retry config — do not invent defaults.",
     },
   ];
   return {
@@ -467,12 +480,12 @@ function runtimeConfigPage(): Omit<ManifestPage, "order"> {
     {
       title: "Overview",
       purpose:
-        "One paragraph naming the configuration surface — env vars, config files, secret stores. Reference the loader entry point if there's a central config module.",
+        "One paragraph framing the configuration surface — central config loader (if any), total env-var count, secret stores. **Do NOT list individual variables here** — they appear once in the Environment variables table. Overview is the narrative wrapper.",
     },
     {
       title: "Environment variables",
       purpose:
-        "Single table covering every env var the service reads. Columns: Name, Required, Default, Consumer (file:line), What breaks if missing. Order alphabetically. Source from `process.env.X`, `os.getenv('X')`, `os.environ['X']`, `System.getenv('X')`, `std::env::var('X')`, etc.",
+        "**Single table covering every env var the service reads. This is the only place variables are listed on the page.** Columns: Name, Required, Default, Consumer (file:line), What breaks if missing. Order alphabetically. One row per variable — never duplicate. Source from `process.env.X`, `os.getenv('X')`, `os.environ['X']`, `System.getenv('X')`, `std::env::var('X')`, etc.",
       shape:
         "Markdown table; one row per env var. Cite file:line for the consumer column. Mark required/optional based on whether code throws when the var is missing or has a default.",
     },
