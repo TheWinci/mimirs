@@ -138,13 +138,11 @@ describe("queues sharding", () => {
 });
 
 describe("endpoints sharding", () => {
-  test("below threshold (5 routes) → single endpoints.md", () => {
+  test("below threshold (2 routes) → single endpoints.md", () => {
+    // Threshold lowered to 3 in v2 — 1-2 routes stay single-page.
     const routes = [
-      { method: "GET", path: "/users", handlerSymbol: null, file: "x", line: 1 },
-      { method: "POST", path: "/users", handlerSymbol: null, file: "x", line: 2 },
-      { method: "DELETE", path: "/users/:id", handlerSymbol: null, file: "x", line: 3 },
-      { method: "GET", path: "/health", handlerSymbol: null, file: "y", line: 1 },
-      { method: "GET", path: "/version", handlerSymbol: null, file: "y", line: 2 },
+      { method: "GET", path: "/health", handlerSymbol: null, file: "x", line: 1 },
+      { method: "GET", path: "/version", handlerSymbol: null, file: "x", line: 2 },
     ];
     const bundles = [bundleWith("c1", "comm-1", { role: "http", routes })];
     const m = buildPageTree(makeDiscovery(profileService()), makeClassified(), makeSyntheses([{ id: "c1", slug: "comm-1" }]), "abc", "files", bundles);
