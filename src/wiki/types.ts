@@ -410,6 +410,22 @@ export interface PageContentCache {
    */
   serviceAggregate?: ServiceAggregateBundle;
   /**
+   * Per-topic detail bundle for `queue-detail` sub-pages. Populated only
+   * when the queues folder threshold has been crossed (≥ 3 topics).
+   */
+  queueDetail?: QueueDetailBundle;
+  /**
+   * Per-group detail bundle for `endpoint-group` sub-pages. Populated only
+   * when the endpoints folder threshold has been crossed (≥ 10 routes).
+   */
+  endpointGroup?: EndpointGroupBundle;
+  /**
+   * Per-flow detail bundle for `data-flow-detail` sub-pages. Populated
+   * only when the data-flows folder threshold has been crossed (≥ 3
+   * triggers) AND a `_meta/_flows.json` synthesis exists.
+   */
+  dataFlow?: DataFlowBundle;
+  /**
    * Pre-run results for the page's `semanticQueries`. Run once during
    * planning so the writer doesn't burn N tool turns calling
    * `read_relevant` itself. Each writer cache replay is the full system
@@ -554,6 +570,105 @@ export interface ServiceAggregateBundle {
     line: number;
     communitySlug: string;
   }[];
+}
+
+/**
+ * Per-topic detail bundle. Built from `ServiceAggregateBundle.queueOps`
+ * grouped by topic, enriched with payload-shape evidence and calling-
+ * route cross-cuts. Used by `queue-detail` sub-pages.
+ */
+export interface QueueDetailBundle {
+  topic: string;
+  /** Producers: file:line + owning-community slug (linkable). */
+  producers: { file: string; line: number; communitySlug: string }[];
+  consumers: { file: string; line: number; communitySlug: string }[];
+  /**
+   * Best-effort payload shape — type/interface/dataclass/struct
+   * definitions found within ±10 lines of a producer call site.
+   * Empty when nothing matches; renderer omits the Payload section.
+   */
+  payloadHints: { file: string; line: number; snippet: string }[];
+  /**
+   * Cross-cut: HTTP routes whose handler community contains a
+   * producer for this topic. Lets the page cite "produced by `POST
+   * /orders`" alongside file:line. Empty when no routes match.
+   */
+  callingRoutes: { method: string; path: string; communitySlug: string }[];
+  /**
+   * Retry / dead-letter / idempotency evidence detected near a
+   * producer or consumer. Best-effort regex over ±10 lines around
+   * each call. Empty when nothing detected; Failure-handling
+   * section omitted (no fabricated defaults).
+   */
+  failureConfig: { kind: "retry" | "dlq" | "idempotency"; file: string; line: number; snippet: string }[];
+}
+
+/**
+ * Per-group detail bundle for endpoint sub-pages. Built from a route-
+ * clustering pass over `ServiceAggregateBundle.routes`. Reuses the
+ * route shape from the aggregate to keep types single-sourced.
+ */
+export interface EndpointGroupBundle {
+  groupSlug: string;
+  /** Path prefix this group covers, e.g. `/api/users`. */
+  pathPrefix: string;
+  routes: ServiceAggregateBundle["routes"];
+  /** Middleware visible on the group's member files. Best-effort. */
+  middleware: { name: string; file: string; line: number }[];
+  owningCommunities: string[];
+  /**
+   * Data stores routes in this group reach. Filtered from per-
+   * community `serviceSignals.dataOps` to only files containing
+   * routes in this group. Capped at 20 entries.
+   */
+  dataStoresTouched: { store: string; model: string | null }[];
+}
+
+/**
+ * Per-flow detail bundle. Phase A names flows via LLM synthesis;
+ * Phase B builds a callee-chain BFS bundle from each flow's trigger
+ * symbol so the writer can render the sequence diagram without re-
+ * walking the call graph.
+ *
+ * `find_usages` is *not* used here — it returns callers (def → caller)
+ * but the writer needs callees (handler → service → repo → DB). The
+ * BFS uses `db.getDependsOnForFiles` plus per-file symbol scan.
+ */
+export interface DataFlowBundle {
+  name: string;
+  slug: string;
+  purpose: string;
+  trigger: { kind: "http" | "queue" | "scheduled" | "manual"; ref: string };
+  /** Communities involved, ordered by call depth from the trigger. */
+  memberCommunities: string[];
+  callChain: {
+    symbol: string;
+    file: string;
+    line: number;
+    depth: number;
+    /** Symbol names this hop calls into (next-depth nodes). */
+    calls: string[];
+  }[];
+  annotations: { file: string; line: number; note: string }[];
+}
+
+/**
+ * LLM-produced flow set persisted to `_meta/_flows.json`. Cached on a
+ * fingerprint over `(sorted trigger refs + sorted community slugs)`;
+ * Phase A is skipped on warm regens with unchanged fingerprint.
+ */
+export interface FlowSpec {
+  name: string;
+  slug: string;
+  purpose: string;
+  trigger: { kind: "http" | "queue" | "scheduled" | "manual"; ref: string };
+  memberCommunities: string[];
+}
+
+export interface FlowsFile {
+  version: 1;
+  fingerprint: string;
+  flows: FlowSpec[];
 }
 
 export interface GettingStartedBundle {

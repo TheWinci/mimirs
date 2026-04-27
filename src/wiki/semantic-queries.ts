@@ -54,6 +54,32 @@ export const SEMANTIC_QUERIES: Record<string, string[]> = {
     "config file loaders and parsers",
     "secrets vault and credential retrieval",
   ],
+  "queues-toc": [
+    "message broker setup and topic naming",
+    "kafka rabbitmq sqs nats clients",
+  ],
+  "queue-detail": [
+    "topic payload schema interface dataclass",
+    "retry dead-letter idempotency keys",
+    "producer publish and consumer subscribe call sites",
+  ],
+  "endpoints-toc": [
+    "router setup and api prefix",
+    "controller decorator and route registration",
+  ],
+  "endpoint-group": [
+    "request validation schema dto",
+    "auth guard middleware and permissions",
+    "handler service repository call chain",
+  ],
+  "data-flows-toc": [
+    "primary triggers entry points routes jobs consumers",
+  ],
+  "data-flow-detail": [
+    "handler service repository database call chain",
+    "error retry fallback degradation handling",
+    "transaction boundaries and rollback",
+  ],
 };
 
 export function semanticQueriesFor(kind: string): string[] {

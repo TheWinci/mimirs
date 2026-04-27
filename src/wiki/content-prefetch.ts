@@ -16,10 +16,15 @@ import type {
   ArchitectureBundle,
   GettingStartedBundle,
   CommunityBundle,
+  DataFlowBundle,
+  EndpointGroupBundle,
+  QueueDetailBundle,
   ServiceAggregateBundle,
   SynthesesFile,
   PrefetchedQueryHit,
 } from "./types";
+import { topicToSlug } from "./page-tree";
+import { clusterRoutes } from "./route-clustering";
 
 /**
  * Narrow a community bundle to a specific subset of its member files for a
@@ -203,6 +208,7 @@ export async function prefetchContent(
   projectDir: string,
   config: RagConfig,
   supplementaryDocs: { path: string; content: string }[] = [],
+  flows?: import("./types").FlowsFile,
 ): Promise<ContentCache> {
   const cache: ContentCache = {};
 
@@ -234,16 +240,27 @@ export async function prefetchContent(
     const bag: PageContentCache = {};
     if (page.kind === "architecture") {
       bag.architecture = architecture;
-    } else if (page.kind === "data-flows") {
+    } else if (page.kind === "data-flows" || page.kind === "data-flows-toc") {
       bag.architecture = architecture;
     } else if (page.kind === "getting-started") {
       bag.gettingStarted = gettingStarted;
     } else if (
       page.kind === "endpoints" ||
       page.kind === "queues" ||
-      page.kind === "runtime-config"
+      page.kind === "runtime-config" ||
+      page.kind === "endpoints-toc" ||
+      page.kind === "queues-toc"
     ) {
       if (serviceAggregate) bag.serviceAggregate = serviceAggregate;
+    } else if (page.kind === "queue-detail") {
+      const detail = buildQueueDetailBundle(page.slug, bundlesById, syntheses, projectDir);
+      if (detail) bag.queueDetail = detail;
+    } else if (page.kind === "endpoint-group") {
+      const detail = buildEndpointGroupBundle(page.slug, bundlesById, syntheses, projectDir);
+      if (detail) bag.endpointGroup = detail;
+    } else if (page.kind === "data-flow-detail") {
+      const detail = buildDataFlowBundle(page.slug, bundlesById, syntheses, db, projectDir, flows);
+      if (detail) bag.dataFlow = detail;
     } else if (page.kind === "community-file" && page.communityId) {
       // Sub-pages share the parent community bundle scoped to memberFiles.
       // Single-file sub-page: one member; group sub-page: multiple members.
@@ -693,4 +710,217 @@ function buildServiceAggregateBundle(
   out.scheduledJobs.sort((a, b) => a.schedule.localeCompare(b.schedule));
 
   return out;
+}
+
+// ─── Aggregate sub-page bundle builders (queues / endpoints / data-flows) ───
+
+const PAYLOAD_SCAN_RADIUS = 10;
+const PAYLOAD_HINT_RE = /\b(?:interface|type|class|struct|@dataclass)\s+(\w+)/;
+const FAILURE_RES: { kind: "retry" | "dlq" | "idempotency"; re: RegExp }[] = [
+  { kind: "retry", re: /\b(retry|retries|maxRetries|maxAttempts|backoff)\b/i },
+  { kind: "dlq", re: /\b(dlq|deadLetter|dead_letter|deadLetterQueue)\b/i },
+  { kind: "idempotency", re: /\b(idempotency|messageGroupId|deduplicationId)\b/i },
+];
+
+/**
+ * Build the per-topic detail bundle for a `queue-detail` sub-page. Slug
+ * comes from the page; we reverse-map to the original topic by trying
+ * every distinct topic across community bundles.
+ */
+function buildQueueDetailBundle(
+  slug: string,
+  bundlesById: Map<string, CommunityBundle>,
+  syntheses: SynthesesFile,
+  projectDir: string,
+): QueueDetailBundle | null {
+  // Find the topic whose slug matches.
+  const topics = new Set<string>();
+  for (const b of bundlesById.values()) {
+    if (!b.serviceSignals) continue;
+    for (const q of b.serviceSignals.queueOps) topics.add(q.topic);
+  }
+  const topic = [...topics].find((t) => topicToSlug(t) === slug);
+  if (!topic) return null;
+
+  const slugByCommunityId = new Map<string, string>();
+  for (const [id, p] of Object.entries(syntheses.payloads)) slugByCommunityId.set(id, p.slug);
+
+  const producers: QueueDetailBundle["producers"] = [];
+  const consumers: QueueDetailBundle["consumers"] = [];
+  const callingRoutes: QueueDetailBundle["callingRoutes"] = [];
+  const payloadHints: QueueDetailBundle["payloadHints"] = [];
+  const failureConfig: QueueDetailBundle["failureConfig"] = [];
+
+  for (const b of bundlesById.values()) {
+    if (!b.serviceSignals) continue;
+    const communitySlug = slugByCommunityId.get(b.communityId) ?? b.communityId;
+    let hasProducer = false;
+    for (const q of b.serviceSignals.queueOps) {
+      if (q.topic !== topic) continue;
+      const op = { file: q.file, line: q.line, communitySlug };
+      if (q.kind === "produce") {
+        producers.push(op);
+        hasProducer = true;
+      } else {
+        consumers.push(op);
+      }
+      // ±10 line scan around the call for payload + failure config.
+      const window = readWindow(projectDir, q.file, q.line, PAYLOAD_SCAN_RADIUS);
+      if (window) {
+        const m = window.match(PAYLOAD_HINT_RE);
+        if (m) payloadHints.push({ file: q.file, line: q.line, snippet: window });
+        for (const fr of FAILURE_RES) {
+          if (fr.re.test(window)) {
+            failureConfig.push({ kind: fr.kind, file: q.file, line: q.line, snippet: window });
+          }
+        }
+      }
+    }
+    // Cross-cut: routes in the same community as a producer are upstream
+    // triggers for this topic.
+    if (hasProducer) {
+      for (const r of b.serviceSignals.routes) {
+        callingRoutes.push({ method: r.method, path: r.path, communitySlug });
+      }
+    }
+  }
+
+  // Determinism + dedupe.
+  producers.sort(byFileLine);
+  consumers.sort(byFileLine);
+  callingRoutes.sort((a, b) => a.path.localeCompare(b.path));
+  return { topic, producers, consumers, callingRoutes, payloadHints, failureConfig };
+}
+
+/**
+ * Build the per-group detail bundle for an `endpoint-group` sub-page.
+ * Re-runs route clustering (cheap, deterministic) and selects the group
+ * whose slug matches; routes outside any group land on the misc page.
+ */
+function buildEndpointGroupBundle(
+  slug: string,
+  bundlesById: Map<string, CommunityBundle>,
+  syntheses: SynthesesFile,
+  projectDir: string,
+): EndpointGroupBundle | null {
+  const slugByCommunityId = new Map<string, string>();
+  for (const [id, p] of Object.entries(syntheses.payloads)) slugByCommunityId.set(id, p.slug);
+  const allRoutes: ServiceAggregateBundle["routes"] = [];
+  for (const b of bundlesById.values()) {
+    if (!b.serviceSignals) continue;
+    const communitySlug = slugByCommunityId.get(b.communityId) ?? b.communityId;
+    for (const r of b.serviceSignals.routes) allRoutes.push({ ...r, communitySlug });
+  }
+  const { groups, misc } = clusterRoutes(allRoutes);
+  let selected: { slug: string; pathPrefix: string; routes: ServiceAggregateBundle["routes"] } | null = null;
+  if (slug === "misc") {
+    selected = { slug: "misc", pathPrefix: "(ungrouped)", routes: misc };
+  } else {
+    selected = groups.find((g) => g.slug === slug) ?? null;
+  }
+  if (!selected || selected.routes.length === 0) return null;
+
+  // Owning communities = distinct slugs the group's routes carry.
+  const owningCommunities = [...new Set(selected.routes.map((r) => r.communitySlug))].sort();
+
+  // Data stores touched: filter every community's dataOps to files
+  // present in this group's routes.
+  const groupFileSet = new Set(selected.routes.map((r) => r.file));
+  const dataStoresMap = new Map<string, { store: string; model: string | null }>();
+  for (const b of bundlesById.values()) {
+    if (!b.serviceSignals) continue;
+    for (const d of b.serviceSignals.dataOps) {
+      if (!groupFileSet.has(d.file)) continue;
+      const key = `${d.store}|${d.model ?? ""}`;
+      if (!dataStoresMap.has(key)) dataStoresMap.set(key, { store: d.store, model: d.model });
+    }
+  }
+  const dataStoresTouched = [...dataStoresMap.values()].slice(0, 20);
+
+  // Middleware scan: read each owning community's member files for
+  // `app.use(`, `@UseGuards(`, `Route::middleware(` patterns.
+  const middleware: EndpointGroupBundle["middleware"] = [];
+  const MW_RES = [
+    /\bapp\.use\s*\(\s*['"`][^'"`]+['"`]\s*,\s*(\w+)/,
+    /@UseGuards\s*\(\s*(\w+)/,
+    /Route::middleware\s*\(\s*['"`]([^'"`]+)['"`]/,
+  ];
+  for (const file of groupFileSet) {
+    const text = readFileIfExists(resolve(projectDir, file));
+    if (!text) continue;
+    const lines = text.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      for (const re of MW_RES) {
+        const m = lines[i].match(re);
+        if (m) middleware.push({ name: m[1], file, line: i + 1 });
+      }
+    }
+  }
+
+  return {
+    groupSlug: slug,
+    pathPrefix: selected.pathPrefix,
+    routes: selected.routes,
+    middleware,
+    owningCommunities,
+    dataStoresTouched,
+  };
+}
+
+/**
+ * Build the per-flow detail bundle. Reads the flow spec from the
+ * persisted `_meta/_flows.json` (passed via the optional `flows`
+ * argument to prefetchContent) and walks the call graph to produce
+ * the call chain.
+ *
+ * Returns null when the flow can't be located in `_flows.json` or
+ * when the trigger handler doesn't resolve. Page renders with empty
+ * bundle in that case; writer falls back to prose-only rendering.
+ */
+function buildDataFlowBundle(
+  slug: string,
+  bundlesById: Map<string, CommunityBundle>,
+  syntheses: SynthesesFile,
+  db: RagDB,
+  projectDir: string,
+  flows: import("./types").FlowsFile | undefined,
+): DataFlowBundle | null {
+  if (!flows) return null;
+  const flow = flows.flows.find((f) => f.slug === slug);
+  if (!flow) return null;
+  const { buildDataFlowBundleFor } = require("./flow-synthesis") as typeof import("./flow-synthesis");
+  return buildDataFlowBundleFor(
+    flow,
+    [...bundlesById.values()],
+    syntheses,
+    db,
+    projectDir,
+    undefined,
+  );
+}
+
+function byFileLine(
+  a: { file: string; line: number },
+  b: { file: string; line: number },
+): number {
+  return a.file.localeCompare(b.file) || a.line - b.line;
+}
+
+/**
+ * Read a ±radius line window around a target line in a project file.
+ * Returns null when the file can't be read. Used by extraction passes
+ * that need lexical context (payload type defs, retry config).
+ */
+function readWindow(
+  projectDir: string,
+  file: string,
+  line: number,
+  radius: number,
+): string | null {
+  const text = readFileIfExists(resolve(projectDir, file));
+  if (!text) return null;
+  const lines = text.split("\n");
+  const start = Math.max(0, line - 1 - radius);
+  const end = Math.min(lines.length, line - 1 + radius);
+  return lines.slice(start, end).join("\n");
 }

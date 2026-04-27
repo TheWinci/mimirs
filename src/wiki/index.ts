@@ -80,9 +80,10 @@ export async function runWikiFinalPlanning(
   unmatchedDocs: { path: string; content: string }[],
   config: RagConfig,
   cluster: ClusterMode = "files",
+  flows?: import("./types").FlowsFile,
 ): Promise<WikiPlanResult> {
   const t0 = Date.now();
-  const manifest = buildPageTree(discovery, classified, syntheses, gitRef, cluster, bundles);
+  const manifest = buildPageTree(discovery, classified, syntheses, gitRef, cluster, bundles, flows);
   console.error(`[wiki] page-tree ${Date.now() - t0}ms — ${manifest.pageCount} pages`);
 
   const bundlesById = new Map(bundles.map((b) => [b.communityId, b]));
@@ -97,6 +98,7 @@ export async function runWikiFinalPlanning(
     projectDir,
     config,
     unmatchedDocs,
+    flows,
   );
   console.error(`[wiki] prefetch ${Date.now() - t1}ms`);
 
