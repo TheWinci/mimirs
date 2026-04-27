@@ -3,14 +3,18 @@ import type {
   DiscoveryResult,
   ClassifiedInventory,
   CommunityBundle,
+  FlowsFile,
+  FlowSpec,
   PageManifest,
   ManifestPage,
   PageDepth,
+  ServiceAggregateBundle,
   SynthesesFile,
   SynthesisPayload,
   SectionSpec,
 } from "./types";
 import { classifyMembers, isSplitCommunity } from "./community-synthesis";
+import { clusterRoutes } from "./route-clustering";
 
 /**
  * Depth-auto thresholds. File count remains the baseline; LOC + tunable count
@@ -29,6 +33,11 @@ const DATA_FLOWS_PATH = "wiki/data-flows.md";
 const ENDPOINTS_PATH = "wiki/endpoints.md";
 const QUEUES_PATH = "wiki/queues.md";
 const RUNTIME_CONFIG_PATH = "wiki/runtime-config.md";
+
+/** Aggregate-page sharding thresholds (plans/aggregate-page-sharding.md). */
+const QUEUE_FOLDER_THRESHOLD = 3;
+const ENDPOINTS_FOLDER_THRESHOLD = 10;
+const DATA_FLOWS_FOLDER_THRESHOLD = 3;
 
 /**
  * Community pages live under a flat `wiki/communities/` folder; aggregates
@@ -52,6 +61,7 @@ export function buildPageTree(
   gitRef: string,
   cluster: "files" | "symbols" = "files",
   bundles: CommunityBundle[] = [],
+  flows?: FlowsFile,
 ): PageManifest {
   void classified;
   const warnings: string[] = [];
@@ -72,15 +82,48 @@ export function buildPageTree(
   pages[DATA_FLOWS_PATH] = { ...dataFlowsPage(), order: order++ };
   pages[GETTING_STARTED_PATH] = { ...gettingStartedPage(), order: order++ };
 
-  // Service-only aggregate pages (Phase 5: backend-service wiki). Skip for
-  // library / cli projects — they'd ship empty `## Endpoints` sections that
-  // confuse readers more than they help.
+  // Service-only aggregate pages (Phase 5 + sharding). Skip for library /
+  // cli projects — they'd ship empty `## Endpoints` sections that confuse
+  // readers more than they help. When a threshold is crossed, the
+  // single-page `kind` flips to `*-toc` and child pages fan out under a
+  // matching folder.
   const profile = discovery.serviceProfile;
   if (profile && (profile.kind === "service" || profile.kind === "mixed")) {
-    pages[ENDPOINTS_PATH] = { ...endpointsPage(), order: order++ };
-    pages[QUEUES_PATH] = { ...queuesPage(), order: order++ };
+    // Endpoints: TOC + children when route count ≥ threshold.
+    const routes = collectAggregateRoutes(bundles, syntheses);
+    if (routes.length >= ENDPOINTS_FOLDER_THRESHOLD) {
+      pages[ENDPOINTS_PATH] = { ...endpointsTocPage(), order: order++ };
+      for (const [path, page] of buildEndpointGroupPages(routes)) {
+        pages[path] = { ...page, order: order++ };
+      }
+    } else {
+      pages[ENDPOINTS_PATH] = { ...endpointsPage(), order: order++ };
+    }
+
+    // Queues: TOC + children when topic count ≥ threshold.
+    const topicSet = collectAggregateTopics(bundles);
+    if (topicSet.size >= QUEUE_FOLDER_THRESHOLD) {
+      pages[QUEUES_PATH] = { ...queuesTocPage(), order: order++ };
+      for (const [path, page] of buildQueueDetailPages([...topicSet])) {
+        pages[path] = { ...page, order: order++ };
+      }
+    } else {
+      pages[QUEUES_PATH] = { ...queuesPage(), order: order++ };
+    }
+
     pages[RUNTIME_CONFIG_PATH] = { ...runtimeConfigPage(), order: order++ };
   }
+
+  // Data-flows: TOC + children when LLM-named flows are present and trigger
+  // count ≥ threshold. Library projects also get the existing single-page
+  // shape — same as before this feature.
+  if (flows && flows.flows.length >= DATA_FLOWS_FOLDER_THRESHOLD) {
+    pages[DATA_FLOWS_PATH] = { ...dataFlowsTocPage(), order: order++ };
+    for (const [path, page] of buildDataFlowDetailPages(flows.flows)) {
+      pages[path] = { ...page, order: order++ };
+    }
+  }
+  // else: dataFlowsPage() already added above.
 
   const metaEdges = computeMetaEdges(syntheses, discovery);
   computeRelatedPages(pages, metaEdges);
@@ -499,6 +542,289 @@ function dataFlowsPage(): Omit<ManifestPage, "order"> {
   };
 }
 
+// ─── Aggregate sub-page builders (queues / endpoints / data-flows) ───
+
+/**
+ * Walk the project's community bundles and return the union of every
+ * route's `(method, path, handlerSymbol, file, line, communitySlug)`.
+ * Used for endpoint-folder threshold + clustering. Keeps ordering
+ * deterministic — sorted by path then method.
+ *
+ * Uses the synthesis layer to map each `serviceSignals.role === "http"`
+ * community's id to its slug, so the slug is the same one that lands
+ * on the community page URL.
+ */
+function collectAggregateRoutes(
+  bundles: CommunityBundle[],
+  syntheses: SynthesesFile,
+): ServiceAggregateBundle["routes"] {
+  const slugById = new Map<string, string>();
+  for (const [id, payload] of Object.entries(syntheses.payloads)) {
+    slugById.set(id, payload.slug);
+  }
+  const out: ServiceAggregateBundle["routes"] = [];
+  for (const b of bundles) {
+    if (!b.serviceSignals) continue;
+    const slug = slugById.get(b.communityId) ?? b.communityId;
+    for (const r of b.serviceSignals.routes) out.push({ ...r, communitySlug: slug });
+  }
+  out.sort((a, b) => a.path.localeCompare(b.path) || a.method.localeCompare(b.method));
+  return out;
+}
+
+/**
+ * Distinct topic names across all communities. Threshold gate uses the
+ * cardinality; per-topic builder uses the names themselves.
+ */
+function collectAggregateTopics(bundles: CommunityBundle[]): Set<string> {
+  const out = new Set<string>();
+  for (const b of bundles) {
+    if (!b.serviceSignals) continue;
+    for (const q of b.serviceSignals.queueOps) out.add(q.topic);
+  }
+  return out;
+}
+
+/** Sanitise a free-form topic name into a slug (kebab-case, alphanumeric). */
+export function topicToSlug(topic: string): string {
+  return topic
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    || "topic";
+}
+
+/**
+ * Per-topic sub-pages. Slug collisions resolved with monotonic numeric
+ * suffix. Ordering deterministic — sorted by topic name.
+ */
+function buildQueueDetailPages(
+  topics: string[],
+): [string, Omit<ManifestPage, "order">][] {
+  const sortedTopics = [...topics].sort();
+  const used = new Set<string>();
+  const out: [string, Omit<ManifestPage, "order">][] = [];
+  for (const topic of sortedTopics) {
+    let slug = topicToSlug(topic);
+    let suffix = 2;
+    while (used.has(slug)) slug = `${topicToSlug(topic)}-${suffix++}`;
+    used.add(slug);
+    out.push([
+      `wiki/queues/${slug}.md`,
+      queueDetailPage(topic, slug),
+    ]);
+  }
+  return out;
+}
+
+function queueDetailPage(topic: string, slug: string): Omit<ManifestPage, "order"> {
+  const sections: SectionSpec[] = [
+    { title: "Overview", purpose: "One paragraph: what fires this topic, what consumes it, business meaning. Pull from `bundle.queueDetail`." },
+    { title: "Producers", purpose: "Bulleted list — each producer's `file:line` + owning community link. Source: `bundle.queueDetail.producers`." },
+    { title: "Consumers", purpose: "Bulleted list — each consumer's `file:line` + owning community link. Source: `bundle.queueDetail.consumers`." },
+    { title: "Payload", purpose: "Type definition or JSON shape with 1-2 sentences of intent. Source: `bundle.queueDetail.payloadHints`. Skip section entirely when empty (do not stub)." },
+    { title: "Triggers", purpose: "Optional. HTTP routes / scheduled jobs that lead to this produce call. Source: `bundle.queueDetail.callingRoutes`. Skip when empty." },
+    { title: "Failure handling", purpose: "Optional. Retry / dead-letter / idempotency config detected on producer or consumer. Source: `bundle.queueDetail.failureConfig`. Skip when empty — do not invent defaults." },
+  ];
+  return {
+    kind: "queue-detail",
+    slug,
+    title: `Queue: ${topic}`,
+    purpose: `Producers, consumers, payload, and failure handling for the \`${topic}\` topic.`,
+    sections,
+    depth: "standard",
+    memberFiles: [],
+    relatedPages: [],
+  };
+}
+
+/** Parent TOC for queues folder. */
+function queuesTocPage(): Omit<ManifestPage, "order"> {
+  const sections: SectionSpec[] = [
+    { title: "Overview", purpose: "Broker(s) in use, total topic count. One paragraph." },
+    {
+      title: "Topics",
+      purpose:
+        "Bulleted list — one entry per topic, formatted: `- **[Topic name](queues/<slug>.md)** — N producers, M consumers. One-line summary.` Source: every `queue-detail` sub-page in the manifest.",
+      shape: "bulleted list, one row per child page",
+    },
+  ];
+  return {
+    kind: "queues-toc",
+    slug: "queues",
+    title: "Queues",
+    purpose:
+      "Index of every message topic the service touches. Detail pages live under `queues/`; this page is the entry point.",
+    sections,
+    depth: "brief",
+    memberFiles: [],
+    relatedPages: [],
+  };
+}
+
+/**
+ * Per-group sub-pages from `route-clustering.clusterRoutes()`. Misc
+ * bucket inlined when small (≤ MISC_INLINE_LIMIT) — the TOC page
+ * lists ungrouped routes directly. Above limit, emit `endpoints/misc.md`.
+ */
+function buildEndpointGroupPages(
+  routes: ServiceAggregateBundle["routes"],
+): [string, Omit<ManifestPage, "order">][] {
+  const { groups, misc } = clusterRoutes(routes);
+  const out: [string, Omit<ManifestPage, "order">][] = [];
+  for (const g of groups) {
+    out.push([
+      `wiki/endpoints/${g.slug}.md`,
+      endpointGroupPage(g.slug, g.pathPrefix, g.routes.length),
+    ]);
+  }
+  if (misc.length > 5) {
+    out.push([
+      "wiki/endpoints/misc.md",
+      endpointGroupPage("misc", "(ungrouped)", misc.length),
+    ]);
+  }
+  return out;
+}
+
+function endpointGroupPage(
+  slug: string,
+  pathPrefix: string,
+  routeCount: number,
+): Omit<ManifestPage, "order"> {
+  const sections: SectionSpec[] = [
+    { title: "Overview", purpose: `Surface this group covers (${pathPrefix}). Link to owning communities. One paragraph.` },
+    {
+      title: "Routes",
+      purpose:
+        "Full table covering every route in this group. Columns: Method | Path | Handler | File:line | Auth | Summary. Source: `bundle.endpointGroup.routes`.",
+      shape: "markdown table, one row per route",
+    },
+    {
+      title: "Middleware",
+      purpose:
+        "Auth + rate-limit + request-id chain applicable to this prefix. Source: `bundle.endpointGroup.middleware`. Skip section entirely when empty.",
+    },
+    {
+      title: "Request flow",
+      purpose:
+        "Pick top 1-2 representative endpoints by call-depth. Sequence diagram + numbered walkthrough citing file:line at each hop.",
+    },
+    {
+      title: "Data stores touched",
+      purpose:
+        "Table of stores + models routes in this group reach. Source: `bundle.endpointGroup.dataStoresTouched`. Skip when empty.",
+    },
+  ];
+  return {
+    kind: "endpoint-group",
+    slug,
+    title: `Endpoints: ${pathPrefix}`,
+    purpose: `${routeCount} routes under \`${pathPrefix}\`. Detail page for the endpoints folder.`,
+    sections,
+    depth: "standard",
+    memberFiles: [],
+    relatedPages: [],
+  };
+}
+
+function endpointsTocPage(): Omit<ManifestPage, "order"> {
+  const sections: SectionSpec[] = [
+    { title: "Overview", purpose: "Total route count, primary frameworks. One paragraph." },
+    {
+      title: "Groups",
+      purpose:
+        "Bulleted list — `- **[Group name](endpoints/<slug>.md)** — N routes under \\`<prefix>\\`. One-line summary.` Source: every `endpoint-group` sub-page in the manifest.",
+      shape: "bulleted list, one row per child page",
+    },
+    {
+      title: "Ungrouped routes",
+      purpose:
+        "Optional. Inline mini-table of routes that didn't cluster (count below MIN_GROUP_SIZE). Skip when there's a `endpoints/misc.md` sub-page or when no ungrouped routes exist.",
+    },
+  ];
+  return {
+    kind: "endpoints-toc",
+    slug: "endpoints",
+    title: "Endpoints",
+    purpose:
+      "Index of every HTTP route group. Detail pages live under `endpoints/`; this page is the entry point.",
+    sections,
+    depth: "brief",
+    memberFiles: [],
+    relatedPages: [],
+  };
+}
+
+/** Per-flow sub-pages built from the persisted `_meta/_flows.json`. */
+function buildDataFlowDetailPages(
+  flows: FlowSpec[],
+): [string, Omit<ManifestPage, "order">][] {
+  const out: [string, Omit<ManifestPage, "order">][] = [];
+  for (const f of flows) {
+    out.push([
+      `wiki/data-flows/${f.slug}.md`,
+      dataFlowDetailPage(f),
+    ]);
+  }
+  return out;
+}
+
+function dataFlowDetailPage(f: FlowSpec): Omit<ManifestPage, "order"> {
+  const sections: SectionSpec[] = [
+    { title: "Overview", purpose: `Trigger: \`${f.trigger.kind}\` ${f.trigger.ref}. Purpose: ${f.purpose}. One paragraph framing.` },
+    {
+      title: "Sequence",
+      purpose:
+        "`sequenceDiagram` Mermaid block tracing the call chain from trigger handler to its terminal hops, followed by numbered prose hops citing file:line. Source: `bundle.dataFlow.callChain`.",
+      shape: "mermaid sequenceDiagram + numbered list",
+    },
+    {
+      title: "Error paths",
+      purpose:
+        "Retries, fallbacks, graceful degradation when detected in the call chain's annotations. Skip when no error-path evidence exists.",
+    },
+    {
+      title: "Touched stores / topics",
+      purpose:
+        "What this flow reads from or writes to. Pull from per-community `serviceSignals.dataOps` filtered to call-chain files.",
+    },
+  ];
+  return {
+    kind: "data-flow-detail",
+    slug: f.slug,
+    title: `Flow: ${f.name}`,
+    purpose: f.purpose,
+    sections,
+    depth: "standard",
+    memberFiles: [],
+    relatedPages: [],
+  };
+}
+
+function dataFlowsTocPage(): Omit<ManifestPage, "order"> {
+  const sections: SectionSpec[] = [
+    { title: "Overview", purpose: "Total flow count, primary triggers. One paragraph." },
+    {
+      title: "Flows",
+      purpose:
+        "Bulleted list — `- **[Flow name](data-flows/<slug>.md)** — Trigger: <kind> <ref>. One-line purpose.` Source: every `data-flow-detail` sub-page in the manifest.",
+      shape: "bulleted list, one row per child page",
+    },
+  ];
+  return {
+    kind: "data-flows-toc",
+    slug: "data-flows",
+    title: "Data flows",
+    purpose:
+      "Index of named end-to-end flows through the service. Detail pages live under `data-flows/`; this page is the entry point.",
+    sections,
+    depth: "brief",
+    memberFiles: [],
+    relatedPages: [],
+  };
+}
+
 /**
  * Top-N sibling communities each community page links to under "See also".
  * Navigation (9→6 in the v2 review) collapsed because community pages
@@ -596,10 +922,20 @@ function computeRelatedPages(
     return out;
   };
 
+  // Aggregate-folder parent-TOC paths keyed by sub-page kind. Lets a
+  // queue-detail page link back to `queues.md`, endpoint-group back to
+  // `endpoints.md`, etc. without hardcoding paths in two places.
+  const tocParentByKind: Record<string, string> = {
+    "queue-detail": QUEUES_PATH,
+    "endpoint-group": ENDPOINTS_PATH,
+    "data-flow-detail": DATA_FLOWS_PATH,
+  };
+
   for (const [path, page] of Object.entries(pages)) {
     const related = new Set<string>();
     const isAggregate = aggregatePaths.includes(path);
     const isSubPage = page.kind === "community-file";
+    const aggregateParent = tocParentByKind[page.kind];
 
     if (isAggregate) {
       for (const cp of communityPaths) related.add(cp);
@@ -613,6 +949,12 @@ function computeRelatedPages(
         }
       }
       for (const ap of aggregatePaths) related.add(ap);
+    } else if (aggregateParent) {
+      // Aggregate-folder sub-page (queue-detail / endpoint-group /
+      // data-flow-detail). Link back to its parent TOC plus the other
+      // aggregate roots so navigation never dead-ends.
+      if (pages[aggregateParent]) related.add(aggregateParent);
+      for (const ap of aggregatePaths) if (ap !== path) related.add(ap);
     } else {
       for (const ap of aggregatePaths) if (ap !== path) related.add(ap);
       if (page.communityId) {

@@ -192,6 +192,33 @@ export function registerWikiTools(server: McpServer, getDB: GetDB) {
   );
 
   server.tool(
+    "write_flows",
+    "Store the LLM-produced flow synthesis payload (Phase A of the data-flows split — see plans/aggregate-page-sharding.md). Validates each flow's slug, trigger kind, and member-community references against the community syntheses. Persists to wiki/_meta/_flows.json. After storing, re-run `generate_wiki()` to regenerate the manifest with per-flow sub-pages.",
+    {
+      directory: z.string().optional().describe("Project directory."),
+      payload: z.object({
+        flows: z.array(z.object({
+          name: z.string(),
+          slug: z.string(),
+          purpose: z.string(),
+          trigger: z.object({
+            kind: z.enum(["http", "queue", "scheduled", "manual"]),
+            ref: z.string(),
+          }),
+          memberCommunities: z.array(z.string()),
+        })).min(1),
+      }),
+    },
+    async ({ directory, payload }) => {
+      const { projectDir } = await resolveProject(directory, getDB);
+      const wikiDir = join(projectDir, "wiki");
+      return {
+        content: [{ type: "text" as const, text: storeFlows(wikiDir, payload) }],
+      };
+    },
+  );
+
+  server.tool(
     "wiki_lint_page",
     "Lint a single wiki markdown file against path, Mermaid-reserved-id, Mermaid-unquoted-label, and Mermaid-html-in-alias rules. Takes a project-relative or absolute path to a `.md` file; returns structured warnings. Fast pre-finalize feedback loop — call after writing a page to catch render bugs and fabricated paths before running the full `generate_wiki(finalize: true)` sweep.",
     {
@@ -421,6 +448,8 @@ function buildLintPageResponse(
 const META_DIR = "_meta";
 const BUNDLES_FILE = "_bundles.json";
 const SYNTHESES_FILE = "_syntheses.json";
+/** Persisted Phase-A flow synthesis output. See plans/aggregate-page-sharding.md Phase 3. */
+const FLOWS_FILE = "_flows.json";
 const DISCOVERY_FILE = "_discovery.json";
 const CLASSIFIED_FILE = "_classified.json";
 const MANIFEST_FILE = "_manifest.json";
@@ -720,6 +749,35 @@ function storeSynthesis(
   return text;
 }
 
+/**
+ * Validate + persist a Phase-A flow synthesis payload. Cross-references
+ * `memberCommunities` against the community syntheses to reject flows
+ * that reference unknown community slugs (typos, stale data after a
+ * community rename). Fingerprint is computed from the input bundle
+ * upstream and re-derived here from current syntheses for parity.
+ */
+function storeFlows(
+  wikiDir: string,
+  payload: unknown,
+): string {
+  const syntheses = loadSyntheses(wikiDir);
+  const knownSlugs = new Set(Object.values(syntheses.payloads).map((p) => p.slug));
+  if (knownSlugs.size === 0) {
+    return "No community syntheses on disk yet. Run `generate_wiki()` and store community syntheses first.";
+  }
+  const { validateFlowsPayload } = require("../wiki/flow-synthesis") as typeof import("../wiki/flow-synthesis");
+  const fingerprint = "<unknown>"; // Set by caller-side build pass; placeholder when called raw.
+  const validated = validateFlowsPayload(payload, fingerprint, knownSlugs);
+  if (!validated.ok) return `❌ Flows rejected: ${validated.error}`;
+  writeJSON(p(wikiDir, FLOWS_FILE), validated.value);
+  let text = `✅ Stored ${validated.value.flows.length} flow${validated.value.flows.length === 1 ? "" : "s"}:\n`;
+  for (const f of validated.value.flows) {
+    text += `- \`${f.slug}\` — ${f.name} (trigger: ${f.trigger.kind} ${f.trigger.ref})\n`;
+  }
+  text += `\nRun \`generate_wiki()\` to rebuild the manifest with per-flow sub-pages.`;
+  return text;
+}
+
 async function buildManifestAndContent(
   ragDb: RagDB,
   projectDir: string,
@@ -745,6 +803,7 @@ async function buildManifestAndContent(
   const cluster: ClusterMode = clusterOverride ?? "files";
   const unmatchedDocs =
     readJSON<{ path: string; content: string }[]>(p(wikiDir, ISOLATE_DOCS_FILE)) ?? [];
+  const flows = readJSON<import("../wiki/types").FlowsFile>(p(wikiDir, FLOWS_FILE)) ?? undefined;
   const result = await runWikiFinalPlanning(
     ragDb,
     projectDir,
@@ -756,6 +815,7 @@ async function buildManifestAndContent(
     unmatchedDocs,
     config,
     cluster,
+    flows,
   );
   writeJSON(p(wikiDir, MANIFEST_FILE), result.manifest);
   writeJSON(p(wikiDir, CONTENT_FILE), result.content);
@@ -1100,6 +1160,12 @@ function renderPagePayload(payload: PagePayload): string {
     text += renderArchitectureBundle(payload.prefetched.architecture);
   } else if (payload.prefetched.gettingStarted) {
     text += renderGettingStartedBundle(payload.prefetched.gettingStarted);
+  } else if (payload.prefetched.queueDetail) {
+    text += renderQueueDetailBundle(payload.prefetched.queueDetail);
+  } else if (payload.prefetched.endpointGroup) {
+    text += renderEndpointGroupBundle(payload.prefetched.endpointGroup);
+  } else if (payload.prefetched.dataFlow) {
+    text += renderDataFlowBundle(payload.prefetched.dataFlow);
   } else if (payload.prefetched.serviceAggregate) {
     text += renderServiceAggregateBundle(payload.prefetched.serviceAggregate);
   }
@@ -1633,6 +1699,95 @@ function renderServiceAggregateBundle(
   return text;
 }
 
+function renderQueueDetailBundle(
+  b: import("../wiki/types").QueueDetailBundle,
+): string {
+  let text = `## Queue detail bundle\n\n`;
+  text += `**Topic:** \`${b.topic}\`\n\n`;
+  text += `**Producers (${b.producers.length}):**\n`;
+  for (const p of b.producers) {
+    text += `- \`${p.file}:${p.line}\` (community: \`${p.communitySlug}\`)\n`;
+  }
+  text += `\n**Consumers (${b.consumers.length}):**\n`;
+  for (const c of b.consumers) {
+    text += `- \`${c.file}:${c.line}\` (community: \`${c.communitySlug}\`)\n`;
+  }
+  if (b.callingRoutes.length > 0) {
+    text += `\n**Calling routes (${b.callingRoutes.length}):**\n`;
+    for (const r of b.callingRoutes) {
+      text += `- \`${r.method} ${r.path}\` (community: \`${r.communitySlug}\`)\n`;
+    }
+  }
+  if (b.payloadHints.length > 0) {
+    text += `\n**Payload hints (${b.payloadHints.length}) — type/interface/dataclass evidence near producer call sites:**\n`;
+    for (const p of b.payloadHints) {
+      text += `\n### \`${p.file}:${p.line}\`\n\n\`\`\`\n${p.snippet}\n\`\`\`\n`;
+    }
+  }
+  if (b.failureConfig.length > 0) {
+    text += `\n**Failure-handling evidence (${b.failureConfig.length}):**\n`;
+    for (const f of b.failureConfig) {
+      text += `- ${f.kind}: \`${f.file}:${f.line}\`\n`;
+    }
+  }
+  return text + "\n";
+}
+
+function renderEndpointGroupBundle(
+  b: import("../wiki/types").EndpointGroupBundle,
+): string {
+  let text = `## Endpoint group bundle\n\n`;
+  text += `**Group:** \`${b.groupSlug}\` — prefix \`${b.pathPrefix}\`\n\n`;
+  text += `**Routes (${b.routes.length}):**\n`;
+  for (const r of b.routes) {
+    const handler = r.handlerSymbol ? ` → \`${r.handlerSymbol}\`` : "";
+    text += `- \`${r.method} ${r.path}\`${handler} — \`${r.file}:${r.line}\` (community: \`${r.communitySlug}\`)\n`;
+  }
+  if (b.middleware.length > 0) {
+    text += `\n**Middleware (${b.middleware.length}):**\n`;
+    for (const m of b.middleware) {
+      text += `- \`${m.name}\` — \`${m.file}:${m.line}\`\n`;
+    }
+  }
+  if (b.dataStoresTouched.length > 0) {
+    text += `\n**Data stores touched (${b.dataStoresTouched.length}):**\n`;
+    for (const d of b.dataStoresTouched) {
+      const model = d.model ? ` \`${d.model}\`` : "";
+      text += `- ${d.store}${model}\n`;
+    }
+  }
+  if (b.owningCommunities.length > 0) {
+    text += `\n**Owning communities:** ${b.owningCommunities.map((c) => `\`${c}\``).join(", ")}\n`;
+  }
+  return text + "\n";
+}
+
+function renderDataFlowBundle(
+  b: import("../wiki/types").DataFlowBundle,
+): string {
+  let text = `## Data flow bundle\n\n`;
+  text += `**Flow:** ${b.name} — \`${b.slug}\`\n`;
+  text += `**Trigger:** \`${b.trigger.kind}\` ${b.trigger.ref}\n`;
+  text += `**Purpose:** ${b.purpose}\n\n`;
+  if (b.memberCommunities.length > 0) {
+    text += `**Member communities:** ${b.memberCommunities.map((c) => `\`${c}\``).join(" → ")}\n\n`;
+  }
+  if (b.callChain.length > 0) {
+    text += `**Call chain (${b.callChain.length} hops):**\n`;
+    for (const c of b.callChain) {
+      const calls = c.calls.length > 0 ? ` → ${c.calls.map((s) => `\`${s}\``).join(", ")}` : "";
+      text += `- depth ${c.depth}: \`${c.symbol}\` (\`${c.file}:${c.line}\`)${calls}\n`;
+    }
+  }
+  if (b.annotations.length > 0) {
+    text += `\n**Annotations (${b.annotations.length}):**\n`;
+    for (const a of b.annotations) {
+      text += `- \`${a.file}:${a.line}\` — ${a.note}\n`;
+    }
+  }
+  return text + "\n";
+}
+
 // ── Resume / incremental ──
 
 function buildResumeResponse(wikiDir: string, projectDir: string): string {
@@ -1735,6 +1890,7 @@ async function buildIncrementalResponse(
   }
 
   // All syntheses present — build the new manifest and diff against the old.
+  const incrementalFlows = readJSON<import("../wiki/types").FlowsFile>(p(wikiDir, FLOWS_FILE)) ?? undefined;
   const result = await runWikiFinalPlanning(
     ragDb,
     projectDir,
@@ -1746,6 +1902,7 @@ async function buildIncrementalResponse(
     bundling.unmatchedDocs,
     config,
     cluster,
+    incrementalFlows,
   );
   writeJSON(p(wikiDir, MANIFEST_FILE), result.manifest);
   writeJSON(p(wikiDir, CONTENT_FILE), result.content);
