@@ -1,13 +1,14 @@
 import { Database } from "bun:sqlite";
 import { type EmbeddedChunk } from "../types";
 import { type StoredFile } from "./types";
+import { normalizePath } from "../utils/path";
 
 export function getFileByPath(db: Database, path: string): StoredFile | null {
   return db
     .query<StoredFile, [string]>(
       "SELECT id, path, hash, indexed_at as indexedAt FROM files WHERE path = ?"
     )
-    .get(path);
+    .get(normalizePath(path));
 }
 
 /**
@@ -18,10 +19,11 @@ export function getFileByPath(db: Database, path: string): StoredFile | null {
  */
 export function getFilesByPaths(db: Database, paths: string[]): StoredFile[] {
   if (paths.length === 0) return [];
+  const normalized = paths.map(normalizePath);
   const BATCH = 499;
   const out: StoredFile[] = [];
-  for (let i = 0; i < paths.length; i += BATCH) {
-    const batch = paths.slice(i, i + BATCH);
+  for (let i = 0; i < normalized.length; i += BATCH) {
+    const batch = normalized.slice(i, i + BATCH);
     const ph = batch.map(() => "?").join(",");
     out.push(
       ...db
@@ -35,6 +37,7 @@ export function getFilesByPaths(db: Database, paths: string[]): StoredFile[] {
 }
 
 export function upsertFileStart(db: Database, path: string, hash: string): number {
+  path = normalizePath(path);
   const existing = getFileByPath(db, path);
   if (existing) {
     // UPDATE instead of DELETE+INSERT to preserve files.id — this keeps
@@ -161,7 +164,7 @@ export function getFileChunkRanges(
          AND c.end_line IS NOT NULL
        ORDER BY c.start_line ASC`,
     )
-    .all(filePath);
+    .all(normalizePath(filePath));
 
   type Range = { entityName: string | null; chunkType: string | null; startLine: number; endLine: number };
   const grouped = new Map<string, Range>();
@@ -228,7 +231,7 @@ export function upsertFile(
 }
 
 export function removeFile(db: Database, path: string): boolean {
-  const existing = getFileByPath(db, path);
+  const existing = getFileByPath(db, normalizePath(path));
   if (!existing) return false;
 
   const tx = db.transaction(() => {
@@ -251,7 +254,11 @@ export function pruneDeleted(db: Database, existingPaths: Set<string>): number {
     .query<{ id: number; path: string }, []>("SELECT id, path FROM files")
     .all();
 
-  const toRemove = allFiles.filter(f => !existingPaths.has(f.path));
+  // Normalize the existing-set so the comparison works on Windows where
+  // callers may pass `\`-separated paths.
+  const normalized = new Set<string>();
+  for (const p of existingPaths) normalized.add(normalizePath(p));
+  const toRemove = allFiles.filter(f => !normalized.has(f.path));
   if (toRemove.length === 0) return 0;
 
   const tx = db.transaction(() => {

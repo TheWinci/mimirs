@@ -1,6 +1,7 @@
 import { basename, dirname } from "path";
 import type { RagDB } from "../db";
 import { generateProjectMap } from "../graph/resolver";
+import { normalizePath } from "../utils/path";
 import {
   detectDispatchDirectories,
   detectFileCommunities,
@@ -358,7 +359,7 @@ function flatProjectFallback(
     }
 
     const files = [...group];
-    modules.push(buildModuleFromFiles(dirname(seed.path), files, fileGraph));
+    modules.push(buildModuleFromFiles(normalizePath(dirname(seed.path)), files, fileGraph));
   }
 
   // Assign remaining ungrouped files as "utilities"
@@ -383,14 +384,16 @@ function flatProjectFallback(
 
 function detectWorkspaceRoots(allPaths: string[], projectDir: string): string[] {
   const roots: string[] = [];
+  // Canonicalize the prefix once so the slice works on Windows.
+  const projectDirNorm = normalizePath(projectDir);
   for (const p of allPaths) {
     const name = basename(p);
     if (!WORKSPACE_ROOTS.includes(name)) continue;
 
-    const dir = dirname(p);
+    const dir = normalizePath(dirname(p));
     // Depth <= 2 from project root
-    const relDir = dir.startsWith(projectDir)
-      ? dir.slice(projectDir.length).replace(/^\//, "")
+    const relDir = dir.startsWith(projectDirNorm)
+      ? dir.slice(projectDirNorm.length).replace(/^\//, "")
       : dir;
     const depth = relDir === "" ? 0 : relDir.split("/").length;
     if (depth <= 2 && depth > 0) {
@@ -401,7 +404,9 @@ function detectWorkspaceRoots(allPaths: string[], projectDir: string): string[] 
 }
 
 function nestModules(modules: DiscoveryModule[]): DiscoveryModule[] {
-  // Sort deepest first so children are processed before parents
+  // Sort deepest first so children are processed before parents.
+  // module.path is built from commonDirPrefix/pluralityDir which now
+  // always emit forward-slash form, so splitting on "/" is portable.
   const sorted = [...modules].sort(
     (a, b) => b.path.split("/").length - a.path.split("/").length
   );

@@ -56,4 +56,23 @@ describe("loadConfig", () => {
     // Zod defaults for unset fields
     expect(config.chunkOverlap).toBe(50);
   });
+
+  test("normalizes Windows-style backslashes in glob patterns", async () => {
+    // Defensive guard for users who paste Windows paths into config.
+    // Glob libs treat `\` as escape — `\` MUST be rewritten to `/`.
+    await mkdir(join(tempDir, ".mimirs"), { recursive: true });
+    await writeFile(
+      join(tempDir, ".mimirs", "config.json"),
+      JSON.stringify({
+        include: ["**\\*.ts", "src\\**\\*.py"],
+        exclude: ["node_modules\\**", "**\\__pycache__\\**"],
+        generated: ["dist\\generated\\**"],
+      })
+    );
+
+    const config = await loadConfig(tempDir);
+    expect(config.include).toEqual(["**/*.ts", "src/**/*.py"]);
+    expect(config.exclude).toEqual(["node_modules/**", "**/__pycache__/**"]);
+    expect(config.generated).toEqual(["dist/generated/**"]);
+  });
 });

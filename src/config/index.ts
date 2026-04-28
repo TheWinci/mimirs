@@ -5,10 +5,19 @@ import { z } from "zod";
 import { log } from "../utils/log";
 import { configureEmbedder, DEFAULT_MODEL_ID, DEFAULT_EMBEDDING_DIM } from "../embeddings/embed";
 
+// Glob patterns are POSIX-style — `\` is an escape character in glob syntax,
+// not a path separator. If a Windows user writes `node_modules\**`, treat
+// the `\` as a path separator and rewrite to `/`. Defense-in-depth: the
+// indexer also normalizes paths at the storage boundary.
+const globList = z
+  .array(z.string())
+  .default([])
+  .transform((arr) => arr.map((p) => p.replaceAll("\\", "/")));
+
 const RagConfigSchema = z.object({
-  include: z.array(z.string()).default([]),
-  exclude: z.array(z.string()).default([]),
-  generated: z.array(z.string()).default([]),
+  include: globList,
+  exclude: globList,
+  generated: globList,
   chunkSize: z.number().int().min(64).default(512),
   chunkOverlap: z.number().int().min(0).default(50),
   hybridWeight: z.number().min(0).max(1).default(0.7),
