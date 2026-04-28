@@ -9,6 +9,7 @@ import { type RagConfig } from "../config";
 import { resolveImports } from "../graph/resolver";
 import { log } from "../utils/log";
 import { checkIndexDir } from "../utils/dir-guard";
+import { normalizePath } from "../utils/path";
 import { type EmbeddedChunk } from "../types";
 
 function aggregateGraphData(chunks: { imports?: ChunkImport[]; exports?: ChunkExport[] }[]): {
@@ -63,7 +64,7 @@ const LARGE_PROJECT_WARN_THRESHOLD = 200_000;
  * "**‍/*.ext" (extension match) or "**‍/Basename" / "**‍/Basename.*" (basename match).
  * Pre-parsing these avoids creating Glob objects entirely.
  */
-function buildIncludeFilter(patterns: string[]): (rel: string) => boolean {
+export function buildIncludeFilter(patterns: string[]): (rel: string) => boolean {
   const extensions = new Set<string>();
   const basenames = new Set<string>();
   const basenamePrefixes: string[] = [];
@@ -94,7 +95,7 @@ function buildIncludeFilter(patterns: string[]): (rel: string) => boolean {
  * basename prefix globs (".env.*", "*.egg-info/**") for fast matching
  * without Glob objects.
  */
-function buildExcludeFilter(patterns: string[]): (rel: string) => boolean {
+export function buildExcludeFilter(patterns: string[]): (rel: string) => boolean {
   /** Prefixes anchored to root (e.g. "src/generated") */
   const anchoredDirPrefixes: string[] = [];
   /** Simple directory names matched anywhere in the path (e.g. "node_modules") */
@@ -199,11 +200,14 @@ async function collectFiles(
   const results: string[] = [];
   let lastReport = 0;
 
-  for (const rel of allEntries) {
+  for (const entry of allEntries) {
+    // Normalize Windows backslashes so "/"-based filter logic matches and
+    // paths stored downstream use a single canonical separator.
+    const rel = normalizePath(entry);
     if (isExcluded(rel)) continue;
     if (!isIncluded(rel)) continue;
 
-    results.push(resolve(directory, rel));
+    results.push(normalizePath(resolve(directory, rel)));
 
     const now = Date.now();
     if (now - lastReport >= 500) {
@@ -593,7 +597,7 @@ export async function indexFile(
   config: RagConfig
 ): Promise<"indexed" | "skipped" | "error"> {
   try {
-    return await processFile(filePath, db, { config });
+    return await processFile(normalizePath(filePath), db, { config });
   } catch (err) {
     log.warn(`Failed to index ${filePath}: ${err instanceof Error ? err.message : err}`, "indexFile");
     return "error";
@@ -616,6 +620,10 @@ export async function indexDirectory(
   if (!dirCheck.safe) {
     throw new Error(dirCheck.reason!);
   }
+
+  // Canonicalize the base dir to forward-slashes so relative()/resolve()
+  // downstream produce paths that compose cleanly with stored ones.
+  directory = normalizePath(directory);
 
   const matchedFiles = await collectFiles(directory, config, onProgress, onProgress);
 

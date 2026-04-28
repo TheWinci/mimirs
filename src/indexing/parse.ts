@@ -1,5 +1,5 @@
 import matter from "gray-matter";
-import { extname } from "path";
+import { extname, basename } from "path";
 
 export interface ParsedFile {
   path: string;
@@ -50,8 +50,9 @@ function resolveExtension(rawExt: string, basename: string): string {
 
 export function parseFile(filePath: string, raw: string): ParsedFile {
   const rawExt = extname(filePath).toLowerCase();
-  const basename = filePath.split("/").pop()?.toLowerCase() ?? "";
-  const ext = resolveExtension(rawExt, basename);
+  // Use path.basename (handles both / and \ separators) instead of split("/").
+  const fileBasename = basename(filePath).toLowerCase();
+  const ext = resolveExtension(rawExt, fileBasename);
 
   if (MARKDOWN_EXTENSIONS.has(ext)) {
     const { data, content } = matter(raw);

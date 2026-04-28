@@ -1,6 +1,7 @@
 import { basename, dirname } from "path";
 import Graph from "graphology";
 import louvain from "graphology-communities-louvain";
+import { normalizePath } from "../utils/path";
 import type { SymbolGraphData } from "../db/graph";
 import type {
   DiscoveryModule,
@@ -701,15 +702,20 @@ function buildModuleFromCluster(
 }
 
 function toRel(absPath: string, projectDir: string): string {
-  const prefix = projectDir.endsWith("/") ? projectDir : projectDir + "/";
-  return absPath.startsWith(prefix) ? absPath.slice(prefix.length) : absPath;
+  // Normalize both sides so the prefix check works on Windows where
+  // projectDir/absPath may arrive with backslashes.
+  const a = normalizePath(absPath);
+  const dir = normalizePath(projectDir);
+  const prefix = dir.endsWith("/") ? dir : dir + "/";
+  return a.startsWith(prefix) ? a.slice(prefix.length) : a;
 }
 
 /** Longest directory prefix shared by every file. "" if nothing in common. */
 function commonDirPrefix(files: string[]): string {
   if (files.length === 0) return "";
-  if (files.length === 1) return dirname(files[0]);
-  const parts = files.map((f) => dirname(f).split("/"));
+  if (files.length === 1) return normalizePath(dirname(files[0]));
+  // dirname returns native separators on Windows — normalize before splitting.
+  const parts = files.map((f) => normalizePath(dirname(f)).split("/"));
   const first = parts[0];
   let i = 0;
   for (; i < first.length; i++) {
@@ -728,7 +734,7 @@ function pluralityDir(files: string[]): string {
   if (files.length === 0) return ".";
   const counts = new Map<string, number>();
   for (const f of files) {
-    const segs = dirname(f).split("/");
+    const segs = normalizePath(dirname(f)).split("/");
     const key = segs.slice(0, 2).join("/") || segs[0] || ".";
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
