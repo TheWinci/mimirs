@@ -19,12 +19,12 @@ After indexing with mimirs: **91K tokens, ~3 seconds** — a 76% drop on that co
 <div align="center">
   <h3>No API keys. No cloud. No Docker.<br />Just bun and SQLite.</h3>
   <h3>
-    <a href="wiki/modules/search/index.md">Semantic Search</a> &nbsp;·&nbsp;
+    <a href="wiki/communities/search-runtime.md">Semantic Search</a> &nbsp;·&nbsp;
     <a href="wiki/index.md">Auto-generated Wiki</a>
     <br>
-    <a href="wiki/modules/conversation/index.md">Cross-session Memory</a> &nbsp;·&nbsp;
-    <a href="wiki/modules/graph/index.md">Dependency Graphs</a> &nbsp;·&nbsp;
-    <a href="docs/tools.md#">Annotations</a>
+    <a href="wiki/communities/conversation-server.md">Cross-session Memory</a> &nbsp;·&nbsp;
+    <a href="wiki/architecture.md">Dependency Graphs</a> &nbsp;·&nbsp;
+    <a href="docs/tools.md">Annotations</a>
   </h3>
   <span>Works with: Claude Code &nbsp;·&nbsp; Cursor &nbsp;·&nbsp; Windsurf &nbsp;·&nbsp; JetBrains (Junie) &nbsp;·&nbsp; GitHub Copilot &nbsp;·&nbsp; any MCP client</span>
 </div>
