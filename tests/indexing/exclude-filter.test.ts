@@ -68,6 +68,20 @@ describe("buildIncludeFilter", () => {
     const winRel = "src\\pkg\\main.py";
     expect(isIncluded(winRel.replaceAll("\\", "/"))).toBe(true);
   });
+
+  test("matches rooted extension globs", () => {
+    const srcOnly = buildIncludeFilter(["src/**/*.ts"]);
+    expect(srcOnly("src/index.ts")).toBe(true);
+    expect(srcOnly("src/nested/file.ts")).toBe(true);
+    expect(srcOnly("tests/index.test.ts")).toBe(false);
+  });
+
+  test("matches exact relative file paths and basename globs with dots", () => {
+    const exact = buildIncludeFilter(["src/wiki/rebuild.ts", "**/AGENTS.md"]);
+    expect(exact("src/wiki/rebuild.ts")).toBe(true);
+    expect(exact("docs/AGENTS.md")).toBe(true);
+    expect(exact("src/wiki/other.ts")).toBe(false);
+  });
 });
 
 describe("normalizePath", () => {

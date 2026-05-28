@@ -49,7 +49,9 @@ This project has a local RAG index (mimirs). Use these MCP tools proactively:
   `get_annotations` first to find the ID.
 - **`write_relevant`**: Before adding new code or docs, find the best insertion
   point — returns the most semantically appropriate file and anchor.
-- **`generate_wiki`**: Generate or update a structured markdown wiki for the
-  codebase. Call with `run: true` to immediately execute all phases. Follow
-  the returned instructions step by step using the other mimirs tools to
-  build wiki pages in `wiki/`.
+- **`wiki`**: Rebuild the project wiki through one MCP tool. Start with
+  `wiki(shape)`, create `wiki/_discovery.json`, validate it with
+  `wiki(validate-discovery)`, then write pages with `wiki(write)` and
+  `wiki(write:page:<slug>)`. The wiki is flow-first: one concrete endpoint,
+  message handler, command, tool, worker, job, schedule, or server start per
+  page. Do not bundle all endpoints, messages, or data flows into broad pages.

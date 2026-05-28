@@ -191,6 +191,20 @@ export class RagDB {
       CREATE INDEX IF NOT EXISTS idx_file_exports_name ON file_exports(name);
       CREATE INDEX IF NOT EXISTS idx_chunks_file ON chunks(file_id);
 
+      CREATE TABLE IF NOT EXISTS symbol_refs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chunk_id INTEGER NOT NULL REFERENCES chunks(id) ON DELETE CASCADE,
+        file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        line INTEGER NOT NULL,
+        resolved_export_id INTEGER REFERENCES file_exports(id) ON DELETE SET NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_symbol_refs_chunk ON symbol_refs(chunk_id);
+      CREATE INDEX IF NOT EXISTS idx_symbol_refs_file ON symbol_refs(file_id);
+      CREATE INDEX IF NOT EXISTS idx_symbol_refs_name ON symbol_refs(name);
+      CREATE INDEX IF NOT EXISTS idx_symbol_refs_resolved ON symbol_refs(resolved_export_id);
+
       CREATE TABLE IF NOT EXISTS conversation_sessions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         session_id TEXT UNIQUE NOT NULL,
@@ -355,6 +369,106 @@ export class RagDB {
     this.migrateChunksEntityColumns();
     this.migrateParentChunkColumns();
     this.migrateGraphColumns();
+    this.dedupeChunks();
+    this.backfillMissingSymbolRefs();
+  }
+
+  /**
+   * One-time recovery for DBs indexed before the `symbol_refs` feature
+   * shipped (April 2026). Those files have chunks + `file_imports` but
+   * zero `symbol_refs` rows — the trace walker can't follow callees out
+   * of them. Clear `files.hash` so the next indexing pass re-emits chunks
+   * with the per-chunk `references` map bun-chunk now provides.
+   *
+   * Detected per-file: a file has imports (`file_imports.resolved_file_id`
+   * non-null on at least one row) but zero `symbol_refs`. Files with zero
+   * imports legitimately have no internal callees and stay alone.
+   */
+  private backfillMissingSymbolRefs() {
+    const stale = this.db
+      .query<{ file_id: number }, []>(
+        `SELECT DISTINCT fi.file_id
+         FROM file_imports fi
+         WHERE fi.resolved_file_id IS NOT NULL
+           AND NOT EXISTS (
+             SELECT 1 FROM symbol_refs sr WHERE sr.file_id = fi.file_id
+           )`,
+      )
+      .all();
+    if (stale.length === 0) return;
+
+    const tx = this.db.transaction(() => {
+      for (const r of stale) {
+        this.db.run("UPDATE files SET hash = '' WHERE id = ?", [r.file_id]);
+      }
+    });
+    tx();
+  }
+
+  /**
+   * One-time recovery: pre-fix DBs accumulated 2× (sometimes more) chunk rows
+   * for files that were re-indexed by two mimirs processes concurrently
+   * (e.g. one MCP server per IDE window). Collapse duplicates by
+   * `(file_id, chunk_index, content_hash)`.
+   *
+   * `symbol_refs` rows on the dropped-side chunks would cascade-delete, but
+   * the surviving chunks' refs are also wrong: every `upsertSymbolRefs`
+   * call clears the file's refs and re-inserts, so only the last-writer's
+   * refs are still in the table — and they point at chunk ids we may have
+   * just deleted. Cleanest recovery is to clear the file's `hash` so the
+   * next indexing pass re-emits chunks + refs cleanly.
+   */
+  private dedupeChunks() {
+    const dupGroups = this.db
+      .query<{ n: number }, []>(
+        `SELECT COUNT(*) AS n FROM (
+           SELECT 1 FROM chunks
+           WHERE content_hash IS NOT NULL
+           GROUP BY file_id, chunk_index, content_hash
+           HAVING COUNT(*) > 1
+         )`,
+      )
+      .get();
+    if (!dupGroups || dupGroups.n === 0) return;
+
+    this.db.transaction(() => {
+      const affectedFiles = this.db
+        .query<{ file_id: number }, []>(
+          `SELECT DISTINCT file_id FROM chunks
+           WHERE content_hash IS NOT NULL
+           GROUP BY file_id, chunk_index, content_hash
+           HAVING COUNT(*) > 1`,
+        )
+        .all();
+
+      this.db.exec(`
+        DELETE FROM chunks
+        WHERE id NOT IN (
+          SELECT MIN(id) FROM chunks
+          WHERE content_hash IS NOT NULL
+          GROUP BY file_id, chunk_index, content_hash
+        )
+        AND content_hash IS NOT NULL
+        AND id IN (
+          SELECT id FROM chunks
+          WHERE content_hash IS NOT NULL
+          AND (file_id, chunk_index, content_hash) IN (
+            SELECT file_id, chunk_index, content_hash FROM chunks
+            WHERE content_hash IS NOT NULL
+            GROUP BY file_id, chunk_index, content_hash
+            HAVING COUNT(*) > 1
+          )
+        )
+      `);
+
+      // Force re-index of affected files — their symbol_refs are stale
+      // (point at chunk ids that may have just been deleted, or were
+      // last-writer-wins from the racing process and never matched the
+      // surviving chunks).
+      for (const f of affectedFiles) {
+        this.db.run("UPDATE files SET hash = '' WHERE id = ?", [f.file_id]);
+      }
+    })();
   }
 
   private migrateChunksEntityColumns() {
@@ -438,7 +552,7 @@ export class RagDB {
     fileOps.updateFileHash(this.db, fileId, hash);
   }
   insertChunkBatch(fileId: number, chunks: EmbeddedChunk[], startIndex: number) {
-    fileOps.insertChunkBatch(this.db, fileId, chunks, startIndex);
+    return fileOps.insertChunkBatch(this.db, fileId, chunks, startIndex);
   }
   insertChunkReturningId(fileId: number, chunk: EmbeddedChunk, chunkIndex: number) {
     return fileOps.insertChunkReturningId(this.db, fileId, chunk, chunkIndex);
@@ -463,6 +577,9 @@ export class RagDB {
   }
   getChunkHashes(fileId: number) {
     return fileOps.getChunkHashes(this.db, fileId);
+  }
+  getChunkIdsByHash(fileId: number) {
+    return fileOps.getChunkIdsByHash(this.db, fileId);
   }
   deleteStaleChunks(fileId: number, keepHashes: Set<string>) {
     return fileOps.deleteStaleChunks(this.db, fileId, keepHashes);
@@ -506,6 +623,51 @@ export class RagDB {
     exports: { name: string; type: string; isDefault?: boolean; isReExport?: boolean; reExportSource?: string }[]
   ) {
     graphOps.upsertFileGraph(this.db, fileId, imports, exports);
+  }
+  upsertSymbolRefs(
+    fileId: number,
+    refs: { chunkId: number; name: string; line: number }[]
+  ) {
+    graphOps.upsertSymbolRefs(this.db, fileId, refs);
+  }
+  resolveSymbolRefs(fileId: number) {
+    graphOps.resolveSymbolRefs(this.db, fileId);
+  }
+  resolveAllSymbolRefs() {
+    graphOps.resolveAllSymbolRefs(this.db);
+  }
+  getCallableExports() {
+    return graphOps.getCallableExports(this.db);
+  }
+  countInboundRefsByExport(excludeFileIds: Set<number>) {
+    return graphOps.countInboundRefsByExport(this.db, excludeFileIds);
+  }
+  getCalleeRefsForExport(exportId: number) {
+    return graphOps.getCalleeRefsForExport(this.db, exportId);
+  }
+  getCalleeRefsForLocalSymbol(fileId: number, name: string) {
+    return graphOps.getCalleeRefsForLocalSymbol(this.db, fileId, name);
+  }
+  getLocalCallable(fileId: number, name: string) {
+    return graphOps.getLocalCallable(this.db, fileId, name);
+  }
+  getUniqueLocalCallableBySuffix(suffix: string) {
+    return graphOps.getUniqueLocalCallableBySuffix(this.db, suffix);
+  }
+  getCallableRange(fileId: number, symbol: string) {
+    return graphOps.getCallableRange(this.db, fileId, symbol);
+  }
+  getSymbolRefsInRange(fileId: number, startLine: number, endLine: number) {
+    return graphOps.getSymbolRefsInRange(this.db, fileId, startLine, endLine);
+  }
+  getContainingChunk(fileId: number, line: number) {
+    return graphOps.getContainingChunk(this.db, fileId, line);
+  }
+  getSymbolReferencesByName(names: string[], filePaths?: string[]) {
+    return graphOps.getSymbolReferencesByName(this.db, names, filePaths);
+  }
+  getProjectRefFanIn() {
+    return graphOps.getProjectRefFanIn(this.db);
   }
   resolveImport(importId: number, resolvedFileId: number) {
     graphOps.resolveImport(this.db, importId, resolvedFileId);

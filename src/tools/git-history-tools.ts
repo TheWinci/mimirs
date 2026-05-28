@@ -112,7 +112,7 @@ export function registerGitHistoryTools(server: McpServer, getDB: GetDB) {
     "file_history",
     "Get the commit history for a specific file. Returns commits that touched the file, sorted by date (newest first). Faster than git log for indexed repositories.",
     {
-      path: z.string().describe("File path (relative to project root, substring match)"),
+      path: z.string().describe("File path (relative to project root, suffix match)"),
       top: z.number().int().min(1).optional().default(20)
         .describe("Max commits to return"),
       since: z.string().optional()

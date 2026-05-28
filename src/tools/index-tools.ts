@@ -6,7 +6,7 @@ import { type GetDB, type WriteStatus, resolveProject } from "./index";
 export function registerIndexTools(server: McpServer, getDB: GetDB, writeStatus?: WriteStatus) {
   server.tool(
     "index_files",
-    "Index files in a directory for semantic search. Skips unchanged files and prunes deleted ones.",
+    "Index files in a directory for semantic search. Without patterns, indexes the project from config and prunes deleted or now-excluded files. With patterns, refreshes or expands only matching files and leaves the rest of the index untouched.",
     {
       directory: z
         .string()
@@ -18,7 +18,7 @@ export function registerIndexTools(server: McpServer, getDB: GetDB, writeStatus?
         .array(z.string())
         .optional()
         .describe(
-          "Override include patterns (e.g. ['**/*.md', '**/*.ts']). Uses .mimirs/config.json if not provided"
+          "Refresh only these include patterns (e.g. ['**/*.md', 'src/**/*.ts']). Does not prune files outside the matched set. To shrink the index, update .mimirs/config.json excludes and call index_files without patterns"
         ),
     },
     async ({ directory, patterns }) => {
@@ -50,15 +50,34 @@ export function registerIndexTools(server: McpServer, getDB: GetDB, writeStatus?
         if (msg.startsWith("scanning files")) {
           writeStatus(msg);
         }
-      });
+      }, undefined, { prune: !patterns });
 
       if (writeStatus) {
         const dbStatus = ragDb.getStatus();
-        writeStatus([
+        const lines = [
           `done`,
           `indexed: ${result.indexed}, skipped: ${result.skipped}, pruned: ${result.pruned}`,
           `total files: ${dbStatus.totalFiles}, total chunks: ${dbStatus.totalChunks}`,
-        ].join("\n"));
+        ];
+        if (result.locked) lines.splice(1, 0, "mode: query-only (another mimirs process owns indexing)");
+        writeStatus(lines.join("\n"));
+      }
+
+      const dbStatus = ragDb.getStatus();
+      if (result.locked) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: [
+                "Indexing skipped:",
+                `  ${result.lockReason ?? "Another mimirs process owns the index lock."}`,
+                `  Existing index: ${dbStatus.totalFiles} files, ${dbStatus.totalChunks} chunks`,
+                "  This server can still answer queries against the existing index.",
+              ].join("\n"),
+            },
+          ],
+        };
       }
 
       return {

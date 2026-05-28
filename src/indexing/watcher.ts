@@ -62,8 +62,10 @@ export function startWatcher(
               const pathToId = buildPathToIdMap(db);
               const idToPath = buildIdToPathMap(pathToId);
               resolveImportsForFile(db, file.id, directory, pathToId, idToPath);
+              db.resolveSymbolRefs(file.id);
               for (const importerId of db.getImportersOf(file.id)) {
                 resolveImportsForFile(db, importerId, directory, pathToId, idToPath);
+                db.resolveSymbolRefs(importerId);
               }
             }
             onEvent?.(`Re-indexed: ${rel}`);

@@ -6,7 +6,7 @@ These tools are available to any MCP client (Claude Code, Cursor, Windsurf, VS C
 |---|---|
 | `search` | Semantic search over indexed files — returns ranked paths, scores, and 400-char snippets. Supports `extensions`, `dirs`, `excludeDirs` scope filters |
 | `read_relevant` | Chunk-level retrieval — returns top-N individual semantic chunks ranked by relevance, with entity names and full content. No file deduplication — two chunks from the same file can both appear. Same scope filters as `search` |
-| `index_files` | Index files in a directory — skips unchanged files, prunes deleted ones |
+| `index_files` | Index files in a directory. Without patterns it syncs the project index from config and prunes deleted/excluded files; with patterns it refreshes only matching files and leaves the rest of the index untouched |
 | `index_status` | Show file count, chunk count, last indexed time |
 | `remove_file` | Remove a specific file from the index |
 | `search_analytics` | Usage analytics — query counts, zero-result queries, low-relevance queries, top terms |
@@ -25,7 +25,7 @@ These tools are available to any MCP client (Claude Code, Cursor, Windsurf, VS C
 | `depends_on` | List all files that a given file imports (its dependencies) |
 | `depended_on_by` | List all files that import a given file (reverse dependencies) |
 | `write_relevant` | Find the best insertion point for new content — returns semantically appropriate files and anchors |
-| `generate_wiki` | Generate or update a structured markdown wiki for the codebase — returns step-by-step instructions that the agent follows using other mimirs tools. Supports incremental updates. Run `index_files` first: planning reads the semantic index, not the filesystem, so stale index entries produce stale pages or silently skip new/renamed files |
+| `wiki` | Run the wiki rebuild workflow. `shape` writes prefetch data and returns the discovery prompt; `validate-discovery` checks `wiki/_discovery.json`; `write` and `write:page:<slug>` coordinate page writing by slug |
 
 ## CLI
 

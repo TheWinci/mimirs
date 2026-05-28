@@ -119,8 +119,11 @@ export async function doctorCommand(args: string[]) {
       name: "Embedding model",
       run: () => {
         try {
-          const { getEmbedding } = require("../../embeddings/embed");
-          // Just check the module loads — actual model download is async
+          const { embed } = require("../../embeddings/embed");
+          if (typeof embed !== "function") {
+            return "Embedding module loaded but `embed` export is missing.";
+          }
+          // Module + export shape only — actual model download is async
           return null;
         } catch (err: unknown) {
           return `Embedding module failed to load: ${err instanceof Error ? err.message : String(err)}`;

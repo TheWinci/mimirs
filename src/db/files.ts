@@ -84,7 +84,8 @@ export function insertChunkBatch(
   fileId: number,
   chunks: EmbeddedChunk[],
   startIndex: number
-) {
+): number[] {
+  const ids: number[] = [];
   const tx = db.transaction(() => {
     for (let i = 0; i < chunks.length; i++) {
       const { snippet, embedding, entityName, chunkType, startLine, endLine, contentHash, parentId } = chunks[i];
@@ -95,6 +96,7 @@ export function insertChunkBatch(
       const chunkId = Number(
         db.query<{ id: number }, []>("SELECT last_insert_rowid() as id").get()!.id
       );
+      ids.push(chunkId);
       db.run(
         "INSERT INTO vec_chunks (chunk_id, embedding) VALUES (?, ?)",
         [chunkId, new Uint8Array(embedding.buffer)]
@@ -102,6 +104,25 @@ export function insertChunkBatch(
     }
   });
   tx();
+  return ids;
+}
+
+/** Map of `content_hash → chunk_id` for a single file. Used by incremental
+ *  reindex to rebuild ref tables without re-deriving chunk-id ↔ content
+ *  alignment from scratch. Skips parent chunks (chunk_index = -1) and any
+ *  rows missing content_hash (legacy chunks pre-content-hash migration). */
+export function getChunkIdsByHash(db: Database, fileId: number): Map<string, number> {
+  const rows = db
+    .query<{ id: number; content_hash: string | null }, [number]>(
+      `SELECT id, content_hash FROM chunks
+       WHERE file_id = ? AND chunk_index >= 0 AND content_hash IS NOT NULL`
+    )
+    .all(fileId);
+  const map = new Map<string, number>();
+  for (const r of rows) {
+    if (r.content_hash) map.set(r.content_hash, r.id);
+  }
+  return map;
 }
 
 /** Insert a single chunk and return its DB id (used for parent chunks). */

@@ -1,8 +1,9 @@
-import { describe, test, expect, beforeAll, afterAll } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { createTempDir, cleanupTempDir, writeFixture } from "../helpers";
 import { join } from "path";
+import { readFile } from "fs/promises";
+import { cleanupTempDir, createTempDir, writeFixture } from "../helpers";
 
 let client: Client;
 let tempDir: string;
@@ -13,29 +14,20 @@ beforeAll(async () => {
 
   await writeFixture(
     tempDir,
-    "src/db.ts",
-    `export class Database {
-  constructor(private path: string) {}
-  query(sql: string) { return []; }
-  close() {}
-}
-`
-  );
-  await writeFixture(
-    tempDir,
-    "src/search.ts",
-    `import { Database } from "./db";
+    "src/server.ts",
+    `import express from "express";
 
-export function search(query: string, db: Database) {
-  return db.query(query);
+export function checkout(req: any, res: any) {
+  return res.json({ ok: true });
 }
-`
+
+export function start() {
+  const app = express();
+  app.post("/checkout", checkout);
+}
+`,
   );
-  await writeFixture(
-    tempDir,
-    "README.md",
-    "# Test Project\n\nA test project for wiki generation.\n"
-  );
+  await writeFixture(tempDir, "README.md", "# Test Service\n\nA tiny HTTP API used by the wiki tests.\n");
 
   transport = new StdioClientTransport({
     command: "bun",
@@ -58,244 +50,422 @@ afterAll(async () => {
 });
 
 function getText(result: any): string {
-  return (result.content as Array<{ type: string; text: string }>)[0].text;
+  if (!result || !Array.isArray(result.content)) return "";
+  return result.content.map((c: any) => c.text ?? "").join("\n");
 }
 
-/** Parse the pending-synthesis checklist to extract community ids. */
-function parsePendingIds(text: string): string[] {
-  const ids: string[] = [];
-  for (const line of text.split("\n")) {
-    const m = line.match(/^-\s+`([a-f0-9]+)`/);
-    if (m) ids.push(m[1]);
-  }
-  return ids;
+async function readJson(path: string): Promise<any> {
+  return JSON.parse(await readFile(join(tempDir, path), "utf-8"));
 }
 
-/** Walk init → synthesis → write_synthesis → init until the manifest exists. */
-async function runFullWikiFlow(dir: string): Promise<string> {
-  const first = await client.callTool({
-    name: "generate_wiki",
-    arguments: { directory: dir },
+async function callWiki(command: string): Promise<string> {
+  const result = await client.callTool({
+    name: "wiki",
+    arguments: { directory: tempDir, command },
   });
-  const firstText = getText(first);
-  const ids = parsePendingIds(firstText);
+  return getText(result);
+}
 
-  for (let i = 0; i < ids.length; i++) {
-    const id = ids[i];
-    await client.callTool({
-      name: "write_synthesis",
-      arguments: {
-        directory: dir,
-        communityId: id,
-        payload: {
-          communityId: id,
-          name: `Community ${i}`,
-          slug: `community-${i}`,
-          purpose: `Auto-generated synthesis for test community ${i}.`,
-          kind: "community",
-          sections: [
-            { title: "Overview", purpose: "Describe what this community does." },
+async function writeDiscovery(value: unknown) {
+  await writeFixture(tempDir, "wiki/_discovery.json", JSON.stringify(value, null, 2));
+}
+
+describe("wiki rebuild tool", () => {
+  test("exposes the new single wiki tool", async () => {
+    const tools = await client.listTools();
+    const names = tools.tools.map((tool) => tool.name);
+    expect(names).toContain("wiki");
+    expect(names).not.toContain("generate_wiki");
+    expect(names).not.toContain("wiki_lint_page");
+    expect(names).not.toContain("wiki_rewrite_page");
+  });
+
+  test("shape writes prefetch and returns the discovery prompt", async () => {
+    const text = await callWiki("shape");
+    expect(text).toContain("Wrote `wiki/_prefetch.json`");
+    expect(text).toContain("You are discovering wiki flows");
+    expect(text).toContain("wiki/_discovery.json");
+    expect(text).toContain("wiki(validate-discovery)");
+    expect(text).toContain("one flow and one page per externally triggered behavior");
+    expect(text).toContain("Do not create one broad `api`, `endpoints`, or `routes` page");
+    expect(text).toContain("Every flow page should have a category `kind`");
+    expect(text).toContain("Every flow page must have exactly one `flowIds` item");
+    expect(text).toContain("Overview pages (second pass)");
+    expect(text).toContain("overview:architecture");
+    expect(text).toContain("overview:configuration");
+    expect(text).toContain("Omit `inputs` when there is no meaningful input");
+    expect(text).toContain("Omit `outputs` when there is no meaningful output");
+    expect(text).toContain("Do not list inputs as outputs");
+    expect(text).toContain("First identify how this project exposes externally triggered behavior");
+    expect(text).toContain("This list is not exhaustive");
+    expect(text).toContain("framework-magic layers");
+    expect(text).toContain("capture important item state changes");
+    expect(text).toContain('"stateChanges"');
+    expect(text).not.toContain("prefetch:signals");
+    expect(text).not.toContain("Stop: index is empty");
+
+    const prefetch = await readJson("wiki/_prefetch.json");
+    expect(prefetch.metadata).toBeDefined();
+    expect(prefetch.metadata.lastCommitHash).toBeDefined();
+    expect(prefetch.map.files.some((file: any) => file.path === "src/server.ts")).toBe(true);
+    expect(prefetch.signals).toBeUndefined();
+    expect(prefetch.annotations).toBeDefined();
+
+    const server = prefetch.map.files.find((file: any) => file.path === "src/server.ts");
+    expect(server.exports.some((exp: any) => exp.name === "checkout" && typeof exp.line === "number")).toBe(true);
+  });
+
+  test("prefetch selectors return nested sections", async () => {
+    expect(await callWiki("prefetch:metadata")).toContain('"lastCommitHash"');
+    expect(await callWiki("prefetch:map:src/server.ts")).toContain('"fanIn"');
+    expect(await callWiki("prefetch:annotations:src/server.ts")).toBe("[]");
+  });
+
+  test("validate-discovery reports structural errors", async () => {
+    await writeDiscovery({
+      metadata: {},
+      flows: [{ id: "checkout" }, { id: "checkout" }],
+      pages: [
+        { slug: "routes/checkout", flowIds: ["checkout"] },
+        { slug: "routes/checkout", flowIds: ["missing-flow"] },
+      ],
+    });
+
+    const text = await callWiki("validate-discovery");
+    expect(text).toContain("structural errors");
+    expect(text).toContain("Duplicate flow id `checkout`");
+    expect(text).toContain("Duplicate page slug `routes/checkout`");
+    expect(text).toContain("pages[0] is missing string `kind`");
+    expect(text).toContain("references missing flow id `missing-flow`");
+    expect(text).not.toContain("inputs is missing");
+    expect(text).not.toContain("outputs is missing");
+  });
+
+  test("validate-discovery reports malformed state changes", async () => {
+    await writeDiscovery({
+      metadata: {},
+      flows: [
+        {
+          id: "checkout",
+          stateChanges: [
+            {
+              from: "pending",
+              to: "paid",
+            },
           ],
         },
-      },
-    });
-  }
-
-  const second = await client.callTool({
-    name: "generate_wiki",
-    arguments: { directory: dir },
-  });
-  return getText(second);
-}
-
-describe("generate_wiki", () => {
-  test("tool is listed in available tools", async () => {
-    const tools = await client.listTools();
-    const names = tools.tools.map((t) => t.name);
-    expect(names).toContain("generate_wiki");
-    expect(names).toContain("write_synthesis");
-  });
-
-  test("first call returns pending synthesis checklist", async () => {
-    const result = await client.callTool({
-      name: "generate_wiki",
-      arguments: { directory: tempDir },
-    });
-
-    const text = getText(result);
-    expect(text).toContain("Step 1 complete");
-    expect(text).toContain("Pending synthesis");
-    expect(text).toContain("generate_wiki(synthesis:");
-    expect(text).toContain("write_synthesis");
-  });
-
-  test("synthesis mode returns per-community prompt", async () => {
-    const initResult = await client.callTool({
-      name: "generate_wiki",
-      arguments: { directory: tempDir },
-    });
-    const ids = parsePendingIds(getText(initResult));
-    expect(ids.length).toBeGreaterThan(0);
-
-    const synthResult = await client.callTool({
-      name: "generate_wiki",
-      arguments: { directory: tempDir, synthesis: ids[0] },
-    });
-    const synthText = getText(synthResult);
-    expect(synthText.length).toBeGreaterThan(50);
-    expect(synthText).toContain(ids[0]);
-  });
-
-  test("write_synthesis rejects invalid slug", async () => {
-    const initResult = await client.callTool({
-      name: "generate_wiki",
-      arguments: { directory: tempDir },
-    });
-    const ids = parsePendingIds(getText(initResult));
-    if (ids.length === 0) return;
-
-    const result = await client.callTool({
-      name: "write_synthesis",
-      arguments: {
-        directory: tempDir,
-        communityId: ids[0],
-        payload: {
-          communityId: ids[0],
-          name: "Bad",
-          slug: "Not Kebab Case",
-          purpose: "x",
-          sections: [{ title: "Overview", purpose: "y" }],
+        {
+          id: "cleanup",
+          stateChanges: "not an array",
         },
+      ],
+      pages: [
+        {
+          slug: "routes/checkout",
+          title: "Checkout route",
+          kind: "route",
+          flowIds: ["checkout"],
+          inputs: ["checkout request"],
+          outputs: ["checkout response"],
+        },
+        {
+          slug: "jobs/cleanup",
+          title: "Cleanup job",
+          kind: "job",
+          flowIds: ["cleanup"],
+          inputs: ["cleanup schedule"],
+          outputs: ["removed files"],
+        },
+      ],
+    });
+
+    const text = await callWiki("validate-discovery");
+    expect(text).toContain("flows[0].stateChanges[0] is missing string `item`");
+    expect(text).toContain("flows[0].stateChanges[0] is missing string `description`");
+    expect(text).toContain("flows[1].stateChanges must be an array when present");
+  });
+
+  test("validate-discovery reports malformed page outputs when present", async () => {
+    await writeDiscovery({
+      metadata: {},
+      flows: [{ id: "checkout" }, { id: "cleanup" }],
+      pages: [
+        {
+          slug: "routes/checkout",
+          title: "Checkout route",
+          kind: "route",
+          flowIds: ["checkout"],
+          outputs: [],
+        },
+        {
+          slug: "jobs/cleanup",
+          title: "Cleanup job",
+          kind: "job",
+          flowIds: ["cleanup"],
+          outputs: ["", 123],
+        },
+      ],
+    });
+
+    const text = await callWiki("validate-discovery");
+    expect(text).toContain("pages[0].outputs must contain at least 1 item");
+    expect(text).toContain("pages[1].outputs[0] must be a non-empty string");
+    expect(text).toContain("pages[1].outputs[1] must be a non-empty string");
+  });
+
+  test("validate-discovery reports malformed page inputs when present", async () => {
+    await writeDiscovery({
+      metadata: {},
+      flows: [{ id: "checkout" }, { id: "cleanup" }],
+      pages: [
+        {
+          slug: "routes/checkout",
+          title: "Checkout route",
+          kind: "route",
+          flowIds: ["checkout"],
+          inputs: [],
+        },
+        {
+          slug: "jobs/cleanup",
+          title: "Cleanup job",
+          kind: "job",
+          flowIds: ["cleanup"],
+          inputs: ["", 123],
+        },
+      ],
+    });
+
+    const text = await callWiki("validate-discovery");
+    expect(text).toContain("pages[0].inputs must contain at least 1 item");
+    expect(text).toContain("pages[1].inputs[0] must be a non-empty string");
+    expect(text).toContain("pages[1].inputs[1] must be a non-empty string");
+  });
+
+  test("validate-discovery reports missing files referenced by flows and pages", async () => {
+    await writeDiscovery({
+      metadata: {},
+      flows: [
+        {
+          id: "checkout",
+          files: [
+            { path: "src/server.ts", role: "handler" },
+            { path: "src/gone.ts", role: "store" },
+          ],
+          evidence: [
+            { path: "src/gone.ts", startLine: 1, endLine: 2 },
+            { path: "src/server.ts", startLine: 1, endLine: 2 },
+          ],
+          stateChanges: [
+            {
+              item: "order",
+              from: null,
+              to: "paid",
+              description: "creates order",
+              files: [{ path: "src/also-gone.ts", role: "writer" }],
+              evidence: [{ path: "src/also-gone.ts", startLine: 1, endLine: 2 }],
+            },
+          ],
+        },
+      ],
+      pages: [
+        {
+          slug: "routes/checkout",
+          title: "Checkout route",
+          kind: "route",
+          flowIds: ["checkout"],
+          primaryFiles: ["src/server.ts", "src/missing.ts"],
+          inputs: ["request"],
+          outputs: ["response"],
+        },
+      ],
+    });
+
+    const text = await callWiki("validate-discovery");
+    expect(text).toContain("references missing file `src/gone.ts`");
+    expect(text).toContain("references missing file `src/also-gone.ts`");
+    expect(text).toContain("references missing file `src/missing.ts`");
+    expect(text).toContain("flows[0].files[1].path");
+    expect(text).toContain("pages[0].primaryFiles[1]");
+    expect(text).not.toContain("references missing file `src/server.ts`");
+  });
+
+  test("validate-discovery allows pages without inputs or outputs", async () => {
+    await writeDiscovery({
+      metadata: {},
+      flows: [{ id: "noop" }],
+      pages: [
+        {
+          slug: "jobs/noop",
+          title: "No-op job",
+          kind: "job",
+          flowIds: ["noop"],
+        },
+      ],
+    });
+
+    const text = await callWiki("validate-discovery");
+    expect(text).toContain("passed structural checks");
+  });
+
+  test("validate-discovery rejects bundled pages", async () => {
+    await writeDiscovery({
+      metadata: {},
+      flows: [
+        { id: "checkout-route", title: "Checkout route", kind: "route" },
+        { id: "orders-route", title: "Orders route", kind: "route" },
+      ],
+      pages: [
+        {
+          slug: "api",
+          title: "API endpoints",
+          kind: "overview",
+          flowIds: ["checkout-route", "orders-route"],
+        },
+      ],
+    });
+
+    const text = await callWiki("validate-discovery");
+    expect(text).not.toContain("kind must be `flow`");
+    expect(text).toContain("slug `api` is too broad");
+    expect(text).toContain("flowIds must contain exactly one flow id");
+  });
+
+  test("validated discovery can be read compactly and by selector", async () => {
+    await writeDiscovery({
+      metadata: {
+        schemaVersion: 1,
+        prefetchCommitHash: null,
+        createdAt: "2026-05-07T00:00:00.000Z",
       },
-    });
-    const text = getText(result);
-    expect(text).toContain("rejected");
-  });
-
-  test("after all syntheses stored, init returns manifest plan", async () => {
-    const text = await runFullWikiFlow(tempDir);
-    expect(text).toContain("Wiki Generation Plan");
-    expect(text).toContain("Computed");
-    expect(text).toContain("pages");
-    expect(text).toContain("Writing rules");
-    expect(text).toContain("wiki/_meta/writing-rules.md");
-    expect(text).toContain("generate_wiki(page: N)");
-  });
-
-  test("manifest + content artifacts written to disk", async () => {
-    const { existsSync } = require("fs");
-    expect(existsSync(join(tempDir, "wiki", "_meta", "_manifest.json"))).toBe(true);
-    expect(existsSync(join(tempDir, "wiki", "_meta", "_content.json"))).toBe(true);
-    expect(existsSync(join(tempDir, "wiki", "_meta", "_classified.json"))).toBe(true);
-    expect(existsSync(join(tempDir, "wiki", "_meta", "_discovery.json"))).toBe(true);
-    expect(existsSync(join(tempDir, "wiki", "_meta", "_syntheses.json"))).toBe(true);
-    expect(existsSync(join(tempDir, "wiki", "_meta", "_bundles.json"))).toBe(true);
-    expect(existsSync(join(tempDir, "wiki", "_update-log.md"))).toBe(true);
-  });
-
-  test("page mode returns payload with sections", async () => {
-    const result = await client.callTool({
-      name: "generate_wiki",
-      arguments: { directory: tempDir, page: 0 },
-    });
-
-    const text = getText(result);
-    expect(text).toContain("Page payload");
-    expect(text).toContain("**Path:**");
-    expect(text).toContain("**Kind:**");
-    expect(text).toContain("Sections to write");
-  });
-
-  test("page mode with out-of-range index returns error", async () => {
-    const result = await client.callTool({
-      name: "generate_wiki",
-      arguments: { directory: tempDir, page: 999 },
-    });
-    const text = getText(result);
-    expect(text.toLowerCase()).toMatch(/out of range|invalid|not found/);
-  });
-
-  test("warns about empty index for unindexed directory", async () => {
-    const emptyDir = await createTempDir();
-    const result = await client.callTool({
-      name: "generate_wiki",
-      arguments: { directory: emptyDir },
+      flows: [
+        {
+          id: "checkout-route",
+          title: "Checkout route",
+          kind: "route",
+          summary: "Handles POST /checkout.",
+          confidence: "high",
+          entrypoints: [{ path: "/checkout", method: "POST" }],
+          files: [{ path: "src/server.ts", role: "handler" }],
+          evidence: [{ path: "src/server.ts", startLine: 7, endLine: 9 }],
+          stateChanges: [
+            {
+              item: "checkout response",
+              from: null,
+              to: "returned",
+              trigger: "POST /checkout handler",
+              description: "The route creates an OK response for the request.",
+              files: [{ path: "src/server.ts", role: "handler" }],
+              evidence: [{ path: "src/server.ts", startLine: 3, endLine: 5 }],
+            },
+          ],
+          relatedFlows: [],
+        },
+      ],
+      pages: [
+        {
+          slug: "routes/checkout",
+          title: "Checkout route",
+          kind: "route",
+          flowIds: ["checkout-route"],
+          primaryFiles: ["src/server.ts"],
+          mustCover: ["request path", "response"],
+          inputs: ["POST /checkout request"],
+          outputs: ["JSON response"],
+          openQuestions: [],
+        },
+      ],
     });
 
-    const text = getText(result);
-    expect(text).toContain("index is empty");
-    expect(text).toContain("index_files");
-    await cleanupTempDir(emptyDir);
+    const validation = await callWiki("validate-discovery");
+    expect(validation).toContain("passed structural checks");
+    expect(validation).toContain("call `wiki(write)` next");
+
+    const compact = await callWiki("discovery");
+    expect(compact).toContain('"checkout-route"');
+    expect(compact).toContain('"routes/checkout"');
+    expect(compact).toContain('"stateChangeCount"');
+    expect(compact).toContain('"inputCount"');
+    expect(compact).toContain('"outputCount"');
+    expect(compact).not.toContain("Handles POST /checkout");
+
+    expect(await callWiki("discovery:flow:checkout-route")).toContain("Handles POST /checkout");
+    expect(await callWiki("discovery:flow:checkout-route")).toContain('"stateChanges"');
+    expect(await callWiki("discovery:page:routes/checkout")).toContain('"primaryFiles"');
   });
 
-  test("resume mode reports remaining pages", async () => {
-    const result = await client.callTool({
-      name: "generate_wiki",
-      arguments: { directory: tempDir, resume: true },
-    });
+  test("write commands return coordinator and page packets", async () => {
+    const coordinator = await callWiki("write");
+    expect(coordinator).toContain("split the page-writing work by page slug");
+    expect(coordinator).toContain("Call `wiki(discovery)`");
+    expect(coordinator).toContain("wiki(write:page:<slug>)");
 
-    const text = getText(result);
-    expect(text).toContain("Wiki Resume");
-    expect(text).toContain("Remaining");
-    expect(text).toContain("Writing rules");
-    expect(text).toContain("wiki/_meta/writing-rules.md");
+    const page = await callWiki("write:page:routes/checkout");
+    expect(page).toContain("Assigned page slug: `routes/checkout`");
+    expect(page).toContain("read the referenced source before writing");
+    expect(page).toContain("Read the source files named in `page.primaryFiles`");
+    expect(page).toContain("Do not write from the page packet alone");
+    expect(page).toContain("Source-first writing contract");
+    expect(page).toContain("Treat discovery, page packets, and `mustCover` items as a map");
+    expect(page).toContain("Do not paste discovery summaries");
+    expect(page).toContain("Source-first self-check");
+    expect(page).toContain("Mermaid sequence diagram");
+    expect(page).toContain("Explain what this one flow does");
+    expect(page).toContain("Use citations sparingly");
+    expect(page).toContain("Treat `mustCover` as the list of required topics for this page");
+    expect(page).toContain("Every item in `page.mustCover` must be explained");
+    expect(page).toContain("Inputs");
+    expect(page).toContain("Outputs");
+    expect(page).toContain("State changes");
+    expect(page).toContain("Key source files");
+    expect(page).toContain("## Page packet");
+    expect(page).toContain('"Checkout route"');
+    expect(page).toContain('"mapEntries"');
+    expect(page).not.toContain('"signals"');
+    expect(page).toContain("Only link to related pages whose subject is named in `relatedFlows`");
+    expect(page).toContain("Example output blocks are illustrative");
+    expect(page).toContain("obviously synthetic");
   });
 
-  test("page mode without manifest returns error", async () => {
-    const emptyDir = await createTempDir();
-    const result = await client.callTool({
-      name: "generate_wiki",
-      arguments: { directory: emptyDir, page: 0 },
-    });
+  test("validate-pages reports broken relative markdown links", async () => {
+    await writeFixture(
+      tempDir,
+      "wiki/tools/example.md",
+      [
+        "# Example",
+        "",
+        "See [neighbor](./neighbor.md) and [gone](../cli/gone.md).",
+        "External [link](https://example.com/x.md) is ignored.",
+        "Anchor-only [link](#section) is ignored.",
+      ].join("\n"),
+    );
+    await writeFixture(tempDir, "wiki/tools/neighbor.md", "# Neighbor\n");
 
-    const text = getText(result);
-    expect(text).toContain("No manifest");
-    await cleanupTempDir(emptyDir);
+    const text = await callWiki("validate-pages");
+    expect(text).toContain("broken relative");
+    expect(text).toContain("tools/example.md");
+    expect(text).toContain("../cli/gone.md");
+    expect(text).not.toContain("./neighbor.md");
+    expect(text).not.toContain("example.com");
   });
 
-  test("wiki_lint_page flags missing file reference", async () => {
-    const { writeFileSync, mkdirSync } = require("fs");
-    const badPage = join(tempDir, "wiki", "communities", "bad.md");
-    mkdirSync(join(tempDir, "wiki", "communities"), { recursive: true });
-    writeFileSync(badPage, "# Bad\n\nSee `src/ghost.ts` for details.\n");
+  test("validate-pages reports success when all links resolve", async () => {
+    await writeFixture(tempDir, "wiki/tools/only.md", "# Only\n\nNo links here.\n");
+    // Remove the broken fixture from the prior test by overwriting it with a valid one.
+    await writeFixture(tempDir, "wiki/tools/example.md", "# Example\n\nSee [neighbor](./neighbor.md).\n");
 
-    const result = await client.callTool({
-      name: "wiki_lint_page",
-      arguments: { directory: tempDir, path: "wiki/communities/bad.md" },
-    });
-    const text = getText(result);
-    expect(text).toContain("missing-file");
-    expect(text).toContain("src/ghost.ts");
+    const text = await callWiki("validate-pages");
+    expect(text).toContain("All relative");
+    expect(text).toContain("resolve to existing files");
   });
 
-  test("wiki_lint_page on clean page reports clean", async () => {
-    const { writeFileSync } = require("fs");
-    const goodPage = join(tempDir, "wiki", "communities", "good.md");
-    writeFileSync(goodPage, "# Good\n\nReferences `src/db.ts` which exists.\n");
-
-    const result = await client.callTool({
-      name: "wiki_lint_page",
-      arguments: { directory: tempDir, path: "wiki/communities/good.md" },
-    });
-    const text = getText(result);
-    expect(text.toLowerCase()).toContain("lint clean");
+  test("write coordinator prompt mentions the validate-pages gate", async () => {
+    const coordinator = await callWiki("write");
+    expect(coordinator).toContain("wiki(validate-pages)");
   });
 
-  test("wiki_rewrite_page returns same shape as generate_wiki(page)", async () => {
-    const viaGenerate = await client.callTool({
-      name: "generate_wiki",
-      arguments: { directory: tempDir, page: 0 },
-    });
-    const viaRewrite = await client.callTool({
-      name: "wiki_rewrite_page",
-      arguments: { directory: tempDir, page: 0 },
-    });
-    const genText = getText(viaGenerate);
-    const rewriteText = getText(viaRewrite);
-    expect(rewriteText).toContain("Page payload");
-    expect(rewriteText).toContain("**Path:**");
-    // Same path + kind — content may differ by timestamp-like fields but structure matches.
-    const pathLine = (s: string) => (s.match(/\*\*Path:\*\*.*$/m) ?? [""])[0];
-    expect(pathLine(rewriteText)).toBe(pathLine(genText));
+  test("unknown selectors return clear tool errors", async () => {
+    const text = await callWiki("prefetch:map:not-real.ts");
+    expect(text).toContain("wiki(prefetch:map:not-real.ts) failed");
+    expect(text).toContain("No prefetch map entry");
   });
 });

@@ -12,6 +12,7 @@ import { indexConversation, startConversationTail } from "../conversation/indexe
 import { ensureGitignore } from "../cli/setup";
 import { registerAllTools } from "../tools";
 import { log } from "../utils/log";
+import { tryAcquireIndexLock, type IndexLock } from "../utils/index-lock";
 
 // Read version from package.json at module load time
 const { version } = await import("../../package.json");
@@ -113,6 +114,7 @@ export async function startServer() {
   // later — this is safe because cleanup just skips null values.
   let watcher: Watcher | null = null;
   let convWatcher: Watcher | null = null;
+  let indexLock: IndexLock | null = null;
 
   function writeExitStatus(reason: string) {
     if (!statusPath) return;
@@ -141,6 +143,7 @@ export async function startServer() {
     log.debug("Shutting down...", "shutdown");
     if (watcher) watcher.close();
     if (convWatcher) convWatcher.close();
+    if (indexLock) indexLock.release();
     for (const entry of dbMap.values()) entry.db.close();
     dbMap.clear();
     process.exit(0);
@@ -260,6 +263,21 @@ export async function startServer() {
       log.warn(`Failed to update .gitignore: ${err instanceof Error ? err.message : err}`, "gitignore");
     });
 
+    // Process-level lock: only one mimirs server per project directory
+    // performs indexing/watching. Other instances (e.g. extra IDE windows)
+    // share the DB read-only — concurrent indexers double-insert chunks.
+    indexLock = tryAcquireIndexLock(startupDir);
+    if (!indexLock) {
+      log.debug("Another mimirs process is indexing this project — running in query-only mode", "index-lock");
+      writeStatus([
+        `done`,
+        `version: ${version}`,
+        `mode: query-only (another mimirs process owns indexing)`,
+      ].join("\n"));
+    }
+
+    if (indexLock) {
+
     // Index in background — don't block server startup
     let totalFiles = 0;
     let processedFiles = 0;
@@ -330,6 +348,7 @@ export async function startServer() {
       writeStatus(`error\nversion: ${version}\nfailed: ${new Date().toISOString()}\n${err instanceof Error ? err.message : err}`);
       log.warn(`Startup indexing failed: ${err instanceof Error ? err.message : err}`, "indexer");
     });
+    } // end if (indexLock)
   }
 
   // Start conversation tailing — find and tail the current session's JSONL

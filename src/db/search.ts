@@ -432,10 +432,67 @@ export function findUsages(db: Database, symbolName: string, exact: boolean, top
       .map((r) => r.file_id)
   );
 
-  let rows: { id: number; snippet: string; file_id: number; chunk_index: number; start_line: number | null; path: string }[] = [];
+  const seen = new Set<string>();
+  const results: UsageResult[] = [];
+
+  // Primary path: bun-chunk-derived symbol_refs index. Precise — call sites
+  // and reference sites only, no FTS hits inside comments or strings.
+  // Exact match: name = ? (case-insensitive). Prefix match: name LIKE ?%.
+  const refRows = exact
+    ? db
+        .query<
+          { snippet: string; file_id: number; start_line: number | null; ref_line: number; path: string },
+          [string]
+        >(
+          `SELECT c.snippet, c.file_id, c.start_line, sr.line AS ref_line, f.path
+           FROM symbol_refs sr
+           JOIN chunks c ON c.id = sr.chunk_id
+           JOIN files f ON f.id = sr.file_id
+           WHERE LOWER(sr.name) = LOWER(?)`
+        )
+        .all(symbolName)
+    : db
+        .query<
+          { snippet: string; file_id: number; start_line: number | null; ref_line: number; path: string },
+          [string]
+        >(
+          `SELECT c.snippet, c.file_id, c.start_line, sr.line AS ref_line, f.path
+           FROM symbol_refs sr
+           JOIN chunks c ON c.id = sr.chunk_id
+           JOIN files f ON f.id = sr.file_id
+           WHERE LOWER(sr.name) LIKE LOWER(?) || '%'`
+        )
+        .all(symbolName);
+
+  for (const row of refRows) {
+    if (definingFileIds.has(row.file_id)) continue;
+
+    // bun-chunk emits 0-indexed file lines; chunk start_line is 1-indexed.
+    // Surface the 1-indexed file line; pull the matching source line as snippet.
+    const fileLine1 = row.ref_line + 1;
+    const lines = row.snippet.split("\n");
+    const lineIdx = row.start_line != null ? fileLine1 - row.start_line : -1;
+    const matchSnippet =
+      lineIdx >= 0 && lineIdx < lines.length
+        ? lines[lineIdx].trim()
+        : row.snippet.slice(0, 120).trim();
+
+    const key = `${row.path}:${fileLine1}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    results.push({ path: row.path, line: fileLine1, snippet: matchSnippet });
+    if (results.length >= top) return results;
+  }
+
+  // Fallback: FTS + regex on chunk text. Used for files indexed before the
+  // symbol_refs migration, languages without a reference query (HTML/CSS/
+  // TOML/YAML), or names that don't appear in any extracted reference set
+  // (e.g. dynamic dispatch, eval'd identifiers).
+  let ftsRows: { id: number; snippet: string; file_id: number; chunk_index: number; start_line: number | null; path: string }[] = [];
   try {
     const ftsQuery = `"${symbolName.replace(/"/g, '""')}"`;
-    rows = db
+    ftsRows = db
       .query<
         { id: number; snippet: string; file_id: number; chunk_index: number; start_line: number | null; path: string },
         [string, number]
@@ -450,16 +507,14 @@ export function findUsages(db: Database, symbolName: string, exact: boolean, top
       )
       .all(ftsQuery, top * 5);
   } catch {
-    return [];
+    return results;
   }
 
   const pattern = exact
     ? new RegExp(`\\b${escapeRegex(symbolName)}\\b`, "i")
     : new RegExp(`\\b${escapeRegex(symbolName)}`, "i");
 
-  const results: UsageResult[] = [];
-
-  for (const row of rows) {
+  for (const row of ftsRows) {
     if (definingFileIds.has(row.file_id)) continue;
 
     const lines = row.snippet.split("\n");
@@ -478,6 +533,10 @@ export function findUsages(db: Database, symbolName: string, exact: boolean, top
       row.start_line != null && matchOffset >= 0
         ? row.start_line + matchOffset
         : row.start_line;
+
+    const key = line != null ? `${row.path}:${line}` : `${row.path}:?${results.length}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
 
     results.push({ path: row.path, line, snippet: matchSnippet });
     if (results.length >= top) break;

@@ -298,7 +298,7 @@ describe("generateProjectMap", () => {
     expect(map).toContain("depends_on:");
   });
 
-  test("entry points listed separately", () => {
+  test("files with no importers are listed separately", () => {
     const emb = new Float32Array(384);
     const pathServer = join(tempDir, "server.ts");
     const pathDb = join(tempDir, "db.ts");
@@ -315,8 +315,8 @@ describe("generateProjectMap", () => {
 
     const map = generateProjectMap(db, { projectDir: tempDir });
 
-    // server.ts has no importers → entry point
-    expect(map).toContain("Entry Points");
+    // server.ts has no importers.
+    expect(map).toContain("Files With No Importers");
     expect(map).toContain("server.ts");
   });
 });
@@ -353,12 +353,12 @@ describe("generateProjectMap — JSON format", () => {
     // server.ts imports from db.ts → fanOut=1, fanIn=0
     expect(serverNode.fanOut).toBe(1);
     expect(serverNode.fanIn).toBe(0);
-    expect(serverNode.isEntryPoint).toBe(true);
+    expect(serverNode.isEntryPoint).toBeUndefined();
 
     // db.ts is imported by server.ts → fanIn=1, fanOut=0
     expect(dbNode.fanIn).toBe(1);
     expect(dbNode.fanOut).toBe(0);
-    expect(dbNode.isEntryPoint).toBe(false);
+    expect(dbNode.isEntryPoint).toBeUndefined();
 
     // db.ts exports should include ALL exports (no truncation)
     expect(dbNode.exports).toHaveLength(2);

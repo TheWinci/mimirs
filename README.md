@@ -19,27 +19,29 @@ After indexing with mimirs: **91K tokens, ~3 seconds** — a 76% drop on that co
 <div align="center">
   <h3>No API keys. No cloud. No Docker.<br />Just bun and SQLite.</h3>
   <h3>
-    <a href="wiki/communities/search-runtime.md">Semantic Search</a> &nbsp;·&nbsp;
-    <a href="wiki/index.md">Auto-generated Wiki</a>
+    <a href="wiki/tools/search.md">Semantic Search</a> &nbsp;·&nbsp;
+    <a href="wiki/tools/wiki.md">Auto-generated Wiki</a>
     <br>
-    <a href="wiki/communities/conversation-server.md">Cross-session Memory</a> &nbsp;·&nbsp;
-    <a href="wiki/architecture.md">Dependency Graphs</a> &nbsp;·&nbsp;
-    <a href="docs/tools.md">Annotations</a>
+    <a href="wiki/tools/search-conversation.md">Cross-session Memory</a> &nbsp;·&nbsp;
+    <a href="wiki/tools/project-map.md">Dependency Graphs</a> &nbsp;·&nbsp;
+    <a href="wiki/tools/annotate.md">Annotations</a>
   </h3>
   <span>Works with: Claude Code &nbsp;·&nbsp; Cursor &nbsp;·&nbsp; Windsurf &nbsp;·&nbsp; JetBrains (Junie) &nbsp;·&nbsp; GitHub Copilot &nbsp;·&nbsp; any MCP client</span>
 </div>
 
 ## Quick start
 
-### 1. Install SQLite (macOS)
+### 1. Prerequisites
 
-Apple's bundled SQLite doesn't support extensions:
+[Bun](https://bun.sh) (`curl -fsSL https://bun.sh/install | bash`) and, on macOS, a modern SQLite — Apple's bundled one doesn't support extensions:
 
 ```bash
 brew install sqlite
 ```
 
-### 2. Set up your editor
+Linux and Windows ship with a compatible SQLite already.
+
+### 2. Set up your editor (automatic)
 
 ```bash
 bunx mimirs init --ide claude   # or: cursor, windsurf, copilot, jetbrains, all
@@ -47,7 +49,141 @@ bunx mimirs init --ide claude   # or: cursor, windsurf, copilot, jetbrains, all
 
 This creates the MCP server config, editor rules, `.mimirs/config.json`, and `.gitignore` entry. Run with `--ide all` to set up every supported editor at once.
 
-### 3. Try the demo (optional)
+`init` covers Claude Code, Cursor, Windsurf, Copilot, and JetBrains (Junie). For everything else — Codex, Zed, custom clients — copy one of the snippets below.
+
+### 3. Set up your editor (manual reference)
+
+The mimirs MCP server runs over stdio. Every client needs the same three things: a `command` (`bunx`), `args` (`["mimirs@latest", "serve"]`), and a `RAG_PROJECT_DIR` env var pointing at your project root.
+
+<details>
+<summary><b>Claude Code</b> — <code>.mcp.json</code> in project root</summary>
+
+```json
+{
+  "mcpServers": {
+    "mimirs": {
+      "command": "bunx",
+      "args": ["mimirs@latest", "serve"],
+      "env": {
+        "RAG_PROJECT_DIR": "/absolute/path/to/your/project"
+      }
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><b>Cursor</b> — <code>.cursor/mcp.json</code> in project root</summary>
+
+```json
+{
+  "mcpServers": {
+    "mimirs": {
+      "command": "bunx",
+      "args": ["mimirs@latest", "serve"],
+      "env": {
+        "RAG_PROJECT_DIR": "/absolute/path/to/your/project"
+      }
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><b>Windsurf</b> — <code>~/.codeium/windsurf/mcp_config.json</code> (global)</summary>
+
+Windsurf reads MCP servers from your home directory, not the project. JetBrains plugin variant uses `~/.codeium/mcp_config.json`.
+
+```json
+{
+  "mcpServers": {
+    "mimirs": {
+      "command": "bunx",
+      "args": ["mimirs@latest", "serve"],
+      "env": {
+        "RAG_PROJECT_DIR": "/absolute/path/to/your/project"
+      }
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><b>JetBrains (Junie)</b> — <code>.junie/mcp.json</code> in project root</summary>
+
+```json
+{
+  "mcpServers": {
+    "mimirs": {
+      "command": "bunx",
+      "args": ["mimirs@latest", "serve"],
+      "env": {
+        "RAG_PROJECT_DIR": "/absolute/path/to/your/project"
+      }
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><b>Codex</b> — <code>~/.codex/config.toml</code> (global)</summary>
+
+Codex uses TOML, not JSON, and reads from `~/.codex/config.toml`. One block per project — pick a unique table name if you wire up multiple repos (`mimirs-frontend`, `mimirs-api`, etc).
+
+```toml
+[mcp_servers.mimirs]
+command = "bunx"
+args = ["mimirs@latest", "serve"]
+env = { RAG_PROJECT_DIR = "/absolute/path/to/your/project" }
+```
+
+Or, equivalently, with an expanded env table:
+
+```toml
+[mcp_servers.mimirs]
+command = "bunx"
+args = ["mimirs@latest", "serve"]
+
+[mcp_servers.mimirs.env]
+RAG_PROJECT_DIR = "/absolute/path/to/your/project"
+```
+</details>
+
+<details>
+<summary><b>Read-only project directory?</b> Redirect the index</summary>
+
+If the project lives in a read-only mount, set `RAG_DB_DIR` to a writable location. The index lives there instead of `<project>/.mimirs/`.
+
+```json
+{
+  "mcpServers": {
+    "mimirs": {
+      "command": "bunx",
+      "args": ["mimirs@latest", "serve"],
+      "env": {
+        "RAG_PROJECT_DIR": "/read/only/project",
+        "RAG_DB_DIR": "/home/me/.cache/mimirs/myproject"
+      }
+    }
+  }
+}
+```
+</details>
+
+### 4. First index
+
+The MCP server indexes lazily on the first query, so once it's wired up you can just ask your agent something. To force a full index up front (useful for large repos):
+
+```bash
+bunx mimirs index            # current directory
+bunx mimirs status           # how many files, chunks, embeddings
+```
+
+### 5. Try the demo (optional)
 
 ```bash
 bunx mimirs demo

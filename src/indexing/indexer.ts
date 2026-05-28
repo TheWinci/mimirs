@@ -10,6 +10,7 @@ import { resolveImports } from "../graph/resolver";
 import { log } from "../utils/log";
 import { checkIndexDir } from "../utils/dir-guard";
 import { normalizePath } from "../utils/path";
+import { tryAcquireIndexLock } from "../utils/index-lock";
 import { type EmbeddedChunk } from "../types";
 
 function aggregateGraphData(chunks: { imports?: ChunkImport[]; exports?: ChunkExport[] }[]): {
@@ -47,6 +48,8 @@ export interface IndexResult {
   skipped: number;
   pruned: number;
   errors: string[];
+  locked?: boolean;
+  lockReason?: string;
 }
 
 function hashString(content: string): string {
@@ -68,24 +71,44 @@ export function buildIncludeFilter(patterns: string[]): (rel: string) => boolean
   const extensions = new Set<string>();
   const basenames = new Set<string>();
   const basenamePrefixes: string[] = [];
+  const exactPaths = new Set<string>();
+  const rootedExtensions: { prefix: string; extension: string }[] = [];
 
   for (const p of patterns) {
+    const normalized = normalizePath(p);
+
     const extMatch = p.match(/^\*\*\/\*(\.\w+)$/);
     if (extMatch) { extensions.add(extMatch[1]); continue; }
 
-    const baseMatch = p.match(/^\*\*\/([A-Za-z]\w*)$/);
+    const rootedExtMatch = normalized.match(/^(.+)\/\*\*\/\*(\.\w+)$/);
+    if (rootedExtMatch) {
+      rootedExtensions.push({ prefix: rootedExtMatch[1].replace(/\/+$/, ""), extension: rootedExtMatch[2] });
+      continue;
+    }
+
+    const baseMatch = normalized.match(/^\*\*\/([^*?/]+)$/);
     if (baseMatch) { basenames.add(baseMatch[1]); continue; }
 
-    const prefixMatch = p.match(/^\*\*\/([A-Za-z]\w*)\.\*$/);
+    const prefixMatch = normalized.match(/^\*\*\/([A-Za-z]\w*)\.\*$/);
     if (prefixMatch) { basenamePrefixes.push(prefixMatch[1] + "."); continue; }
+
+    if (!normalized.includes("*") && !normalized.includes("?")) {
+      exactPaths.add(normalized);
+      continue;
+    }
   }
 
   return (rel: string) => {
+    rel = normalizePath(rel);
     const ext = extname(rel);
     const base = basename(rel);
-    return extensions.has(ext)
+    return exactPaths.has(rel)
+      || extensions.has(ext)
       || basenames.has(base)
-      || basenamePrefixes.some((p) => base.startsWith(p));
+      || basenamePrefixes.some((p) => base.startsWith(p))
+      || rootedExtensions.some(({ prefix, extension }) =>
+        rel.startsWith(prefix + "/") && ext === extension
+      );
   };
 }
 
@@ -253,6 +276,7 @@ function buildEmbeddedChunk(chunk: import("./chunker").Chunk, embedding: Float32
     startLine: chunk.startLine ?? null,
     endLine: chunk.endLine ?? null,
     contentHash: chunk.hash ?? null,
+    references: chunk.references,
   };
 }
 
@@ -469,10 +493,12 @@ async function processFile(
 
   // Write all child chunks (now with parent_id set where applicable)
   const DB_BATCH = 500;
+  const allChunkIds: number[] = [];
   for (let i = 0; i < allEmbedded.length; i += DB_BATCH) {
     if (signal?.aborted) break;
     const batch = allEmbedded.slice(i, i + DB_BATCH);
-    db.insertChunkBatch(fileId, batch, i);
+    const ids = db.insertChunkBatch(fileId, batch, i);
+    allChunkIds.push(...ids);
     onProgress?.(`Writing ${Math.min(i + DB_BATCH, allEmbedded.length)}/${allEmbedded.length} chunks for ${relPath}`, { transient: true });
   }
 
@@ -482,8 +508,38 @@ async function processFile(
     : aggregateGraphData(chunks);
   db.upsertFileGraph(fileId, graphData.imports, graphData.exports);
 
+  // Symbol-level references: bun-chunk emits per-chunk identifier maps.
+  // Resolution against import scope happens after the project-wide
+  // import-resolution pass (`resolveAllSymbolRefs` at end of indexProject).
+  const refsToInsert = collectSymbolRefs(allEmbedded, allChunkIds);
+  if (refsToInsert.length > 0) db.upsertSymbolRefs(fileId, refsToInsert);
+
   onProgress?.(`Indexed: ${relPath} (${chunks.length} chunks)`);
   return "indexed";
+}
+
+/** Flatten per-chunk `references` maps into rows for `symbol_refs` insertion. */
+function collectSymbolRefs(
+  chunks: EmbeddedChunk[],
+  chunkIds: number[]
+): { chunkId: number; name: string; line: number }[] {
+  const out: { chunkId: number; name: string; line: number }[] = [];
+  // chunkIds is parallel to chunks for the leaves we just inserted; parent
+  // chunks (created earlier by `createParentChunks`) sit at the front of
+  // `allEmbedded` when present, so honor whichever length is shorter.
+  const n = Math.min(chunks.length, chunkIds.length);
+  for (let i = 0; i < n; i++) {
+    const refs = chunks[i].references;
+    if (!refs) continue;
+    const chunkId = chunkIds[i];
+    for (const name in refs) {
+      const lines = refs[name];
+      for (const line of lines) {
+        out.push({ chunkId, name, line });
+      }
+    }
+  }
+  return out;
 }
 
 /**
@@ -584,8 +640,40 @@ async function processFileIncremental(
     : aggregateGraphData(chunks);
   db.upsertFileGraph(fileId, graphData.imports, graphData.exports);
 
+  // Re-emit symbol refs from the freshly parsed chunks. Line numbers in
+  // bun-chunk's `references` are absolute-within-file and may have shifted
+  // for kept chunks if surrounding content moved. Rewriting wholesale is
+  // simpler than partial diff and aligns with the line-number reality of
+  // the current file.
+  rewriteSymbolRefsByContentHash(db, fileId, chunks);
+
   onProgress?.(`Indexed (incremental): ${relPath} (${newCount} new, ${chunks.length - newCount} kept)`);
   return "indexed";
+}
+
+/**
+ * Rewrite `symbol_refs` for a file using `content_hash → chunk_id` lookups.
+ * Used by the incremental path where we don't have a parallel array of
+ * chunk ids — the DB already holds the mix of kept-and-new chunks.
+ */
+function rewriteSymbolRefsByContentHash(
+  db: RagDB,
+  fileId: number,
+  chunks: import("./chunker").Chunk[]
+) {
+  const hashToId = db.getChunkIdsByHash(fileId);
+  const refs: { chunkId: number; name: string; line: number }[] = [];
+  for (const chunk of chunks) {
+    if (!chunk.references || !chunk.hash) continue;
+    const chunkId = hashToId.get(chunk.hash);
+    if (chunkId == null) continue;
+    for (const name in chunk.references) {
+      for (const line of chunk.references[name]) {
+        refs.push({ chunkId, name, line });
+      }
+    }
+  }
+  db.upsertSymbolRefs(fileId, refs);
 }
 
 /**
@@ -609,7 +697,8 @@ export async function indexDirectory(
   db: RagDB,
   config: RagConfig,
   onProgress?: (msg: string, opts?: { transient?: boolean }) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options?: { prune?: boolean }
 ): Promise<IndexResult> {
   const result: IndexResult = { indexed: 0, skipped: 0, pruned: 0, errors: [] };
 
@@ -624,6 +713,23 @@ export async function indexDirectory(
   // Canonicalize the base dir to forward-slashes so relative()/resolve()
   // downstream produce paths that compose cleanly with stored ones.
   directory = normalizePath(directory);
+
+  // Funnel concurrent indexers (multiple IDE windows, CLI overlapping with
+  // server) through a process-level lock. Without this, two `processFile`
+  // runs for the same file race past each other's deletes and produce 2×
+  // chunk rows. Reentrant within this process — server can hold the lock
+  // for its lifetime while wrapping its own `indexDirectory` calls.
+  const lock = tryAcquireIndexLock(directory);
+  if (!lock) {
+    const reason = "Another mimirs process owns the index lock for this directory.";
+    result.locked = true;
+    result.lockReason = reason;
+    onProgress?.(`${reason} Skipping indexing in this process.`);
+    log.warn(`Skipping indexing: another mimirs process holds the lock for ${directory}`, "indexer");
+    return result;
+  }
+
+  try {
 
   const matchedFiles = await collectFiles(directory, config, onProgress, onProgress);
 
@@ -665,11 +771,14 @@ export async function indexDirectory(
 
   if (signal?.aborted) return result;
 
-  // Prune files that no longer exist
-  const existingPaths = new Set(matchedFiles);
-  result.pruned = db.pruneDeleted(existingPaths);
-  if (result.pruned > 0) {
-    onProgress?.(`Pruned ${result.pruned} deleted files from index`);
+  if (options?.prune !== false) {
+    // Prune files that no longer exist from full-project index runs. Scoped
+    // re-indexes must not delete every indexed file outside their include set.
+    const existingPaths = new Set(matchedFiles);
+    result.pruned = db.pruneDeleted(existingPaths);
+    if (result.pruned > 0) {
+      onProgress?.(`Pruned ${result.pruned} deleted files from index`);
+    }
   }
 
   // Resolve import paths across all files
@@ -678,7 +787,13 @@ export async function indexDirectory(
     if (resolved > 0) {
       onProgress?.(`Resolved ${resolved} import paths`);
     }
+    // Symbol-level resolution must follow file-level import resolution —
+    // cross-file ref edges depend on `file_imports.resolved_file_id`.
+    db.resolveAllSymbolRefs();
   }
 
   return result;
+  } finally {
+    lock.release();
+  }
 }

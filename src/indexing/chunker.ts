@@ -4,6 +4,10 @@ import { log } from "../utils/log";
 
 export type { ChunkImport, ChunkExport };
 
+/** Identifier references aggregated as `{ name -> sorted unique 0-indexed lines (within file) }`.
+ *  Mirror of bun-chunk's `ChunkReferences` (not re-exported by the package). */
+export type ChunkReferences = Record<string, number[]>;
+
 export interface Chunk {
   text: string;
   index: number;
@@ -17,6 +21,9 @@ export interface Chunk {
   /** AST chunk type (e.g. "method", "field", "class") — available even without exports */
   chunkType?: string;
   hash?: string;
+  /** Identifier references inside this chunk: `{ name -> sorted lines (0-indexed within file) }`.
+   *  From bun-chunk 1.1.0+. Excludes self-declaration and import/export ancestors. */
+  references?: ChunkReferences;
 }
 
 const DEFAULT_CHUNK_SIZE = 512; // in characters
@@ -162,6 +169,7 @@ async function _chunkText(
           if (c.name) chunk.name = c.name;
           if (c.type) chunk.chunkType = c.type;
           if (c.hash) chunk.hash = c.hash;
+          if (c.references && Object.keys(c.references).length > 0) chunk.references = c.references;
           return chunk;
         });
         return {

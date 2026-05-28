@@ -60,10 +60,11 @@ This project has a local RAG index (mimirs). Use these MCP tools:
   dependencies. Use before modifying a shared module to see who depends on it.
 - **\`write_relevant\`**: Before adding new code or docs, find the best insertion
   point — returns the most semantically appropriate file and anchor.
-- **\`generate_wiki\`**: Generate or update a structured markdown wiki for the
-  codebase. Call with \`run: true\` to immediately execute all phases. Follow
-  the returned instructions step by step using the other mimirs tools to
-  build wiki pages in \`wiki/\`.`;
+- **\`wiki\`**: Run the wiki rebuild workflow. Start with
+  \`wiki(command: "shape")\`, follow the returned discovery prompt, validate
+  \`wiki/_discovery.json\` with \`wiki(command: "validate-discovery")\`, then
+  use \`wiki(command: "write")\` and \`wiki(command: "write:page:<slug>")\`
+  to split page writing by slug.`;
 
 const MDC_BLOCK = `${MARKER}
 ---

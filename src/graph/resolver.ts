@@ -250,13 +250,14 @@ function generateFileMap(
     }
   }
 
-  // Identify entry points (no importers)
-  const entryPoints: GraphNode[] = [];
+  // Identify files with no indexed importers. This is structural fan-in,
+  // not necessarily an external application entry point.
+  const noImporterNodes: GraphNode[] = [];
   const otherNodes: GraphNode[] = [];
 
   for (const node of graph.nodes) {
     if (dependedOnBy.get(node.id)!.length === 0) {
-      entryPoints.push(node);
+      noImporterNodes.push(node);
     } else {
       otherNodes.push(node);
     }
@@ -289,9 +290,9 @@ function generateFileMap(
     }
   }
 
-  if (entryPoints.length > 0) {
-    lines.push(`### Entry Points (no importers)`);
-    for (const node of entryPoints) {
+  if (noImporterNodes.length > 0) {
+    lines.push(`### Files With No Importers`);
+    for (const node of noImporterNodes) {
       formatNode(node);
     }
     lines.push("");
@@ -378,7 +379,6 @@ function generateFileMapJson(
     exports: node.exports.map((e) => ({ name: e.name, type: e.type })),
     fanIn: fanIn.get(node.id) ?? 0,
     fanOut: fanOut.get(node.id) ?? 0,
-    isEntryPoint: (fanIn.get(node.id) ?? 0) === 0,
   }));
 
   const edges = graph.edges.map((edge) => ({

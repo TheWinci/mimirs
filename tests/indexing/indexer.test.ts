@@ -90,6 +90,33 @@ describe("indexDirectory", () => {
     expect(db.getStatus().totalFiles).toBe(1);
   });
 
+  test("scoped re-index can skip pruning files outside the scope", async () => {
+    await writeFixture(tempDir, "keep.md", "# Keep");
+    await writeFixture(tempDir, "notes.txt", "Notes");
+
+    await indexDirectory(tempDir, db, defaultConfig);
+    expect(db.getStatus().totalFiles).toBe(2);
+
+    const scopedConfig = { ...defaultConfig, include: ["**/*.md"] };
+    const result = await indexDirectory(tempDir, db, scopedConfig, undefined, undefined, { prune: false });
+
+    expect(result.pruned).toBe(0);
+    expect(db.getStatus().totalFiles).toBe(2);
+  });
+
+  test("reports when another process owns the index lock", async () => {
+    await mkdir(join(tempDir, ".mimirs"), { recursive: true });
+    await writeFile(join(tempDir, ".mimirs", "index.lock"), String(process.ppid));
+
+    const result = await indexDirectory(tempDir, db, defaultConfig);
+
+    expect(result.locked).toBe(true);
+    expect(result.lockReason).toContain("index lock");
+    expect(result.indexed).toBe(0);
+    expect(result.skipped).toBe(0);
+    expect(result.pruned).toBe(0);
+  });
+
   test("handles nested directories", async () => {
     await writeFixture(tempDir, "docs/guide.md", "# Guide");
     await writeFixture(tempDir, "docs/api/ref.md", "# API Reference");

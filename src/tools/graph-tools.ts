@@ -7,7 +7,7 @@ import { type GetDB, resolveProject } from "./index";
 export function registerGraphTools(server: McpServer, getDB: GetDB) {
   server.tool(
     "project_map",
-    "Visualize how files relate to each other — imports, exports, and entry points. Faster than reading import statements across many files. Use 'focus' to zoom into a specific file's neighborhood. Use format 'json' for structured data with fan-in/fan-out metrics. Use search or read_relevant next to explore specific areas of the map.",
+    "Visualize how files relate to each other — imports, exports, and fan-in/fan-out. Faster than reading import statements across many files. Use 'focus' to zoom into a specific file's neighborhood. Use format 'json' for structured data with fan-in/fan-out metrics. Use search or read_relevant next to explore specific areas of the map.",
     {
       directory: z
         .string()
