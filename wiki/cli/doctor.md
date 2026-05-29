@@ -1,133 +1,140 @@
 # CLI: doctor
 
-`mimirs doctor` runs a sequence of checks against the local environment and prints a pass/fail line per check. It exists for one job: when the IDE's MCP client says "Connection closed" with no detail, `doctor` is what the user can run to find out *why* the server crashed.
+`mimirs doctor` runs a set of environment checks that mirror what the MCP server needs to start. The server runs as a background process spawned by your editor, so when it fails to come up there is often nowhere to see the error. `doctor` reproduces the same startup work in the foreground — loading the custom SQLite build, the `sqlite-vec` extension, the database, and the embedding module — and prints a pass/fail line and an actionable fix for each. Run it when the server will not start, when search returns nothing, or right after installing on a new machine.
 
-The command deliberately depends on as little as possible. It must keep working when `bun:sqlite` or `sqlite-vec` can't load — because that's exactly the failure mode it needs to diagnose.
+## Why doctor stays lightweight
 
-## Flow
+The whole point of `doctor` is to be runnable even when the heavy parts of mimirs are broken. Its only top-level import is the CLI logger (`src/cli/commands/doctor.ts:1-4`). Everything that could itself fail to load — the database wrapper, `sqlite-vec`, the embedding module — is pulled in lazily with `require()` inside the individual check functions (`src/cli/commands/doctor.ts:28-29`, `src/cli/commands/doctor.ts:95`, `src/cli/commands/doctor.ts:110`, `src/cli/commands/doctor.ts:122`). Because it never imports the server or `serve` command at module load time, a broken native dependency surfaces as a single failed check with a fix message, instead of crashing the whole command before it can print anything. This is the same reason each check is wrapped so a thrown error becomes a recorded failure rather than an uncaught exception (`src/cli/commands/doctor.ts:137-153`).
+
+## How it works
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User
+    participant User
     participant Cmd as doctorCommand
-    participant Native as bun:sqlite + sqlite-vec
-    participant FS as filesystem
-
+    participant Native as Bun / SQLite / sqlite-vec
+    participant DB as RagDB
+    participant Logs as .mimirs files
     User->>Cmd: mimirs doctor [dir]
-    Cmd->>Cmd: resolve(projectDir)
-    loop each Check
-        Cmd->>Native: require / probe
-        Native-->>Cmd: ok | error
-        Cmd->>User: print "✓ name" or "✗ name\n  detail"
+    Cmd->>Cmd: resolve projectDir, build check list
+    loop each check
+        Cmd->>Native: lazily require + probe
+        Native-->>Cmd: null (pass) or error string (fail)
+        Cmd->>User: print ✓ name or ✗ name + detail
     end
-    Cmd->>FS: read .mimirs/server-error.log (if exists)
-    Cmd->>User: dump crash log
-    Cmd->>FS: read .mimirs/status (if exists)
-    alt status startsWith "error" or "interrupted"
-        Cmd->>User: dump indexing status
-    end
-    alt any check failed
-        Cmd->>User: "N check(s) failed."
-        Cmd-->>User: exit 1
-    else all passed
+    Cmd->>DB: open RagDB, then close
+    Cmd->>Logs: read server-error.log if present
+    Cmd->>Logs: read status file if error/interrupted
+    alt all checks passed
         Cmd->>User: "All checks passed."
+    else some failed
+        Cmd->>User: "N check(s) failed", exit code 1
     end
 ```
 
-1. `doctorCommand` resolves the target dir from `args[1]`, `RAG_PROJECT_DIR`, or `process.cwd()`, in that order (`src/cli/commands/doctor.ts:12`).
-2. It then walks an array of `Check` objects, each with a `run()` that returns either `null` (pass) or an error string (`src/cli/commands/doctor.ts:15-133`).
-3. Each result is printed immediately: `✓ name` for pass, `✗ name` plus an indented detail line for fail. A `try/catch` around `check.run()` makes sure a thrown check never aborts the rest (`src/cli/commands/doctor.ts:137-153`).
-4. After the checks, doctor opportunistically dumps `.mimirs/server-error.log` if it exists, then `.mimirs/status` if its first line is `error` or `interrupted`. This puts the most relevant post-mortem info on screen alongside the checks (`src/cli/commands/doctor.ts:156-175`).
-5. If any check failed, doctor prints a count and exits with code 1; otherwise it prints `"All checks passed."` (`src/cli/commands/doctor.ts:177-183`).
-
-## Why doctor stays decoupled from serve
-
-`src/cli/index.ts:16-18` carries a comment explaining: `serve` is imported dynamically because `src/server/index.ts` has top-level await and native dependencies (`bun:sqlite`, `sqlite-vec`). A static import of `serve` would be a static import of those natives transitively — and that import would crash the whole CLI at module-load time, before `doctor` could even start.
-
-`doctor` itself only imports `fs`, `path`, `os`, and the shared `cli` logger (`src/cli/commands/doctor.ts:1-4`). Inside individual checks it `require()`s the native modules lazily, so a load failure becomes a failed check (with a useful error message) instead of crashing the binary.
-
-This is the asymmetry that keeps doctor useful: every other command imports through `src/cli/index.ts`'s static import graph; only `serve` is gated behind a dynamic import; `doctor` is the recovery surface for when that dynamic import would fail.
-
-## Checks performed
-
-Each check runs in order and is independent.
-
-1. **Bun runtime.** Verifies `typeof Bun !== "undefined"`. Mimirs requires Bun; this catches `node` invocations (`src/cli/commands/doctor.ts:16-22`).
-2. **SQLite (extension-capable).** The interesting check. It `require`s `bun:sqlite` and `sqlite-vec`, and on macOS scans `/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib` and `/usr/local/opt/sqlite/lib/libsqlite3.dylib`. Apple's system SQLite is built without extension support, so without Homebrew SQLite the `sqlite-vec` extension can't load. When neither path exists, doctor returns the actionable fix `'run "brew install sqlite" and restart your editor.'` Otherwise it calls `Database.setCustomSQLite(found)`, opens `:memory:`, loads `sqlite-vec`, and asserts `vec_version()` returns a string. On Linux failure the fix line points at `libsqlite3-dev` / `sqlite-devel` (`src/cli/commands/doctor.ts:23-64`).
-3. **Project directory.** Confirms the resolved path exists on disk (`src/cli/commands/doctor.ts:66-71`).
-4. **`.rag directory writable`.** Picks the same data dir mimirs would (`RAG_DB_DIR` env, else `<dir>/.mimirs`), makes it, writes a probe file, then deletes it. On failure the message points at `RAG_DB_DIR` as the fix (`src/cli/commands/doctor.ts:72-90`).
-5. **Database opens.** Lazy-requires `RagDB` and constructs it for the resolved dir, then closes. This is the integration test that ties together SQLite, sqlite-vec, the file system, and the migration code (`src/cli/commands/doctor.ts:91-103`).
-6. **`sqlite-vec` extension.** A redundant but cheap sanity check that the npm package is installed and exports a `load` function. Different failure surface than check 2 — this one fires when the package is missing entirely, not when the extension fails to load against SQLite (`src/cli/commands/doctor.ts:104-117`).
-7. **Embedding model.** Imports `../../embeddings/embed` and asserts the `embed` export is a function. The actual model download is async and not exercised here — the check is "the module loads cleanly" (`src/cli/commands/doctor.ts:118-132`).
-
-## Output sections
-
-After the check list, doctor inspects two files inside `.mimirs/`:
-
-- **`.mimirs/server-error.log`** — written by `serveCommand` on module-load failure and by `startServer` on startup failure. When present, doctor prints it wrapped in `--- Recent crash log (.mimirs/server-error.log) ---` markers (`src/cli/commands/doctor.ts:157-163`, `src/cli/commands/serve.ts:21-47`, `src/server/index.ts:62-86`).
-- **`.mimirs/status`** — written by `serve` and during the first `init` index. Doctor only surfaces it when the first line is `error` or `interrupted`, because `done` and progress lines aren't useful here (`src/cli/commands/doctor.ts:166-175`).
-
-This means doctor can answer three different "what went wrong?" questions in a single run: the static environment (checks), the last load attempt (`server-error.log`), and the last index attempt (`status`).
+1. The target directory is resolved from the first positional argument, falling back to the `RAG_PROJECT_DIR` environment variable and then the current working directory (`src/cli/commands/doctor.ts:12`).
+2. The command defines an ordered list of checks. Each is `{ name, run }`, where `run` returns `null` on success or an error string (often with an indented `Fix:` line) on failure (`src/cli/commands/doctor.ts:6-9`, `src/cli/commands/doctor.ts:15-133`).
+3. It prints a header naming the directory under test (`src/cli/commands/doctor.ts:135`).
+4. It runs each check in order. A `null` result prints `✓ <name>`; a non-null result or a thrown exception prints `✗ <name>` followed by the indented detail, and is recorded as a failure (`src/cli/commands/doctor.ts:137-153`).
+5. After the checks, it looks for a recent crash log at `.mimirs/server-error.log` and, if present, prints its full contents between `--- Recent crash log ---` markers (`src/cli/commands/doctor.ts:156-163`).
+6. It reads the indexing `status` file; if its first line is `error` or `interrupted`, it prints the status block (`src/cli/commands/doctor.ts:166-175`).
+7. If no checks failed it prints `All checks passed.`; otherwise it prints how many failed and exits with code `1` (`src/cli/commands/doctor.ts:177-183`).
 
 ## Inputs
 
-| Input | Source | Notes |
-| --- | --- | --- |
-| `directory` | first positional arg | Resolved with fallbacks: `args[1]` → `RAG_PROJECT_DIR` → `process.cwd()` (`src/cli/commands/doctor.ts:12`). |
-| `RAG_DB_DIR` | env | When set, the writable-dir check probes this path instead of `<dir>/.mimirs` (`src/cli/commands/doctor.ts:75-77`). |
+| name | type | required | description |
+| --- | --- | --- | --- |
+| directory | positional string | no | Project directory to diagnose. Falls back to `RAG_PROJECT_DIR`, then the current working directory, and is resolved to an absolute path (`src/cli/commands/doctor.ts:12`). |
+| `RAG_PROJECT_DIR` | env var | no | Used as the project directory when no positional argument is given (`src/cli/commands/doctor.ts:12`). |
+| `RAG_DB_DIR` | env var | no | When set, the writability probe targets this directory instead of `<projectDir>/.mimirs` (`src/cli/commands/doctor.ts:75-77`). |
 
 ## Outputs
 
-| Output | Where | Notes |
+| output | where it lands / shape / description |
+| --- | --- |
+| Per-check status lines | Printed to stdout: `✓ <name>` for a pass, `✗ <name>` plus an indented detail line for a fail (`src/cli/commands/doctor.ts:142-152`). |
+| Crash log dump | Full contents of `.mimirs/server-error.log` printed between markers when that file exists (`src/cli/commands/doctor.ts:158-163`). |
+| Indexing status dump | The `.mimirs/status` file contents printed when its first line is `error` or `interrupted` (`src/cli/commands/doctor.ts:170-174`). |
+| Summary line | `All checks passed.` or `N check(s) failed. Fix the issues above and retry.` (`src/cli/commands/doctor.ts:178-181`). |
+| Exit code | `0` when all checks pass; `1` (via `process.exit(1)`) when any check fails (`src/cli/commands/doctor.ts:182`). |
+
+## The checks
+
+The checks run in this order. Each reproduces a step the server itself performs at startup.
+
+| Check | What it verifies | Failure / fix |
 | --- | --- | --- |
-| Per-check status line | stdout | `✓ <name>` or `✗ <name>` + indented detail with an actionable fix. |
-| Crash log dump | stdout | Contents of `.mimirs/server-error.log` when present. |
-| Indexing status dump | stdout | Contents of `.mimirs/status` when its first line is `error` or `interrupted`. |
-| Final summary | stdout | `"All checks passed."` or `"N check(s) failed. Fix the issues above and retry."` |
-| Exit code | shell | `0` when everything passes, `1` when any check fails (`src/cli/commands/doctor.ts:181-183`). |
+| Bun runtime | The global `Bun` object exists; mimirs only runs under Bun (`src/cli/commands/doctor.ts:17-21`). | "Bun runtime not detected." |
+| SQLite (extension-capable) | Loads `bun:sqlite` and `sqlite-vec`, opens an in-memory DB, and calls `vec_version()`. On macOS it first locates a Homebrew SQLite dylib and registers it with `Database.setCustomSQLite`, because Apple's bundled SQLite cannot load extensions (`src/cli/commands/doctor.ts:24-63`). | macOS: `brew install sqlite`; Linux: install `libsqlite3-dev` / `sqlite-devel`. |
+| Project directory | The resolved project directory exists on disk (`src/cli/commands/doctor.ts:66-70`). | "Directory does not exist." |
+| .rag directory writable | Creates the data directory (`RAG_DB_DIR` or `<projectDir>/.mimirs`), writes a `.doctor-probe` file, and removes it (`src/cli/commands/doctor.ts:73-89`). | "Cannot write to … Set RAG_DB_DIR to a writable directory." |
+| Database opens | Constructs `RagDB` for the project and closes it, exercising the real database initialization path (`src/cli/commands/doctor.ts:92-102`). | "Database failed to open: …" |
+| sqlite-vec extension | Independently requires the `sqlite-vec` module and confirms it exposes a `load` function (`src/cli/commands/doctor.ts:105-116`). | "sqlite-vec module not found … Fix: bun install sqlite-vec". |
+| Embedding model | Requires the embedding module and confirms `embed` is a function. It does not download or run the model — that happens asynchronously at real use (`src/cli/commands/doctor.ts:119-131`). | "Embedding module failed to load: …" |
+
+Note that the SQLite extension capability is verified twice from different angles: the "SQLite (extension-capable)" check actually loads `sqlite-vec` into a live database and queries it, while the later "sqlite-vec extension" check only confirms the module imports and exposes `load`. The embedding check is deliberately shallow — it checks the module shape, not a real embedding call, so it stays fast and offline-safe (`src/cli/commands/doctor.ts:126`).
+
+## Relationship to .mimirs/server-error.log and the status file
+
+Because the MCP server runs detached, an uncaught startup error is written to `.mimirs/server-error.log` rather than your terminal. `doctor` reads that file after running its checks and prints it verbatim, so a crash that happened during a real server launch shows up alongside the live check results (`src/cli/commands/doctor.ts:157-163`). It also inspects the indexing `status` file: only when the first line is `error` or `interrupted` does it print the block, surfacing a stalled or failed index without noise during a healthy run (`src/cli/commands/doctor.ts:166-175`). Both reads are best-effort — if the files are absent, that section is simply skipped.
+
+## State changes
+
+`doctor` is essentially read-only, with one transient exception. The "Database opens" check constructs `RagDB`, which can create or migrate the database on first open, and the writability probe creates the data directory if it does not exist (`src/cli/commands/doctor.ts:80`, `src/cli/commands/doctor.ts:96`). The probe file `.doctor-probe` is written and immediately deleted, so it leaves no residue (`src/cli/commands/doctor.ts:81-83`).
 
 ## Branches and failure cases
 
-- **Bun missing.** First check fails fast; subsequent checks that need `require` of native modules may still run but will likely fail too.
-- **macOS without Homebrew SQLite.** The most common failure mode. The SQLite check returns a fix string ending with `brew install sqlite` and the user is expected to restart their editor afterwards.
-- **DB lock from running server.** The `RagDB` open check may fail with `SQLITE_BUSY` when an IDE-launched server already holds the DB. The error string is shown; the fix is usually to close the IDE window briefly.
-- **No `.mimirs/` directory yet.** Doctor still runs — the writable-dir check will create one as part of the probe. No crash log and no status block are printed in this case.
-- **Crash log from previous failure.** Even when all checks pass, doctor will still print an old `server-error.log` if one exists. Treat it as historical context; delete the file once resolved.
+- **No directory argument:** falls back to `RAG_PROJECT_DIR`, then `process.cwd()` (`src/cli/commands/doctor.ts:12`).
+- **Bun missing:** `typeof Bun === "undefined"` returns the Bun error string (`src/cli/commands/doctor.ts:19`).
+- **macOS without Homebrew SQLite:** no dylib found in the known paths, so the check returns the `brew install sqlite` message before opening any database (`src/cli/commands/doctor.ts:36-42`).
+- **sqlite-vec loads but `vec_version()` returns nothing:** reported as "SQLite loaded but sqlite-vec didn't initialize properly." (`src/cli/commands/doctor.ts:51`).
+- **SQLite load throws:** the catch branch tailors the fix message per platform — macOS suggests `brew install sqlite`, Linux suggests the dev package, others get the raw message (`src/cli/commands/doctor.ts:53-61`).
+- **Project directory absent:** reported with the resolved path (`src/cli/commands/doctor.ts:68`).
+- **Data directory not writable:** the probe write fails and the error code (or message) is surfaced with the `RAG_DB_DIR` hint (`src/cli/commands/doctor.ts:85-87`).
+- **`RAG_DB_DIR` set:** the writability probe targets that resolved directory instead of `<projectDir>/.mimirs` (`src/cli/commands/doctor.ts:75-77`).
+- **Database open fails:** the `RagDB` constructor error is reported (`src/cli/commands/doctor.ts:99-100`).
+- **sqlite-vec module missing or missing `load`:** reported with the `bun install sqlite-vec` fix (`src/cli/commands/doctor.ts:111-114`).
+- **Embedding module fails to load or lacks `embed`:** reported as an embedding-module failure (`src/cli/commands/doctor.ts:123-129`).
+- **A check throws unexpectedly:** the wrapper catches it, records a failure, and continues with the remaining checks (`src/cli/commands/doctor.ts:148-153`).
+- **Any failure at the end:** prints the failure count and calls `process.exit(1)`; all-pass prints `All checks passed.` with the default exit code (`src/cli/commands/doctor.ts:178-182`).
 
 ## Example
 
 ```bash
+# Diagnose the current project
 mimirs doctor
-# mimirs doctor — checking /Users/me/repos/foo
-#
-#   ✓ Bun runtime
-#   ✗ SQLite (extension-capable)
-#     Homebrew SQLite not found. Apple's bundled SQLite doesn't support extensions.
-#         Fix: run "brew install sqlite" and restart your editor.
-#
-#   ✓ Project directory
-#   ✓ .rag directory writable
-#   ✗ Database opens
-#     Database failed to open: <details>
-#   ...
-#
-# --- Recent crash log (.mimirs/server-error.log) ---
-# mimirs server module failed to load at 2026-05-27T13:21:09.000Z
-# ...
-# --- end ---
-#
-# 2 check(s) failed. Fix the issues above and retry.
+
+# Diagnose a specific project
+mimirs doctor /path/to/project
 ```
+
+Illustrative output on a macOS machine missing the Homebrew SQLite build:
+
+```
+mimirs doctor — checking /path/to/project
+
+  ✓ Bun runtime
+  ✗ SQLite (extension-capable)
+    Homebrew SQLite not found. Apple's bundled SQLite doesn't support extensions.
+    Fix: run "brew install sqlite" and restart your editor.
+
+  ✓ Project directory
+  ✓ .rag directory writable
+  ...
+
+1 check(s) failed. Fix the issues above and retry.
+```
+
+## Related commands
+
+- [cli/serve](./serve.md) — starts the MCP server whose startup these checks reproduce.
+- [server/start](../server/start.md) — the server lifecycle that produces `.mimirs/server-error.log` on failure.
+- [tools/server-info](../tools/server-info.md) — the tool that reports server health once it is running.
 
 ## Key source files
 
-- `src/cli/commands/doctor.ts` — every check; the entire flow lives here.
-- `src/cli/index.ts:16-18` — the comment that documents why `serve` is dynamic and `doctor` is not.
-- `src/cli/commands/serve.ts:21-47` — writer of `.mimirs/server-error.log` for module-load failures.
-- `src/server/index.ts:62-86` — writer of `.mimirs/server-error.log` for startup failures.
-
-## Related flows
-
-- [CLI: serve](serve.md) — the command whose failures doctor exists to explain.
-- [tools/server-info](../tools/server-info.md) — equivalent diagnostic when the server *is* running.
+- `src/cli/commands/doctor.ts` — the entire command: the check definitions, the runner loop, the crash-log and status reads, and the exit code.
+- `src/db/` — the `RagDB` wrapper exercised by the "Database opens" check.
+- `src/embeddings/embed.ts` — the embedding module whose `embed` export the embedding check validates.
+- `src/utils/log.ts` — the `cli` logger used for all output.

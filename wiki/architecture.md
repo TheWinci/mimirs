@@ -1,73 +1,71 @@
 # Architecture
 
-This page is a bird's-eye view of mimirs: how the pieces fit together at runtime, what crosses which boundary, and which invariants the code relies on. It's for someone trying to add a feature or debug an end-to-end issue who needs a map before diving into a flow page.
+This page is the orientation map for anyone changing mimirs. It explains the two ways callers reach the system, the shared services every entry point delegates to, and the cross-cutting concerns — the embedding model, the per-project SQLite database, the index lock, and the status/error files — that hold it together. Per-feature behavior lives on the individual flow pages; this page is about how the pieces connect and where to cut in when you need to change them.
 
-## Two front doors, one store
+## Two front doors, one database
 
-mimirs is reached through two surfaces. The MCP stdio server (`src/server/index.ts:88-256`) is what an editor like Claude Code or Cursor talks to over a JSON-RPC pipe; the `mimirs` CLI is what a human uses from a shell. Both end up in the same place: a per-project SQLite file at `.mimirs/index.db`, opened by `RagDB` (`src/db/index.ts:89-123`). The CLI bootstraps each subcommand by constructing `RagDB` directly. The server keeps a per-directory cache of open DBs (`src/server/index.ts:23-51`) so background tasks like the watcher can keep using a connection across many tool calls without re-opening it.
+mimirs exposes the same capabilities two ways. The **MCP stdio server** is the door an editor or agent uses: `startServer` builds an `McpServer`, registers every tool, and connects a `StdioServerTransport` (`src/server/index.ts:181-207`). The **CLI** is the door a human uses from a terminal; each subcommand under `src/cli/commands/` constructs its own `RagDB` and calls the same service functions. Both doors read and write the same store: a per-project SQLite database at `.mimirs/index.db`, opened by the `RagDB` class (`src/db/index.ts:89-123`).
+
+Because both doors share one database file, neither owns it exclusively. The server keeps a `RagDB` per project directory in a long-lived `dbMap` and never closes a connection mid-session, because background indexing and the file watcher may still hold it; connections close only on process exit (`src/server/index.ts:20-51`, `src/server/index.ts:140-150`). The CLI opens, uses, and exits. The reconciliation between concurrent writers is the index lock, described below.
 
 ```mermaid
-flowchart LR
-  Editor[Editor / MCP client] -- stdio --> Server[src/server/index.ts]
-  User[Shell user] --> CLI[src/cli/index.ts]
-  Server --> Tools[src/tools/index.ts]
-  CLI --> Commands[src/cli/commands/*]
-  Tools --> Indexer[src/indexing/indexer.ts]
-  Tools --> Hybrid[src/search/hybrid.ts]
-  Tools --> GraphSvc[src/graph/resolver.ts]
-  Tools --> ConvSvc[src/conversation/indexer.ts]
-  Tools --> GitSvc[src/git/indexer.ts]
-  Tools --> WikiSvc[src/wiki/rebuild.ts]
-  Commands --> Indexer
-  Commands --> Hybrid
-  Indexer --> Embed[src/embeddings/embed.ts]
-  Hybrid --> Embed
-  Indexer --> DB[(RagDB / .mimirs/index.db)]
-  Hybrid --> DB
-  ConvSvc --> DB
-  GitSvc --> DB
-  GraphSvc --> DB
+graph TD
+  editor[Editor / Agent] -->|MCP stdio| srv[startServer<br>src/server/index.ts]
+  human[Terminal user] -->|argv| cli[CLI commands<br>src/cli/commands/*]
+  srv -->|registerAllTools| reg[Tool registry<br>src/tools/index.ts]
+  reg --> svc[Shared services]
+  cli --> svc
+  svc --> idx[Indexer<br>src/indexing/indexer.ts]
+  svc --> hyb[Hybrid search<br>src/search/hybrid.ts]
+  svc --> emb[Embeddings<br>src/embeddings/embed.ts]
+  idx --> emb
+  hyb --> emb
+  idx --> db[(RagDB / SQLite<br>src/db/index.ts)]
+  hyb --> db
+  svc --> db
+  srv -->|tryAcquireIndexLock| lock[index.lock<br>src/utils/index-lock.ts]
+  srv -->|writeStatus| statusfile[.mimirs/status]
+  srv -->|writeStartupError| errlog[.mimirs/server-error.log]
 ```
 
-The contract that lets both front doors share the same code is `resolveProject` in `src/tools/index.ts:21-37`. Tool handlers receive a `directory` argument, `resolveProject` turns it into an absolute path, opens or returns a cached DB, loads the project config, and applies the embedding model from that config. CLI commands do the same three steps inline (see `src/cli/commands/init.ts:31-32` for the pattern). The contract is: nothing downstream of `resolveProject` is allowed to assume a process-wide project.
+## The tool registry seam
 
-## Tools as thin handlers
+Every MCP tool is registered from one place. `registerAllTools` calls one `registerXTools` function per tool family, passing the same `getDB` accessor, the optional connected-DB lister, and the `writeStatus` callback (`src/tools/index.ts:39-56`). Each family module (search, indexing, graph, conversation, checkpoints, annotations, analytics, git, git history, server info, wiki) registers its tools against the `McpServer` and is otherwise independent.
 
-The MCP toolbox is one file per topic under `src/tools/`, glued together by `registerAllTools` in `src/tools/index.ts:39-56`. Each handler does the same shape: parse a Zod schema, call `resolveProject`, dispatch to a service module, return text content. The search tool is typical — `src/tools/search.ts` validates inputs and delegates to `search()` in `src/search/hybrid.ts:313-397`. Indexing handlers (`src/tools/index-tools.ts:7-92`) call `indexDirectory` from `src/indexing/indexer.ts:695-799`. The boundary is sharp: tools never touch SQL or globs; services never construct MCP responses.
+This is the seam to edit when adding a capability. To add a new tool family, write a `registerYTools(server, getDB)` module under `src/tools/`, then add one import plus one call inside `registerAllTools`. Every handler shares one contract: it receives an optional `directory` param and resolves it through `resolveProject`, which validates the path exists, loads config, applies the embedding config, and returns `{ projectDir, db, config }` (`src/tools/index.ts:21-37`). Handlers should not open databases or load config themselves; they go through `resolveProject` so the project-resolution and embedding-setup rules stay in one place.
 
-See [search](tools/search.md) and [index_files](tools/index-files.md) for the per-tool detail.
+## Shared services behind both doors
 
-## Cross-cutting embeddings
+Tool handlers and CLI commands are thin. The real work lives in services that both doors call.
 
-`src/embeddings/embed.ts` is a singleton used by every service that needs a vector. The indexer calls it when chunking files (`src/indexing/indexer.ts:741-742` eagerly loads the model so status reflects model-load progress before file progress starts). The search code calls it once per query (`src/search/hybrid.ts:323`). Annotations and checkpoints embed their text at write time, and the git-history indexer embeds commit messages. Because the model is a singleton, changing `config.embeddingModel` only takes effect after a restart — `applyEmbeddingConfig` runs once per `resolveProject` and reconfigures the embedder for the rest of the process lifetime.
+The **indexer** turns files into searchable rows. `indexDirectory` scans the project, chunks and parses each file, embeds the chunks, and upserts `files` and `chunks` rows; with `prune: true` it also removes rows for files that no longer match the include patterns (`src/indexing/indexer.ts`, called from `src/tools/index-tools.ts:31-53`). The `index_files` tool passes `prune: !patterns` so a full re-index prunes deleted files but a pattern-scoped refresh leaves the rest of the index untouched (`src/tools/index-tools.ts:24-53`). See [index_files](tools/index-files.md) for the full per-call behavior.
 
-## The index lock invariant
+The **hybrid search** service answers code-lookup queries. `search` embeds the query, runs a vector search and a BM25 full-text search, merges the two scores, deduplicates by file, expands exact symbol matches, applies path/filename/graph boosts, and returns ranked files (`src/search/hybrid.ts:313-397`). The dependency-graph boost reads importer counts straight from the database, so search quality depends on the indexer having populated the graph (`src/search/hybrid.ts:301-311`). The `search` tool is a thin wrapper that builds a `PathFilter` from the `extensions`/`dirs`/`excludeDirs` params and formats the ranked results (`src/tools/search.ts:31-99`). See [search](tools/search.md).
 
-Multiple mimirs servers can be alive against the same project — one per IDE window is normal. Without coordination, two concurrent `indexDirectory` calls on the same file race past each other's deletes and double-insert chunk rows (`src/utils/index-lock.ts:17-27`). The defense is a process-level lock at `.mimirs/index.lock`, acquired by `tryAcquireIndexLock` (`src/utils/index-lock.ts:28-65`). The lock contains the holding PID; stale locks (PID gone) are reclaimed automatically; reentrant within one process via the `heldLocks` refcount so the server can hold the lock for its lifetime and also wrap each manual `indexDirectory` call.
+The same database object also serves the graph, conversation, checkpoint, annotation, analytics, git, and wiki services — each backed by its own store module under `src/db/`. The `RagDB` class composes all of those store modules (`src/db/index.ts:9-17`), which is why it has a fan-in of more than fifty: nearly every command, tool, and test reaches the database through it.
 
-The server tries to acquire it during boot (`src/server/index.ts:269-277`). Lock holders run the indexer and watcher; non-holders write `mode: query-only` to the status file and keep serving search/read tools against whatever the lock holder has produced. `indexDirectory` itself also tries to acquire the lock at `src/indexing/indexer.ts:722-730`, so the safety holds even when an MCP tool call drives indexing directly.
+## Embeddings as a cross-cutting dependency
 
-There is a one-time self-repair path that exists because earlier versions ran without this lock: `RagDB.dedupeChunks` (`src/db/index.ts:421-472`) collapses duplicate `(file_id, chunk_index, content_hash)` rows and clears `files.hash` on affected files so the next indexer pass re-emits them cleanly.
+Both the indexer and the search service depend on the same embedding model. Chunks are embedded at index time; the query is embedded at search time; the two must use the same model and vector dimension or the vectors are not comparable. The embedder lives in `src/embeddings/embed.ts`, which exposes `embed` for single strings and `embedBatch`/`embedBatchMerged` for indexing throughput, plus `configureEmbedder` and `getEmbeddingDim` (`src/embeddings/embed.ts:35-202`). The database reads the active dimension from `getEmbeddingDim()` when it creates the vector table (`src/db/index.ts:3`), and `resolveProject` calls `applyEmbeddingConfig(config)` before any tool runs so the model the index was built with is the model used to query it (`src/tools/index.ts:34-36`). When changing embedding behavior, treat the model id and dimension as a contract spanning the indexer, the search service, and the schema — not a local detail of one module.
 
-## Observability via files, not endpoints
+## The process-level index lock
 
-mimirs is an stdio process — there is no HTTP port to scrape. External observers (IDEs, the `mimirs doctor` CLI, the user's own scripts) read two files under `.mimirs/`:
+Multiple mimirs servers can target the same project — one MCP server per editor window is common. If two of them index concurrently they race past each other and double-insert chunk rows. The guard is a process-level lock. On startup, after the transport is connected, the server calls `tryAcquireIndexLock(startupDir)`; only the holder runs the background indexer and file watcher, and any other instance announces `mode: query-only` and serves reads against the existing index (`src/server/index.ts:266-352`).
 
-- `status` is rewritten throughout boot and on every watcher event. Boot phases are visible at `src/server/index.ts:110`, `179`, `190`, `205`, `207`. Watcher progress is written at `src/server/index.ts:339-346`. Exit reasons land via `writeExitStatus` at `src/server/index.ts:119-138`, including `interrupted` on SIGINT/SIGTERM/SIGHUP, `stdin closed`, or `uncaught exception`.
-- `server-error.log` is written by `writeStartupError` (`src/server/index.ts:62-86`) when something blows up before transport connect — exactly the case where the MCP client only sees `Connection closed` with no details.
+The lock is a PID file at `.mimirs/index.lock`. `tryAcquireIndexLock` reclaims a stale lock when the recorded PID is no longer alive, refuses when a live process holds it (returns `null`), and is reentrant within one process via a per-directory refcount so the server can hold it for its lifetime while `indexDirectory` also wraps each run (`src/utils/index-lock.ts:28-89`). The invariant is: at most one process writes the index for a given project at a time; everyone else reads. When touching indexing concurrency, keep that invariant — the lock, not SQLite's `busy_timeout`, is what prevents duplicate chunks. The `index_files` tool surfaces a lock miss explicitly, returning an "Indexing skipped" message and still answering from the existing index (`src/tools/index-tools.ts:66-81`).
 
-The `server_info` tool (`src/tools/server-info-tools.ts:12-75`) is the in-band version of the same idea: project dir, db dir, embedding model, active config, all open DBs and their last-active times.
+## Status file and error log for observability
 
-## How a search call hangs together
+The server's lifecycle is observable from outside the process through two files under `.mimirs/`. The **status file** is written at every boot phase by the `writeStatus` closure, which stamps the line with `pid:<n>` so an instance only ever overwrites its own status (`src/server/index.ts:100-110`). It moves through `starting` (with sub-phases: creating server, tools registered, connecting transport, transport connected), then either `done` with version, indexed/skipped/pruned counts, file/chunk totals, and watcher progress, or `error` with the failure (`src/server/index.ts:179-210`, `src/server/index.ts:322-348`). On shutdown, `writeExitStatus` writes `interrupted` with a reason — but only if this instance still owns the file and it has not already reached `done`/`error`, so a fresh instance's status is never clobbered (`src/server/index.ts:119-138`).
 
-The search flow is a good worked example of the whole stack. `src/tools/search.ts` accepts a query and optional path filters, `resolveProject` opens the DB and configures the embedder, and `search()` in `src/search/hybrid.ts:313-397` runs a hybrid vector + FTS query against `RagDB`, blends scores via `mergeHybridScores`, applies path/filename/graph boosts, and writes a `query_log` row through `db.logQuery` at `src/search/hybrid.ts:386-394`. That row is what powers the `search_analytics` tool later. The store side of the same flow is `src/db/analytics.ts:3-8`.
+The **error log** captures crashes that would otherwise be invisible. If tool registration or transport connection throws, `writeStartupError` writes `.mimirs/server-error.log` with the message, stack, and a `bunx mimirs doctor` hint, because a client that loses the stdio pipe sees only "Connection closed" with no detail (`src/server/index.ts:62-86`, `src/server/index.ts:191-211`). When DB open fails, the code distinguishes transient errors (`database is locked`, `SQLITE_BUSY`) — which are not cached, so the next tool call retries — from permanent ones like missing SQLite or a read-only filesystem, which are cached in `permanentError` so every later tool call returns a clear fix instead of failing opaquely (`src/server/index.ts:214-256`, `src/server/index.ts:34-37`). These files, plus `getConnectedDBs`, are what the server-info tooling reports. The full boot sequence is on [mimirs serve](server/start.md) and [mimirs serve (CLI)](cli/serve.md).
 
 ## Key source files
 
-- `src/server/index.ts` — MCP stdio entry; status file, signal handlers, DB cache, lock acquisition, background indexer and watcher, conversation tail.
-- `src/tools/index.ts` — tool registration and the `resolveProject` contract that both front doors share.
-- `src/indexing/indexer.ts` — full-project and per-file indexing pipeline; takes the same lock as the server.
-- `src/search/hybrid.ts` — hybrid vector + FTS search, score blending, analytics logging.
-- `src/db/index.ts` — `RagDB` class and the SQLite schema (files, chunks, vec/FTS virtual tables, annotations, checkpoints, conversation, git_commits).
-- `src/utils/index-lock.ts` — process-level lock that protects the indexer from itself.
-- `src/tools/server-info-tools.ts` — in-band observability surface.
+- `src/server/index.ts` — MCP server boot: tool registration, transport connect, status/error files, index lock acquisition, background indexing, conversation tailing, shutdown cleanup.
+- `src/tools/index.ts` — the tool registry seam (`registerAllTools`) and the shared `resolveProject` contract.
+- `src/indexing/indexer.ts` — `indexDirectory`/`indexFile`: scans, chunks, embeds, and upserts/prunes file and chunk rows.
+- `src/search/hybrid.ts` — `search`/`searchChunks`: hybrid vector + BM25 ranking with symbol expansion and graph boost; logs each query for analytics.
+- `src/db/index.ts` — `RagDB`: the per-project SQLite store composing every store module; the single point both front doors read and write.
+- `src/utils/index-lock.ts` — `tryAcquireIndexLock`: the PID-file lock that funnels indexing through one process.
+- `src/embeddings/embed.ts` — the embedding model shared by indexing and search; owner of model id and vector dimension.

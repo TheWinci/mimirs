@@ -1,8 +1,8 @@
 {
   "metadata": {
     "schemaVersion": 1,
-    "prefetchCommitHash": "1f890ef82613a5409b4dc6174f13b199e01eb622",
-    "createdAt": "2026-05-27T16:00:00.000Z"
+    "prefetchCommitHash": "df9ea0e221bdc7a130083a67a477d983983d75f6",
+    "createdAt": "2026-05-28T18:55:00.000Z"
   },
   "flows": [
     {
@@ -11,16 +11,38 @@
       "kind": "tool",
       "summary": "Hybrid vector + FTS file-level discovery with path and extension filters; returns ranked file paths with snippet previews.",
       "confidence": "high",
-      "entrypoints": ["search"],
+      "entrypoints": [
+        "search"
+      ],
       "files": [
-        { "path": "src/tools/search.ts", "role": "handler" },
-        { "path": "src/search/hybrid.ts", "role": "service" },
-        { "path": "src/db/index.ts", "role": "store" },
-        { "path": "src/embeddings/embed.ts", "role": "service" }
+        {
+          "path": "src/tools/search.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/search/hybrid.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        },
+        {
+          "path": "src/embeddings/embed.ts",
+          "role": "service"
+        }
       ],
       "evidence": [
-        { "path": "src/tools/search.ts", "startLine": 32, "endLine": 99 },
-        { "path": "src/search/hybrid.ts", "startLine": 380, "endLine": 395 }
+        {
+          "path": "src/tools/search.ts",
+          "startLine": 32,
+          "endLine": 99
+        },
+        {
+          "path": "src/search/hybrid.ts",
+          "startLine": 380,
+          "endLine": 395
+        }
       ],
       "stateChanges": [
         {
@@ -30,16 +52,34 @@
           "trigger": "search tool invocation completes",
           "description": "Each search call writes an analytics row used by search_analytics.",
           "files": [
-            { "path": "src/search/hybrid.ts", "role": "writer" },
-            { "path": "src/db/analytics.ts", "role": "store" }
+            {
+              "path": "src/search/hybrid.ts",
+              "role": "writer"
+            },
+            {
+              "path": "src/db/analytics.ts",
+              "role": "store"
+            }
           ],
           "evidence": [
-            { "path": "src/search/hybrid.ts", "startLine": 385, "endLine": 395 },
-            { "path": "src/db/analytics.ts", "startLine": 1, "endLine": 20 }
+            {
+              "path": "src/search/hybrid.ts",
+              "startLine": 385,
+              "endLine": 395
+            },
+            {
+              "path": "src/db/analytics.ts",
+              "startLine": 1,
+              "endLine": 20
+            }
           ]
         }
       ],
-      "relatedFlows": ["flow-tool-read-relevant", "flow-tool-search-symbols", "flow-tool-search-analytics"]
+      "relatedFlows": [
+        "flow-tool-read-relevant",
+        "flow-tool-search-symbols",
+        "flow-tool-search-analytics"
+      ]
     },
     {
       "id": "flow-tool-read-relevant",
@@ -47,15 +87,33 @@
       "kind": "tool",
       "summary": "Returns ranked chunk bodies with exact line ranges plus inline annotations, instead of just file paths.",
       "confidence": "high",
-      "entrypoints": ["read_relevant"],
+      "entrypoints": [
+        "read_relevant"
+      ],
       "files": [
-        { "path": "src/tools/search.ts", "role": "handler" },
-        { "path": "src/search/hybrid.ts", "role": "service" },
-        { "path": "src/db/index.ts", "role": "store" },
-        { "path": "src/db/annotations.ts", "role": "store" }
+        {
+          "path": "src/tools/search.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/search/hybrid.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        },
+        {
+          "path": "src/db/annotations.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/tools/search.ts", "startLine": 101, "endLine": 216 }
+        {
+          "path": "src/tools/search.ts",
+          "startLine": 101,
+          "endLine": 216
+        }
       ],
       "stateChanges": [
         {
@@ -65,31 +123,59 @@
           "trigger": "read_relevant tool invocation completes",
           "description": "Like search, read_relevant logs each chunk-level query for analytics.",
           "files": [
-            { "path": "src/search/hybrid.ts", "role": "writer" },
-            { "path": "src/db/analytics.ts", "role": "store" }
+            {
+              "path": "src/search/hybrid.ts",
+              "role": "writer"
+            },
+            {
+              "path": "src/db/analytics.ts",
+              "role": "store"
+            }
           ],
           "evidence": [
-            { "path": "src/search/hybrid.ts", "startLine": 540, "endLine": 555 }
+            {
+              "path": "src/search/hybrid.ts",
+              "startLine": 540,
+              "endLine": 555
+            }
           ]
         }
       ],
-      "relatedFlows": ["flow-tool-search", "flow-tool-get-annotations"]
+      "relatedFlows": [
+        "flow-tool-search",
+        "flow-tool-get-annotations"
+      ]
     },
     {
       "id": "flow-tool-search-symbols",
       "title": "MCP tool: search_symbols",
       "kind": "tool",
-      "summary": "Direct symbol-name lookup against the persisted symbol table — finds functions, classes, types by name without semantic search.",
+      "summary": "Direct symbol-name lookup against the persisted symbol table \u2014 finds functions, classes, types by name without semantic search.",
       "confidence": "high",
-      "entrypoints": ["search_symbols"],
+      "entrypoints": [
+        "search_symbols"
+      ],
       "files": [
-        { "path": "src/tools/search.ts", "role": "handler" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/tools/search.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/tools/search.ts", "startLine": 218, "endLine": 275 }
+        {
+          "path": "src/tools/search.ts",
+          "startLine": 218,
+          "endLine": 275
+        }
       ],
-      "relatedFlows": ["flow-tool-find-usages", "flow-tool-search"]
+      "relatedFlows": [
+        "flow-tool-find-usages",
+        "flow-tool-search"
+      ]
     },
     {
       "id": "flow-tool-write-relevant",
@@ -97,16 +183,33 @@
       "kind": "tool",
       "summary": "Suggests the best existing file and anchor in which to add new code or documentation.",
       "confidence": "high",
-      "entrypoints": ["write_relevant"],
+      "entrypoints": [
+        "write_relevant"
+      ],
       "files": [
-        { "path": "src/tools/search.ts", "role": "handler" },
-        { "path": "src/search/hybrid.ts", "role": "service" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/tools/search.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/search/hybrid.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/tools/search.ts", "startLine": 276, "endLine": 345 }
+        {
+          "path": "src/tools/search.ts",
+          "startLine": 276,
+          "endLine": 345
+        }
       ],
-      "relatedFlows": ["flow-tool-read-relevant"]
+      "relatedFlows": [
+        "flow-tool-read-relevant"
+      ]
     },
     {
       "id": "flow-tool-index-files",
@@ -114,15 +217,33 @@
       "kind": "tool",
       "summary": "Re-indexes the project (or a glob subset) through the indexing pipeline; prunes deleted files when no patterns are passed.",
       "confidence": "high",
-      "entrypoints": ["index_files"],
+      "entrypoints": [
+        "index_files"
+      ],
       "files": [
-        { "path": "src/tools/index-tools.ts", "role": "handler" },
-        { "path": "src/indexing/indexer.ts", "role": "service" },
-        { "path": "src/utils/index-lock.ts", "role": "service" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/tools/index-tools.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/indexing/indexer.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/utils/index-lock.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/tools/index-tools.ts", "startLine": 7, "endLine": 92 }
+        {
+          "path": "src/tools/index-tools.ts",
+          "startLine": 7,
+          "endLine": 92
+        }
       ],
       "stateChanges": [
         {
@@ -132,11 +253,21 @@
           "trigger": "index_files invocation",
           "description": "indexDirectory upserts file/chunk rows and, when prune=true, removes rows whose files no longer match include patterns.",
           "files": [
-            { "path": "src/indexing/indexer.ts", "role": "writer" },
-            { "path": "src/db/index.ts", "role": "store" }
+            {
+              "path": "src/indexing/indexer.ts",
+              "role": "writer"
+            },
+            {
+              "path": "src/db/index.ts",
+              "role": "store"
+            }
           ],
           "evidence": [
-            { "path": "src/tools/index-tools.ts", "startLine": 24, "endLine": 65 }
+            {
+              "path": "src/tools/index-tools.ts",
+              "startLine": 24,
+              "endLine": 65
+            }
           ]
         },
         {
@@ -146,14 +277,25 @@
           "trigger": "index_files invocation",
           "description": "Indexer progress callback writes per-file percentages to the status file.",
           "files": [
-            { "path": "src/tools/index-tools.ts", "role": "writer" }
+            {
+              "path": "src/tools/index-tools.ts",
+              "role": "writer"
+            }
           ],
           "evidence": [
-            { "path": "src/tools/index-tools.ts", "startLine": 31, "endLine": 64 }
+            {
+              "path": "src/tools/index-tools.ts",
+              "startLine": 31,
+              "endLine": 64
+            }
           ]
         }
       ],
-      "relatedFlows": ["flow-tool-index-status", "flow-tool-remove-file", "flow-server-start"]
+      "relatedFlows": [
+        "flow-tool-index-status",
+        "flow-tool-remove-file",
+        "flow-server-start"
+      ]
     },
     {
       "id": "flow-tool-index-status",
@@ -161,15 +303,30 @@
       "kind": "tool",
       "summary": "Reports indexed file count, chunk count, and last-indexed timestamp for the current project.",
       "confidence": "high",
-      "entrypoints": ["index_status"],
+      "entrypoints": [
+        "index_status"
+      ],
       "files": [
-        { "path": "src/tools/index-tools.ts", "role": "handler" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/tools/index-tools.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/tools/index-tools.ts", "startLine": 94, "endLine": 116 }
+        {
+          "path": "src/tools/index-tools.ts",
+          "startLine": 94,
+          "endLine": 116
+        }
       ],
-      "relatedFlows": ["flow-tool-index-files", "flow-tool-server-info"]
+      "relatedFlows": [
+        "flow-tool-index-files",
+        "flow-tool-server-info"
+      ]
     },
     {
       "id": "flow-tool-remove-file",
@@ -177,13 +334,25 @@
       "kind": "tool",
       "summary": "Removes a single file's rows from the index without re-indexing the whole project.",
       "confidence": "high",
-      "entrypoints": ["remove_file"],
+      "entrypoints": [
+        "remove_file"
+      ],
       "files": [
-        { "path": "src/tools/index-tools.ts", "role": "handler" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/tools/index-tools.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/tools/index-tools.ts", "startLine": 118, "endLine": 143 }
+        {
+          "path": "src/tools/index-tools.ts",
+          "startLine": 118,
+          "endLine": 143
+        }
       ],
       "stateChanges": [
         {
@@ -193,14 +362,24 @@
           "trigger": "remove_file with a path",
           "description": "db.removeFile deletes the file row and cascades to chunks, symbols, and dependency edges.",
           "files": [
-            { "path": "src/db/index.ts", "role": "store" }
+            {
+              "path": "src/db/index.ts",
+              "role": "store"
+            }
           ],
           "evidence": [
-            { "path": "src/tools/index-tools.ts", "startLine": 128, "endLine": 140 }
+            {
+              "path": "src/tools/index-tools.ts",
+              "startLine": 128,
+              "endLine": 140
+            }
           ]
         }
       ],
-      "relatedFlows": ["flow-tool-index-files", "flow-cli-remove"]
+      "relatedFlows": [
+        "flow-tool-index-files",
+        "flow-cli-remove"
+      ]
     },
     {
       "id": "flow-tool-project-map",
@@ -208,16 +387,35 @@
       "kind": "tool",
       "summary": "Builds a focused dependency-graph view around a file or directory, in text or JSON form.",
       "confidence": "high",
-      "entrypoints": ["project_map"],
+      "entrypoints": [
+        "project_map"
+      ],
       "files": [
-        { "path": "src/tools/graph-tools.ts", "role": "handler" },
-        { "path": "src/graph/resolver.ts", "role": "service" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/tools/graph-tools.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/graph/resolver.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/tools/graph-tools.ts", "startLine": 8, "endLine": 51 }
+        {
+          "path": "src/tools/graph-tools.ts",
+          "startLine": 8,
+          "endLine": 51
+        }
       ],
-      "relatedFlows": ["flow-tool-depends-on", "flow-tool-depended-on-by", "flow-cli-map"]
+      "relatedFlows": [
+        "flow-tool-depends-on",
+        "flow-tool-depended-on-by",
+        "flow-cli-map"
+      ]
     },
     {
       "id": "flow-tool-find-usages",
@@ -225,15 +423,30 @@
       "kind": "tool",
       "summary": "Resolves every call site of a symbol via the persisted symbol-reference tables and groups them by file.",
       "confidence": "high",
-      "entrypoints": ["find_usages"],
+      "entrypoints": [
+        "find_usages"
+      ],
       "files": [
-        { "path": "src/tools/graph-tools.ts", "role": "handler" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/tools/graph-tools.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/tools/graph-tools.ts", "startLine": 53, "endLine": 107 }
+        {
+          "path": "src/tools/graph-tools.ts",
+          "startLine": 53,
+          "endLine": 107
+        }
       ],
-      "relatedFlows": ["flow-tool-search-symbols", "flow-tool-depended-on-by"]
+      "relatedFlows": [
+        "flow-tool-search-symbols",
+        "flow-tool-depended-on-by"
+      ]
     },
     {
       "id": "flow-tool-depends-on",
@@ -241,15 +454,30 @@
       "kind": "tool",
       "summary": "Lists files imported by a given file (outgoing dependencies) using stored import edges.",
       "confidence": "high",
-      "entrypoints": ["depends_on"],
+      "entrypoints": [
+        "depends_on"
+      ],
       "files": [
-        { "path": "src/tools/graph-tools.ts", "role": "handler" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/tools/graph-tools.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/tools/graph-tools.ts", "startLine": 109, "endLine": 140 }
+        {
+          "path": "src/tools/graph-tools.ts",
+          "startLine": 109,
+          "endLine": 140
+        }
       ],
-      "relatedFlows": ["flow-tool-depended-on-by", "flow-tool-project-map"]
+      "relatedFlows": [
+        "flow-tool-depended-on-by",
+        "flow-tool-project-map"
+      ]
     },
     {
       "id": "flow-tool-depended-on-by",
@@ -257,15 +485,30 @@
       "kind": "tool",
       "summary": "Lists files that import a given file (reverse dependencies / blast radius).",
       "confidence": "high",
-      "entrypoints": ["depended_on_by"],
+      "entrypoints": [
+        "depended_on_by"
+      ],
       "files": [
-        { "path": "src/tools/graph-tools.ts", "role": "handler" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/tools/graph-tools.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/tools/graph-tools.ts", "startLine": 142, "endLine": 173 }
+        {
+          "path": "src/tools/graph-tools.ts",
+          "startLine": 142,
+          "endLine": 173
+        }
       ],
-      "relatedFlows": ["flow-tool-depends-on", "flow-tool-find-usages"]
+      "relatedFlows": [
+        "flow-tool-depends-on",
+        "flow-tool-find-usages"
+      ]
     },
     {
       "id": "flow-tool-annotate",
@@ -273,14 +516,29 @@
       "kind": "tool",
       "summary": "Attaches a persistent note to a file or symbol; embedded so it can surface inline during read_relevant.",
       "confidence": "high",
-      "entrypoints": ["annotate"],
+      "entrypoints": [
+        "annotate"
+      ],
       "files": [
-        { "path": "src/tools/annotation-tools.ts", "role": "handler" },
-        { "path": "src/embeddings/embed.ts", "role": "service" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/tools/annotation-tools.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/embeddings/embed.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/tools/annotation-tools.ts", "startLine": 8, "endLine": 39 }
+        {
+          "path": "src/tools/annotation-tools.ts",
+          "startLine": 8,
+          "endLine": 39
+        }
       ],
       "stateChanges": [
         {
@@ -290,32 +548,64 @@
           "trigger": "annotate invocation",
           "description": "upsertAnnotation embeds the note text and writes or replaces the row keyed by path + symbol.",
           "files": [
-            { "path": "src/tools/annotation-tools.ts", "role": "writer" },
-            { "path": "src/db/index.ts", "role": "store" }
+            {
+              "path": "src/tools/annotation-tools.ts",
+              "role": "writer"
+            },
+            {
+              "path": "src/db/index.ts",
+              "role": "store"
+            }
           ],
           "evidence": [
-            { "path": "src/tools/annotation-tools.ts", "startLine": 27, "endLine": 38 }
+            {
+              "path": "src/tools/annotation-tools.ts",
+              "startLine": 27,
+              "endLine": 38
+            }
           ]
         }
       ],
-      "relatedFlows": ["flow-tool-get-annotations", "flow-tool-delete-annotation", "flow-tool-read-relevant"]
+      "relatedFlows": [
+        "flow-tool-get-annotations",
+        "flow-tool-delete-annotation",
+        "flow-tool-read-relevant"
+      ]
     },
     {
       "id": "flow-tool-get-annotations",
       "title": "MCP tool: get_annotations",
       "kind": "tool",
-      "summary": "Retrieves persistent notes by path, by semantic query, or both — used to surface caveats before editing.",
+      "summary": "Retrieves persistent notes by path, by semantic query, or both \u2014 used to surface caveats before editing.",
       "confidence": "high",
-      "entrypoints": ["get_annotations"],
+      "entrypoints": [
+        "get_annotations"
+      ],
       "files": [
-        { "path": "src/tools/annotation-tools.ts", "role": "handler" },
-        { "path": "src/embeddings/embed.ts", "role": "service" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/tools/annotation-tools.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/embeddings/embed.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/tools/annotation-tools.ts", "startLine": 41, "endLine": 88 }
+        {
+          "path": "src/tools/annotation-tools.ts",
+          "startLine": 41,
+          "endLine": 88
+        }
       ],
-      "relatedFlows": ["flow-tool-annotate", "flow-tool-delete-annotation"]
+      "relatedFlows": [
+        "flow-tool-annotate",
+        "flow-tool-delete-annotation"
+      ]
     },
     {
       "id": "flow-tool-delete-annotation",
@@ -323,13 +613,25 @@
       "kind": "tool",
       "summary": "Removes a single annotation by id once the underlying bug or constraint is gone.",
       "confidence": "high",
-      "entrypoints": ["delete_annotation"],
+      "entrypoints": [
+        "delete_annotation"
+      ],
       "files": [
-        { "path": "src/tools/annotation-tools.ts", "role": "handler" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/tools/annotation-tools.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/tools/annotation-tools.ts", "startLine": 90, "endLine": 114 }
+        {
+          "path": "src/tools/annotation-tools.ts",
+          "startLine": 90,
+          "endLine": 114
+        }
       ],
       "stateChanges": [
         {
@@ -339,14 +641,24 @@
           "trigger": "delete_annotation with an id",
           "description": "db.deleteAnnotation removes the row, after which it no longer surfaces in read_relevant.",
           "files": [
-            { "path": "src/db/index.ts", "role": "store" }
+            {
+              "path": "src/db/index.ts",
+              "role": "store"
+            }
           ],
           "evidence": [
-            { "path": "src/tools/annotation-tools.ts", "startLine": 100, "endLine": 113 }
+            {
+              "path": "src/tools/annotation-tools.ts",
+              "startLine": 100,
+              "endLine": 113
+            }
           ]
         }
       ],
-      "relatedFlows": ["flow-tool-annotate", "flow-tool-get-annotations"]
+      "relatedFlows": [
+        "flow-tool-annotate",
+        "flow-tool-get-annotations"
+      ]
     },
     {
       "id": "flow-tool-create-checkpoint",
@@ -354,15 +666,33 @@
       "kind": "tool",
       "summary": "Saves a checkpoint row (decision/milestone/blocker/etc.) tagged to the current session and turn, with embedded summary for later search.",
       "confidence": "high",
-      "entrypoints": ["create_checkpoint"],
+      "entrypoints": [
+        "create_checkpoint"
+      ],
       "files": [
-        { "path": "src/tools/checkpoint-tools.ts", "role": "handler" },
-        { "path": "src/conversation/parser.ts", "role": "service" },
-        { "path": "src/embeddings/embed.ts", "role": "service" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/tools/checkpoint-tools.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/conversation/parser.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/embeddings/embed.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/tools/checkpoint-tools.ts", "startLine": 8, "endLine": 78 }
+        {
+          "path": "src/tools/checkpoint-tools.ts",
+          "startLine": 8,
+          "endLine": 78
+        }
       ],
       "stateChanges": [
         {
@@ -372,15 +702,29 @@
           "trigger": "create_checkpoint invocation",
           "description": "db.createCheckpoint persists the checkpoint and its embedding so future sessions can list and semantically search it.",
           "files": [
-            { "path": "src/tools/checkpoint-tools.ts", "role": "writer" },
-            { "path": "src/db/index.ts", "role": "store" }
+            {
+              "path": "src/tools/checkpoint-tools.ts",
+              "role": "writer"
+            },
+            {
+              "path": "src/db/index.ts",
+              "role": "store"
+            }
           ],
           "evidence": [
-            { "path": "src/tools/checkpoint-tools.ts", "startLine": 34, "endLine": 60 }
+            {
+              "path": "src/tools/checkpoint-tools.ts",
+              "startLine": 34,
+              "endLine": 60
+            }
           ]
         }
       ],
-      "relatedFlows": ["flow-tool-list-checkpoints", "flow-tool-search-checkpoints", "flow-cli-checkpoint"]
+      "relatedFlows": [
+        "flow-tool-list-checkpoints",
+        "flow-tool-search-checkpoints",
+        "flow-cli-checkpoint"
+      ]
     },
     {
       "id": "flow-tool-list-checkpoints",
@@ -388,15 +732,30 @@
       "kind": "tool",
       "summary": "Lists checkpoints across sessions, most recent first, with optional session and type filters.",
       "confidence": "high",
-      "entrypoints": ["list_checkpoints"],
+      "entrypoints": [
+        "list_checkpoints"
+      ],
       "files": [
-        { "path": "src/tools/checkpoint-tools.ts", "role": "handler" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/tools/checkpoint-tools.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/tools/checkpoint-tools.ts", "startLine": 80, "endLine": 118 }
+        {
+          "path": "src/tools/checkpoint-tools.ts",
+          "startLine": 80,
+          "endLine": 118
+        }
       ],
-      "relatedFlows": ["flow-tool-create-checkpoint", "flow-tool-search-checkpoints"]
+      "relatedFlows": [
+        "flow-tool-create-checkpoint",
+        "flow-tool-search-checkpoints"
+      ]
     },
     {
       "id": "flow-tool-search-checkpoints",
@@ -404,16 +763,34 @@
       "kind": "tool",
       "summary": "Semantic search over checkpoint titles and summaries using stored embeddings.",
       "confidence": "high",
-      "entrypoints": ["search_checkpoints"],
+      "entrypoints": [
+        "search_checkpoints"
+      ],
       "files": [
-        { "path": "src/tools/checkpoint-tools.ts", "role": "handler" },
-        { "path": "src/embeddings/embed.ts", "role": "service" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/tools/checkpoint-tools.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/embeddings/embed.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/tools/checkpoint-tools.ts", "startLine": 120, "endLine": 158 }
+        {
+          "path": "src/tools/checkpoint-tools.ts",
+          "startLine": 120,
+          "endLine": 158
+        }
       ],
-      "relatedFlows": ["flow-tool-create-checkpoint", "flow-tool-list-checkpoints"]
+      "relatedFlows": [
+        "flow-tool-create-checkpoint",
+        "flow-tool-list-checkpoints"
+      ]
     },
     {
       "id": "flow-tool-search-conversation",
@@ -421,16 +798,34 @@
       "kind": "tool",
       "summary": "Hybrid vector + BM25 search over indexed Claude Code conversation turns, with optional session filter.",
       "confidence": "high",
-      "entrypoints": ["search_conversation"],
+      "entrypoints": [
+        "search_conversation"
+      ],
       "files": [
-        { "path": "src/tools/conversation-tools.ts", "role": "handler" },
-        { "path": "src/embeddings/embed.ts", "role": "service" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/tools/conversation-tools.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/embeddings/embed.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/tools/conversation-tools.ts", "startLine": 8, "endLine": 87 }
+        {
+          "path": "src/tools/conversation-tools.ts",
+          "startLine": 8,
+          "endLine": 87
+        }
       ],
-      "relatedFlows": ["flow-server-start", "flow-cli-conversation"]
+      "relatedFlows": [
+        "flow-server-start",
+        "flow-cli-conversation"
+      ]
     },
     {
       "id": "flow-tool-search-analytics",
@@ -438,15 +833,31 @@
       "kind": "tool",
       "summary": "Aggregates the search_queries log into totals, zero-result and low-score query lists, and top searched terms.",
       "confidence": "high",
-      "entrypoints": ["search_analytics"],
+      "entrypoints": [
+        "search_analytics"
+      ],
       "files": [
-        { "path": "src/tools/analytics-tools.ts", "role": "handler" },
-        { "path": "src/db/analytics.ts", "role": "store" }
+        {
+          "path": "src/tools/analytics-tools.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/db/analytics.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/tools/analytics-tools.ts", "startLine": 6, "endLine": 60 }
+        {
+          "path": "src/tools/analytics-tools.ts",
+          "startLine": 6,
+          "endLine": 60
+        }
       ],
-      "relatedFlows": ["flow-tool-search", "flow-tool-read-relevant", "flow-cli-analytics"]
+      "relatedFlows": [
+        "flow-tool-search",
+        "flow-tool-read-relevant",
+        "flow-cli-analytics"
+      ]
     },
     {
       "id": "flow-tool-git-context",
@@ -454,15 +865,30 @@
       "kind": "tool",
       "summary": "Runs git status/log/diff to summarise uncommitted changes, recent commits, and changed files, annotating each path with index status.",
       "confidence": "high",
-      "entrypoints": ["git_context"],
+      "entrypoints": [
+        "git_context"
+      ],
       "files": [
-        { "path": "src/tools/git-tools.ts", "role": "handler" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/tools/git-tools.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/tools/git-tools.ts", "startLine": 21, "endLine": 102 }
+        {
+          "path": "src/tools/git-tools.ts",
+          "startLine": 21,
+          "endLine": 102
+        }
       ],
-      "relatedFlows": ["flow-tool-search-commits", "flow-tool-file-history"]
+      "relatedFlows": [
+        "flow-tool-search-commits",
+        "flow-tool-file-history"
+      ]
     },
     {
       "id": "flow-tool-search-commits",
@@ -470,16 +896,34 @@
       "kind": "tool",
       "summary": "Hybrid vector + FTS search across indexed git commit history with author/date/path filters.",
       "confidence": "high",
-      "entrypoints": ["search_commits"],
+      "entrypoints": [
+        "search_commits"
+      ],
       "files": [
-        { "path": "src/tools/git-history-tools.ts", "role": "handler" },
-        { "path": "src/embeddings/embed.ts", "role": "service" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/tools/git-history-tools.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/embeddings/embed.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/tools/git-history-tools.ts", "startLine": 34, "endLine": 109 }
+        {
+          "path": "src/tools/git-history-tools.ts",
+          "startLine": 34,
+          "endLine": 109
+        }
       ],
-      "relatedFlows": ["flow-tool-file-history", "flow-cli-history"]
+      "relatedFlows": [
+        "flow-tool-file-history",
+        "flow-cli-history"
+      ]
     },
     {
       "id": "flow-tool-file-history",
@@ -487,15 +931,30 @@
       "kind": "tool",
       "summary": "Returns indexed commits that touched a given file, newest first, without invoking git.",
       "confidence": "high",
-      "entrypoints": ["file_history"],
+      "entrypoints": [
+        "file_history"
+      ],
       "files": [
-        { "path": "src/tools/git-history-tools.ts", "role": "handler" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/tools/git-history-tools.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/tools/git-history-tools.ts", "startLine": 111, "endLine": 142 }
+        {
+          "path": "src/tools/git-history-tools.ts",
+          "startLine": 111,
+          "endLine": 142
+        }
       ],
-      "relatedFlows": ["flow-tool-search-commits", "flow-tool-git-context"]
+      "relatedFlows": [
+        "flow-tool-search-commits",
+        "flow-tool-git-context"
+      ]
     },
     {
       "id": "flow-tool-server-info",
@@ -503,17 +962,39 @@
       "kind": "tool",
       "summary": "Reports resolved project dir, DB location, index status, embedding model, active config, and connected DBs.",
       "confidence": "high",
-      "entrypoints": ["server_info"],
+      "entrypoints": [
+        "server_info"
+      ],
       "files": [
-        { "path": "src/tools/server-info-tools.ts", "role": "handler" },
-        { "path": "src/config/index.ts", "role": "service" },
-        { "path": "src/embeddings/embed.ts", "role": "service" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/tools/server-info-tools.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/config/index.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/embeddings/embed.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/tools/server-info-tools.ts", "startLine": 12, "endLine": 75 }
+        {
+          "path": "src/tools/server-info-tools.ts",
+          "startLine": 12,
+          "endLine": 75
+        }
       ],
-      "relatedFlows": ["flow-tool-index-status", "flow-server-start", "flow-cli-doctor"]
+      "relatedFlows": [
+        "flow-tool-index-status",
+        "flow-server-start",
+        "flow-cli-doctor"
+      ]
     },
     {
       "id": "flow-tool-wiki",
@@ -521,15 +1002,34 @@
       "kind": "tool",
       "summary": "Runs a step of the wiki rebuild workflow (shape, prefetch, discovery, validate, write) selected via colon selectors.",
       "confidence": "high",
-      "entrypoints": ["wiki"],
+      "entrypoints": [
+        "wiki"
+      ],
       "files": [
-        { "path": "src/tools/wiki-tools.ts", "role": "handler" },
-        { "path": "src/wiki/rebuild.ts", "role": "service" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/tools/wiki-tools.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/wiki/rebuild.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/tools/wiki-tools.ts", "startLine": 23, "endLine": 56 },
-        { "path": "src/wiki/rebuild.ts", "startLine": 920, "endLine": 988 }
+        {
+          "path": "src/tools/wiki-tools.ts",
+          "startLine": 23,
+          "endLine": 56
+        },
+        {
+          "path": "src/wiki/rebuild.ts",
+          "startLine": 920,
+          "endLine": 988
+        }
       ],
       "stateChanges": [
         {
@@ -539,11 +1039,22 @@
           "trigger": "wiki(prefetch) / wiki(discovery) / wiki(validate-discovery)",
           "description": "The rebuild driver writes the prefetch JSON, then accepts a discovery JSON and validates its shape and referenced paths.",
           "files": [
-            { "path": "src/wiki/rebuild.ts", "role": "writer" }
+            {
+              "path": "src/wiki/rebuild.ts",
+              "role": "writer"
+            }
           ],
           "evidence": [
-            { "path": "src/wiki/rebuild.ts", "startLine": 300, "endLine": 380 },
-            { "path": "src/wiki/rebuild.ts", "startLine": 656, "endLine": 753 }
+            {
+              "path": "src/wiki/rebuild.ts",
+              "startLine": 300,
+              "endLine": 380
+            },
+            {
+              "path": "src/wiki/rebuild.ts",
+              "startLine": 656,
+              "endLine": 753
+            }
           ]
         }
       ],
@@ -555,15 +1066,33 @@
       "kind": "command",
       "summary": "Creates default .mimirs/config.json, registers MCP config snippets for selected IDEs, and optionally runs the first index.",
       "confidence": "high",
-      "entrypoints": ["init"],
+      "entrypoints": [
+        "init"
+      ],
       "files": [
-        { "path": "src/cli/commands/init.ts", "role": "entrypoint" },
-        { "path": "src/cli/setup.ts", "role": "service" },
-        { "path": "src/indexing/indexer.ts", "role": "service" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/cli/commands/init.ts",
+          "role": "entrypoint"
+        },
+        {
+          "path": "src/cli/setup.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/indexing/indexer.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/cli/commands/init.ts", "startLine": 10, "endLine": 88 }
+        {
+          "path": "src/cli/commands/init.ts",
+          "startLine": 10,
+          "endLine": 88
+        }
       ],
       "stateChanges": [
         {
@@ -573,10 +1102,17 @@
           "trigger": "mimirs init",
           "description": "runSetup writes the project's default config, IDE MCP snippets, and ensures .mimirs/ is gitignored.",
           "files": [
-            { "path": "src/cli/setup.ts", "role": "writer" }
+            {
+              "path": "src/cli/setup.ts",
+              "role": "writer"
+            }
           ],
           "evidence": [
-            { "path": "src/cli/commands/init.ts", "startLine": 14, "endLine": 26 }
+            {
+              "path": "src/cli/commands/init.ts",
+              "startLine": 14,
+              "endLine": 26
+            }
           ]
         },
         {
@@ -586,15 +1122,29 @@
           "trigger": "user confirms 'Index project now?'",
           "description": "When confirmed, init calls indexDirectory to perform the first full index.",
           "files": [
-            { "path": "src/indexing/indexer.ts", "role": "writer" },
-            { "path": "src/db/index.ts", "role": "store" }
+            {
+              "path": "src/indexing/indexer.ts",
+              "role": "writer"
+            },
+            {
+              "path": "src/db/index.ts",
+              "role": "store"
+            }
           ],
           "evidence": [
-            { "path": "src/cli/commands/init.ts", "startLine": 29, "endLine": 86 }
+            {
+              "path": "src/cli/commands/init.ts",
+              "startLine": 29,
+              "endLine": 86
+            }
           ]
         }
       ],
-      "relatedFlows": ["flow-cli-index", "flow-cli-serve", "flow-cli-cleanup"]
+      "relatedFlows": [
+        "flow-cli-index",
+        "flow-cli-serve",
+        "flow-cli-cleanup"
+      ]
     },
     {
       "id": "flow-cli-index",
@@ -602,14 +1152,29 @@
       "kind": "command",
       "summary": "Indexes files in a directory with terminal progress; supports --patterns for partial refresh and --verbose for per-file output.",
       "confidence": "high",
-      "entrypoints": ["index"],
+      "entrypoints": [
+        "index"
+      ],
       "files": [
-        { "path": "src/cli/commands/index-cmd.ts", "role": "entrypoint" },
-        { "path": "src/indexing/indexer.ts", "role": "service" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/cli/commands/index-cmd.ts",
+          "role": "entrypoint"
+        },
+        {
+          "path": "src/indexing/indexer.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/cli/commands/index-cmd.ts", "startLine": 1, "endLine": 48 }
+        {
+          "path": "src/cli/commands/index-cmd.ts",
+          "startLine": 1,
+          "endLine": 48
+        }
       ],
       "stateChanges": [
         {
@@ -619,15 +1184,28 @@
           "trigger": "mimirs index [dir]",
           "description": "indexDirectory does an incremental update of all matching files and prunes outdated rows.",
           "files": [
-            { "path": "src/indexing/indexer.ts", "role": "writer" },
-            { "path": "src/db/index.ts", "role": "store" }
+            {
+              "path": "src/indexing/indexer.ts",
+              "role": "writer"
+            },
+            {
+              "path": "src/db/index.ts",
+              "role": "store"
+            }
           ],
           "evidence": [
-            { "path": "src/cli/commands/index-cmd.ts", "startLine": 1, "endLine": 48 }
+            {
+              "path": "src/cli/commands/index-cmd.ts",
+              "startLine": 1,
+              "endLine": 48
+            }
           ]
         }
       ],
-      "relatedFlows": ["flow-tool-index-files", "flow-cli-init"]
+      "relatedFlows": [
+        "flow-tool-index-files",
+        "flow-cli-init"
+      ]
     },
     {
       "id": "flow-cli-search",
@@ -635,33 +1213,69 @@
       "kind": "command",
       "summary": "Runs a hybrid vector + FTS query from the shell and prints the top file matches with snippets.",
       "confidence": "high",
-      "entrypoints": ["search"],
+      "entrypoints": [
+        "search"
+      ],
       "files": [
-        { "path": "src/cli/commands/search-cmd.ts", "role": "entrypoint" },
-        { "path": "src/search/hybrid.ts", "role": "service" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/cli/commands/search-cmd.ts",
+          "role": "entrypoint"
+        },
+        {
+          "path": "src/search/hybrid.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/cli/commands/search-cmd.ts", "startLine": 1, "endLine": 89 }
+        {
+          "path": "src/cli/commands/search-cmd.ts",
+          "startLine": 1,
+          "endLine": 89
+        }
       ],
-      "relatedFlows": ["flow-tool-search", "flow-cli-read"]
+      "relatedFlows": [
+        "flow-tool-search",
+        "flow-cli-read"
+      ]
     },
     {
       "id": "flow-cli-read",
       "title": "CLI: mimirs read",
       "kind": "command",
-      "summary": "CLI counterpart to read_relevant — prints ranked chunk content with exact line ranges.",
+      "summary": "CLI counterpart to read_relevant \u2014 prints ranked chunk content with exact line ranges.",
       "confidence": "high",
-      "entrypoints": ["read"],
+      "entrypoints": [
+        "read"
+      ],
       "files": [
-        { "path": "src/cli/commands/search-cmd.ts", "role": "entrypoint" },
-        { "path": "src/search/hybrid.ts", "role": "service" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/cli/commands/search-cmd.ts",
+          "role": "entrypoint"
+        },
+        {
+          "path": "src/search/hybrid.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/cli/commands/search-cmd.ts", "startLine": 1, "endLine": 89 }
+        {
+          "path": "src/cli/commands/search-cmd.ts",
+          "startLine": 1,
+          "endLine": 89
+        }
       ],
-      "relatedFlows": ["flow-tool-read-relevant", "flow-cli-search"]
+      "relatedFlows": [
+        "flow-tool-read-relevant",
+        "flow-cli-search"
+      ]
     },
     {
       "id": "flow-cli-serve",
@@ -669,16 +1283,34 @@
       "kind": "command",
       "summary": "Bootstraps the MCP stdio server; delegates to startServer for tool registration, transport, and background indexing.",
       "confidence": "high",
-      "entrypoints": ["serve"],
+      "entrypoints": [
+        "serve"
+      ],
       "files": [
-        { "path": "src/cli/commands/serve.ts", "role": "entrypoint" },
-        { "path": "src/server/index.ts", "role": "service" }
+        {
+          "path": "src/cli/commands/serve.ts",
+          "role": "entrypoint"
+        },
+        {
+          "path": "src/server/index.ts",
+          "role": "service"
+        }
       ],
       "evidence": [
-        { "path": "src/cli/commands/serve.ts", "startLine": 1, "endLine": 53 },
-        { "path": "src/cli/index.ts", "startLine": 92, "endLine": 96 }
+        {
+          "path": "src/cli/commands/serve.ts",
+          "startLine": 1,
+          "endLine": 53
+        },
+        {
+          "path": "src/cli/index.ts",
+          "startLine": 92,
+          "endLine": 96
+        }
       ],
-      "relatedFlows": ["flow-server-start"]
+      "relatedFlows": [
+        "flow-server-start"
+      ]
     },
     {
       "id": "flow-cli-status",
@@ -686,15 +1318,30 @@
       "kind": "command",
       "summary": "Prints index totals (files, chunks, last-indexed) for the given project directory.",
       "confidence": "high",
-      "entrypoints": ["status"],
+      "entrypoints": [
+        "status"
+      ],
       "files": [
-        { "path": "src/cli/commands/status.ts", "role": "entrypoint" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/cli/commands/status.ts",
+          "role": "entrypoint"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/cli/commands/status.ts", "startLine": 1, "endLine": 14 }
+        {
+          "path": "src/cli/commands/status.ts",
+          "startLine": 1,
+          "endLine": 14
+        }
       ],
-      "relatedFlows": ["flow-tool-index-status", "flow-tool-server-info"]
+      "relatedFlows": [
+        "flow-tool-index-status",
+        "flow-tool-server-info"
+      ]
     },
     {
       "id": "flow-cli-cleanup",
@@ -702,12 +1349,21 @@
       "kind": "command",
       "summary": "Removes mimirs artifacts: the .mimirs/ data directory, the instructions block in agent files, and the MCP server entry in IDE configs.",
       "confidence": "high",
-      "entrypoints": ["cleanup"],
+      "entrypoints": [
+        "cleanup"
+      ],
       "files": [
-        { "path": "src/cli/commands/cleanup.ts", "role": "entrypoint" }
+        {
+          "path": "src/cli/commands/cleanup.ts",
+          "role": "entrypoint"
+        }
       ],
       "evidence": [
-        { "path": "src/cli/commands/cleanup.ts", "startLine": 1, "endLine": 170 }
+        {
+          "path": "src/cli/commands/cleanup.ts",
+          "startLine": 1,
+          "endLine": 170
+        }
       ],
       "stateChanges": [
         {
@@ -717,14 +1373,23 @@
           "trigger": "mimirs cleanup",
           "description": "cleanup deletes the .mimirs data directory, strips the mimirs instructions block from agent files, and removes the mimirs MCP entry from IDE config files.",
           "files": [
-            { "path": "src/cli/commands/cleanup.ts", "role": "writer" }
+            {
+              "path": "src/cli/commands/cleanup.ts",
+              "role": "writer"
+            }
           ],
           "evidence": [
-            { "path": "src/cli/commands/cleanup.ts", "startLine": 15, "endLine": 100 }
+            {
+              "path": "src/cli/commands/cleanup.ts",
+              "startLine": 15,
+              "endLine": 100
+            }
           ]
         }
       ],
-      "relatedFlows": ["flow-cli-init"]
+      "relatedFlows": [
+        "flow-cli-init"
+      ]
     },
     {
       "id": "flow-cli-doctor",
@@ -732,14 +1397,27 @@
       "kind": "command",
       "summary": "Diagnoses MCP server startup: checks for native modules, SQLite availability, embedding model load, and prints actionable fixes.",
       "confidence": "high",
-      "entrypoints": ["doctor"],
+      "entrypoints": [
+        "doctor"
+      ],
       "files": [
-        { "path": "src/cli/commands/doctor.ts", "role": "entrypoint" }
+        {
+          "path": "src/cli/commands/doctor.ts",
+          "role": "entrypoint"
+        }
       ],
       "evidence": [
-        { "path": "src/cli/commands/doctor.ts", "startLine": 1, "endLine": 184 }
+        {
+          "path": "src/cli/commands/doctor.ts",
+          "startLine": 1,
+          "endLine": 184
+        }
       ],
-      "relatedFlows": ["flow-cli-serve", "flow-server-start", "flow-tool-server-info"]
+      "relatedFlows": [
+        "flow-cli-serve",
+        "flow-server-start",
+        "flow-tool-server-info"
+      ]
     },
     {
       "id": "flow-cli-demo",
@@ -747,16 +1425,34 @@
       "kind": "command",
       "summary": "Runs an interactive feature demo against a small sample to show search/read/map output shapes.",
       "confidence": "medium",
-      "entrypoints": ["demo"],
+      "entrypoints": [
+        "demo"
+      ],
       "files": [
-        { "path": "src/cli/commands/demo.ts", "role": "entrypoint" },
-        { "path": "src/search/hybrid.ts", "role": "service" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/cli/commands/demo.ts",
+          "role": "entrypoint"
+        },
+        {
+          "path": "src/search/hybrid.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/cli/commands/demo.ts", "startLine": 1, "endLine": 126 }
+        {
+          "path": "src/cli/commands/demo.ts",
+          "startLine": 1,
+          "endLine": 126
+        }
       ],
-      "relatedFlows": ["flow-cli-search", "flow-cli-map"]
+      "relatedFlows": [
+        "flow-cli-search",
+        "flow-cli-map"
+      ]
     },
     {
       "id": "flow-cli-map",
@@ -764,16 +1460,33 @@
       "kind": "command",
       "summary": "Generates a project dependency graph from the CLI in Mermaid (or focused) format.",
       "confidence": "high",
-      "entrypoints": ["map"],
+      "entrypoints": [
+        "map"
+      ],
       "files": [
-        { "path": "src/cli/commands/map.ts", "role": "entrypoint" },
-        { "path": "src/graph/resolver.ts", "role": "service" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/cli/commands/map.ts",
+          "role": "entrypoint"
+        },
+        {
+          "path": "src/graph/resolver.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/cli/commands/map.ts", "startLine": 1, "endLine": 20 }
+        {
+          "path": "src/cli/commands/map.ts",
+          "startLine": 1,
+          "endLine": 20
+        }
       ],
-      "relatedFlows": ["flow-tool-project-map"]
+      "relatedFlows": [
+        "flow-tool-project-map"
+      ]
     },
     {
       "id": "flow-cli-remove",
@@ -781,13 +1494,25 @@
       "kind": "command",
       "summary": "Removes a single file from the index via the CLI.",
       "confidence": "high",
-      "entrypoints": ["remove"],
+      "entrypoints": [
+        "remove"
+      ],
       "files": [
-        { "path": "src/cli/commands/remove.ts", "role": "entrypoint" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/cli/commands/remove.ts",
+          "role": "entrypoint"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/cli/commands/remove.ts", "startLine": 1, "endLine": 16 }
+        {
+          "path": "src/cli/commands/remove.ts",
+          "startLine": 1,
+          "endLine": 16
+        }
       ],
       "stateChanges": [
         {
@@ -797,14 +1522,23 @@
           "trigger": "mimirs remove <file>",
           "description": "db.removeFile deletes the file row and associated chunks.",
           "files": [
-            { "path": "src/db/index.ts", "role": "store" }
+            {
+              "path": "src/db/index.ts",
+              "role": "store"
+            }
           ],
           "evidence": [
-            { "path": "src/cli/commands/remove.ts", "startLine": 1, "endLine": 16 }
+            {
+              "path": "src/cli/commands/remove.ts",
+              "startLine": 1,
+              "endLine": 16
+            }
           ]
         }
       ],
-      "relatedFlows": ["flow-tool-remove-file"]
+      "relatedFlows": [
+        "flow-tool-remove-file"
+      ]
     },
     {
       "id": "flow-cli-history",
@@ -812,14 +1546,29 @@
       "kind": "command",
       "summary": "Subcommand group for git history: `history index` populates the commit table, `history search` queries it, `history status` reports counts.",
       "confidence": "high",
-      "entrypoints": ["history"],
+      "entrypoints": [
+        "history"
+      ],
       "files": [
-        { "path": "src/cli/commands/history.ts", "role": "entrypoint" },
-        { "path": "src/git/indexer.ts", "role": "service" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/cli/commands/history.ts",
+          "role": "entrypoint"
+        },
+        {
+          "path": "src/git/indexer.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/cli/commands/history.ts", "startLine": 1, "endLine": 140 }
+        {
+          "path": "src/cli/commands/history.ts",
+          "startLine": 1,
+          "endLine": 140
+        }
       ],
       "stateChanges": [
         {
@@ -829,15 +1578,28 @@
           "trigger": "mimirs history index",
           "description": "indexGitHistory parses git log and inserts commit rows with embeddings into the DB.",
           "files": [
-            { "path": "src/git/indexer.ts", "role": "writer" },
-            { "path": "src/db/index.ts", "role": "store" }
+            {
+              "path": "src/git/indexer.ts",
+              "role": "writer"
+            },
+            {
+              "path": "src/db/index.ts",
+              "role": "store"
+            }
           ],
           "evidence": [
-            { "path": "src/cli/commands/history.ts", "startLine": 36, "endLine": 63 }
+            {
+              "path": "src/cli/commands/history.ts",
+              "startLine": 36,
+              "endLine": 63
+            }
           ]
         }
       ],
-      "relatedFlows": ["flow-tool-search-commits", "flow-tool-file-history"]
+      "relatedFlows": [
+        "flow-tool-search-commits",
+        "flow-tool-file-history"
+      ]
     },
     {
       "id": "flow-cli-conversation",
@@ -845,15 +1607,33 @@
       "kind": "command",
       "summary": "Subcommand group for conversation history: `conversation index` ingests session JSONL files, `conversation search` queries turns, `conversation sessions` lists them.",
       "confidence": "high",
-      "entrypoints": ["conversation"],
+      "entrypoints": [
+        "conversation"
+      ],
       "files": [
-        { "path": "src/cli/commands/conversation.ts", "role": "entrypoint" },
-        { "path": "src/conversation/indexer.ts", "role": "service" },
-        { "path": "src/conversation/parser.ts", "role": "service" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/cli/commands/conversation.ts",
+          "role": "entrypoint"
+        },
+        {
+          "path": "src/conversation/indexer.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/conversation/parser.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/cli/commands/conversation.ts", "startLine": 1, "endLine": 103 }
+        {
+          "path": "src/cli/commands/conversation.ts",
+          "startLine": 1,
+          "endLine": 103
+        }
       ],
       "stateChanges": [
         {
@@ -863,15 +1643,28 @@
           "trigger": "mimirs conversation index",
           "description": "indexConversation reads session JSONL files and inserts new turn rows with embeddings.",
           "files": [
-            { "path": "src/conversation/indexer.ts", "role": "writer" },
-            { "path": "src/db/index.ts", "role": "store" }
+            {
+              "path": "src/conversation/indexer.ts",
+              "role": "writer"
+            },
+            {
+              "path": "src/db/index.ts",
+              "role": "store"
+            }
           ],
           "evidence": [
-            { "path": "src/cli/commands/conversation.ts", "startLine": 1, "endLine": 103 }
+            {
+              "path": "src/cli/commands/conversation.ts",
+              "startLine": 1,
+              "endLine": 103
+            }
           ]
         }
       ],
-      "relatedFlows": ["flow-tool-search-conversation", "flow-server-start"]
+      "relatedFlows": [
+        "flow-tool-search-conversation",
+        "flow-server-start"
+      ]
     },
     {
       "id": "flow-cli-checkpoint",
@@ -879,14 +1672,29 @@
       "kind": "command",
       "summary": "Subcommand group for checkpoints: `checkpoint create` saves one, `checkpoint list` enumerates them, `checkpoint search` queries by meaning.",
       "confidence": "high",
-      "entrypoints": ["checkpoint"],
+      "entrypoints": [
+        "checkpoint"
+      ],
       "files": [
-        { "path": "src/cli/commands/checkpoint.ts", "role": "entrypoint" },
-        { "path": "src/embeddings/embed.ts", "role": "service" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/cli/commands/checkpoint.ts",
+          "role": "entrypoint"
+        },
+        {
+          "path": "src/embeddings/embed.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/cli/commands/checkpoint.ts", "startLine": 1, "endLine": 86 }
+        {
+          "path": "src/cli/commands/checkpoint.ts",
+          "startLine": 1,
+          "endLine": 86
+        }
       ],
       "stateChanges": [
         {
@@ -896,14 +1704,25 @@
           "trigger": "mimirs checkpoint create <type> <title> <summary>",
           "description": "Embeds title + summary and persists a checkpoint, mirroring the create_checkpoint tool.",
           "files": [
-            { "path": "src/db/index.ts", "role": "store" }
+            {
+              "path": "src/db/index.ts",
+              "role": "store"
+            }
           ],
           "evidence": [
-            { "path": "src/cli/commands/checkpoint.ts", "startLine": 8, "endLine": 86 }
+            {
+              "path": "src/cli/commands/checkpoint.ts",
+              "startLine": 8,
+              "endLine": 86
+            }
           ]
         }
       ],
-      "relatedFlows": ["flow-tool-create-checkpoint", "flow-tool-list-checkpoints", "flow-tool-search-checkpoints"]
+      "relatedFlows": [
+        "flow-tool-create-checkpoint",
+        "flow-tool-list-checkpoints",
+        "flow-tool-search-checkpoints"
+      ]
     },
     {
       "id": "flow-cli-annotations",
@@ -911,15 +1730,30 @@
       "kind": "command",
       "summary": "Lists annotations for the project (or filtered by path) from the CLI.",
       "confidence": "high",
-      "entrypoints": ["annotations"],
+      "entrypoints": [
+        "annotations"
+      ],
       "files": [
-        { "path": "src/cli/commands/annotations.ts", "role": "entrypoint" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/cli/commands/annotations.ts",
+          "role": "entrypoint"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/cli/commands/annotations.ts", "startLine": 1, "endLine": 27 }
+        {
+          "path": "src/cli/commands/annotations.ts",
+          "startLine": 1,
+          "endLine": 27
+        }
       ],
-      "relatedFlows": ["flow-tool-get-annotations", "flow-tool-annotate"]
+      "relatedFlows": [
+        "flow-tool-get-annotations",
+        "flow-tool-annotate"
+      ]
     },
     {
       "id": "flow-cli-analytics",
@@ -927,15 +1761,29 @@
       "kind": "command",
       "summary": "Prints search usage analytics from the CLI over a configurable look-back window.",
       "confidence": "high",
-      "entrypoints": ["analytics"],
+      "entrypoints": [
+        "analytics"
+      ],
       "files": [
-        { "path": "src/cli/commands/analytics.ts", "role": "entrypoint" },
-        { "path": "src/db/analytics.ts", "role": "store" }
+        {
+          "path": "src/cli/commands/analytics.ts",
+          "role": "entrypoint"
+        },
+        {
+          "path": "src/db/analytics.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/cli/commands/analytics.ts", "startLine": 1, "endLine": 59 }
+        {
+          "path": "src/cli/commands/analytics.ts",
+          "startLine": 1,
+          "endLine": 59
+        }
       ],
-      "relatedFlows": ["flow-tool-search-analytics"]
+      "relatedFlows": [
+        "flow-tool-search-analytics"
+      ]
     },
     {
       "id": "flow-cli-session-context",
@@ -943,15 +1791,31 @@
       "kind": "command",
       "summary": "Prints a session start summary: recent checkpoints, recent git changes, and active annotations to brief a new agent.",
       "confidence": "high",
-      "entrypoints": ["session-context"],
+      "entrypoints": [
+        "session-context"
+      ],
       "files": [
-        { "path": "src/cli/commands/session-context.ts", "role": "entrypoint" },
-        { "path": "src/db/index.ts", "role": "store" }
+        {
+          "path": "src/cli/commands/session-context.ts",
+          "role": "entrypoint"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
       ],
       "evidence": [
-        { "path": "src/cli/commands/session-context.ts", "startLine": 1, "endLine": 101 }
+        {
+          "path": "src/cli/commands/session-context.ts",
+          "startLine": 1,
+          "endLine": 101
+        }
       ],
-      "relatedFlows": ["flow-tool-git-context", "flow-tool-list-checkpoints", "flow-tool-get-annotations"]
+      "relatedFlows": [
+        "flow-tool-git-context",
+        "flow-tool-list-checkpoints",
+        "flow-tool-get-annotations"
+      ]
     },
     {
       "id": "flow-cli-eval",
@@ -959,14 +1823,25 @@
       "kind": "command",
       "summary": "Runs A/B evaluation comparing answers produced with and without RAG against a fixture file.",
       "confidence": "medium",
-      "entrypoints": ["eval"],
+      "entrypoints": [
+        "eval"
+      ],
       "files": [
-        { "path": "src/cli/commands/eval.ts", "role": "entrypoint" }
+        {
+          "path": "src/cli/commands/eval.ts",
+          "role": "entrypoint"
+        }
       ],
       "evidence": [
-        { "path": "src/cli/commands/eval.ts", "startLine": 1, "endLine": 32 }
+        {
+          "path": "src/cli/commands/eval.ts",
+          "startLine": 1,
+          "endLine": 32
+        }
       ],
-      "relatedFlows": ["flow-cli-benchmark"]
+      "relatedFlows": [
+        "flow-cli-benchmark"
+      ]
     },
     {
       "id": "flow-cli-benchmark",
@@ -974,14 +1849,26 @@
       "kind": "command",
       "summary": "Runs search quality benchmarks against a fixture file and reports relevance metrics.",
       "confidence": "medium",
-      "entrypoints": ["benchmark"],
+      "entrypoints": [
+        "benchmark"
+      ],
       "files": [
-        { "path": "src/cli/commands/benchmark.ts", "role": "entrypoint" }
+        {
+          "path": "src/cli/commands/benchmark.ts",
+          "role": "entrypoint"
+        }
       ],
       "evidence": [
-        { "path": "src/cli/commands/benchmark.ts", "startLine": 1, "endLine": 31 }
+        {
+          "path": "src/cli/commands/benchmark.ts",
+          "startLine": 1,
+          "endLine": 31
+        }
       ],
-      "relatedFlows": ["flow-cli-eval", "flow-cli-benchmark-models"]
+      "relatedFlows": [
+        "flow-cli-eval",
+        "flow-cli-benchmark-models"
+      ]
     },
     {
       "id": "flow-cli-benchmark-models",
@@ -989,14 +1876,25 @@
       "kind": "command",
       "summary": "Benchmarks multiple embedding models against the same fixture to compare retrieval quality.",
       "confidence": "medium",
-      "entrypoints": ["benchmark-models"],
+      "entrypoints": [
+        "benchmark-models"
+      ],
       "files": [
-        { "path": "src/cli/commands/benchmark-models.ts", "role": "entrypoint" }
+        {
+          "path": "src/cli/commands/benchmark-models.ts",
+          "role": "entrypoint"
+        }
       ],
       "evidence": [
-        { "path": "src/cli/commands/benchmark-models.ts", "startLine": 1, "endLine": 138 }
+        {
+          "path": "src/cli/commands/benchmark-models.ts",
+          "startLine": 1,
+          "endLine": 138
+        }
       ],
-      "relatedFlows": ["flow-cli-benchmark"]
+      "relatedFlows": [
+        "flow-cli-benchmark"
+      ]
     },
     {
       "id": "flow-server-start",
@@ -1004,18 +1902,46 @@
       "kind": "server-start",
       "summary": "Boots the mimirs MCP server: registers tools, connects stdio transport, runs background indexing under a process-level lock, and tails the current conversation session.",
       "confidence": "high",
-      "entrypoints": ["mimirs serve"],
+      "entrypoints": [
+        "mimirs serve"
+      ],
       "files": [
-        { "path": "src/server/index.ts", "role": "entrypoint" },
-        { "path": "src/tools/index.ts", "role": "service" },
-        { "path": "src/indexing/indexer.ts", "role": "service" },
-        { "path": "src/indexing/watcher.ts", "role": "service" },
-        { "path": "src/conversation/indexer.ts", "role": "service" },
-        { "path": "src/utils/index-lock.ts", "role": "service" }
+        {
+          "path": "src/server/index.ts",
+          "role": "entrypoint"
+        },
+        {
+          "path": "src/tools/index.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/indexing/indexer.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/indexing/watcher.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/conversation/indexer.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/utils/index-lock.ts",
+          "role": "service"
+        }
       ],
       "evidence": [
-        { "path": "src/server/index.ts", "startLine": 88, "endLine": 256 },
-        { "path": "src/server/index.ts", "startLine": 257, "endLine": 387 }
+        {
+          "path": "src/server/index.ts",
+          "startLine": 88,
+          "endLine": 256
+        },
+        {
+          "path": "src/server/index.ts",
+          "startLine": 257,
+          "endLine": 387
+        }
       ],
       "stateChanges": [
         {
@@ -1025,11 +1951,22 @@
           "trigger": "startServer boot",
           "description": "writeStatus is called at every boot phase so external clients can see the server's lifecycle.",
           "files": [
-            { "path": "src/server/index.ts", "role": "writer" }
+            {
+              "path": "src/server/index.ts",
+              "role": "writer"
+            }
           ],
           "evidence": [
-            { "path": "src/server/index.ts", "startLine": 100, "endLine": 137 },
-            { "path": "src/server/index.ts", "startLine": 322, "endLine": 348 }
+            {
+              "path": "src/server/index.ts",
+              "startLine": 100,
+              "endLine": 137
+            },
+            {
+              "path": "src/server/index.ts",
+              "startLine": 322,
+              "endLine": 348
+            }
           ]
         },
         {
@@ -1039,11 +1976,21 @@
           "trigger": "tryAcquireIndexLock during startup",
           "description": "Only the lock holder runs the background indexer and watcher; other instances run in query-only mode.",
           "files": [
-            { "path": "src/utils/index-lock.ts", "role": "service" },
-            { "path": "src/server/index.ts", "role": "writer" }
+            {
+              "path": "src/utils/index-lock.ts",
+              "role": "service"
+            },
+            {
+              "path": "src/server/index.ts",
+              "role": "writer"
+            }
           ],
           "evidence": [
-            { "path": "src/server/index.ts", "startLine": 266, "endLine": 280 }
+            {
+              "path": "src/server/index.ts",
+              "startLine": 266,
+              "endLine": 280
+            }
           ]
         },
         {
@@ -1053,12 +2000,25 @@
           "trigger": "startServer background indexing",
           "description": "After connecting the transport, the server kicks off indexDirectory and then a file watcher, so the index stays current.",
           "files": [
-            { "path": "src/indexing/indexer.ts", "role": "writer" },
-            { "path": "src/indexing/watcher.ts", "role": "writer" },
-            { "path": "src/db/index.ts", "role": "store" }
+            {
+              "path": "src/indexing/indexer.ts",
+              "role": "writer"
+            },
+            {
+              "path": "src/indexing/watcher.ts",
+              "role": "writer"
+            },
+            {
+              "path": "src/db/index.ts",
+              "role": "store"
+            }
           ],
           "evidence": [
-            { "path": "src/server/index.ts", "startLine": 285, "endLine": 351 }
+            {
+              "path": "src/server/index.ts",
+              "startLine": 285,
+              "endLine": 351
+            }
           ]
         },
         {
@@ -1068,15 +2028,30 @@
           "trigger": "startServer conversation tailing",
           "description": "startConversationTail follows the active session's JSONL and indexes older sessions in the background.",
           "files": [
-            { "path": "src/conversation/indexer.ts", "role": "writer" },
-            { "path": "src/db/index.ts", "role": "store" }
+            {
+              "path": "src/conversation/indexer.ts",
+              "role": "writer"
+            },
+            {
+              "path": "src/db/index.ts",
+              "role": "store"
+            }
           ],
           "evidence": [
-            { "path": "src/server/index.ts", "startLine": 354, "endLine": 386 }
+            {
+              "path": "src/server/index.ts",
+              "startLine": 354,
+              "endLine": 386
+            }
           ]
         }
       ],
-      "relatedFlows": ["flow-cli-serve", "flow-tool-index-files", "flow-tool-search-conversation", "flow-tool-server-info"]
+      "relatedFlows": [
+        "flow-cli-serve",
+        "flow-tool-index-files",
+        "flow-tool-search-conversation",
+        "flow-tool-server-info"
+      ]
     }
   ],
   "pages": [
@@ -1084,688 +2059,1230 @@
       "slug": "tools/search",
       "title": "Tool: search",
       "kind": "tool",
-      "flowIds": ["flow-tool-search"],
-      "primaryFiles": ["src/tools/search.ts", "src/search/hybrid.ts"],
+      "flowIds": [
+        "flow-tool-search"
+      ],
+      "primaryFiles": [
+        "src/tools/search.ts",
+        "src/search/hybrid.ts"
+      ],
       "mustCover": [
         "Inputs: query, top, extensions, dirs, excludeDirs, directory",
         "Hybrid scoring: vector + FTS with config.hybridWeight",
         "Output shape: ranked file paths with snippet previews and timing",
-        "Side effect: writes a search_queries analytics row"
+        "Side effect: writes a query_log analytics row"
       ],
-      "inputs": ["query", "top", "extensions", "dirs", "excludeDirs", "directory"],
-      "outputs": ["ranked file paths with snippets", "search_queries analytics row"],
+      "inputs": [
+        "query",
+        "top",
+        "extensions",
+        "dirs",
+        "excludeDirs",
+        "directory"
+      ],
+      "outputs": [
+        "ranked file paths with snippets",
+        "query_log analytics row"
+      ],
       "openQuestions": []
     },
     {
       "slug": "tools/read-relevant",
       "title": "Tool: read_relevant",
       "kind": "tool",
-      "flowIds": ["flow-tool-read-relevant"],
-      "primaryFiles": ["src/tools/search.ts", "src/search/hybrid.ts", "src/db/annotations.ts"],
+      "flowIds": [
+        "flow-tool-read-relevant"
+      ],
+      "primaryFiles": [
+        "src/tools/search.ts",
+        "src/search/hybrid.ts",
+        "src/db/annotations.ts"
+      ],
       "mustCover": [
         "Returns chunk bodies with exact line ranges",
         "Inline [NOTE] blocks from annotations",
         "Filters: extensions/dirs/excludeDirs/threshold",
         "Difference from search (chunk-level vs file-level)"
       ],
-      "inputs": ["query", "top", "threshold", "extensions", "dirs", "excludeDirs", "directory"],
-      "outputs": ["ranked chunks with line ranges", "inline annotations", "search_queries analytics row"],
+      "inputs": [
+        "query",
+        "top",
+        "threshold",
+        "extensions",
+        "dirs",
+        "excludeDirs",
+        "directory"
+      ],
+      "outputs": [
+        "ranked chunks with line ranges",
+        "inline annotations",
+        "query_log analytics row"
+      ],
       "openQuestions": []
     },
     {
       "slug": "tools/search-symbols",
       "title": "Tool: search_symbols",
       "kind": "tool",
-      "flowIds": ["flow-tool-search-symbols"],
-      "primaryFiles": ["src/tools/search.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-tool-search-symbols"
+      ],
+      "primaryFiles": [
+        "src/tools/search.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "Symbol-name lookup against the persisted symbol table",
         "Filters by type (function/class/interface/type/enum/export)",
         "List-all-exports mode when no symbol is given",
         "Enrichment data: hasChildren, referenceCount, isReexport"
       ],
-      "inputs": ["symbol", "type", "exact", "top", "directory"],
-      "outputs": ["ranked symbol matches with file and line"],
+      "inputs": [
+        "symbol",
+        "type",
+        "exact",
+        "top",
+        "directory"
+      ],
+      "outputs": [
+        "ranked symbol matches with file and line"
+      ],
       "openQuestions": []
     },
     {
       "slug": "tools/write-relevant",
       "title": "Tool: write_relevant",
       "kind": "tool",
-      "flowIds": ["flow-tool-write-relevant"],
-      "primaryFiles": ["src/tools/search.ts", "src/search/hybrid.ts"],
+      "flowIds": [
+        "flow-tool-write-relevant"
+      ],
+      "primaryFiles": [
+        "src/tools/search.ts",
+        "src/search/hybrid.ts"
+      ],
       "mustCover": [
         "Picks the most semantically appropriate file and anchor",
         "Used before adding new code or docs",
-        "Inputs: query, file-type hint, directory",
+        "Inputs: content, top, threshold, directory",
         "Output shape: suggested path and anchor"
       ],
-      "inputs": ["query", "directory"],
-      "outputs": ["suggested file path and insertion anchor"],
+      "inputs": [
+        "content",
+        "top",
+        "threshold",
+        "directory"
+      ],
+      "outputs": [
+        "suggested file path and insertion anchor"
+      ],
       "openQuestions": []
     },
     {
       "slug": "tools/index-files",
       "title": "Tool: index_files",
       "kind": "tool",
-      "flowIds": ["flow-tool-index-files"],
-      "primaryFiles": ["src/tools/index-tools.ts", "src/indexing/indexer.ts", "src/utils/index-lock.ts"],
+      "flowIds": [
+        "flow-tool-index-files"
+      ],
+      "primaryFiles": [
+        "src/tools/index-tools.ts",
+        "src/indexing/indexer.ts",
+        "src/utils/index-lock.ts"
+      ],
       "mustCover": [
         "Full vs pattern-scoped indexing (prune semantics)",
         "Progress callback writing to .mimirs/status",
         "Query-only fallback when another mimirs process owns the lock",
-        "DB tables updated: files, chunks, symbols, dependencies"
+        "DB tables updated: files, chunks, file_imports, file_exports, symbol_refs"
       ],
-      "inputs": ["directory", "patterns"],
-      "outputs": ["indexed/skipped/pruned counts", "updated index", ".mimirs/status text"],
+      "inputs": [
+        "directory",
+        "patterns"
+      ],
+      "outputs": [
+        "indexed/skipped/pruned counts",
+        "updated index",
+        ".mimirs/status text"
+      ],
       "openQuestions": []
     },
     {
       "slug": "tools/index-status",
       "title": "Tool: index_status",
       "kind": "tool",
-      "flowIds": ["flow-tool-index-status"],
-      "primaryFiles": ["src/tools/index-tools.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-tool-index-status"
+      ],
+      "primaryFiles": [
+        "src/tools/index-tools.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "Reads totalFiles/totalChunks/lastIndexed from the DB",
-        "Pure read tool — no state changes",
+        "Pure read tool \u2014 no state changes",
         "Difference from server_info (which adds config and connections)"
       ],
-      "inputs": ["directory"],
-      "outputs": ["file count, chunk count, last indexed timestamp"],
+      "inputs": [
+        "directory"
+      ],
+      "outputs": [
+        "file count, chunk count, last indexed timestamp"
+      ],
       "openQuestions": []
     },
     {
       "slug": "tools/remove-file",
       "title": "Tool: remove_file",
       "kind": "tool",
-      "flowIds": ["flow-tool-remove-file"],
-      "primaryFiles": ["src/tools/index-tools.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-tool-remove-file"
+      ],
+      "primaryFiles": [
+        "src/tools/index-tools.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
-        "Deletes the file row and cascades to chunks and references",
-        "Idempotent — returns a 'not in index' message when absent",
+        "Deletes the file row, its chunks, and matching vector rows manually; foreign keys are off so ON DELETE CASCADE does not fire and graph rows (file_imports/file_exports/symbol_refs) are left behind",
+        "Idempotent \u2014 returns a 'not in index' message when absent",
         "Use case: prune a file faster than waiting for index_files prune"
       ],
-      "inputs": ["path", "directory"],
-      "outputs": ["confirmation message", "deleted file/chunk rows"],
+      "inputs": [
+        "path",
+        "directory"
+      ],
+      "outputs": [
+        "confirmation message",
+        "deleted file/chunk rows"
+      ],
       "openQuestions": []
     },
     {
       "slug": "tools/project-map",
       "title": "Tool: project_map",
       "kind": "tool",
-      "flowIds": ["flow-tool-project-map"],
-      "primaryFiles": ["src/tools/graph-tools.ts", "src/graph/resolver.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-tool-project-map"
+      ],
+      "primaryFiles": [
+        "src/tools/graph-tools.ts",
+        "src/graph/resolver.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "Focus on a file's neighborhood",
         "Zoom levels: file vs directory",
         "Output formats: text vs json with fan-in/fan-out metrics",
         "Source of truth: dependency edges in the DB"
       ],
-      "inputs": ["directory", "focus", "zoom", "format"],
-      "outputs": ["text or JSON dependency map"],
+      "inputs": [
+        "directory",
+        "focus",
+        "zoom",
+        "format"
+      ],
+      "outputs": [
+        "text or JSON dependency map"
+      ],
       "openQuestions": []
     },
     {
       "slug": "tools/find-usages",
       "title": "Tool: find_usages",
       "kind": "tool",
-      "flowIds": ["flow-tool-find-usages"],
-      "primaryFiles": ["src/tools/graph-tools.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-tool-find-usages"
+      ],
+      "primaryFiles": [
+        "src/tools/graph-tools.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "Exact vs substring matching",
         "Why it is more reliable than grep (handles aliased imports/re-exports)",
         "Output grouped by file with line numbers"
       ],
-      "inputs": ["symbol", "exact", "top", "directory"],
-      "outputs": ["usages grouped by file with line and snippet"],
+      "inputs": [
+        "symbol",
+        "exact",
+        "top",
+        "directory"
+      ],
+      "outputs": [
+        "usages grouped by file with line and snippet"
+      ],
       "openQuestions": []
     },
     {
       "slug": "tools/depends-on",
       "title": "Tool: depends_on",
       "kind": "tool",
-      "flowIds": ["flow-tool-depends-on"],
-      "primaryFiles": ["src/tools/graph-tools.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-tool-depends-on"
+      ],
+      "primaryFiles": [
+        "src/tools/graph-tools.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "Resolved imports for a single file",
         "Inverse of depended_on_by",
         "Edge data: import source string"
       ],
-      "inputs": ["file", "directory"],
-      "outputs": ["list of imported files with import source"],
+      "inputs": [
+        "file",
+        "directory"
+      ],
+      "outputs": [
+        "list of imported files with import source"
+      ],
       "openQuestions": []
     },
     {
       "slug": "tools/depended-on-by",
       "title": "Tool: depended_on_by",
       "kind": "tool",
-      "flowIds": ["flow-tool-depended-on-by"],
-      "primaryFiles": ["src/tools/graph-tools.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-tool-depended-on-by"
+      ],
+      "primaryFiles": [
+        "src/tools/graph-tools.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
-        "Reverse import graph — who imports this file",
+        "Reverse import graph \u2014 who imports this file",
         "Use case: blast radius before a rename or signature change",
         "Difference from find_usages (file-level vs symbol-level)"
       ],
-      "inputs": ["file", "directory"],
-      "outputs": ["list of importing files"],
+      "inputs": [
+        "file",
+        "directory"
+      ],
+      "outputs": [
+        "list of importing files"
+      ],
       "openQuestions": []
     },
     {
       "slug": "tools/annotate",
       "title": "Tool: annotate",
       "kind": "tool",
-      "flowIds": ["flow-tool-annotate"],
-      "primaryFiles": ["src/tools/annotation-tools.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-tool-annotate"
+      ],
+      "primaryFiles": [
+        "src/tools/annotation-tools.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "Inputs: path, note, symbol (optional), author (defaults to agent)",
         "Note is embedded so semantic search works later",
-        "Upsert behavior — second call replaces previous note for same path+symbol",
+        "Upsert behavior \u2014 second call replaces previous note for same path+symbol",
         "Output surfaces inline in read_relevant"
       ],
-      "inputs": ["path", "note", "symbol", "author", "directory"],
-      "outputs": ["annotation id confirmation", "annotations row"],
+      "inputs": [
+        "path",
+        "note",
+        "symbol",
+        "author",
+        "directory"
+      ],
+      "outputs": [
+        "annotation id confirmation",
+        "annotations row"
+      ],
       "openQuestions": []
     },
     {
       "slug": "tools/get-annotations",
       "title": "Tool: get_annotations",
       "kind": "tool",
-      "flowIds": ["flow-tool-get-annotations"],
-      "primaryFiles": ["src/tools/annotation-tools.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-tool-get-annotations"
+      ],
+      "primaryFiles": [
+        "src/tools/annotation-tools.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "Three modes: by path, by query, by path+query",
         "Output formatting (id, path, symbol, author, timestamp)",
         "When to use vs the inline [NOTE] surface in read_relevant"
       ],
-      "inputs": ["path", "query", "directory"],
-      "outputs": ["formatted annotation listing"],
+      "inputs": [
+        "path",
+        "query",
+        "directory"
+      ],
+      "outputs": [
+        "formatted annotation listing"
+      ],
       "openQuestions": []
     },
     {
       "slug": "tools/delete-annotation",
       "title": "Tool: delete_annotation",
       "kind": "tool",
-      "flowIds": ["flow-tool-delete-annotation"],
-      "primaryFiles": ["src/tools/annotation-tools.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-tool-delete-annotation"
+      ],
+      "primaryFiles": [
+        "src/tools/annotation-tools.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "Deletes by numeric id from get_annotations",
         "When to use (fixed bug, lifted constraint, deleted file)",
         "Behavior when id is missing"
       ],
-      "inputs": ["id", "directory"],
-      "outputs": ["confirmation or not-found message"],
+      "inputs": [
+        "id",
+        "directory"
+      ],
+      "outputs": [
+        "confirmation or not-found message"
+      ],
       "openQuestions": []
     },
     {
       "slug": "tools/create-checkpoint",
       "title": "Tool: create_checkpoint",
       "kind": "tool",
-      "flowIds": ["flow-tool-create-checkpoint"],
-      "primaryFiles": ["src/tools/checkpoint-tools.ts", "src/conversation/parser.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-tool-create-checkpoint"
+      ],
+      "primaryFiles": [
+        "src/tools/checkpoint-tools.ts",
+        "src/conversation/parser.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "Allowed types (decision/milestone/blocker/direction_change/handoff)",
         "Session and turn binding via discoverSessions + getTurnCount",
         "Embedding of title + summary for later search",
         "Recommended usage as the final step of a task"
       ],
-      "inputs": ["type", "title", "summary", "filesInvolved", "tags", "directory"],
-      "outputs": ["checkpoint id confirmation", "checkpoints row"],
+      "inputs": [
+        "type",
+        "title",
+        "summary",
+        "filesInvolved",
+        "tags",
+        "directory"
+      ],
+      "outputs": [
+        "checkpoint id confirmation",
+        "checkpoints row"
+      ],
       "openQuestions": []
     },
     {
       "slug": "tools/list-checkpoints",
       "title": "Tool: list_checkpoints",
       "kind": "tool",
-      "flowIds": ["flow-tool-list-checkpoints"],
-      "primaryFiles": ["src/tools/checkpoint-tools.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-tool-list-checkpoints"
+      ],
+      "primaryFiles": [
+        "src/tools/checkpoint-tools.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "Cross-session default",
         "Filters: sessionId, type, limit",
         "Output format with files and tags"
       ],
-      "inputs": ["sessionId", "type", "limit", "directory"],
-      "outputs": ["formatted checkpoint listing"],
+      "inputs": [
+        "sessionId",
+        "type",
+        "limit",
+        "directory"
+      ],
+      "outputs": [
+        "formatted checkpoint listing"
+      ],
       "openQuestions": []
     },
     {
       "slug": "tools/search-checkpoints",
       "title": "Tool: search_checkpoints",
       "kind": "tool",
-      "flowIds": ["flow-tool-search-checkpoints"],
-      "primaryFiles": ["src/tools/checkpoint-tools.ts", "src/embeddings/embed.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-tool-search-checkpoints"
+      ],
+      "primaryFiles": [
+        "src/tools/checkpoint-tools.ts",
+        "src/embeddings/embed.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "Semantic search over title + summary embeddings",
         "Optional type filter",
         "Score formatting"
       ],
-      "inputs": ["query", "type", "limit", "directory"],
-      "outputs": ["ranked checkpoint matches with score"],
+      "inputs": [
+        "query",
+        "type",
+        "limit",
+        "directory"
+      ],
+      "outputs": [
+        "ranked checkpoint matches with score"
+      ],
       "openQuestions": []
     },
     {
       "slug": "tools/search-conversation",
       "title": "Tool: search_conversation",
       "kind": "tool",
-      "flowIds": ["flow-tool-search-conversation"],
-      "primaryFiles": ["src/tools/conversation-tools.ts", "src/embeddings/embed.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-tool-search-conversation"
+      ],
+      "primaryFiles": [
+        "src/tools/conversation-tools.ts",
+        "src/embeddings/embed.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "Hybrid vector + BM25 over conversation_turns",
         "FTS fallback to vector-only on FTS error",
         "Output: turn index, timestamp, tools used, files referenced",
         "Where the turn data comes from (conversation tail in server start)"
       ],
-      "inputs": ["query", "sessionId", "top", "directory"],
-      "outputs": ["ranked conversation turns with snippet"],
+      "inputs": [
+        "query",
+        "sessionId",
+        "top",
+        "directory"
+      ],
+      "outputs": [
+        "ranked conversation turns with snippet"
+      ],
       "openQuestions": []
     },
     {
       "slug": "tools/search-analytics",
       "title": "Tool: search_analytics",
       "kind": "tool",
-      "flowIds": ["flow-tool-search-analytics"],
-      "primaryFiles": ["src/tools/analytics-tools.ts", "src/db/analytics.ts"],
+      "flowIds": [
+        "flow-tool-search-analytics"
+      ],
+      "primaryFiles": [
+        "src/tools/analytics-tools.ts",
+        "src/db/analytics.ts"
+      ],
       "mustCover": [
         "Aggregated metrics: totalQueries, avgResultCount, avgTopScore, zero-result rate",
         "Top searched terms, zero-result queries, low-score queries",
         "Configurable look-back via days",
         "Source data: rows written by search and read_relevant"
       ],
-      "inputs": ["days", "directory"],
-      "outputs": ["analytics summary with top/zero-result/low-score lists"],
+      "inputs": [
+        "days",
+        "directory"
+      ],
+      "outputs": [
+        "analytics summary with top/zero-result/low-score lists"
+      ],
       "openQuestions": []
     },
     {
       "slug": "tools/git-context",
       "title": "Tool: git_context",
       "kind": "tool",
-      "flowIds": ["flow-tool-git-context"],
-      "primaryFiles": ["src/tools/git-tools.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-tool-git-context"
+      ],
+      "primaryFiles": [
+        "src/tools/git-tools.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "Sections: uncommitted changes, recent commits, changed files, optional diff",
         "Annotates each path with [indexed] or [not indexed]",
         "Flags: since, include_diff, files_only",
         "Behavior when not a git repo"
       ],
-      "inputs": ["since", "include_diff", "files_only", "directory"],
-      "outputs": ["formatted git context sections"],
+      "inputs": [
+        "since",
+        "include_diff",
+        "files_only",
+        "directory"
+      ],
+      "outputs": [
+        "formatted git context sections"
+      ],
       "openQuestions": []
     },
     {
       "slug": "tools/search-commits",
       "title": "Tool: search_commits",
       "kind": "tool",
-      "flowIds": ["flow-tool-search-commits"],
-      "primaryFiles": ["src/tools/git-history-tools.ts", "src/embeddings/embed.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-tool-search-commits"
+      ],
+      "primaryFiles": [
+        "src/tools/git-history-tools.ts",
+        "src/embeddings/embed.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "Hybrid vector + FTS scoring with 0.7 weight",
         "Filters: author, since, until, path, threshold",
         "Empty-index hint pointing at history index",
         "Output: shortHash, score, date, author, message, files"
       ],
-      "inputs": ["query", "top", "author", "since", "until", "path", "threshold", "directory"],
-      "outputs": ["ranked commits with file/insertion/deletion stats"],
+      "inputs": [
+        "query",
+        "top",
+        "author",
+        "since",
+        "until",
+        "path",
+        "threshold",
+        "directory"
+      ],
+      "outputs": [
+        "ranked commits with file/insertion/deletion stats"
+      ],
       "openQuestions": []
     },
     {
       "slug": "tools/file-history",
       "title": "Tool: file_history",
       "kind": "tool",
-      "flowIds": ["flow-tool-file-history"],
-      "primaryFiles": ["src/tools/git-history-tools.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-tool-file-history"
+      ],
+      "primaryFiles": [
+        "src/tools/git-history-tools.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "Suffix-match on path",
         "Sorting: newest first",
         "Optional since filter",
         "Backed by the same git_commits table as search_commits"
       ],
-      "inputs": ["path", "top", "since", "directory"],
-      "outputs": ["commits touching the file with stats"],
+      "inputs": [
+        "path",
+        "top",
+        "since",
+        "directory"
+      ],
+      "outputs": [
+        "commits touching the file with stats"
+      ],
       "openQuestions": []
     },
     {
       "slug": "tools/server-info",
       "title": "Tool: server_info",
       "kind": "tool",
-      "flowIds": ["flow-tool-server-info"],
-      "primaryFiles": ["src/tools/server-info-tools.ts", "src/config/index.ts", "src/embeddings/embed.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-tool-server-info"
+      ],
+      "primaryFiles": [
+        "src/tools/server-info-tools.ts",
+        "src/config/index.ts",
+        "src/embeddings/embed.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "Sections: Server, Index, Embedding, Config, Connected Databases",
         "Embedding model id and dimension",
         "Active config keys (chunkSize, chunkOverlap, hybridWeight, include/exclude)",
         "Per-DB opened/last_active durations"
       ],
-      "inputs": ["directory"],
-      "outputs": ["multi-section diagnostic text"],
+      "inputs": [
+        "directory"
+      ],
+      "outputs": [
+        "multi-section diagnostic text"
+      ],
       "openQuestions": []
     },
     {
       "slug": "tools/wiki",
       "title": "Tool: wiki",
       "kind": "tool",
-      "flowIds": ["flow-tool-wiki"],
-      "primaryFiles": ["src/tools/wiki-tools.ts", "src/wiki/rebuild.ts"],
+      "flowIds": [
+        "flow-tool-wiki"
+      ],
+      "primaryFiles": [
+        "src/tools/wiki-tools.ts",
+        "src/wiki/rebuild.ts"
+      ],
       "mustCover": [
         "Supported commands and colon selectors (shape, prefetch, prefetch:map:<path>, discovery, validate-discovery, write, write:page:<slug>, validate-pages)",
         "Workflow order: shape -> prefetch -> discovery -> validate-discovery -> write -> validate-pages",
         "Outputs: wiki/_prefetch.json, wiki/_discovery.json, wiki/<slug>.md",
         "Validation of discovery shape and referenced paths"
       ],
-      "inputs": ["command", "directory"],
-      "outputs": ["per-command prompt or validation text", "wiki workflow files"],
+      "inputs": [
+        "command",
+        "directory"
+      ],
+      "outputs": [
+        "per-command prompt or validation text",
+        "wiki workflow files"
+      ],
       "openQuestions": []
     },
     {
       "slug": "cli/init",
       "title": "CLI: init",
       "kind": "command",
-      "flowIds": ["flow-cli-init"],
-      "primaryFiles": ["src/cli/commands/init.ts", "src/cli/setup.ts", "src/indexing/indexer.ts"],
+      "flowIds": [
+        "flow-cli-init"
+      ],
+      "primaryFiles": [
+        "src/cli/commands/init.ts",
+        "src/cli/setup.ts",
+        "src/indexing/indexer.ts"
+      ],
       "mustCover": [
         "--ide flag and supported targets (claude/cursor/windsurf/copilot/all)",
         "MCP snippet for unknown IDEs",
         "Optional first index after confirmation",
         ".mimirs/status progress writes"
       ],
-      "inputs": ["directory", "--ide", "--yes", "--verbose"],
-      "outputs": [".mimirs/config.json", "IDE MCP config entries", "first index"],
+      "inputs": [
+        "directory",
+        "--ide",
+        "--yes",
+        "--verbose"
+      ],
+      "outputs": [
+        ".mimirs/config.json",
+        "IDE MCP config entries",
+        "first index"
+      ],
       "openQuestions": []
     },
     {
       "slug": "cli/index",
       "title": "CLI: index",
       "kind": "command",
-      "flowIds": ["flow-cli-index"],
-      "primaryFiles": ["src/cli/commands/index-cmd.ts", "src/indexing/indexer.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-cli-index"
+      ],
+      "primaryFiles": [
+        "src/cli/commands/index-cmd.ts",
+        "src/indexing/indexer.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "--patterns flag and prune semantics",
         "--verbose vs quiet progress output",
         "Effect on the DB (files/chunks/symbols)"
       ],
-      "inputs": ["directory", "--patterns", "--verbose"],
-      "outputs": ["indexed/skipped/pruned summary", "updated DB"],
+      "inputs": [
+        "directory",
+        "--patterns",
+        "--verbose"
+      ],
+      "outputs": [
+        "indexed/skipped/pruned summary",
+        "updated DB"
+      ],
       "openQuestions": []
     },
     {
       "slug": "cli/search",
       "title": "CLI: search",
       "kind": "command",
-      "flowIds": ["flow-cli-search"],
-      "primaryFiles": ["src/cli/commands/search-cmd.ts", "src/search/hybrid.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-cli-search"
+      ],
+      "primaryFiles": [
+        "src/cli/commands/search-cmd.ts",
+        "src/search/hybrid.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "--top flag",
         "Output format with score, path, snippet",
         "Difference from `mimirs read` (file-level vs chunk-level)"
       ],
-      "inputs": ["query", "--top", "--dir"],
-      "outputs": ["ranked file matches with snippets"],
+      "inputs": [
+        "query",
+        "--top",
+        "--dir"
+      ],
+      "outputs": [
+        "ranked file matches with snippets"
+      ],
       "openQuestions": []
     },
     {
       "slug": "cli/read",
       "title": "CLI: read",
       "kind": "command",
-      "flowIds": ["flow-cli-read"],
-      "primaryFiles": ["src/cli/commands/search-cmd.ts", "src/search/hybrid.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-cli-read"
+      ],
+      "primaryFiles": [
+        "src/cli/commands/search-cmd.ts",
+        "src/search/hybrid.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "--top, --threshold, --dir flags",
-        "Chunk-level output with line ranges",
-        "Inline annotation rendering"
+        "Chunk-level output: prints score, path, entity, and content",
+        "Line ranges and inline [NOTE] blocks are NOT rendered by the CLI (that is the read_relevant MCP tool)"
       ],
-      "inputs": ["query", "--top", "--threshold", "--dir"],
-      "outputs": ["ranked chunks with line ranges and inline annotations"],
+      "inputs": [
+        "query",
+        "--top",
+        "--threshold",
+        "--dir"
+      ],
+      "outputs": [
+        "ranked chunks: score, path, entity, content"
+      ],
       "openQuestions": []
     },
     {
       "slug": "cli/serve",
       "title": "CLI: serve",
       "kind": "command",
-      "flowIds": ["flow-cli-serve"],
-      "primaryFiles": ["src/cli/commands/serve.ts", "src/server/index.ts", "src/tools/index.ts"],
+      "flowIds": [
+        "flow-cli-serve"
+      ],
+      "primaryFiles": [
+        "src/cli/commands/serve.ts",
+        "src/server/index.ts",
+        "src/tools/index.ts"
+      ],
       "mustCover": [
         "Dynamic import of serveCommand to keep doctor working without native modules",
         "Hand-off to startServer",
         "Stdin/signal-driven shutdown",
         "Diagnostic log at .mimirs/server-error.log on crash"
       ],
-      "inputs": ["RAG_PROJECT_DIR env"],
-      "outputs": ["running MCP stdio server"],
+      "inputs": [
+        "RAG_PROJECT_DIR env"
+      ],
+      "outputs": [
+        "running MCP stdio server"
+      ],
       "openQuestions": []
     },
     {
       "slug": "cli/status",
       "title": "CLI: status",
       "kind": "command",
-      "flowIds": ["flow-cli-status"],
-      "primaryFiles": ["src/cli/commands/status.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-cli-status"
+      ],
+      "primaryFiles": [
+        "src/cli/commands/status.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "Reads file/chunk totals from the DB",
         "Last indexed timestamp",
         "When to prefer this over index_status or server_info"
       ],
-      "inputs": ["directory"],
-      "outputs": ["text summary of index totals"],
+      "inputs": [
+        "directory"
+      ],
+      "outputs": [
+        "text summary of index totals"
+      ],
       "openQuestions": []
     },
     {
       "slug": "cli/cleanup",
       "title": "CLI: cleanup",
       "kind": "command",
-      "flowIds": ["flow-cli-cleanup"],
-      "primaryFiles": ["src/cli/commands/cleanup.ts"],
+      "flowIds": [
+        "flow-cli-cleanup"
+      ],
+      "primaryFiles": [
+        "src/cli/commands/cleanup.ts"
+      ],
       "mustCover": [
         "Removes the .mimirs/ data directory",
         "Strips the mimirs instructions block from agent markdown files (AGENTS.md, CLAUDE.md, etc.)",
         "Removes the mimirs entry from IDE MCP config files",
         "Confirmation prompt unless -y passed"
       ],
-      "inputs": ["directory", "-y"],
-      "outputs": ["list of removed files and stripped blocks"],
+      "inputs": [
+        "directory",
+        "-y"
+      ],
+      "outputs": [
+        "list of removed files and stripped blocks"
+      ],
       "openQuestions": []
     },
     {
       "slug": "cli/doctor",
       "title": "CLI: doctor",
       "kind": "command",
-      "flowIds": ["flow-cli-doctor"],
-      "primaryFiles": ["src/cli/commands/doctor.ts"],
+      "flowIds": [
+        "flow-cli-doctor"
+      ],
+      "primaryFiles": [
+        "src/cli/commands/doctor.ts"
+      ],
       "mustCover": [
         "Why doctor avoids importing serve transitively",
         "Checks performed (Bun, SQLite, sqlite-vec, embedding model)",
         "Output sections and actionable fixes",
         "Relationship to .mimirs/server-error.log"
       ],
-      "inputs": ["directory"],
-      "outputs": ["diagnostic report with pass/fail per check"],
+      "inputs": [
+        "directory"
+      ],
+      "outputs": [
+        "diagnostic report with pass/fail per check"
+      ],
       "openQuestions": []
     },
     {
       "slug": "cli/demo",
       "title": "CLI: demo",
       "kind": "command",
-      "flowIds": ["flow-cli-demo"],
-      "primaryFiles": ["src/cli/commands/demo.ts"],
+      "flowIds": [
+        "flow-cli-demo"
+      ],
+      "primaryFiles": [
+        "src/cli/commands/demo.ts"
+      ],
       "mustCover": [
         "Walkthrough of search/read/map output",
         "Sample data the demo uses",
         "Intended audience (first-time users)"
       ],
-      "inputs": ["directory"],
-      "outputs": ["interactive demo output"],
-      "openQuestions": ["Confirm whether the demo indexes a sample or uses an existing index"]
+      "inputs": [
+        "directory"
+      ],
+      "outputs": [
+        "interactive demo output"
+      ],
+      "openQuestions": [
+        "Confirm whether the demo indexes a sample or uses an existing index"
+      ]
     },
     {
       "slug": "cli/map",
       "title": "CLI: map",
       "kind": "command",
-      "flowIds": ["flow-cli-map"],
-      "primaryFiles": ["src/cli/commands/map.ts", "src/graph/resolver.ts"],
+      "flowIds": [
+        "flow-cli-map"
+      ],
+      "primaryFiles": [
+        "src/cli/commands/map.ts",
+        "src/graph/resolver.ts"
+      ],
       "mustCover": [
         "--focus and --zoom flags",
-        "Mermaid output for VS Code's built-in preview",
+        "Structured text dependency output (the CLI no longer emits Mermaid)",
         "Difference from the project_map tool (CLI prints text)"
       ],
-      "inputs": ["directory", "--focus", "--zoom"],
-      "outputs": ["Mermaid or text dependency graph"],
+      "inputs": [
+        "directory",
+        "--focus",
+        "--zoom"
+      ],
+      "outputs": [
+        "text dependency graph"
+      ],
       "openQuestions": []
     },
     {
       "slug": "cli/remove",
       "title": "CLI: remove",
       "kind": "command",
-      "flowIds": ["flow-cli-remove"],
-      "primaryFiles": ["src/cli/commands/remove.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-cli-remove"
+      ],
+      "primaryFiles": [
+        "src/cli/commands/remove.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "Single-file removal from the index",
         "When to prefer over a full re-index"
       ],
-      "inputs": ["file", "directory"],
-      "outputs": ["confirmation message", "deleted file row"],
+      "inputs": [
+        "file",
+        "directory"
+      ],
+      "outputs": [
+        "confirmation message",
+        "deleted file row"
+      ],
       "openQuestions": []
     },
     {
       "slug": "cli/history",
       "title": "CLI: history",
       "kind": "command",
-      "flowIds": ["flow-cli-history"],
-      "primaryFiles": ["src/cli/commands/history.ts", "src/git/indexer.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-cli-history"
+      ],
+      "primaryFiles": [
+        "src/cli/commands/history.ts",
+        "src/git/indexer.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "Subcommands: index, search, status",
         "--since for incremental indexing",
         "Hybrid scoring with 0.7/0.3 weight",
         "When to run history index (prerequisite for search_commits / file_history)"
       ],
-      "inputs": ["index|search|status", "--since", "--top", "--author", "--dir"],
-      "outputs": ["indexed commit rows", "ranked commit results", "history stats"],
+      "inputs": [
+        "index|search|status",
+        "--since",
+        "--top",
+        "--author",
+        "--dir"
+      ],
+      "outputs": [
+        "indexed commit rows",
+        "ranked commit results",
+        "history stats"
+      ],
       "openQuestions": []
     },
     {
       "slug": "cli/conversation",
       "title": "CLI: conversation",
       "kind": "command",
-      "flowIds": ["flow-cli-conversation"],
-      "primaryFiles": ["src/cli/commands/conversation.ts", "src/conversation/indexer.ts", "src/conversation/parser.ts"],
+      "flowIds": [
+        "flow-cli-conversation"
+      ],
+      "primaryFiles": [
+        "src/cli/commands/conversation.ts",
+        "src/conversation/indexer.ts",
+        "src/conversation/parser.ts"
+      ],
       "mustCover": [
         "Subcommands: search, sessions, index",
         "Where session JSONL files come from (Claude Code project dir)",
         "Relationship to the conversation tail started by server start"
       ],
-      "inputs": ["search|sessions|index", "query", "--dir", "--top"],
-      "outputs": ["session listing", "ranked turns", "indexed turn rows"],
+      "inputs": [
+        "search|sessions|index",
+        "query",
+        "--dir",
+        "--top"
+      ],
+      "outputs": [
+        "session listing",
+        "ranked turns",
+        "indexed turn rows"
+      ],
       "openQuestions": []
     },
     {
       "slug": "cli/checkpoint",
       "title": "CLI: checkpoint",
       "kind": "command",
-      "flowIds": ["flow-cli-checkpoint"],
-      "primaryFiles": ["src/cli/commands/checkpoint.ts", "src/embeddings/embed.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-cli-checkpoint"
+      ],
+      "primaryFiles": [
+        "src/cli/commands/checkpoint.ts",
+        "src/embeddings/embed.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "Subcommands: create, list, search",
         "--files and --tags on create",
         "Filtering by type",
         "Parity with the create_checkpoint / list_checkpoints / search_checkpoints tools"
       ],
-      "inputs": ["create|list|search", "type", "title", "summary", "--files", "--tags", "--dir"],
-      "outputs": ["created checkpoint row", "checkpoint listing or ranked results"],
+      "inputs": [
+        "create|list|search",
+        "type",
+        "title",
+        "summary",
+        "--files",
+        "--tags",
+        "--dir"
+      ],
+      "outputs": [
+        "created checkpoint row",
+        "checkpoint listing or ranked results"
+      ],
       "openQuestions": []
     },
     {
       "slug": "cli/annotations",
       "title": "CLI: annotations",
       "kind": "command",
-      "flowIds": ["flow-cli-annotations"],
-      "primaryFiles": ["src/cli/commands/annotations.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-cli-annotations"
+      ],
+      "primaryFiles": [
+        "src/cli/commands/annotations.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "Path filter (--path)",
         "Output format (id, path, symbol, author, timestamp)",
-        "Read-only — does not call annotate"
+        "Read-only \u2014 does not call annotate"
       ],
-      "inputs": ["directory", "--path", "--dir"],
-      "outputs": ["formatted annotation listing"],
+      "inputs": [
+        "directory",
+        "--path",
+        "--dir"
+      ],
+      "outputs": [
+        "formatted annotation listing"
+      ],
       "openQuestions": []
     },
     {
       "slug": "cli/analytics",
       "title": "CLI: analytics",
       "kind": "command",
-      "flowIds": ["flow-cli-analytics"],
-      "primaryFiles": ["src/cli/commands/analytics.ts", "src/db/analytics.ts"],
+      "flowIds": [
+        "flow-cli-analytics"
+      ],
+      "primaryFiles": [
+        "src/cli/commands/analytics.ts",
+        "src/db/analytics.ts"
+      ],
       "mustCover": [
         "--days window",
         "Output sections (totals, top, zero-result, low-score)",
         "How to act on zero-result queries (index missing topics)"
       ],
-      "inputs": ["directory", "--days"],
-      "outputs": ["analytics report"],
+      "inputs": [
+        "directory",
+        "--days"
+      ],
+      "outputs": [
+        "analytics report"
+      ],
       "openQuestions": []
     },
     {
       "slug": "cli/session-context",
       "title": "CLI: session-context",
       "kind": "command",
-      "flowIds": ["flow-cli-session-context"],
-      "primaryFiles": ["src/cli/commands/session-context.ts", "src/db/index.ts"],
-      "mustCover": [
-        "What the summary contains (recent checkpoints, git changes, annotations)",
-        "Use case at session start",
-        "Composition of git_context + list_checkpoints + get_annotations"
+      "flowIds": [
+        "flow-cli-session-context"
       ],
-      "inputs": ["directory", "--dir"],
-      "outputs": ["text summary for a new session"],
+      "primaryFiles": [
+        "src/cli/commands/session-context.ts",
+        "src/db/index.ts"
+      ],
+      "mustCover": [
+        "What the summary contains (git status + recent commits, index status, recent zero-result/low-relevance search gaps, annotations on changed files)",
+        "Use case at session start",
+        "Composition of git status/commits + index status + analytics gaps + annotations (it does not read checkpoints)"
+      ],
+      "inputs": [
+        "directory",
+        "--dir"
+      ],
+      "outputs": [
+        "text summary for a new session"
+      ],
       "openQuestions": []
     },
     {
       "slug": "cli/eval",
       "title": "CLI: eval",
       "kind": "command",
-      "flowIds": ["flow-cli-eval"],
-      "primaryFiles": ["src/cli/commands/eval.ts"],
+      "flowIds": [
+        "flow-cli-eval"
+      ],
+      "primaryFiles": [
+        "src/cli/commands/eval.ts"
+      ],
       "mustCover": [
         "Fixture file format",
         "A/B output (with vs without RAG)",
         "--out option for saving results"
       ],
-      "inputs": ["fixture", "--dir", "--top", "--out"],
-      "outputs": ["A/B eval report"],
-      "openQuestions": ["Document the exact fixture schema once stabilised"]
+      "inputs": [
+        "fixture",
+        "--dir",
+        "--top",
+        "--out"
+      ],
+      "outputs": [
+        "A/B eval report"
+      ],
+      "openQuestions": [
+        "Document the exact fixture schema once stabilised"
+      ]
     },
     {
       "slug": "cli/benchmark",
       "title": "CLI: benchmark",
       "kind": "command",
-      "flowIds": ["flow-cli-benchmark"],
-      "primaryFiles": ["src/cli/commands/benchmark.ts"],
+      "flowIds": [
+        "flow-cli-benchmark"
+      ],
+      "primaryFiles": [
+        "src/cli/commands/benchmark.ts"
+      ],
       "mustCover": [
         "Fixture-based search quality benchmark",
-        "Reported metrics (precision, recall, MRR)",
+        "Reported metrics (recall@K, MRR, zero-miss rate; precision is not computed)",
         "Relationship to benchmark-models"
       ],
-      "inputs": ["fixture", "--dir", "--top"],
-      "outputs": ["benchmark report"],
-      "openQuestions": ["Document exact metrics emitted"]
+      "inputs": [
+        "fixture",
+        "--dir",
+        "--top"
+      ],
+      "outputs": [
+        "benchmark report"
+      ],
+      "openQuestions": [
+        "Document exact metrics emitted"
+      ]
     },
     {
       "slug": "cli/benchmark-models",
       "title": "CLI: benchmark-models",
       "kind": "command",
-      "flowIds": ["flow-cli-benchmark-models"],
-      "primaryFiles": ["src/cli/commands/benchmark-models.ts"],
+      "flowIds": [
+        "flow-cli-benchmark-models"
+      ],
+      "primaryFiles": [
+        "src/cli/commands/benchmark-models.ts"
+      ],
       "mustCover": [
         "Multiple embedding models compared on the same fixture",
         "Output table with per-model metrics",
         "How model selection feeds back into config"
       ],
-      "inputs": ["fixture", "--dir", "--models"],
-      "outputs": ["per-model comparison table"],
+      "inputs": [
+        "fixture",
+        "--dir",
+        "--models"
+      ],
+      "outputs": [
+        "per-model comparison table"
+      ],
       "openQuestions": []
     },
     {
       "slug": "server/start",
       "title": "Server: MCP stdio start",
       "kind": "server-start",
-      "flowIds": ["flow-server-start"],
-      "primaryFiles": ["src/server/index.ts", "src/tools/index.ts", "src/indexing/indexer.ts", "src/indexing/watcher.ts", "src/conversation/indexer.ts", "src/utils/index-lock.ts"],
+      "flowIds": [
+        "flow-server-start"
+      ],
+      "primaryFiles": [
+        "src/server/index.ts",
+        "src/tools/index.ts",
+        "src/indexing/indexer.ts",
+        "src/indexing/watcher.ts",
+        "src/conversation/indexer.ts",
+        "src/utils/index-lock.ts"
+      ],
       "mustCover": [
         "Boot phases written to .mimirs/status",
         "Transport connect before slow startup work (avoids client timeout)",
@@ -1776,16 +3293,36 @@
         "Permanent vs transient DB open errors",
         "Crash logging to .mimirs/server-error.log"
       ],
-      "inputs": ["RAG_PROJECT_DIR", "RAG_DB_DIR", "LOG_LEVEL"],
-      "outputs": ["registered MCP tools", "background index", "watcher", "conversation tail", ".mimirs/status updates"],
+      "inputs": [
+        "RAG_PROJECT_DIR",
+        "RAG_DB_DIR",
+        "LOG_LEVEL"
+      ],
+      "outputs": [
+        "registered MCP tools",
+        "background index",
+        "watcher",
+        "conversation tail",
+        ".mimirs/status updates"
+      ],
       "openQuestions": []
     },
     {
       "slug": "architecture",
       "title": "Architecture",
       "kind": "overview:architecture",
-      "flowIds": ["flow-server-start", "flow-tool-search", "flow-tool-index-files"],
-      "primaryFiles": ["src/server/index.ts", "src/tools/index.ts", "src/indexing/indexer.ts", "src/search/hybrid.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-server-start",
+        "flow-tool-search",
+        "flow-tool-index-files"
+      ],
+      "primaryFiles": [
+        "src/server/index.ts",
+        "src/tools/index.ts",
+        "src/indexing/indexer.ts",
+        "src/search/hybrid.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "Two front doors: MCP stdio server and the mimirs CLI, both backed by the same SQLite DB",
         "Tool/command handlers delegate to shared services (indexer, search, graph, conversation, git, wiki)",
@@ -1799,8 +3336,18 @@
       "slug": "data-model",
       "title": "Data model",
       "kind": "overview:data-model",
-      "flowIds": ["flow-tool-index-files", "flow-tool-create-checkpoint", "flow-tool-annotate", "flow-cli-history"],
-      "primaryFiles": ["src/db/index.ts", "src/db/analytics.ts", "src/db/types.ts", "src/db/annotations.ts"],
+      "flowIds": [
+        "flow-tool-index-files",
+        "flow-tool-create-checkpoint",
+        "flow-tool-annotate",
+        "flow-cli-history"
+      ],
+      "primaryFiles": [
+        "src/db/index.ts",
+        "src/db/analytics.ts",
+        "src/db/types.ts",
+        "src/db/annotations.ts"
+      ],
       "mustCover": [
         "Core tables: files, chunks, symbols, references, dependencies",
         "Auxiliary tables: annotations, checkpoints, sessions, conversation_turns, git_commits, search_queries",
@@ -1814,8 +3361,19 @@
       "slug": "module-map",
       "title": "Module map",
       "kind": "overview:module-map",
-      "flowIds": ["flow-server-start", "flow-tool-search", "flow-tool-index-files"],
-      "primaryFiles": ["src/server/index.ts", "src/tools/index.ts", "src/cli/index.ts", "src/indexing/indexer.ts", "src/search/hybrid.ts", "src/db/index.ts"],
+      "flowIds": [
+        "flow-server-start",
+        "flow-tool-search",
+        "flow-tool-index-files"
+      ],
+      "primaryFiles": [
+        "src/server/index.ts",
+        "src/tools/index.ts",
+        "src/cli/index.ts",
+        "src/indexing/indexer.ts",
+        "src/search/hybrid.ts",
+        "src/db/index.ts"
+      ],
       "mustCover": [
         "Top-level dirs: cli/, server/, tools/, indexing/, search/, graph/, db/, embeddings/, conversation/, git/, wiki/, utils/, config/",
         "Direction of imports (handlers depend on services, services depend on db + embeddings + utils)",
@@ -1828,8 +3386,17 @@
       "slug": "runtime-lifecycle",
       "title": "Runtime lifecycle",
       "kind": "overview:runtime-lifecycle",
-      "flowIds": ["flow-server-start", "flow-cli-serve", "flow-tool-index-files"],
-      "primaryFiles": ["src/server/index.ts", "src/cli/commands/serve.ts", "src/indexing/watcher.ts", "src/utils/index-lock.ts"],
+      "flowIds": [
+        "flow-server-start",
+        "flow-cli-serve",
+        "flow-tool-index-files"
+      ],
+      "primaryFiles": [
+        "src/server/index.ts",
+        "src/cli/commands/serve.ts",
+        "src/indexing/watcher.ts",
+        "src/utils/index-lock.ts"
+      ],
       "mustCover": [
         "Boot order: status write -> signal handlers -> server create -> tool registration -> transport -> DB preflight -> config load -> index lock -> background index -> watcher -> conversation tail",
         "Why transport connects before slow startup work",
@@ -1843,8 +3410,17 @@
       "slug": "configuration",
       "title": "Configuration",
       "kind": "overview:configuration",
-      "flowIds": ["flow-cli-init", "flow-tool-server-info", "flow-tool-index-files"],
-      "primaryFiles": ["src/config/index.ts", "src/cli/setup.ts", "src/server/index.ts", "src/tools/server-info-tools.ts"],
+      "flowIds": [
+        "flow-cli-init",
+        "flow-tool-server-info",
+        "flow-tool-index-files"
+      ],
+      "primaryFiles": [
+        "src/config/index.ts",
+        "src/cli/setup.ts",
+        "src/server/index.ts",
+        "src/tools/server-info-tools.ts"
+      ],
       "mustCover": [
         "Sources of config: .mimirs/config.json, env vars (RAG_PROJECT_DIR, RAG_DB_DIR, LOG_LEVEL), CLI flags",
         "Default values and precedence",

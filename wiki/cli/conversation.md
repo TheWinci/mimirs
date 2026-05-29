@@ -1,18 +1,43 @@
 # CLI: conversation
 
-`mimirs conversation` indexes and queries Claude Code session
-transcripts so past chats become searchable. It has three
-subcommands: `index` ingests every session JSONL file for the current
-project, `search` runs hybrid vector + BM25 search across indexed
-turns, and `sessions` lists discovered transcripts with their indexed
-status. Use it when you want to remember what was decided in an
-earlier session, or to feed the `search_conversation` MCP tool.
+`mimirs conversation` works with the transcripts of past Claude Code sessions for
+the current project. It can list the session files Claude Code wrote to disk,
+ingest their turns into the local index, and run a hybrid (vector + keyword)
+search over those turns. This is the command-line counterpart to the
+[search_conversation](../tools/search-conversation.md) MCP tool: same underlying
+tables and search logic, exposed for terminal use and for one-off bulk indexing.
 
-Session files are not stored in the project. They live in Claude
-Code's per-project directory under
-`~/.claude/projects/<encoded-project-path>/<session-id>.jsonl` —
-`discoverSessions` reads from that location, never from the project
-itself (`src/conversation/parser.ts:291-323`).
+The command is a small dispatcher. It reads the subcommand from `args[1]`,
+resolves the project directory from `--dir` (defaulting to `.`), opens the
+project's `RagDB`, and branches on `search`, `sessions`, or `index`. Any other
+value prints usage and exits with code `1`. The database is closed at the end in
+all branches (`src/cli/commands/conversation.ts:9-103`).
+
+## Where session transcripts come from
+
+Claude Code stores each session as a JSONL file under
+`~/.claude/projects/<encoded-path>/`, where the project path has every `/`
+replaced with `-`. `discoverSessions` builds that directory name, globs for
+`*.jsonl`, stats each file, and returns one `SessionInfo` per file (session id,
+full path, mtime, size), sorted most-recent-first. If the project directory has
+never been opened in Claude Code, the glob throws and the function returns an
+empty list rather than erroring (`src/conversation/parser.ts:292-323`).
+
+The session id is just the filename with `.jsonl` stripped
+(`src/conversation/parser.ts:302`). Nothing in this command writes those JSONL
+files; they are produced by Claude Code itself. This command only reads them.
+
+## Relationship to live tailing during `server start`
+
+`conversation index` is the manual, batch counterpart to the live tail that the
+MCP server starts on launch. The same module exports `startConversationTail`,
+which `watch`es a single JSONL file and, after a 1.5s debounce, calls the same
+`indexConversation` to ingest only the bytes appended since the last read
+(`src/conversation/indexer.ts:91-147`). The CLI command, by contrast, re-reads
+each discovered session from offset `0` every time it runs. Both paths land in
+the same `conversation_turns` / `conversation_chunks` tables, and both rely on
+`INSERT OR IGNORE` to avoid creating duplicate rows. See
+[server start](../server/start.md) for the tailing side.
 
 ## Flow
 
@@ -20,215 +45,168 @@ itself (`src/conversation/parser.ts:291-323`).
 sequenceDiagram
     autonumber
     actor User
-    participant CLI as conversationCommand
-    participant Parser as parser.ts
+    participant CLI as conversation.ts
+    participant Parser as discoverSessions
     participant Indexer as indexConversation
-    participant Embed as embed/embedBatch
     participant DB as RagDB
-    User->>CLI: mimirs conversation <search|sessions|index> [args]
+    User->>CLI: mimirs conversation <sub> [--dir] [--top]
     CLI->>DB: new RagDB(dir)
-    alt sessions
+    alt sub == sessions
         CLI->>Parser: discoverSessions(dir)
         Parser-->>CLI: SessionInfo[]
-        loop each session
-            CLI->>DB: getSession(sessionId)
-            DB-->>CLI: row or undefined
-            CLI->>User: "<id>...  <mtime>  <turns indexed | not indexed>"
-        end
-    else index
-        CLI->>Parser: discoverSessions(dir)
-        Parser-->>CLI: SessionInfo[]
-        loop each session
-            CLI->>Indexer: indexConversation(jsonlPath, sessionId, db)
-            Indexer->>Parser: readJSONL + parseTurns
-            Indexer->>Embed: embedBatch(chunked turn text)
-            Indexer->>DB: insertTurn / upsertSession / updateSessionStats
-            Indexer-->>CLI: { turnsIndexed, newOffset, totalTokens }
-        end
-        CLI->>User: "Done: N turns indexed across M sessions"
-    else search
-        CLI->>CLI: loadConfig(dir), top = --top or config.searchTopK
+        CLI->>DB: getSession(id) per session
+        CLI-->>User: one line per session + indexed status
+    else sub == index
         CLI->>Parser: discoverSessions(dir)
         loop each session
-            CLI->>DB: getSession(sessionId)
-            alt new or modified
-                CLI->>Indexer: indexConversation(...)
-            end
+            CLI->>Indexer: indexConversation(path, id, db)
+            Indexer->>DB: insertTurn (INSERT OR IGNORE) + upsertSession
         end
-        CLI->>Embed: embed(query)
-        CLI->>DB: searchConversation(emb, top)
-        CLI->>DB: textSearchConversation(query, top)
-        CLI->>CLI: merge with config.hybridWeight
-        CLI->>User: print ranked turns
+        CLI-->>User: per-session and total turn counts
+    else sub == search
+        CLI->>Parser: discoverSessions(dir)
+        loop stale sessions
+            CLI->>Indexer: indexConversation(...)
+        end
+        CLI->>DB: searchConversation(embed(query)) + textSearchConversation(query)
+        CLI-->>User: ranked turns (top N)
+    else other
+        CLI-->>User: usage, exit 1
     end
     CLI->>DB: close()
 ```
 
-1. The user runs `mimirs conversation <sub> [args]`. The CLI reads
-   `args[1]` as the subcommand. Directory defaults to `--dir` or `.`
-   (`src/cli/commands/conversation.ts:9-12`).
-2. `RagDB` is opened once at the top of the handler and closed at the
-   end, so every branch reuses the same DB handle.
-3. **`sessions`** branch: calls `discoverSessions(dir)` and prints one
-   line per session showing the short id, mtime, indexed turn count
-   (or `not indexed`), and file size in KB
-   (`src/cli/commands/conversation.ts:69-80`).
-4. **`index`** branch: calls `discoverSessions(dir)` and then, for
-   each session, invokes `indexConversation(jsonlPath, sessionId,
-   db)`. The indexer reads JSONL from the current offset, parses
-   turns, chunks the text, embeds the chunks, and inserts new turn
-   rows. It returns `turnsIndexed`, `newOffset`, and `totalTokens`
-   per session (`src/conversation/indexer.ts:13-49`).
-5. **`search`** branch: before running the actual search, the CLI
-   refreshes the index — it iterates discovered sessions and re-runs
-   `indexConversation` for any session whose disk `mtime` is newer
-   than the stored mtime, or that has no row at all
-   (`src/cli/commands/conversation.ts:25-31`). This guarantees freshly
-   resumed conversations are searchable without a manual `index`.
-6. The query is embedded once with `embed(query)`. Vector results
-   come from `db.searchConversation(emb, top)` and BM25-style results
-   from `db.textSearchConversation(query, top)`. The text search
-   call is wrapped in `try / catch` because FTS can throw on special
-   characters in the query (`src/cli/commands/conversation.ts:33-39`).
-7. Results are merged in a `Map<turnId, row>`. The weighting uses the
-   project's `hybridWeight` config (not a hard-coded value): vector
-   rows contribute `score * hybridWeight` and text rows contribute
-   `score * (1 - hybridWeight)`. When a turn appears in both, its
-   contributions add (`src/cli/commands/conversation.ts:41-52`).
-8. The merged turns are sorted descending by score and trimmed to
-   `top`. Each result prints as a three-line block: turn index with
-   timestamp and any tools used, the first 200 chars of the snippet,
-   and a `Files: ...` line listing up to 5 referenced files when
-   present (`src/cli/commands/conversation.ts:58-67`).
+1. The user runs the command with a subcommand and optional `--dir` / `--top`.
+   The directory is resolved and a `RagDB` is opened
+   (`src/cli/commands/conversation.ts:10-12`).
+2. `sessions` discovers every transcript file for the project
+   (`src/cli/commands/conversation.ts:70`).
+3. For each session it looks up the stored row via `getSession` to report
+   whether it has been indexed and how many turns it holds
+   (`src/cli/commands/conversation.ts:74-79`).
+4. `index` discovers sessions and indexes every one from the start, summing the
+   newly inserted turns (`src/cli/commands/conversation.ts:82-95`).
+5. `indexConversation` reads the JSONL, parses turns, inserts each as a row plus
+   embedded chunks, then updates the session's stats and read offset
+   (`src/conversation/indexer.ts:14-51`).
+6. `search` first re-indexes only sessions whose file mtime is newer than the
+   stored mtime (or that were never indexed), so results are fresh without a
+   separate `index` run (`src/cli/commands/conversation.ts:25-31`).
+7. It then embeds the query and runs vector + keyword search, merges the two
+   result sets by score, and prints the top results
+   (`src/cli/commands/conversation.ts:34-67`).
+8. Any unrecognized subcommand prints usage and exits `1`
+   (`src/cli/commands/conversation.ts:97-100`).
 
 ## Inputs
 
-| Input | Subcommand | Source | Notes |
-| --- | --- | --- | --- |
-| `search\|sessions\|index` | all | `args[1]` | Required. Anything else triggers the usage error and `exit(1)` (`src/cli/commands/conversation.ts:97-100`). |
-| `query` | search | `args[2]` | Required for `search`. Missing query prints usage and exits 1. |
-| `--dir D` | all | flag | Optional. Project directory. Defaults to `.`. |
-| `--top N` | search | flag | Optional. Defaults to `config.searchTopK` from the loaded project config. Sets both the per-query row cap and the final returned count. |
-
-The `index` and `sessions` branches do not load the full project
-config — they only need the directory.
+| name | type | required | description |
+|------|------|----------|-------------|
+| subcommand | `search` \| `sessions` \| `index` | yes | Read from `args[1]`; any other value prints usage and exits `1` (`src/cli/commands/conversation.ts:10`, `97-100`). |
+| query | string | yes for `search` | The free-text search query, `args[2]`. Missing it prints usage and exits `1` (`src/cli/commands/conversation.ts:15-19`). |
+| `--dir` | path | no | Project directory; resolved, defaults to `.` (`src/cli/commands/conversation.ts:11`). Determines which `~/.claude/projects/` folder is scanned. |
+| `--top` | integer | no (`search` only) | Max results to return. Defaults to `config.searchTopK` (`src/cli/commands/conversation.ts:22`). |
 
 ## Outputs
 
-| Output | What happens |
-| --- | --- |
-| Session listing | `sessions` prints one line per discovered transcript: `<short-id>...  <iso-date>  <"K turns indexed"\|"not indexed">  (<size>KB)`. |
-| Ranked turns | `search` prints up to `--top` three-line blocks with the turn index, timestamp, tool tags, a 200-char snippet, and referenced files. |
-| Indexed turn rows | `index` (and the auto-refresh inside `search`) inserts new rows into the conversation tables via `db.insertTurn` and updates `sessions` / `session_stats` (`src/conversation/indexer.ts:36-49`). |
+| output | where it lands / shape / description |
+|--------|--------------------------------------|
+| session listing | stdout: one line per session — short id, ISO date (from mtime), `N turns indexed` or `not indexed`, and size in KB (`src/cli/commands/conversation.ts:74-79`). Empty list prints "No conversation sessions found for this project." |
+| ranked turns | stdout: per result, `Turn <index> (<timestamp>) [tool, tool]`, a 200-char snippet, and up to 5 referenced files. Empty result prints "No conversation results found." (`src/cli/commands/conversation.ts:56-67`). |
+| indexed turn rows | Inserted/ignored rows in `conversation_turns` + `conversation_chunks`, plus updated `conversation_sessions` stats. `index` prints per-session counts (only when > 0) and a grand total (`src/cli/commands/conversation.ts:86-95`). |
 
 ## State changes
 
-### `sessions` and conversation turn tables
+**`conversation_sessions` and `conversation_turns` gain rows for new turns.**
 
-- Before: previously indexed turns for each session (potentially
-  empty if the session is new).
-- After: every new turn since the last stored byte offset has a row
-  with embeddings; `sessions.read_offset`, `turn_count`, and
-  `total_tokens` are updated.
-- Trigger: `mimirs conversation index`, or implicitly inside
-  `mimirs conversation search` when a session's disk `mtime` is newer
-  than the stored mtime, or no row exists yet.
-- Why it matters: `mcp__mimirs__search_conversation` and any later
-  CLI search reads these tables. Without them, the search returns
-  nothing.
-- Code: `indexConversation` orchestrates the work
-  (`src/conversation/indexer.ts:13-49`); `indexTurn` does the chunking
-  + embedding + insert per turn (`src/conversation/indexer.ts:54-86`).
-  `db.insertTurn` returns 0 when a duplicate is detected, so re-runs
-  are safe.
+- *Before*: the turns/sessions tables hold whatever was indexed by a prior
+  `index` run or by the live tail — possibly nothing.
+- *After*: each new turn in each session JSONL has a row in
+  `conversation_turns` plus one or more embedded rows in `conversation_chunks`,
+  and the session's `turn_count`, `total_tokens`, and `read_offset` are updated.
+- *Why it matters*: this is the searchable store. Every later
+  conversation search (CLI or the
+  [search_conversation](../tools/search-conversation.md) tool) reads from these
+  tables.
+- *Code*: `indexConversation` parses entries, inserts each turn via `indexTurn`,
+  then calls `upsertSession` and `updateSessionStats`
+  (`src/conversation/indexer.ts:33-50`). `insertTurn` uses `INSERT OR IGNORE`
+  keyed on `(session_id, turn_index)` and returns `0` when the row already
+  exists, so re-indexing does not duplicate turns
+  (`src/db/conversation.ts:56-91`).
 
 ## Branches and failure cases
 
-- **Unknown or missing subcommand**: `cli.error("Usage: mimirs
-  conversation <search|sessions|index>")` and exit 1
-  (`src/cli/commands/conversation.ts:97-100`).
-- **No sessions found**: `discoverSessions` returns an empty array
-  when the Claude project directory does not exist or contains no
-  `.jsonl` files. The `sessions` branch prints
-  `"No conversation sessions found for this project."`; `index`
-  prints the same. Search continues but will not have data to query
-  (`src/cli/commands/conversation.ts:71-72, 82-84`).
-- **Search yields nothing**: prints
-  `"No conversation results found."` and returns
-  (`src/cli/commands/conversation.ts:56-57`).
-- **FTS error on special characters**: the `textSearchConversation`
-  call is wrapped in `try / catch`. A failure leaves `bm25Results`
-  empty and the search proceeds with vector results only
-  (`src/cli/commands/conversation.ts:37-39`).
+| branch | behavior |
+|--------|----------|
+| `search` with no query | Prints usage, exits `1` (`src/cli/commands/conversation.ts:16-19`). |
+| `search`, all sessions current | No re-index; only sessions whose stored mtime is older than the file (or unindexed) are re-read (`src/cli/commands/conversation.ts:27-31`). |
+| `search`, FTS throws | The BM25 call is wrapped in `try/catch`; on failure `bm25Results` stays empty and only vector results contribute (`src/cli/commands/conversation.ts:36-39`). |
+| `search`, no matches | Prints "No conversation results found." (`src/cli/commands/conversation.ts:56-57`). |
+| `sessions`, none found | Prints "No conversation sessions found for this project." (`src/cli/commands/conversation.ts:71-72`). |
+| `index`, none found | Same empty message; no indexing attempted (`src/cli/commands/conversation.ts:83-84`). |
+| `index`, all turns already present | `insertTurn` ignores duplicates, so `turnsIndexed` is `0`; that session's per-line log is skipped and the total reflects only new turns (`src/cli/commands/conversation.ts:91-92`). |
+| empty / unreadable JSONL | `readJSONL` returns no entries past the offset; `indexConversation` returns `turnsIndexed: 0` early (`src/conversation/indexer.ts:24-26`, `src/conversation/parser.ts:76-78`). Malformed lines are skipped silently (`src/conversation/parser.ts:94-98`). |
+| unknown subcommand | Prints usage, exits `1` (`src/cli/commands/conversation.ts:97-100`). |
 
-## Where session JSONL files come from
+## How a turn is built
 
-`discoverSessions` derives the directory by URL-encoding the project
-path (replacing `/` with `-`) and looking under
-`$HOME/.claude/projects/<encoded>` for `*.jsonl` files
-(`src/conversation/parser.ts:292-323`). For a project at
-`/Users/jane/code/my-app`, that becomes
-`~/.claude/projects/-Users-jane-code-my-app/`. Each file is a
-JSON-lines transcript written by Claude Code as the user works.
+`parseTurns` walks the user/assistant messages in order. A new turn starts only
+at a user message that has real text and no tool result; subsequent assistant
+text, tool uses, and tool results accumulate into that turn until the next such
+user message (`src/conversation/parser.ts:111-255`). Tool results for
+`Read`/`Glob`/`Write`/`Edit`/`NotebookEdit` are dropped from the indexed text
+unless they are short (≤ 500 chars), because their content is already covered by
+the code index (`src/conversation/parser.ts:60-63`, `214-227`). `buildTurnText`
+joins user text, assistant text, and kept tool results into the string that gets
+chunked and embedded (`src/conversation/parser.ts:261-277`).
 
-Sessions are sorted newest-first by mtime so the `sessions`
-subcommand always shows the most-recent transcript at the top
-(`src/conversation/parser.ts:319-322`).
+## Hybrid search scoring
 
-## Relationship to the server's conversation tail
-
-When `mimirs serve` starts, it also begins tailing the active session
-in the background via `startConversationTail` so live turns get
-indexed as the user works (`src/conversation/indexer.ts:90-...`). The
-CLI's `index` subcommand is the batch counterpart: when the server is
-not running (or hasn't been running for a while), `mimirs
-conversation index` catches up the index by reading from each
-session's stored byte offset. Both paths funnel through the same
-`indexConversation` function, so they cannot disagree about what is
-indexed — only about when.
-
-The `search` subcommand also runs the catch-up loop before querying,
-so an ad-hoc CLI search is never blocked by an idle indexer.
+The query embedding feeds `searchConversation` (vector) and the raw query feeds
+`textSearchConversation` (BM25). Results are merged into one map keyed by
+`turnId`: vector scores are multiplied by `config.hybridWeight`, BM25 scores by
+`1 - config.hybridWeight`, and overlapping turns sum both contributions. The map
+is sorted by combined score and sliced to `top`
+(`src/cli/commands/conversation.ts:41-54`).
 
 ## Example
 
-```
-# Show what session files exist
-mimirs conversation sessions
-# →   abcd1234...  2026-04-22T11:03:14  84 turns indexed  (412KB)
-#     ef567890...  2026-04-20T09:18:00  not indexed  (88KB)
+```bash
+# List session transcripts for this project and their index status
+bun run mimirs conversation sessions
 
-# Index everything
-mimirs conversation index
-# → Found 2 sessions, indexing...
-#     abcd1234...: 0 turns
-#     ef567890...: 17 turns
-#   Done: 17 turns indexed across 2 sessions
+# Index every session from scratch (idempotent)
+bun run mimirs conversation index
 
-# Hybrid search
-mimirs conversation search "decision on hybrid weight" --top 5
-# → Turn 42 (2026-04-22T10:55:01Z) [search, read_relevant]
-#     We landed on 0.7/0.3 vector/text after benchmarking on this fixture...
-#     Files: src/search/hybrid.ts, src/config/index.ts
+# Search past turns, top 5
+bun run mimirs conversation search "why did we switch to sqlite-vec" --top 5
 ```
+
+Illustrative `search` output:
+
+```
+Turn 12 (2026-05-20T14:03:11Z) [search, read_relevant]
+  User: why did we switch to sqlite-vec  Assistant: we moved off the previous...
+  Files: src/db/index.ts, src/db/conversation.ts
+```
+
+## Open question
+
+The live tail (`startConversationTail`) is not guarded by the index lock, so a
+second mimirs process indexing the same session first can leave the tail's
+in-memory offset and turn index stale, since it only advances when
+`turnsIndexed > 0` (`src/conversation/indexer.ts:97-123`). The CLI `index`
+command always reads from offset `0`, so it is not affected by that drift, but
+concurrent CLI + server runs share the same tables.
 
 ## Key source files
 
-- `src/cli/commands/conversation.ts` — CLI entrypoint with three
-  branches.
-- `src/conversation/parser.ts` — `discoverSessions`, `readJSONL`,
-  `parseTurns`, `buildTurnText`.
-- `src/conversation/indexer.ts` — `indexConversation` (batch + catch-up)
-  and `startConversationTail` (the live-tail used by the server).
-- `src/db/index.ts` — `RagDB.searchConversation`,
-  `RagDB.textSearchConversation`, `RagDB.getSession`,
-  `RagDB.insertTurn`, `RagDB.upsertSession`,
-  `RagDB.updateSessionStats`.
-- `src/embeddings/embed.ts` — `embed` and `embedBatch`.
-
-## Related flows
-
-- [tools/search-conversation](../tools/search-conversation.md) — MCP
-  tool that wraps the same search path.
-- [cli/serve](./serve.md) — the server start command that runs the
-  live conversation tail alongside this CLI's batch indexer.
+- `src/cli/commands/conversation.ts` — subcommand dispatch, hybrid search merge,
+  output formatting.
+- `src/conversation/parser.ts` — session discovery, JSONL reading, turn parsing,
+  indexable-text construction.
+- `src/conversation/indexer.ts` — per-turn chunking/embedding/insert and session
+  stat updates; also the live tail used by the server.
+- `src/db/conversation.ts` — `insertTurn` (duplicate-safe), `getSession`,
+  vector and keyword search queries.

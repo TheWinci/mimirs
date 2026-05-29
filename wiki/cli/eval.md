@@ -1,131 +1,145 @@
 # CLI: eval
 
-`mimirs eval` runs an A/B retrieval evaluation. For each task in a fixture file it produces two traces — one where a search was run against the RAG index (`with-rag`) and one where no search happened (`without-rag`) — and reports aggregate stats plus a per-task breakdown. The point is to show how much the local index actually helps an agent find the right files, against a fixed list of tasks you care about.
+`mimirs eval` measures how much the local search index actually helps. It takes a file of tasks, runs each task two ways — once with semantic search turned on, once with it turned off — and prints a side-by-side report. Use it when you want a number to back the claim that indexing this project improves what an agent can find, or to catch a regression where search stops surfacing the files a task needs.
 
-## Flow
+The command is a thin wrapper. It parses arguments, loads the task file, opens the index, runs the A/B comparison, prints the report, and optionally saves the raw traces to disk. All of the real work lives in the search evaluation helpers in `src/search/eval.ts`.
+
+## How the comparison works
+
+For every task the evaluator builds two traces. The "with-rag" trace runs one semantic search over the index using the task description as the query and records the files that came back. The "without-rag" trace runs no search at all and returns an empty result set, simulating an agent that has no index to lean on (`src/search/eval.ts:62-91`). Because the second condition is a fixed empty baseline, the report is really showing "what does search add on top of nothing", not a comparison of two search algorithms.
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant User
-    participant CLI as evalCommand
+    actor User
+    participant Cmd as evalCommand
     participant Loader as loadEvalTasks
     participant Runner as runEval
     participant Search as search (hybrid)
-    User->>CLI: mimirs eval <fixture> [--dir D --top N --out F]
-    CLI->>Loader: read + parse fixture JSON
-    Loader-->>CLI: EvalTask[]
-    loop per task
-        Runner->>Search: with-rag → search(task.task)
-        Runner->>Runner: without-rag → empty results
+    participant Report as formatEvalReport
+    User->>Cmd: mimirs eval tasks.json --dir . --top 5
+    Cmd->>Loader: read + validate task file
+    Loader-->>Cmd: EvalTask[]
+    loop each task
+        Cmd->>Runner: runEval(tasks, db, dir, top)
+        Runner->>Search: with-rag query (task text)
+        Search-->>Runner: ranked results
+        Note over Runner: without-rag trace returns empty results
     end
-    Runner-->>CLI: EvalSummary (traces + stats)
-    CLI-->>User: formatEvalReport(...)
-    opt --out F
-        CLI->>CLI: saveEvalTraces(traces, F)
+    Runner-->>Cmd: EvalSummary (stats + traces)
+    Cmd->>Report: formatEvalReport(summary)
+    Report-->>User: A/B table + per-task breakdown
+    opt --out given
+        Cmd->>Cmd: saveEvalTraces(traces, outPath)
     end
-    CLI->>CLI: db.close()
 ```
 
-1. The first positional argument is the fixture path. Missing → the command prints usage and exits with code `1` (`src/cli/commands/eval.ts:8-12`).
-2. The project directory comes from `--dir` (default `.`) and `--top` from the flag, falling back to `config.benchmarkTopK` (`src/cli/commands/eval.ts:14-18`).
-3. `loadEvalTasks(file)` reads the fixture, parses it as JSON, and validates it is an array where every entry has a string `task` and `grading` (`src/search/eval.ts:40-55`). Anything else throws.
-4. `runEval` iterates the tasks. For each task it calls `runEvalTask` twice — once with `condition: "with-rag"`, once with `condition: "without-rag"`. The with-rag branch calls `search(task.task, db, topK, 0, config.hybridWeight, config.generated)`; the without-rag branch returns an empty result list (`src/search/eval.ts:62-91`).
-5. After all tasks finish, `runEval` splits traces into the two conditions and computes per-condition averages plus a file-hit rate over tasks that have `expectedFiles`.
-6. `formatEvalReport` prints the summary header (two columns: With RAG / Without RAG) and a per-task breakdown that lists the files each with-rag trace found and the grading rubric. Without-rag traces always have zero files found, so they are not repeated per-task.
-7. If `--out F` is set, `saveEvalTraces(summary.traces, F)` writes the full traces (both conditions, with search results) as pretty-printed JSON.
+1. The user runs the command with a task file and optional flags. `evalCommand` requires the first positional argument (the file); without it the command prints a usage line and exits with code 1 (`src/cli/commands/eval.ts:8-12`).
+2. `loadEvalTasks` reads and JSON-parses the file. It throws if the top level is not an array, or if any entry is missing `task` or `grading` (`src/search/eval.ts:40-55`).
+3. The parsed tasks are returned to the command, which logs how many tasks it will run against which directory (`src/cli/commands/eval.ts:20-21`).
+4. `runEval` loops over the tasks, building a "with-rag" and a "without-rag" trace for each (`src/search/eval.ts:101-105`).
+5. The "with-rag" trace loads the project config and calls the hybrid `search` helper once, passing the task text as the query and `topK` as the limit (`src/search/eval.ts:73-77`).
+6. The "without-rag" trace skips search entirely, so its result list stays empty and its `searchCount` stays 0 (`src/search/eval.ts:70-77`).
+7. `runEval` aggregates the traces into an `EvalSummary` with per-condition averages and a file-hit rate (`src/search/eval.ts:135-141`).
+8. `formatEvalReport` turns the summary into the printed table plus a per-task breakdown (`src/search/eval.ts:143-167`).
+9. If `--out` was supplied, `saveEvalTraces` writes the full trace array as pretty-printed JSON, then the index is closed (`src/cli/commands/eval.ts:26-31`).
+
+## Fixture file format
+
+The task file is a JSON array. Each element is an object with two required string fields and one optional array field:
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `task` | string | yes | The task description. It is used directly as the search query for the "with-rag" condition. |
+| `grading` | string | yes | Human-readable criteria describing what a good answer looks like. It is not scored automatically; it is echoed into the per-task breakdown for a human to judge against. |
+| `expectedFiles` | string[] | no | Files the task should surface. When present, they drive the file-hit-rate metric. |
+
+These shapes are defined by the `EvalTask` interface (`src/search/eval.ts:7-11`). A minimal valid file is an array of objects, each with at least `task` and `grading`; anything else throws during load.
 
 ## Inputs
 
-| Input | Where it comes from | Effect |
-|---|---|---|
-| `fixture` (positional) | First arg | Path to a JSON file describing the eval tasks. Required. |
-| `--dir D` | CLI flag (default `.`) | Project directory whose RAG index is searched. |
-| `--top N` | CLI flag (default `config.benchmarkTopK`) | How many search results to retrieve per task; reused for both conditions even though only with-rag uses it. |
-| `--out F` | CLI flag, optional | If set, full traces are written to this path as JSON. |
-
-### Fixture file format
-
-The fixture is a JSON array. Each entry is an `EvalTask`:
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `task` | string | yes | The natural-language ask the simulated agent would search for. |
-| `grading` | string | yes | Human-readable description of what a good answer looks like. Printed in the report; not used for automated grading. |
-| `expectedFiles` | string[] | optional | Files the search ideally returns. When present, contributes to the file-hit rate. Path matching is loose (suffix / endsWith / exact) so relative paths work. |
-
-The validator only checks `task` and `grading` are present and the file is a JSON array (`src/search/eval.ts:44-52`). Extra fields are tolerated. The fixture schema is flagged as not yet fully stable — the open question on this page is to document the exact schema once it is.
+| Name | Type | Required | Description |
+| --- | --- | --- | --- |
+| `fixture` | positional path | yes | Path to the JSON task file. Resolved relative to cwd. Missing value prints usage and exits 1 (`src/cli/commands/eval.ts:8-12`). |
+| `--dir` | path | no | Project directory whose index is queried. Defaults to `.` and is resolved to an absolute path (`src/cli/commands/eval.ts:14`). |
+| `--top` | integer | no | Number of results to request per "with-rag" search. Defaults to the project's `benchmarkTopK` config value, which itself defaults to 5 (`src/cli/commands/eval.ts:18`, `src/config/index.ts:32`). |
+| `--out` | path | no | When set, the raw traces are written here as JSON after the report prints (`src/cli/commands/eval.ts:15`,`26-29`). |
 
 ## Outputs
 
-- **Stdout**: a formatted A/B summary table from `formatEvalReport` plus a per-task breakdown listing each task, the files found, and its grading rubric.
-- **Trace file** (when `--out` is set): a JSON array of `EvalTrace` records, two per task (one per condition). Each trace contains `task`, `grading`, `condition`, `searchResults` (raw `DedupedResult[]` with score + snippet), `filesReferenced`, `searchCount`, and `durationMs` (`src/search/eval.ts:13-21`).
-- **Exit code**: `0` on success, `1` if no fixture argument was given. There are no quality thresholds — eval will not exit non-zero on bad results (unlike `mimirs benchmark`).
+| Output | Where it lands / shape / description |
+| --- | --- |
+| A/B eval report | Printed to stdout. A header line with the task count, a four-row comparison table (avg results, avg files found, file hit rate, avg latency) for both conditions, then a per-task breakdown listing the task text, the basenames of files found, and the grading criteria (`src/search/eval.ts:143-167`). |
+| Trace file | Only when `--out` is given. A JSON array of every `EvalTrace`, including full search results, pretty-printed with two-space indentation (`src/search/eval.ts:169-171`). |
 
-## Reported metrics
+The report compares the two conditions on these metrics:
 
-`formatEvalReport` prints these fields side-by-side for each condition (`src/search/eval.ts:143-167`):
+| Metric | With RAG | Without RAG |
+| --- | --- | --- |
+| Avg results | Mean number of search hits per task | Always 0 (no search runs) |
+| Avg files found | Mean number of referenced files per task | Always 0 |
+| File hit rate | % of tasks (that declare `expectedFiles`) where at least one expected file was found | 0% — nothing is found |
+| Avg latency | Mean search time in ms | Near 0 — no work is done |
 
-- **Avg results** — `searchResults.length` averaged across traces in that condition. Always `0` for without-rag.
-- **Avg files found** — same as above (one file per result). For with-rag this is bounded by `--top`.
-- **File hit rate** — share of tasks with a non-empty `expectedFiles` where at least one expected file appears in the trace's results. Without-rag is always `0%` because nothing was searched.
-- **Avg latency** — milliseconds spent inside `runEvalTask`; for without-rag this is essentially noise from the `performance.now()` bracket.
+## State changes
 
-The per-task breakdown only iterates the with-rag traces and shows the file basenames found per task. The without-rag column exists in the header to make the comparison obvious but is not detailed per task — there is nothing to show.
+This command does not mutate the index or any persistent project state. It opens the database for searching and closes it at the end (`src/cli/commands/eval.ts:16`,`31`). The only file system write is optional: when `--out` is set it creates or overwrites the trace file at the resolved path (`src/search/eval.ts:169-171`).
 
 ## Branches and failure cases
 
-- Missing fixture argument → `cli.error` with usage line + `process.exit(1)`.
-- Fixture is not a JSON array → `loadEvalTasks` throws and the command crashes before any search runs.
-- Fixture entry missing `task` or `grading` → same; the error message includes the offending entry.
-- `expectedFiles` absent on all tasks → file hit rate is `0` (the `withExpected` counter never increments).
-- `--top` parses with `parseInt` and no validation. Non-numeric values become `NaN` and propagate into the search call.
-- The command does not validate that `--out` is writable until `saveEvalTraces` actually runs at the end — a bad path will surface as a `fs/promises.writeFile` error after the eval has completed.
+- **Missing fixture argument** — no positional file: prints the usage string and exits with code 1 (`src/cli/commands/eval.ts:8-12`).
+- **File not an array** — `loadEvalTasks` throws "Eval file must be a JSON array of { task, grading } objects" (`src/search/eval.ts:44-46`).
+- **Entry missing required fields** — any element without `task` or `grading` throws an error naming the offending entry (`src/search/eval.ts:48-52`).
+- **Invalid JSON** — `JSON.parse` throws before validation runs (`src/search/eval.ts:42`).
+- **`--top` not passed** — falls back to the config's `benchmarkTopK` (default 5) (`src/cli/commands/eval.ts:18`).
+- **`--out` not passed** — the trace file write is skipped; only the report prints (`src/cli/commands/eval.ts:26`).
+- **Task with no `expectedFiles`** — that task is excluded from the file-hit-rate denominator. If no task declares expected files, the rate is reported as 0 because the divisor is 0 (`src/search/eval.ts:118-130`).
+- **File-match logic** — an expected file counts as found when any referenced path equals it, ends with it, or is a suffix of it, so relative and absolute path forms both match (`src/search/eval.ts:124-126`).
+- **Empty trace set guard** — average computation divides by `traceSet.length || 1`, so an empty set yields 0 averages rather than a divide-by-zero (`src/search/eval.ts:111`).
 
 ## Example
 
-```sh
-mimirs eval evals/agent-tasks.json --dir . --top 5 --out evals/last-run.json
+```bash
+# tasks.json:
+# [
+#   {
+#     "task": "where is the database opened",
+#     "grading": "should point to the RagDB constructor",
+#     "expectedFiles": ["src/db/index.ts"]
+#   }
+# ]
+
+bun run mimirs eval tasks.json --dir . --top 5 --out traces.json
 ```
 
-Fixture entry:
-
-```json
-[
-  {
-    "task": "where is the embedding model configured",
-    "grading": "Should mention embeddings/embed.ts and the configureEmbedder function",
-    "expectedFiles": ["src/embeddings/embed.ts"]
-  }
-]
-```
-
-Illustrative report:
+Illustrative report shape:
 
 ```
+Running A/B eval with 1 tasks against /path/to/project...
+
 A/B Eval results (1 tasks):
 
                      With RAG    Without RAG
   Avg results:            5.0            0.0
   Avg files found:        5.0            0.0
   File hit rate:          100%             0%
-  Avg latency:             42ms            0ms
+  Avg latency:            12ms             0ms
 
 Per-task breakdown:
-  "where is the embedding model configured"
-    files found: embed.ts, config.ts, indexer.ts, hybrid.ts, init.ts
-    grading: Should mention embeddings/embed.ts and the configureEmbedder function
+  "where is the database opened"
+    files found: index.ts, hybrid.ts
+    grading: should point to the RagDB constructor
+
+Traces saved to traces.json
 ```
 
-## Related flows
+## Related
 
-- [cli/benchmark](benchmark.md) — fixture-based retrieval benchmark with quantitative metrics (recall@K, MRR). `eval` is the A/B counterpart that simulates agent search; `benchmark` measures retrieval quality directly.
+- [benchmark](benchmark.md) — the sibling measurement command, which scores retrieval quality (recall and MRR) against labeled queries rather than running the with/without-search A/B comparison.
 
 ## Key source files
 
-- `src/cli/commands/eval.ts` — argument parsing, top-K resolution, optional trace save.
-- `src/search/eval.ts` — `loadEvalTasks`, `runEval`, `runEvalTask`, `formatEvalReport`, `saveEvalTraces`.
-
-## Open questions
-
-- The exact fixture schema is marked unstable in discovery. The validator currently only enforces `task` + `grading` are strings and that `expectedFiles` (if present) is treated as a string array via index access — there is no explicit type check on `expectedFiles`. Treat the format as best-effort until the schema is fixed.
+- `src/cli/commands/eval.ts` — command entry point: argument parsing, orchestration, optional trace save.
+- `src/search/eval.ts` — task loading, per-task trace building, A/B aggregation, report formatting, trace persistence.
+- `src/config/index.ts` — supplies the `benchmarkTopK` default used when `--top` is omitted.
+- `src/search/hybrid.ts` — the `search` function that powers the "with-rag" condition.

@@ -1,16 +1,27 @@
 # CLI: checkpoint
 
-`mimirs checkpoint` is the CLI mirror of the checkpoint MCP tools.
-Subcommands: `create` saves a new checkpoint row (a typed note with
-title, summary, optional file list and tags), `list` enumerates
-stored checkpoints filtered by type, and `search` runs vector
-similarity over the title+summary embedding. The CLI shares the same
-schema and storage as the `create_checkpoint`, `list_checkpoints`,
-and `search_checkpoints` MCP tools, so anything created here is
-visible from agents and vice versa.
+`mimirs checkpoint` records and recalls short, durable notes about work done in a
+project — what was changed, why, and which files were involved. Each checkpoint
+is embedded so that later sessions can find it by meaning, not just exact words.
+This is the terminal-side equivalent of the
+[create_checkpoint](../tools/create-checkpoint.md),
+[list_checkpoints](../tools/list-checkpoints.md), and
+[search_checkpoints](../tools/search-checkpoints.md) MCP tools: same tables, same
+storage and scoring, exposed for scripts and manual use.
 
-Use it from the terminal when you want to write a checkpoint without
-going through Claude Code, or to grep what has accumulated.
+The command is a dispatcher. It reads the subcommand from `args[1]`, resolves the
+project directory from `--dir` (defaulting to `.`), opens the project's `RagDB`,
+and branches on `create`, `list`, or `search`. Any other value prints usage and
+exits with code `1`. The database is closed at the end
+(`src/cli/commands/checkpoint.ts:7-86`).
+
+## Subcommands
+
+| subcommand | required args | optional flags | what it does |
+|------------|---------------|----------------|--------------|
+| `create` | `<type> <title> <summary>` | `--files`, `--tags`, `--dir` | Embeds title + summary and stores one checkpoint row (`src/cli/commands/checkpoint.ts:12-36`). |
+| `list` | — | `--type`, `--top`, `--dir` | Enumerates stored checkpoints, newest first, optionally filtered by type (`src/cli/commands/checkpoint.ts:37-55`). |
+| `search` | `<query>` | `--type`, `--top`, `--dir` | Embeds the query and returns the closest checkpoints by vector distance (`src/cli/commands/checkpoint.ts:56-79`). |
 
 ## Flow
 
@@ -18,199 +29,155 @@ going through Claude Code, or to grep what has accumulated.
 sequenceDiagram
     autonumber
     actor User
-    participant CLI as checkpointCommand
-    participant Parser as parser.ts
-    participant Embed as embed
+    participant CLI as checkpoint.ts
+    participant Embed as embed()
     participant DB as RagDB
-    User->>CLI: mimirs checkpoint <create|list|search> [args]
+    User->>CLI: mimirs checkpoint <sub> ...
     CLI->>DB: new RagDB(dir)
-    alt create
-        CLI->>Parser: discoverSessions(dir)
-        Parser-->>CLI: SessionInfo[] (newest first)
-        CLI->>DB: getTurnCount(sessionId)
-        CLI->>Embed: embed("<title>. <summary>")
-        CLI->>DB: createCheckpoint(sessionId, turnIndex, ts, type, title, summary, files, tags, emb)
-        DB-->>CLI: new row id
-        CLI->>User: "Checkpoint #id created: [type] title"
-    else list
-        CLI->>DB: listCheckpoints(undefined, --type, --top)
-        DB-->>CLI: rows
-        loop each row
-            CLI->>User: "#id [type] title [tags]\n  ts (turn N)\n  summary\n  Files: ..."
-        end
-    else search
+    alt sub == create
+        CLI->>CLI: discoverSessions(dir), getTurnCount
+        CLI->>Embed: embed("title. summary")
+        Embed-->>CLI: Float32Array
+        CLI->>DB: createCheckpoint(... embedding)
+        CLI-->>User: Checkpoint #id created
+    else sub == list
+        CLI->>DB: listCheckpoints(undefined, type, top)
+        CLI-->>User: one block per checkpoint
+    else sub == search
         CLI->>Embed: embed(query)
-        CLI->>DB: searchCheckpoints(emb, --top, --type)
-        DB-->>CLI: rows with score
-        loop each row
-            CLI->>User: "score  #id [type] title\n  summary\n  Files: ..."
-        end
+        Embed-->>CLI: Float32Array
+        CLI->>DB: searchCheckpoints(emb, top, type)
+        CLI-->>User: scored results
+    else other
+        CLI-->>User: usage, exit 1
     end
     CLI->>DB: close()
 ```
 
-1. The user runs `mimirs checkpoint <sub> [args]`. The CLI reads
-   `args[1]` to pick a branch. Directory is taken from `--dir` or
-   defaults to `.` (`src/cli/commands/checkpoint.ts:9-10`).
-2. `RagDB` opens the project DB at the top of the handler. Every
-   branch closes it at the end.
-3. **`create`** requires the next three positional arguments:
-   `type`, `title`, and `summary`. Any missing argument prints the
-   usage string with `--files` and `--tags` hints and exits with code
-   1 (`src/cli/commands/checkpoint.ts:13-19`).
-4. `--files` and `--tags` are comma-separated strings, split with
-   `String.split(",").map(trim)`. They are stored as arrays on the
-   row (`src/cli/commands/checkpoint.ts:21-24`).
-5. The session/turn link is best-effort: the CLI calls
-   `discoverSessions(dir)` and uses the newest session id (or the
-   string literal `"unknown"` if none exists). It then asks the DB
-   for that session's `turnCount` and stores `turnIndex = max(0,
-   turnCount - 1)` — i.e. the index of the most recent turn the DB
-   currently knows about (`src/cli/commands/checkpoint.ts:26-29`).
-6. The embedding is computed once over `"<title>. <summary>"` and
-   passed to `db.createCheckpoint`. The DB call returns the new row
-   id, which is printed back to the user
+1. The user runs the command; the directory is resolved and a `RagDB` opened
+   (`src/cli/commands/checkpoint.ts:8-10`).
+2. `create` validates that `type`, `title`, and `summary` are all present, else
+   prints usage and exits `1` (`src/cli/commands/checkpoint.ts:13-19`).
+3. To attach the checkpoint to a point in the session timeline, it finds the most
+   recent session transcript and reads its stored turn count, using
+   `turnCount - 1` (floored at `0`) as the turn index
+   (`src/cli/commands/checkpoint.ts:26-29`).
+4. It embeds the string `"<title>. <summary>"` and stores the row via
+   `createCheckpoint`, printing the new id
    (`src/cli/commands/checkpoint.ts:31-36`).
-7. **`list`** calls `db.listCheckpoints(undefined, type, top)` — the
-   first argument is `sessionId`, deliberately left undefined so the
-   listing spans the whole project, not just the latest session
-   (`src/cli/commands/checkpoint.ts:38-40`). Default `--top` is 20.
-8. Each listed checkpoint is printed as a four-line block: header
-   with id, type, title, and tags; timestamp and `turn N` line;
-   summary; and an optional `Files: ...` line when
-   `filesInvolved` is non-empty (`src/cli/commands/checkpoint.ts:45-54`).
-9. **`search`** requires the query as `args[2]`. Missing query prints
-   usage and exits 1. Default `--top` is 5
-   (`src/cli/commands/checkpoint.ts:56-64`).
-10. The query is embedded and passed to
-    `db.searchCheckpoints(emb, top, type)`. Each result is printed as
-    a three-line block: `<score>  #id [type] title`, the summary, and
-    the optional files line. Score is rendered with four decimals
-    (`src/cli/commands/checkpoint.ts:65-78`).
+5. `list` queries up to `--top` (default 20) checkpoints, optionally filtered by
+   `--type`, and prints each one (`src/cli/commands/checkpoint.ts:38-54`).
+6. `search` embeds the query and runs a vector-distance search over the stored
+   checkpoint embeddings, printing each result with its score
+   (`src/cli/commands/checkpoint.ts:63-78`).
+7. Any unrecognized subcommand prints usage and exits `1`
+   (`src/cli/commands/checkpoint.ts:80-82`).
 
 ## Inputs
 
-| Input | Subcommand | Source | Notes |
-| --- | --- | --- | --- |
-| `create\|list\|search` | all | `args[1]` | Required. Anything else triggers the usage error and exit 1 (`src/cli/commands/checkpoint.ts:80-83`). |
-| `type` | create | `args[2]` | Required. A free-form string (for example `task-done`, `decision`, `bug`). Also accepted by `--type` on `list` and `search` as a filter. |
-| `title` | create | `args[3]` | Required. Used in the embedding and rendered first in lists. |
-| `summary` | create | `args[4]` | Required. Concatenated with the title for the embedding text and shown verbatim in list/search output. |
-| `--files f1,f2` | create | flag | Optional. Comma-separated paths. Stored as an array on the row. |
-| `--tags t1,t2` | create | flag | Optional. Comma-separated labels. Stored as an array on the row. |
-| `--type T` | list, search | flag | Optional. Filter rows to one checkpoint type. |
-| `--top N` | list, search | flag | Optional. Defaults to 20 for `list`, 5 for `search`. |
-| `query` | search | `args[2]` | Required for `search`. Embedded and matched against the row embeddings. |
-| `--dir D` | all | flag | Optional. Project directory. Defaults to `.`. |
+| name | type | required | description |
+|------|------|----------|-------------|
+| subcommand | `create` \| `list` \| `search` | yes | `args[1]`; anything else prints usage, exits `1` (`src/cli/commands/checkpoint.ts:8`, `80-82`). |
+| type | string | yes for `create` | Free-text category (`args[2]`), e.g. `decision`, `bugfix`. Not validated against an enum (`src/cli/commands/checkpoint.ts:13`). |
+| title | string | yes for `create` | Short headline (`args[3]`); embedded with the summary (`src/cli/commands/checkpoint.ts:14`, `31`). |
+| summary | string | yes for `create` | Body text (`args[4]`); embedded with the title (`src/cli/commands/checkpoint.ts:15`, `31`). |
+| query | string | yes for `search` | Free-text query (`args[2]`); missing it prints usage, exits `1` (`src/cli/commands/checkpoint.ts:57-61`). |
+| `--files` | comma list | no (`create`) | Split on `,` and trimmed into `filesInvolved`; defaults to `[]` (`src/cli/commands/checkpoint.ts:21-23`). |
+| `--tags` | comma list | no (`create`) | Split on `,` and trimmed into `tags`; defaults to `[]` (`src/cli/commands/checkpoint.ts:22-24`). |
+| `--type` | string | no (`list`, `search`) | Restricts results to checkpoints with that exact type (`src/cli/commands/checkpoint.ts:38`, `63`). |
+| `--top` | integer | no | Result cap. Default `20` for `list`, `5` for `search` (`src/cli/commands/checkpoint.ts:39`, `64`). |
+| `--dir` | path | no | Project directory; resolved, defaults to `.` (`src/cli/commands/checkpoint.ts:9`). |
 
 ## Outputs
 
-| Output | What happens |
-| --- | --- |
-| Created checkpoint row | `create` writes a row to the `checkpoints` table with the embedding and prints `Checkpoint #<id> created: [<type>] <title>` (`src/cli/commands/checkpoint.ts:36`). |
-| Listing | `list` prints a four-line block per row (header, timestamp+turn, summary, optional files). Empty result prints `"No checkpoints found."`. |
-| Ranked search results | `search` prints a three-line block per row including the similarity score. Empty result prints `"No matching checkpoints found."`. |
+| output | where it lands / shape / description |
+|--------|--------------------------------------|
+| created checkpoint row | A row in `conversation_checkpoints` plus an embedding in `vec_checkpoints`; stdout prints `Checkpoint #<id> created: [<type>] <title>` (`src/cli/commands/checkpoint.ts:36`, `src/db/checkpoints.ts:4-48`). |
+| checkpoint listing | stdout: per checkpoint, `#<id> [<type>] <title> [tags]`, then timestamp + turn index, summary, and `Files:` line if any. Empty prints "No checkpoints found." (`src/cli/commands/checkpoint.ts:42-54`). |
+| ranked results | stdout: per result, `<score> #<id> [<type>] <title>`, summary, and `Files:` line if any. Empty prints "No matching checkpoints found." (`src/cli/commands/checkpoint.ts:68-78`). |
 
 ## State changes
 
-### `checkpoints` row
+**A new checkpoint row and its embedding are persisted.**
 
-- Before: no row for this checkpoint.
-- After: a new row exists carrying `sessionId`, `turnIndex`,
-  `timestamp`, `type`, `title`, `summary`, `filesInvolved`, `tags`,
-  and the title+summary embedding. The row id is returned and
-  printed.
-- Trigger: `mimirs checkpoint create <type> <title> <summary>`.
-- Why it matters: `list_checkpoints`, `search_checkpoints`, and this
-  CLI's `list`/`search` branches all read this row. It is the same
-  storage used by the agent-facing `create_checkpoint` tool, so
-  there is one source of truth.
-- Code: `db.createCheckpoint` in `src/db/index.ts:748-756`; the CLI
-  call site is `src/cli/commands/checkpoint.ts:31-35`.
-
-The CLI does not have an update or delete branch. Checkpoints, once
-created, live until the DB is wiped. Filtering by type is the
-preferred way to keep listings manageable.
+- *Before*: no row for this checkpoint exists.
+- *After*: `conversation_checkpoints` has a new row holding session id, turn
+  index, timestamp, type, title, summary, JSON-encoded `files_involved` and
+  `tags`; `vec_checkpoints` holds the title+summary embedding keyed by the new
+  checkpoint id.
+- *Why it matters*: this is the only way later `list`/`search` calls (CLI or the
+  [search_checkpoints](../tools/search-checkpoints.md) tool) surface the note.
+- *Code*: `createCheckpoint` runs both inserts inside one transaction and returns
+  the new id. Note that the row's own `embedding` column is written as `null`;
+  the usable embedding lives in the `vec_checkpoints` virtual table, which is what
+  search queries (`src/db/checkpoints.ts:4-48`).
 
 ## Branches and failure cases
 
-- **Unknown or missing subcommand**: prints
-  `"Usage: mimirs checkpoint <create|list|search>"` and exits 1
-  (`src/cli/commands/checkpoint.ts:80-83`).
-- **`create` with missing positional args**: prints the long usage
-  with `--files` and `--tags` hints, exits 1
-  (`src/cli/commands/checkpoint.ts:16-19`).
-- **`search` with missing query**: prints
-  `"Usage: mimirs checkpoint search <query> ..."`, exits 1
-  (`src/cli/commands/checkpoint.ts:58-61`).
-- **No sessions discovered when creating**: `sessionId` falls back to
-  the literal string `"unknown"` and `turnIndex` to `0`. The row is
-  still created; the link to a real conversation turn is just not
-  recorded (`src/cli/commands/checkpoint.ts:27-29`).
-- **Empty result sets**: `list` prints `"No checkpoints found."`;
-  `search` prints `"No matching checkpoints found."`. Both exit 0.
-- **Type filter that matches nothing**: hits the same empty-result
-  paths above — there is no special "no rows match this type"
-  message.
+| branch | behavior |
+|--------|----------|
+| `create` missing type/title/summary | Prints usage, exits `1` (`src/cli/commands/checkpoint.ts:16-19`). |
+| `create`, no session transcripts | `discoverSessions` returns empty, so `sessionId` falls back to the literal `"unknown"` and `turnIndex` is `0` (`src/cli/commands/checkpoint.ts:26-29`). |
+| `create`, session never indexed | `getTurnCount` returns `0`, so `turnIndex` is `0` (`src/cli/commands/checkpoint.ts:28-29`). |
+| `--files` / `--tags` absent | Default to empty arrays, stored as `"[]"` (`src/cli/commands/checkpoint.ts:23-24`). |
+| `list`, none found | Prints "No checkpoints found." (`src/cli/commands/checkpoint.ts:42-43`). |
+| `list` / `search` with `--type` | Filters to that exact type; `list` filters in SQL, `search` filters the candidate rows after the vector query (`src/db/checkpoints.ts:90-143`). |
+| `search` missing query | Prints usage, exits `1` (`src/cli/commands/checkpoint.ts:58-61`). |
+| `search`, no matches | Prints "No matching checkpoints found." (`src/cli/commands/checkpoint.ts:68-69`). |
+| unknown subcommand | Prints usage, exits `1` (`src/cli/commands/checkpoint.ts:80-82`). |
 
-## Filtering by type
+## Type filtering and scoring details
 
-`type` is a free-form string. The schema does not validate it, so
-projects typically pick a small vocabulary and stick to it (for
-example: `task-done`, `decision`, `bug`, `note`). The CLI passes
-`--type` straight into `db.listCheckpoints` and
-`db.searchCheckpoints` as the third argument; both functions accept
-an optional type filter applied in SQL. Mistyped values produce
-empty results silently.
+`list` passes `--type` straight into the SQL `WHERE` clause via `listCheckpoints`
+and orders newest-first. `search` over-fetches `topK * 2` candidates by vector
+distance, then skips any whose `type` does not match the requested filter and
+stops once `topK` survivors are collected; this means a tight `--type` filter can
+return fewer than `--top` results. The printed score is `1 / (1 + distance)`, so
+higher is closer (`src/db/checkpoints.ts:90-143`).
 
 ## Parity with the MCP tools
 
-| CLI subcommand | MCP tool | Notes |
-| --- | --- | --- |
-| `checkpoint create` | `create_checkpoint` | Same `db.createCheckpoint` call, same embedding strategy (title + ". " + summary). The MCP tool runs inside an active session and therefore knows the real `sessionId` and `turnIndex` for free; the CLI infers them from the newest discovered session. |
-| `checkpoint list` | `list_checkpoints` | Same `db.listCheckpoints` call. Both accept a type filter and a top-N cap. |
-| `checkpoint search` | `search_checkpoints` | Same `db.searchCheckpoints` call after embedding the query. The CLI prints a four-decimal score; the MCP tool returns the score as a number for the agent. |
-
-Anything created from either surface is visible to the other.
+The CLI and the MCP tools call the same `RagDB` methods —
+`createCheckpoint`, `listCheckpoints`, `searchCheckpoints` — so behavior is
+shared. The differences are at the edges: the CLI takes positional args and comma
+lists, formats text for a terminal, and derives `sessionId`/`turnIndex` from
+discovered sessions; the tools accept structured arguments and return structured
+results. See [create_checkpoint](../tools/create-checkpoint.md),
+[list_checkpoints](../tools/list-checkpoints.md), and
+[search_checkpoints](../tools/search-checkpoints.md).
 
 ## Example
 
+```bash
+# Record a decision touching two files
+bun run mimirs checkpoint create decision \
+  "switch embeddings to local model" \
+  "moved off the hosted embedder to cut latency; updated config defaults" \
+  --files src/embeddings/embed.ts,src/config/index.ts \
+  --tags embeddings,perf
+
+# List the last 10 bugfix checkpoints
+bun run mimirs checkpoint list --type bugfix --top 10
+
+# Find checkpoints about embeddings
+bun run mimirs checkpoint search "why we changed the embedder" --top 5
 ```
-mimirs checkpoint create decision \
-  "Hybrid weight set to 0.7" \
-  "Benchmarks favored 0.7 vector / 0.3 text on this corpus." \
-  --files src/search/hybrid.ts,src/config/index.ts \
-  --tags search,tuning
-# → Checkpoint #42 created: [decision] Hybrid weight set to 0.7
 
-mimirs checkpoint list --type decision --top 5
-# → #42 [decision] Hybrid weight set to 0.7 [search, tuning]
-#     2026-04-22T11:00:00.000Z (turn 17)
-#     Benchmarks favored 0.7 vector / 0.3 text on this corpus.
-#     Files: src/search/hybrid.ts, src/config/index.ts
+Illustrative `search` output:
 
-mimirs checkpoint search "hybrid weight benchmark" --top 3
-# → 0.8123  #42 [decision] Hybrid weight set to 0.7
-#     Benchmarks favored 0.7 vector / 0.3 text on this corpus.
-#     Files: src/search/hybrid.ts, src/config/index.ts
+```
+0.7421  #7 [decision] switch embeddings to local model
+  moved off the hosted embedder to cut latency; updated config defaults
+  Files: src/embeddings/embed.ts, src/config/index.ts
 ```
 
 ## Key source files
 
-- `src/cli/commands/checkpoint.ts` — CLI entrypoint with three
-  branches.
-- `src/embeddings/embed.ts` — `embed` for both `create` and `search`.
-- `src/db/index.ts` — `RagDB.createCheckpoint`,
-  `RagDB.listCheckpoints`, `RagDB.searchCheckpoints`,
-  `RagDB.getTurnCount`.
-- `src/conversation/parser.ts` — `discoverSessions` for the
-  best-effort session/turn link on `create`.
-
-## Related flows
-
-- [tools/create-checkpoint](../tools/create-checkpoint.md) — MCP tool
-  that writes the same row from inside an active session.
-- [tools/list-checkpoints](../tools/list-checkpoints.md) — MCP tool
-  reading the same rows.
-- [tools/search-checkpoints](../tools/search-checkpoints.md) — MCP
-  tool running the same vector query.
+- `src/cli/commands/checkpoint.ts` — subcommand dispatch, arg parsing, session
+  resolution, output formatting.
+- `src/db/checkpoints.ts` — `createCheckpoint`, `listCheckpoints`,
+  `searchCheckpoints`, and row/embedding storage.
+- `src/embeddings/embed.ts` — `embed`, which turns title+summary or the query
+  into the vector used for storage and search.
+- `src/conversation/parser.ts` — `discoverSessions`, used to attach a checkpoint
+  to the most recent session.

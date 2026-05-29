@@ -1,105 +1,110 @@
 # Tool: delete_annotation
 
-`delete_annotation` removes a single annotation by its numeric id. Use it when the underlying reason for a note is gone — the bug is fixed, the constraint is lifted, or the file or symbol the note pointed at no longer exists. The handler is at `src/tools/annotation-tools.ts:90-114` and calls `db.deleteAnnotation`, defined in `src/db/annotations.ts:175-194`.
+`delete_annotation` removes one persistent note by its numeric id. Notes left by [annotate](annotate.md) stay in the index forever and keep surfacing inline in [read_relevant](read-relevant.md) output, so once the thing a note warned about is gone — a bug got fixed, a constraint was lifted, a file or symbol was deleted — the note becomes noise. This tool retires it.
 
-The id is the same `#<id>` produced by [`get_annotations`](get-annotations.md), so the normal workflow is: list or search annotations, copy the id, then call this tool.
+Because you delete by id, you normally call [get_annotations](get-annotations.md) first to find the id; the inline `[NOTE]` lines in `read_relevant` do not print ids.
 
-## Flow
+The handler is registered in `src/tools/annotation-tools.ts:90-114`.
+
+## How it works
 
 ```mermaid
 sequenceDiagram
   autonumber
-  participant Caller as Caller (MCP)
-  participant Handler as delete_annotation handler
-  participant DB as RagDB.deleteAnnotation
-  participant SQLite as annotations + fts + vec tables
+  participant Caller
+  participant Tool as delete_annotation handler
+  participant DB as deleteAnnotation
+  participant SQLite as annotations / vec / fts
 
-  Caller->>Handler: { id, directory? }
-  Handler->>Handler: resolveProject(directory)
-  Handler->>DB: deleteAnnotation(id)
-  DB->>SQLite: SELECT id, note FROM annotations WHERE id = ?
-  alt row missing
-    DB-->>Handler: false
-    Handler-->>Caller: "Annotation #<id> not found."
+  Caller->>Tool: id, directory?
+  Tool->>Tool: resolveProject(directory) -> RagDB
+  Tool->>DB: deleteAnnotation(id)
+  DB->>SQLite: SELECT id, note WHERE id = ?
+  alt no such row
+    DB-->>Tool: false
+    Tool-->>Caller: "Annotation #id not found."
   else row exists
-    DB->>SQLite: fts_annotations 'delete' row
-    DB->>SQLite: DELETE FROM vec_annotations WHERE annotation_id = ?
-    DB->>SQLite: DELETE FROM annotations WHERE id = ?
-    DB-->>Handler: true
-    Handler-->>Caller: "Annotation #<id> deleted."
+    DB->>SQLite: remove FTS, vector, and base rows
+    DB-->>Tool: true
+    Tool-->>Caller: "Annotation #id deleted."
   end
 ```
 
-1. Caller invokes the tool with `id` (positive integer) and optional `directory`. Schema at `src/tools/annotation-tools.ts:93-99`.
-2. `resolveProject` selects the right `RagDB` for the project.
-3. `deleteAnnotation` first reads the existing row so it has the `note` text needed to evict the FTS row (`src/db/annotations.ts:176-180`).
-4. If no row matches, the helper returns `false` and the handler responds with `Annotation #<id> not found.` (`src/tools/annotation-tools.ts:104-108`). Nothing else is touched.
-5. If the row exists, a transaction removes it from the FTS index, the vector table, and the main `annotations` table in that order (`src/db/annotations.ts:183-193`). The FTS removal uses the `'delete'` command with the original `note` text because FTS5 contentless indexes need the original tokens to undo them.
-6. The handler returns `Annotation #<id> deleted.` (`src/tools/annotation-tools.ts:110-112`).
-
-## When to use
-
-- A bug referenced by the note has been fixed — the warning is now misleading.
-- A constraint has been lifted (e.g. a workaround is no longer needed).
-- The file or symbol the note pointed at was deleted. Stale notes still show up in `get_annotations` and `read_relevant`.
-- A note is wrong or obsolete and you want to replace it with a different one on a different symbol — to *edit* a note in place, call `annotate` again with the same `(path, symbol)` instead, which upserts.
-
-## Behavior when id is missing
-
-The SELECT-before-DELETE pattern means a missing id is a fast, harmless no-op: the helper returns `false` and the response is the `not found` message (`src/db/annotations.ts:181`, `src/tools/annotation-tools.ts:104-108`). Nothing is written to any of the three tables, so the database is unchanged.
+1. The caller invokes the tool with a required `id` and an optional `directory`. The schema requires `id` to be an integer of at least 1 (`src/tools/annotation-tools.ts:93-99`).
+2. `resolveProject` resolves the optional `directory` into the project's `RagDB` handle, falling back to `RAG_PROJECT_DIR` or the current working directory (`src/tools/annotation-tools.ts:101`).
+3. `deleteAnnotation(id)` is called. It first reads the row's `id` and `note` to confirm the annotation exists (`src/tools/annotation-tools.ts:103`, `src/db/annotations.ts:176-180`).
+4. If no row matches, the function returns `false` without touching anything (`src/db/annotations.ts:181`).
+5. If the row exists, a transaction removes the full-text index entry for the note, the vector entry, and finally the base `annotations` row (`src/db/annotations.ts:183-192`).
+6. The handler maps the boolean to a message: `false` becomes `Annotation #<id> not found.`, `true` becomes `Annotation #<id> deleted.` (`src/tools/annotation-tools.ts:104-112`).
 
 ## Inputs
 
-| Input | Required | Notes |
-|---|---|---|
-| `id` | yes | Positive integer id. Comes from `get_annotations` output (`#<id>`). Zod requires `int().min(1)` at `src/tools/annotation-tools.ts:94`. |
-| `directory` | no | Project directory. Defaults to `RAG_PROJECT_DIR` env or cwd. |
+| name | type | required | description |
+|------|------|----------|-------------|
+| `id` | integer ≥ 1 | yes | The annotation id to delete. This is the `#<id>` shown in [get_annotations](get-annotations.md) output (`src/tools/annotation-tools.ts:94`). |
+| `directory` | string | no | Project directory to operate on. Defaults to the `RAG_PROJECT_DIR` env var or the current working directory (`src/tools/annotation-tools.ts:95-98`). |
 
 ## Outputs
 
-| Output | Notes |
-|---|---|
-| `Annotation #<id> deleted.` | On a successful delete. |
-| `Annotation #<id> not found.` | When the id does not match any row. |
+| output | where it lands / shape / description |
+|--------|--------------------------------------|
+| Confirmation message | A single text block. On success: `Annotation #<id> deleted.` On a missing id: `Annotation #<id> not found.` (`src/tools/annotation-tools.ts:104-112`). |
 
 ## State changes
 
-`annotations` row — existing row → `null`. The row is removed from `annotations`, the matching FTS5 row is evicted with `INSERT … VALUES ('delete', rowid, note)`, and the vector row is removed from `vec_annotations`. All three writes run inside `db.transaction` so a partial state is not visible to other readers (`src/db/annotations.ts:183-193`). After this point the annotation no longer surfaces as a `[NOTE]` block in `read_relevant`, and `get_annotations` will not return it.
+**`annotations` row for the given id**
+
+- Before: an existing row in `annotations`, with matching entries in `vec_annotations` and `fts_annotations`.
+- After: all three are gone — the base row, its vector, and its full-text entry are removed inside one transaction (`src/db/annotations.ts:183-192`).
+
+This matters because the note will no longer surface anywhere. [read_relevant](read-relevant.md) builds its `[NOTE]` lines from live annotation rows, so deleting the row stops the warning from appearing on future reads, and [get_annotations](get-annotations.md) can no longer return it by path or by semantic query. All three storage locations are cleared together so no orphaned vector or full-text entry is left behind (`src/db/annotations.ts:183-192`).
 
 ## Branches and failure cases
 
-- Non-integer or zero/negative `id` is rejected by Zod before the handler runs.
-- A missing id returns the `not found` message rather than throwing. Callers can retry or list annotations again without special-casing the error.
-- Because the helper deletes the FTS row using the stored note text, an externally-corrupted FTS index could fail the transaction. The DB transaction wraps all three writes, so a failure rolls back and the annotation stays intact.
+- **Missing id.** When no row matches the id, `deleteAnnotation` returns `false` before opening the delete transaction, and the handler reports `Annotation #<id> not found.` — nothing is changed (`src/db/annotations.ts:181`, `src/tools/annotation-tools.ts:104-108`).
+- **Existing id.** The row and its index entries are removed and the handler reports success (`src/db/annotations.ts:183-193`, `src/tools/annotation-tools.ts:110-112`).
+- **Out-of-range id.** An `id` below 1 fails schema validation before the handler runs, since the input requires an integer of at least 1 (`src/tools/annotation-tools.ts:94`).
+- **Atomicity.** The full-text, vector, and base deletes run in a single transaction, so a partial delete cannot leave the note half-removed (`src/db/annotations.ts:183-192`).
+- **Directory resolution.** An invalid project directory surfaces as an error from `resolveProject` / `RagDB`, not from this handler's own logic.
 
 ## Example
 
+Delete a note whose id you got from [get_annotations](get-annotations.md):
+
 ```json
-{
-  "name": "delete_annotation",
-  "arguments": { "id": 17 }
-}
+{ "id": 7 }
 ```
 
-On success:
+Returned text on success:
 
 ```
-Annotation #17 deleted.
+Annotation #7 deleted.
 ```
 
-On miss:
+If id 7 was already removed or never existed:
 
 ```
-Annotation #17 not found.
+Annotation #7 not found.
 ```
+
+## When to use it
+
+Delete a note once the reason for it is gone:
+
+- The bug or race condition it warned about has been fixed.
+- The "don't refactor yet" constraint has been lifted.
+- The file or symbol it was attached to was deleted, so the note can never match a chunk again.
+
+Find the id with [get_annotations](get-annotations.md) — by path for a single file, or by `query` if you only remember the warning's content — then pass it here.
+
+## Related tools
+
+- [annotate](annotate.md) — creates the notes this tool removes.
+- [get_annotations](get-annotations.md) — how you find the id to pass in.
+- [read_relevant](read-relevant.md) — where a note stops appearing once deleted.
 
 ## Key source files
 
-- `src/tools/annotation-tools.ts` — handler at lines 90-114.
-- `src/db/annotations.ts` — `deleteAnnotation` at lines 175-194; uses the SELECT-then-DELETE pattern and a transaction across the three tables.
-- `src/db/index.ts` — exposes `RagDB.deleteAnnotation` to the handler.
-
-## Related flows
-
-- [annotate](annotate.md) — also the right tool for re-writing a note in place via `(path, symbol)` upsert.
-- [get_annotations](get-annotations.md) — produces the `#<id>` values used here.
+- `src/tools/annotation-tools.ts` — registers `delete_annotation` and maps the result boolean to a message.
+- `src/db/annotations.ts` — `deleteAnnotation`, including the existence check and the transactional removal across the three tables.
+- `src/db/index.ts` — the `RagDB` class exposing `deleteAnnotation` and defining the `annotations`, `vec_annotations`, and `fts_annotations` tables.

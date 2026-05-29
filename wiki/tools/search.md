@@ -1,179 +1,153 @@
 # Tool: search
 
-The `search` MCP tool is the entry point for "where does X live?" questions.
-It runs a hybrid vector + full-text search across every indexed file and
-returns ranked file paths with short snippets, deduplicated so each file
-shows up once. Agents use it as a discovery step before pulling content with
-`read_relevant` or jumping to a specific symbol with `search_symbols`.
+The `search` MCP tool answers the question "where in this codebase does X live?" by file. You give it a natural-language query (or a symbol name), and it returns a ranked list of file paths, each with a short snippet preview and a relevance score. It is the discovery step before reading: find the files, then call `read_relevant` to pull the actual code with line ranges.
 
-The handler lives in `src/tools/search.ts:31-99` and delegates the actual
-ranking to the `search` function in `src/search/hybrid.ts:313-397`.
+The handler is registered in `src/tools/search.ts:31-99`. The ranking work happens in the `search` function in `src/search/hybrid.ts:313-397`.
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Client as "MCP client"
-    participant Handler as "search handler"
-    participant Hybrid as "search() in hybrid.ts"
-    participant Vec as "vec_chunks (sqlite-vec)"
-    participant Fts as "fts_chunks (FTS5)"
-    participant Log as "query_log"
+## When to use it
 
-    Client->>Handler: tool call (query, top?, dirs?, ...)
-    Handler->>Handler: resolveProject + buildFilter
-    Handler->>Hybrid: search(query, db, topK, 0, hybridWeight, generated, filter)
-    Hybrid->>Hybrid: embed(query)
-    Hybrid->>Vec: db.search(embedding, topK*4, filter)
-    Hybrid->>Fts: db.textSearch(query, topK*4, filter)
-    Hybrid->>Hybrid: mergeHybridScores + symbol expansion + boosts
-    Hybrid->>Log: db.logQuery(query, count, topScore, topPath, durationMs)
-    Hybrid-->>Handler: DedupedResult[] (one entry per file)
-    Handler-->>Client: header + ranked list + read_relevant tip
-```
-
-1. The client invokes `search` with a natural-language query and optional
-   filters (`src/tools/search.ts:32-62`).
-2. `resolveProject` opens the project DB; `buildFilter` resolves any
-   `dirs`/`excludeDirs` to absolute paths against `projectDir` so they
-   match the absolute paths stored in the index (`src/tools/search.ts:13-29`).
-3. The handler calls `search(...)` with `topK = top ?? config.searchTopK`,
-   threshold `0`, the config-driven `hybridWeight`, the configured
-   `generated` patterns, and the filter (`src/tools/search.ts:67-68`).
-4. `search` embeds the query, then fetches `topK*4` vector hits and
-   `topK*4` BM25 hits, each pre-filtered by path
-   (`src/search/hybrid.ts:322-334`).
-5. `mergeHybridScores` combines the two streams using `hybridWeight`, then
-   the result is deduplicated per file, keeping the best score and
-   accumulating distinct snippets (`src/search/hybrid.ts:336-359`).
-6. Identifier-shaped tokens in the query trigger a symbol-table lookup;
-   exact symbol hits are merged into the candidate list
-   (`src/search/hybrid.ts:362-374`).
-7. Score adjustments: source-vs-test bias, filename affinity, generated-file
-   demotion, then a dependency-graph boost based on importer count
-   (`src/search/hybrid.ts:301-311`, `src/search/hybrid.ts:377-381`).
-8. `expandForDocs` appends documentation matches without displacing code
-   results, and the final list is logged to `query_log` via `db.logQuery`
-   before returning (`src/search/hybrid.ts:384-394`).
-9. The handler formats `score  path` lines with the first snippet truncated
-   to 400 characters and appends a tip that points the agent at
-   `read_relevant` (`src/tools/search.ts:84-97`).
+Use `search` when you do not yet know which files matter for a topic. It searches by meaning, not just by string match, so a query like "how does auth work" can surface files that never contain the word "auth". If you instead need the code body itself, call [read_relevant](read-relevant.md); if you know the exact symbol name, [search_symbols](search-symbols.md) is faster.
 
 ## Inputs
 
-- `query` — required string, 1 to 2000 characters. Used both for the
-  embedding and as the BM25 query (`src/tools/search.ts:36`).
-- `top` — optional 1–1000 result cap. Defaults to `config.searchTopK`
-  when omitted (`src/tools/search.ts:43-49`, `src/tools/search.ts:68`).
-- `extensions` — optional list of file extensions to include. Leading dot
-  is optional; matching is implemented in `buildFilter` →
-  `PathFilter.extensions` (`src/tools/search.ts:50-53`).
-- `dirs` — optional include list. Paths are resolved relative to the
-  project root and stored as absolute paths so they match the index
-  (`src/tools/search.ts:54-57`, `src/tools/search.ts:26`).
-- `excludeDirs` — optional exclude list, same resolution rule
-  (`src/tools/search.ts:58-61`, `src/tools/search.ts:27`).
-- `directory` — optional project root override; defaults to
-  `RAG_PROJECT_DIR` or the server cwd through `resolveProject`
-  (`src/tools/search.ts:37-42`).
+| name | type | required | description |
+| --- | --- | --- | --- |
+| `query` | string (1–2000 chars) | yes | The search text. Natural language or a symbol name. |
+| `top` | integer (1–1000) | no | Number of file results to return. Defaults to `config.searchTopK`. |
+| `extensions` | string[] | no | Restrict results to these file extensions, e.g. `[".ts", ".tsx"]`. A missing leading dot is tolerated. |
+| `dirs` | string[] | no | Restrict to these directories. Relative paths are resolved against the project root. |
+| `excludeDirs` | string[] | no | Drop results under these directories. |
+| `directory` | string | no | Which project to search. Defaults to the `RAG_PROJECT_DIR` env var or the current working directory. |
+
+The three scoping arrays are folded into a single path filter by `buildFilter` in `src/tools/search.ts:13-29`. If none of them are populated the filter is `undefined` and the search runs unscoped. Relative `dirs` and `excludeDirs` are resolved to absolute paths with `resolve(projectDir, d)` so they match the absolute paths stored in the index `src/tools/search.ts:24-28`.
 
 ## Outputs
 
-- Text content with one entry per file: `score  path` then a snippet
-  truncated to 400 characters. Snippets are taken from `result.snippets[0]`
-  — the highest-scoring chunk per file (`src/tools/search.ts:86-91`).
-- A header line counts the results, total indexed files, and elapsed
-  milliseconds (`src/tools/search.ts:84`).
-- A trailing tip points at `read_relevant` so the agent can pull full
-  content next (`src/tools/search.ts:93`).
-- Side effect: one row appended to `query_log` with the query, result
-  count, top score, top path, and `durationMs` (see State changes).
+| output | where it lands / shape / description |
+| --- | --- |
+| Ranked file list | Returned as a single MCP text block. A header line with the result count, total indexed file count, and elapsed milliseconds, then one entry per file: a 4-decimal score, the file path, and the first snippet truncated to 400 characters. A footer suggests calling `read_relevant`. |
+| Empty-result message | When nothing matches, a text block explaining that no results were found and suggesting `index_files`. |
+| Analytics row | A row written to the `query_log` table recording the query, result count, top score, top path, and duration. |
 
-## Hybrid scoring
+The output text is assembled at `src/tools/search.ts:84-97`. Each line is `score.toFixed(4)` followed by the path and `snippets[0]?.slice(0, 400)` `src/tools/search.ts:86-91`.
 
-The merge is a single linear interpolation:
+## How a query is scored
 
-- vector score and FTS score are both normalised onto a 0–1 scale before
-  merging.
-- `mergeHybridScores(vec, fts, hybridWeight)` returns
-  `hybridWeight * vec + (1 - hybridWeight) * fts` for documents that
-  appear in both lists; documents that appear in only one are scaled by
-  the corresponding weight (`src/search/hybrid.ts:64`).
-- `hybridWeight` comes from `config.hybridWeight` and is plumbed through
-  every call from the tool handler (`src/tools/search.ts:68`).
-- If the FTS query throws — usually a tokenisation error on a special
-  character — the handler still returns vector-only results and a debug
-  log line is emitted (`src/search/hybrid.ts:330-334`).
-- After merging, paths are reshaped by `applyPathBoost`,
-  `applyFilenameBoost`, and `applyGraphBoost`. The graph boost is
-  `0.05 * log2(importerCount + 1)`, so a widely-imported file gains up to
-  a few hundredths of a point (`src/search/hybrid.ts:301-311`).
+The tool runs a hybrid search: it combines semantic (vector) similarity with keyword (full-text) matching, then layers several path-based adjustments on top.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Caller
+  participant Handler as search handler<br>(src/tools/search.ts)
+  participant Svc as search()<br>(src/search/hybrid.ts)
+  participant Embed as embed()
+  participant DB as RagDB
+  Caller->>Handler: query, top, filters
+  Handler->>Handler: resolveProject + buildFilter
+  Handler->>Svc: search(query, db, topK, weight, filter)
+  Svc->>Embed: embed(query)
+  Embed-->>Svc: query vector
+  Svc->>DB: vector search (topK*4)
+  Svc->>DB: BM25 text search (topK*4)
+  Svc->>Svc: merge scores, dedupe by file
+  Svc->>DB: exact symbol lookup for identifiers
+  Svc->>Svc: path/filename/generated/graph boosts, sort
+  Svc->>DB: logQuery(...)
+  Svc-->>Handler: ranked DedupedResult[]
+  Handler-->>Caller: header + ranked paths + footer
+```
+
+1. The handler resolves the project directory, database, and config, and builds the path filter `src/tools/search.ts:64-65`.
+2. It times the call with `performance.now()` and invokes `search` with `top ?? config.searchTopK`, a threshold of `0`, `config.hybridWeight`, and the configured generated-file patterns `src/tools/search.ts:67-68`.
+3. `search` embeds the query into a vector `src/search/hybrid.ts:323`.
+4. It runs a vector search for `topK * 4` candidates so there is room to dedupe `src/search/hybrid.ts:326`.
+5. It runs a BM25 keyword search for `topK * 4` candidates. If the full-text query throws (for example on odd characters), it logs at debug level and falls back to vector-only results `src/search/hybrid.ts:329-334`.
+6. `mergeHybridScores` combines the two lists: each result's final score is `hybridWeight * vectorScore + (1 - hybridWeight) * textScore`, keyed by `path:chunkIndex` `src/search/hybrid.ts:65-91`. The default weight is 0.7, i.e. 70% vector and 30% keyword `src/search/hybrid.ts:58`.
+7. Results are deduplicated to one entry per file, keeping the best score and collecting distinct snippets `src/search/hybrid.ts:339-359`.
+8. If the query contains code-like identifiers, those are looked up by exact symbol name and merged in (see "Symbol expansion" below) `src/search/hybrid.ts:362-374`.
+9. Three score adjustments are applied in order — path boost, filename affinity, dependency-graph boost — then the list is sorted by score `src/search/hybrid.ts:377-381`.
+10. Documentation files are allowed to expand the result set so they do not push code out (see "Doc expansion") `src/search/hybrid.ts:384`.
+11. The query and its top result are logged for analytics `src/search/hybrid.ts:388-394`.
+12. The handler formats the ranked paths into text and returns them `src/tools/search.ts:84-97`.
+
+### Hybrid weight
+
+`config.hybridWeight` controls the blend. At 1.0 the score is pure vector similarity; at 0.0 it is pure keyword match. Vector scores come from distance as `1 / (1 + distance)` `src/db/search.ts:89`. The weight is read from project config and passed straight through `src/tools/search.ts:68`.
+
+### Score adjustments
+
+These multipliers run after merge and shape the final ranking:
+
+| adjustment | effect | source |
+| --- | --- | --- |
+| Path boost | Test files are multiplied by 0.85, recognized source dirs (`src`, `lib`, `app`, `pkg`, `packages`, `internal`, `cmd`) by 1.1 | `src/search/hybrid.ts:106-115` |
+| Filename affinity | Query words appearing in the filename stem add `0.1` each; words in directory segments add `0.05` each | `src/search/hybrid.ts:187-235` |
+| Boilerplate demotion | Files like `types.ts`, `index.d.ts`, `doc.go` are multiplied by 0.8 | `src/search/hybrid.ts:120-123`, `202-204` |
+| Generated demotion | Files matching the configured `generated` glob patterns are multiplied by 0.75 | `src/search/hybrid.ts:129`, `205-208` |
+| Graph boost | Files imported by others get `+0.05 * log2(importerCount + 1)` | `src/search/hybrid.ts:301-311` |
+
+### Symbol expansion
+
+`search` does not rely on semantics alone. It extracts code-style identifiers from the query — tokens with mixed case, underscores, or dots, at least 3 chars, minus common English stop words `src/search/hybrid.ts:239-259`. For each identifier it does an exact symbol lookup. A symbol hit on a file already in the candidate set boosts that file's score (`* 1.3`); a brand-new file is added with a base score of 0.75, since an exact name match is high signal `src/search/hybrid.ts:261-279`. Symbol hits are filtered through the same path filter in memory via `matchesFilter`, because they bypass the SQL filter `src/search/hybrid.ts:368`.
+
+### Doc expansion
+
+Markdown files (`.md`, `.mdx`) are useful context but should not displace code. After sorting, `expandForDocs` checks the top-K slice: if it contains both docs and code, it widens the returned slice by the number of docs so code files keep their slots. If the slice is all docs or all code, nothing is expanded `src/search/hybrid.ts:287-298`.
 
 ## State changes
 
-### `search_queries` row (the `query_log` table)
+### Analytics row in `query_log`
 
-- Before: no row exists for this invocation.
-- After: one new row in `query_log` with `query`, `result_count`,
-  `top_score`, `top_path`, `duration_ms`, and `created_at` set to the
-  current ISO timestamp.
-- Trigger: every successful call to `search()` writes one row, even when
-  the result list is empty — `db.logQuery` is called unconditionally at
-  the end of the function (`src/search/hybrid.ts:387-394`).
-- Why it matters: `search_analytics` aggregates this table to surface
-  zero-result and low-score queries, and the trend command compares
-  windows of it (`src/db/analytics.ts:10-67`).
+| before | after |
+| --- | --- |
+| No row for this query | One new `query_log` row: query text, result count, top score, top path, duration in ms, and an ISO timestamp |
+
+Every completed search writes this row by calling `db.logQuery(...)` near the end of `search` `src/search/hybrid.ts:388-394`. The write itself is a single `INSERT INTO query_log (...)` `src/db/analytics.ts:3-8`. This is the data that [search_analytics](search-analytics.md) later aggregates to surface zero-result and low-score queries. The row is written even when the search returns zero results — in that case `result_count` is 0 and `top_score`/`top_path` are null `src/search/hybrid.ts:391-392`.
+
+Note that the duration recorded inside `search` is measured around the embedding and database work only `src/search/hybrid.ts:322`, `387`, which is slightly less than the duration the handler reports in the header (the handler times the whole call, including project resolution overhead) `src/tools/search.ts:67-69`.
 
 ## Branches and failure cases
 
-- Empty index or no matches: the handler returns a single text block that
-  reports the indexed file count and suggests calling `index_files` first.
-  A scope-specific suffix is added when a path filter is active
-  (`src/tools/search.ts:72-82`).
-- FTS failure: caught and logged, falling back to vector-only ranking
-  (`src/search/hybrid.ts:330-334`). The query is still recorded.
-- Symbol expansion only runs when `extractIdentifiers(query)` finds an
-  identifier-shaped token; pure-prose queries skip it
-  (`src/search/hybrid.ts:362-374`).
+- **No filter fields set** — `buildFilter` returns `undefined` and the search runs across the whole index `src/tools/search.ts:19-23`.
+- **Filter set but nothing matches** — results are empty; the message includes " matching the given scope" to signal the filter may be too narrow `src/tools/search.ts:72-82`.
+- **Empty index / nothing matches** — returns the "No results found... Try calling index_files first." text with the current total file count `src/tools/search.ts:78`.
+- **Full-text query throws** — the BM25 path is wrapped in try/catch; on failure it logs at debug level and continues with vector-only results rather than erroring `src/search/hybrid.ts:330-334`.
+- **`top` omitted** — falls back to `config.searchTopK` `src/tools/search.ts:68`.
+- **Over-fetch for filters** — when a path filter is active the inner SQL fetches `topK * 5` rows before filtering, so a narrow scope still yields enough candidates `src/db/search.ts:52-63`.
+- **No code-like identifiers in query** — symbol expansion is skipped entirely `src/search/hybrid.ts:363`.
 
 ## Example
 
+Arguments to scope a search to TypeScript source under `src`, excluding tests:
+
 ```json
 {
-  "query": "how does indexing decide when to re-embed a file",
-  "top": 5,
+  "query": "how are query embeddings cached",
+  "top": 8,
   "extensions": [".ts"],
-  "dirs": ["src/indexing"],
+  "dirs": ["src"],
   "excludeDirs": ["tests"]
 }
 ```
 
-The response is plain text:
+Illustrative output shape:
 
 ```
-── 5 results across 198 indexed files (24ms) ──
+── 8 results across 186 indexed files (42ms) ──
 
-0.7421  src/indexing/indexer.ts
-  export async function indexFile(...) { ... }...
+0.8123  src/embeddings/embed.ts
+  export async function embed(text: string)...
 
-0.6133  src/indexing/hash.ts
-  function fileHash(...) { ... }...
+0.7440  src/db/search.ts
+  export function vectorSearch(db, queryEmbedding...)...
 
 ── Tip: call read_relevant with the same query to get full function/class content with exact line ranges. ──
 ```
 
-## Related flows
-
-- `read_relevant` — same hybrid scoring but returns chunk bodies with
-  exact line ranges instead of one row per file.
-- `search_symbols` — name-based lookup when you already know the symbol.
-- `search_analytics` — aggregates the `query_log` rows this tool writes.
-
 ## Key source files
 
-- `src/tools/search.ts` — MCP registration, input schema, output
-  formatting, and filter construction.
-- `src/search/hybrid.ts` — embedding, vector + FTS merge, boosts, dedup,
-  and analytics logging.
-- `src/db/index.ts` — `RagDB.search`, `RagDB.textSearch`, and
-  `RagDB.logQuery` thin wrappers over the SQLite layer.
-- `src/db/analytics.ts` — `query_log` insert and aggregation SQL.
+- `src/tools/search.ts` — registers the `search` tool, builds the path filter, formats output.
+- `src/search/hybrid.ts` — the `search` function: hybrid merge, dedupe, symbol expansion, boosts, analytics logging.
+- `src/db/search.ts` — SQL-level vector and full-text search plus the path-filter clause builder.
+- `src/db/analytics.ts` — `logQuery` writes the `query_log` row consumed by analytics.

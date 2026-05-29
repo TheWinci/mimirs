@@ -1,88 +1,145 @@
 # CLI: status
 
-`mimirs status` reads three counters out of the local index database and prints them. It is the simplest health check for "is this project indexed at all, and when did the last index run finish".
+`mimirs status` gives a quick, offline answer to "is this project indexed, and
+how much?" It opens the project's local database, reads three numbers — how many
+files and chunks are stored and when the most recent file was indexed — and
+prints them. It does not contact a running server and does not change anything.
 
-It does not contact a running server, does not look at `.mimirs/status` (which is the server's progress file), and does not read any config beyond what's needed to open the DB.
+Reach for it when you want to confirm an index exists and is not empty, for
+example right after running [index](index.md) or when debugging why
+[search](search.md) returns nothing. It reads straight from the database on
+disk, so it works whether or not the MCP server is running.
 
-## Flow
+The whole command is `statusCommand` in `src/cli/commands/status.ts:5`. The
+numbers come from `getStatus` in `src/db/files.ts:363`.
+
+## What the command does
+
+`statusCommand` resolves the target directory, opens the database, calls
+`getStatus`, prints a four-line summary, and closes the database
+(`src/cli/commands/status.ts:5-13`).
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User
+    participant User
     participant Cmd as statusCommand
-    participant DB as RagDB
+    participant DB as RagDB (.mimirs)
+    participant Q as getStatus
 
     User->>Cmd: mimirs status [dir]
     Cmd->>DB: new RagDB(dir)
-    Cmd->>DB: db.getStatus()
-    DB-->>Cmd: { totalFiles, totalChunks, lastIndexed }
-    Cmd->>User: print "Index status for <dir>:"
-    Cmd->>User: print "Files: N"
-    Cmd->>User: print "Chunks: M"
-    Cmd->>User: print "Last indexed: <iso> | never"
+    Cmd->>Q: db.getStatus()
+    Q->>DB: COUNT(*) files, COUNT(*) chunks, MAX(indexed_at)
+    Q-->>Cmd: { totalFiles, totalChunks, lastIndexed }
+    Cmd->>User: print Files / Chunks / Last indexed
     Cmd->>DB: db.close()
 ```
 
-1. The CLI resolves the directory argument (defaulting to `.` when missing or when the first arg begins with `--`) (`src/cli/commands/status.ts:6`).
-2. `new RagDB(dir)` opens (and creates if needed) `.mimirs/rag.db` and runs migrations. This is the same call that every other command uses, so the existence of the DB file is itself part of what "status" tells you.
-3. `db.getStatus()` returns `totalFiles`, `totalChunks`, and `lastIndexed`. `lastIndexed` is a string timestamp or `null` (printed as `never`).
-4. Three lines are printed verbatim, then the DB is closed (`src/cli/commands/status.ts:9-13`).
+1. The user runs the command, optionally naming a directory. The first
+   positional argument is the directory; if it is missing or starts with `--`,
+   the current directory is used. The path is resolved to absolute
+   (`src/cli/commands/status.ts:6`).
+2. The command opens the project database with `new RagDB(dir)`
+   (`src/cli/commands/status.ts:7`).
+3. It calls `db.getStatus()`, which runs three SQL queries: a `COUNT(*)` over
+   the `files` table, a `COUNT(*)` over the `chunks` table, and a query for the
+   most recent `indexed_at` value (`src/cli/commands/status.ts:8`,
+   `src/db/files.ts:363-380`).
+4. It prints a header naming the directory, then the file count, chunk count,
+   and last-indexed timestamp (`src/cli/commands/status.ts:9-12`).
+5. It closes the database (`src/cli/commands/status.ts:13`).
 
 ## Inputs
 
-| Input | Source | Notes |
-| --- | --- | --- |
-| `directory` | first positional arg | Defaults to `.`. Args starting with `--` are skipped so flag-only invocations still default to cwd (`src/cli/commands/status.ts:6`). |
+| name | type | required | description |
+|------|------|----------|-------------|
+| directory | positional arg | no | Project directory to inspect. Taken from `args[1]` only when present and not a flag; otherwise defaults to `.` and is resolved to an absolute path (`src/cli/commands/status.ts:6`). |
+
+The data it reports comes entirely from the `.mimirs` database for that
+directory; there are no other inputs and no flags.
 
 ## Outputs
 
-| Output | Where | Notes |
-| --- | --- | --- |
-| `Index status for <dir>:` header | stdout | Uses the resolved absolute path. |
-| `Files: N` | stdout | Total rows in the `files` table. |
-| `Chunks: M` | stdout | Total rows in the `chunks` table. |
-| `Last indexed: <ts>` | stdout | Most recent indexed timestamp on `files`, or the literal `never` when nothing is indexed yet. |
+| output | where it lands / shape / description |
+|--------|--------------------------------------|
+| Header | `Index status for <dir>:` printed to stdout (`src/cli/commands/status.ts:9`). |
+| `Files` | `status.totalFiles` — the row count of the `files` table (`src/cli/commands/status.ts:10`, `src/db/files.ts:364-367`). |
+| `Chunks` | `status.totalChunks` — the row count of the `chunks` table (`src/cli/commands/status.ts:11`, `src/db/files.ts:368-370`). |
+| `Last indexed` | `status.lastIndexed`, or the literal `never` when it is null — the newest `indexed_at` timestamp across all files (`src/cli/commands/status.ts:12`, `src/db/files.ts:371-379`). |
+
+This command is read-only: it writes nothing to disk and changes no stored
+state.
+
+## When to use status vs the MCP tools
+
+All three surfaces report on the index, but they differ in scope and in whether
+a server must be running.
+
+| | `mimirs status` (CLI) | `index_status` (MCP tool) | `server_info` (MCP tool) |
+|--|------------------------|----------------------------|---------------------------|
+| How it runs | standalone CLI, reads the DB directly | a tool call to a running server | a tool call to a running server |
+| Server required | no | yes | yes |
+| Reports | files, chunks, last-indexed for one directory | index counts and indexing progress as seen by the server | which projects/databases the server has connected |
+
+Prefer `mimirs status` for a fast, offline sanity check from the shell. Use
+[index_status](../tools/index-status.md) or [server_info](../tools/server-info.md)
+when an agent needs the live view from inside a running server session.
 
 ## Branches and failure cases
 
-- **Empty index.** All three values come back as 0 / `never` and the command exits cleanly. There is no "warn the user" branch — interpreting the output is left to the reader.
-- **Missing DB file.** `new RagDB(dir)` creates the DB on first open, so calling status in a fresh directory will print zeros instead of erroring. To check that the IDE-launched server is healthy, look at `.mimirs/status` (see [serve](serve.md)) or run [doctor](doctor.md).
-- **Unsafe directory.** The `RagDB` constructor goes through the dir-guard for unsafe paths; if the resolved directory is the user's home or a system root, opening the DB throws and the CLI exits with the thrown message. This is intentional — the same guard protects every entry point.
+- **Default directory.** With no positional argument, or an argument that starts
+  with `--`, the target is the current directory
+  (`src/cli/commands/status.ts:6`).
+- **Never indexed.** When the `files` table has no rows, the most-recent
+  `indexed_at` query returns nothing, `lastIndexed` is null, and the command
+  prints `Last indexed: never`; `Files` and `Chunks` show `0`
+  (`src/cli/commands/status.ts:12`, `src/db/files.ts:371-379`).
+- **Fresh, empty database.** Opening a directory that has never been indexed
+  still creates/opens the database via `new RagDB(dir)` and reports zero counts
+  rather than erroring (`src/cli/commands/status.ts:7-12`).
 
 ## Example
 
 ```bash
+# Status for the current project.
 mimirs status
-# Index status for /Users/me/repos/foo:
-#   Files:        312
-#   Chunks:       4287
-#   Last indexed: 2026-05-27T14:33:12.420Z
 
-mimirs status ../other-project
-# Index status for /Users/me/repos/other-project:
-#   Files:        0
-#   Chunks:       0
-#   Last indexed: never
+# Status for a specific directory.
+mimirs status ./packages/api
 ```
 
-## When to use this vs other status surfaces
+Illustrative output:
 
-| Surface | Reads | Use when |
-| --- | --- | --- |
-| `mimirs status` | DB counters | Quick CLI check of "is anything indexed yet". |
-| `.mimirs/status` (file) | server-written status | Watching live indexing progress (`starting / N/M files / done`). Written by `serve`, see [serve](serve.md). |
-| `index_status` MCP tool | DB counters | Same numbers as `mimirs status`, but addressable from inside an MCP client. |
-| `server_info` MCP tool | live server state | Connected DBs, version, uptime — only meaningful from inside the running server. |
+```
+Index status for /Users/example/my-app:
+  Files:        124
+  Chunks:       1893
+  Last indexed: 2026-05-28T11:42:07.512Z
+```
 
-`mimirs status` is the smallest of the four. Reach for it when you want to confirm that the index database itself has rows; reach for `.mimirs/status` when you want to know whether the server is currently scanning or finished; reach for the MCP tools when you are already in an agent session.
+For a directory that has never been indexed:
+
+```
+Index status for /Users/example/empty:
+  Files:        0
+  Chunks:       0
+  Last indexed: never
+```
 
 ## Key source files
 
-- `src/cli/commands/status.ts` — full command (14 lines).
-- `src/db/index.ts` — `RagDB` constructor and `getStatus()`.
+- `src/cli/commands/status.ts` — the command: directory resolution, the
+  `getStatus` call, and the printed summary.
+- `src/db/files.ts` — `getStatus`, the three queries that produce the file
+  count, chunk count, and last-indexed timestamp.
+- `src/db/index.ts` — `RagDB`, which exposes `getStatus` on the opened database.
 
-## Related flows
+## Related pages
 
-- [tools/index-status](../tools/index-status.md) — same counters over MCP.
-- [tools/server-info](../tools/server-info.md) — live server state, complementary view.
+- [index](index.md) — builds or refreshes the index whose totals this command
+  reports.
+- [index_status](../tools/index-status.md) — the server-side equivalent for an
+  agent.
+- [server_info](../tools/server-info.md) — reports which projects a running
+  server has connected.

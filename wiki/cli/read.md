@@ -1,113 +1,183 @@
 # CLI: read
 
-`mimirs read` is the chunk-level sibling of [`mimirs search`](search.md). It prints the actual content of the most relevant semantic chunks (functions, classes, markdown sections), each with a score, file path, and optional entity name.
+`mimirs read` answers "show me the code that is relevant to this topic." Unlike
+[search](search.md), which lists matching *files*, `read` returns the actual
+*content* of the best-matching chunks — individual functions, classes, and
+documentation sections — ranked by relevance. It is the command-line
+counterpart of the `read_relevant` MCP tool.
 
-Use it when you need the code itself in the terminal — for example piping into `less`, grepping further, or pasting into another tool. For machine-readable chunk results with inline annotation rendering, use the `read_relevant` MCP tool instead; this CLI surface does not inject annotation blocks (it just prints chunk content as stored).
+Use it when you want to read the relevant code directly in the terminal rather
+than open files one by one. When you only need to know which files are
+involved, use [search](search.md) instead.
 
-## Flow
+The command entry point is `readCommand` in
+`src/cli/commands/search-cmd.ts:61`. The chunk search runs in
+`searchChunks` (`src/search/hybrid.ts:470`).
+
+## What the command does
+
+`readCommand` validates the query, opens the database, runs the chunk-level
+hybrid search, and prints each matching chunk's score, path, optional entity
+name, and full content (`src/cli/commands/search-cmd.ts:61-88`).
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User
+    participant User
     participant Cmd as readCommand
-    participant Hybrid as searchChunks()
-    participant DB as RagDB
-    participant Embed as embed()
+    participant DB as RagDB (.mimirs)
+    participant SearchChunks as searchChunks()
+    participant Embed as embedder
 
-    User->>Cmd: mimirs read "<query>" [--top N] [--threshold T] [--dir D]
-    Cmd->>Cmd: open RagDB + loadConfig + applyEmbeddingConfig
-    Cmd->>Cmd: build PathFilter (--ext / --in / --exclude)
-    Cmd->>Hybrid: searchChunks(query, db, top, threshold, hybridWeight, generated, filter)
-    Hybrid->>Embed: embed(query)
-    Embed-->>Hybrid: query vector
-    Hybrid->>DB: searchChunks (vec, top*4) + textSearchChunks (FTS, top*4)
-    Hybrid->>Hybrid: merge + path/filename/graph boosts
-    Hybrid->>Hybrid: groupByParent (≥2 siblings → parent)
-    Hybrid->>Hybrid: expandForDocs
-    Hybrid->>DB: logQuery (analytics)
-    Hybrid-->>Cmd: ChunkResult[]
-    Cmd->>User: one block per chunk: [score] path • entity, content, ---
+    User->>Cmd: mimirs read "query" [--top N] [--threshold T] [--dir D] [filters]
+    alt no query
+        Cmd->>User: usage error, exit 1
+    end
+    Cmd->>DB: new RagDB(dir)
+    Cmd->>Cmd: loadConfig + applyEmbeddingConfig
+    Cmd->>SearchChunks: searchChunks(query, db, top, threshold, hybridWeight, generated, filter)
+    SearchChunks->>Embed: embed(query)
+    SearchChunks->>DB: vector + BM25 chunk search
+    SearchChunks->>SearchChunks: merge scores, drop below threshold
+    SearchChunks-->>Cmd: ChunkResult[]
+    alt empty
+        Cmd->>User: "No relevant chunks found. Has the directory been indexed?"
+    else has results
+        Cmd->>User: per chunk: [score] path • entity, then content, then ---
+    end
+    Cmd->>DB: db.close()
 ```
 
-1. The CLI requires a query positional. Without it, it prints usage and exits with code 1 (`src/cli/commands/search-cmd.ts:62-66`).
-2. The DB is opened for the directory in `--dir` (default `.`). `applyEmbeddingConfig` makes sure the runtime embedding model matches the indexed one.
-3. `buildCliFilter` collects scope flags into a `PathFilter`; passing none means the full index is searched (`src/cli/commands/search-cmd.ts:17-30`).
-4. `--top` defaults to `8`; `--threshold` defaults to `0.3`. Both are passed straight into `searchChunks` (`src/cli/commands/search-cmd.ts:72-73`).
-5. `searchChunks` embeds the query, runs vector + FTS chunk searches (each with `top * 4` candidates), merges them under `hybridWeight`, and drops anything below the threshold (`src/search/hybrid.ts:470-493`).
-6. Each surviving chunk is rescored: test paths multiplied by `0.85`, source paths by `1.1`, boilerplate basenames by `0.8`, generated paths by the configured demotion, plus filename and path-segment affinity bonuses, plus a logarithmic graph boost from `db.getImportersOf(file.id).length` (`src/search/hybrid.ts:494-534`).
-7. `groupByParent` promotes the parent chunk when two or more child chunks from the same parent appear, so sibling methods don't crowd the result list (`src/search/hybrid.ts:404-464`, `src/search/hybrid.ts:537-538`).
-8. `expandForDocs` appends documentation chunks as bonus results without displacing code chunks. The query is logged to the analytics table (`src/search/hybrid.ts:540-551`).
-9. The CLI prints each result as `[score] path  •  entityName` followed by the raw chunk content and a `---` separator (`src/cli/commands/search-cmd.ts:81-86`).
+1. The user runs the command with a query and optional flags; the query is the
+   first positional argument (`src/cli/commands/search-cmd.ts:62`).
+2. If the query is missing, the command prints a usage line and exits with
+   status 1 (`src/cli/commands/search-cmd.ts:63-66`).
+3. It resolves the target directory (`--dir` or the current directory), opens
+   the database, and loads/applies config (`src/cli/commands/search-cmd.ts:68-71`).
+4. It reads `--top` (default `8`) and `--threshold` (default `0.3`), and builds
+   an optional path filter from `--ext`/`--in`/`--exclude`
+   (`src/cli/commands/search-cmd.ts:72-74`).
+5. It calls `searchChunks`, which embeds the query, runs a vector and a BM25
+   chunk search, merges scores, drops chunks below the threshold, and applies
+   path-based score adjustments (`src/cli/commands/search-cmd.ts:76`,
+   `src/search/hybrid.ts:470-498`).
+6. If nothing matched, it prints "No relevant chunks found. Has the directory
+   been indexed?" (`src/cli/commands/search-cmd.ts:78-79`).
+7. Otherwise, for each chunk it prints a header line `[score] path • entity`,
+   then the chunk content, then a `---` separator
+   (`src/cli/commands/search-cmd.ts:81-86`).
+8. It closes the database (`src/cli/commands/search-cmd.ts:88`).
 
 ## Inputs
 
-| Input | Source | Notes |
-| --- | --- | --- |
-| `query` | first positional arg | Required. |
-| `--top` | flag | Max chunks to return. Default `8` (`src/cli/commands/search-cmd.ts:72`). |
-| `--threshold` | flag | Minimum hybrid score before the chunk is considered. Default `0.3` (`src/cli/commands/search-cmd.ts:73`). |
-| `--dir` | flag | Project directory. Default `.`. |
-| `--ext` / `--extensions` | flag | Comma-separated extensions. |
-| `--in` / `--dirs` | flag | Comma-separated directory roots, resolved against the project dir. |
-| `--exclude` / `--exclude-dirs` | flag | Comma-separated directories to omit. |
+| name | type | required | description |
+|------|------|----------|-------------|
+| query | positional arg | yes | The natural-language query (`args[1]`). Missing it triggers a usage error and exit 1 (`src/cli/commands/search-cmd.ts:62-66`). |
+| `--top` | flag with value | no | Maximum number of chunks to return. Defaults to `8`, parsed with `parseInt` (`src/cli/commands/search-cmd.ts:72`). |
+| `--threshold` | flag with value | no | Minimum relevance score (0–1) a chunk must meet to be returned. Defaults to `0.3`, parsed with `parseFloat` (`src/cli/commands/search-cmd.ts:73`). |
+| `--dir` | flag with value | no | Project directory to search. Resolved against the current directory; defaults to `.` (`src/cli/commands/search-cmd.ts:68`). |
+| `--ext` / `--extensions` | flag with value | no | Comma-separated extensions to restrict results to (`src/cli/commands/search-cmd.ts:21`). |
+| `--in` / `--dirs` | flag with value | no | Comma-separated directories to restrict results to (`src/cli/commands/search-cmd.ts:22`). |
+| `--exclude` / `--exclude-dirs` | flag with value | no | Comma-separated directories to exclude (`src/cli/commands/search-cmd.ts:23`). |
+
+The filter flags are merged into a single path filter only when at least one is
+present (`src/cli/commands/search-cmd.ts:17-30`).
 
 ## Outputs
 
-| Output | Where | Notes |
-| --- | --- | --- |
-| Ranked chunk blocks | stdout | `[0.82] path  •  entityName`, then the chunk content, then `---`. `entityName` is omitted when the chunk has none (e.g. top-level prose). |
-| Empty-result hint | stdout | `"No relevant chunks found. Has the directory been indexed?"`. |
-| Analytics row | `query_log` table | Same `logQuery` write as `mimirs search`. |
+| output | where it lands / shape / description |
+|--------|--------------------------------------|
+| Chunk results | Printed to stdout, one block per `ChunkResult` (`src/search/hybrid.ts:45-55`). |
+| Header line | `[score] path • entity` — `r.score.toFixed(2)` and `r.path`, with `  •  entityName` appended only when the chunk has an entity name (`src/cli/commands/search-cmd.ts:82-83`). |
+| Chunk content | The full chunk text printed verbatim on the following lines (`src/cli/commands/search-cmd.ts:84`). |
+| Separator | A `---` line between chunks (`src/cli/commands/search-cmd.ts:85`). |
+| Empty-result message | "No relevant chunks found. Has the directory been indexed?" when zero chunks meet the threshold (`src/cli/commands/search-cmd.ts:79`). |
 
-`ChunkResult` carries `startLine` and `endLine` (`src/search/hybrid.ts:45-55`) and the underlying tool surface uses them to render `path:startLine-endLine` citations. The CLI does not currently print those numbers — it only emits the path and entity name in the header. Open question: should the CLI render the line range as well? Today, agents that need exact line ranges should call the `read_relevant` MCP tool, which formats them.
+`ChunkResult` carries `startLine`, `endLine`, `chunkType`, and `parentId`
+alongside the printed fields (`src/search/hybrid.ts:45-55`), but this command
+prints only the score, path, entity name, and content — it does not render line
+ranges, and it does not attach any inline annotation blocks. Those are produced
+by the `read_relevant` MCP tool, not by this command
+(`src/cli/commands/search-cmd.ts:81-86`).
+
+This command reads the index and prints results; it does not write or change
+any stored state.
+
+## search vs read
+
+Both commands live in `src/cli/commands/search-cmd.ts` and share the same
+flag and filter parsing, but they differ in result granularity and defaults.
+
+| | `mimirs read` | `mimirs search` |
+|--|---------------|-----------------|
+| Underlying function | `searchChunks` (`src/search/hybrid.ts:470`) | `search` (`src/search/hybrid.ts:313`) |
+| Result granularity | individual chunks (functions, classes, sections) | one entry per file, deduplicated by path |
+| Default `--top` | `8` (`src/cli/commands/search-cmd.ts:72`) | `config.searchTopK` (`src/cli/commands/search-cmd.ts:43`) |
+| `--threshold` | `0.3` default, settable (`src/cli/commands/search-cmd.ts:73`) | always `0` |
+| Output per item | score + path + entity name + full content | score + path + truncated snippet |
+
+Use `read` to get the *content* of matching chunks; use `search` to locate the
+*files* a topic lives in.
 
 ## Branches and failure cases
 
-- **No query.** Exits 1 with usage.
-- **Threshold too high.** All chunks filtered out → empty-result message.
-- **FTS failure.** `db.textSearchChunks` is wrapped in `try/catch`; vector-only fallback at debug log (`src/search/hybrid.ts:484-489`).
-- **Parent grouping.** Two child chunks may be collapsed into the parent chunk, which can change the path you see versus the chunks that originally scored highest. The promoted parent inherits the best child score (`src/search/hybrid.ts:438-451`).
-- **Doc expansion.** Documentation chunks (markdown, etc.) are appended as bonuses; they do not push code results out of the top N.
+- **Missing query.** Prints the usage string and exits with code 1
+  (`src/cli/commands/search-cmd.ts:63-66`).
+- **No matches above threshold.** Prints the "No relevant chunks found" hint and
+  closes (`src/cli/commands/search-cmd.ts:78-79`). Raising `--threshold` makes
+  this more likely; lowering it returns more, lower-confidence chunks.
+- **Entity name absent.** When a chunk has no entity name (for example a plain
+  text block), the `  •  entity` suffix is omitted from the header line
+  (`src/cli/commands/search-cmd.ts:82`).
+- **No filter flags.** When none of `--ext`/`--in`/`--exclude` is present,
+  `buildCliFilter` returns `undefined` and the search runs unscoped
+  (`src/cli/commands/search-cmd.ts:24`).
+- **FTS failure falls back.** Inside `searchChunks`, if the BM25 chunk query
+  throws, it is caught and the search proceeds vector-only
+  (`src/search/hybrid.ts:485-489`).
 
 ## Example
 
 ```bash
-mimirs read "how does the index lock work"
-mimirs read "checkpoint" --top 4 --threshold 0.45
-mimirs read "embed" --dir ../other-project --ext .ts --in src/embeddings
+# Read the chunks most relevant to "how scores are merged".
+mimirs read "how scores are merged"
+
+# Top 5 chunks at a stricter threshold, TypeScript only.
+mimirs read "embedding model loading" --top 5 --threshold 0.45 --ext .ts
+
+# Read from a different project directory.
+mimirs read "config defaults" --dir ../other-project
 ```
 
-Sample output:
+Illustrative output:
 
 ```
-[0.84] src/indexing/indexer.ts  •  indexDirectory
-export async function indexDirectory(
-  directory: string,
-  db: RagDB,
-  config: RagConfig,
-  ...
+[0.81] src/search/hybrid.ts  •  mergeHybridScores
+export function mergeHybridScores(vectorResults, textResults, hybridWeight) {
+  // ...merge and normalize vector + BM25 scores...
+}
 
 ---
 
-[0.71] src/utils/index-lock.ts  •  tryAcquireIndexLock
-export function tryAcquireIndexLock(directory: string): IndexLock | null {
-  ...
+[0.74] src/db/search.ts  •  textSearchChunks
+textSearchChunks(query, limit, filter) {
+  // ...BM25 FTS query over chunks...
+}
 
 ---
 ```
-
-## Read vs search
-
-See the comparison table in [CLI: search](search.md#search-vs-read). The same hybrid scorer feeds both; `read` calls `searchChunks` (chunk granularity, with parent grouping and doc expansion) while `search` calls `search` (file granularity, deduped).
 
 ## Key source files
 
-- `src/cli/commands/search-cmd.ts` — `readCommand`, flag parsing, output formatting.
-- `src/search/hybrid.ts` — `searchChunks`, parent grouping, doc expansion.
-- `src/db/index.ts` — `RagDB.searchChunks`, `RagDB.textSearchChunks`, `RagDB.getChunkById`.
+- `src/cli/commands/search-cmd.ts` — `readCommand` entry point and the shared
+  flag/filter parsing (`parseListFlag`, `buildCliFilter`).
+- `src/search/hybrid.ts` — `searchChunks`, the chunk-level hybrid query, and the
+  `ChunkResult` shape.
+- `src/db/index.ts` — `RagDB`, providing the chunk-level vector and text search
+  primitives.
 
-## Related flows
+## Related pages
 
-- [CLI: search](search.md) — file-level sibling.
-- [tools/read-relevant](../tools/read-relevant.md) — chunk-level read over MCP, with inline `[NOTE]` annotation rendering.
+- [search](search.md) — file-level sibling command from the same source file.
+- [read_relevant](../tools/read-relevant.md) — the MCP tool that exposes
+  chunk-level results (with line ranges and inline notes) to an agent.

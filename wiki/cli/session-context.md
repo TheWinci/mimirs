@@ -1,124 +1,179 @@
 # CLI: session-context
 
-`mimirs session-context` prints a short briefing for a new coding session: what is currently uncommitted, the last five commits, how big the local index is, recent search gaps, and any annotations attached to files that are being modified right now. The point is to compress the "what is this repo in the middle of?" question into one stdout dump that an agent or a returning user can read before doing anything else.
+`mimirs session-context` prints a short Markdown briefing meant to be read at the
+start of a new working session. Instead of having an agent or developer
+re-discover the state of the project, it assembles a few high-signal facts into
+one block: what is uncommitted, what was committed recently, how big and how fresh
+the index is, where recent searches came up empty, and which notes apply to the
+files currently being worked on. It is read-only and writes nothing back
+(`src/cli/commands/session-context.ts:16-101`).
 
-It is a composition command — it does not invent new data sources, it just calls the same DB methods and `git` subcommands that the underlying MCP tools (`git_context`, `list_checkpoints`, `get_annotations`, `search_analytics`) expose individually.
+## When to use it
+
+Run it as the first thing in a session. It answers "what was I (or someone) doing
+here, and what should I be careful of?" by combining four independent sources.
+There is no learning curve: there are no subcommands and the only meaningful input
+is which directory to inspect.
+
+## What the briefing contains
+
+The output is built as an array of Markdown sections that are joined with blank
+lines at the end. Each section is appended only if it has content, so an empty
+project can print nothing at all (`src/cli/commands/session-context.ts:18`,
+`98-100`). The sections, in order:
+
+| section | source | content |
+|---------|--------|---------|
+| Uncommitted changes | `git status --short` | The short-form working tree status, when non-empty (`src/cli/commands/session-context.ts:23-26`). |
+| Recent commits | `git log --oneline -5` | The last five commits, one line each (`src/cli/commands/session-context.ts:28-31`). |
+| Index | `db.getStatus()` | File count, chunk count, and last-indexed timestamp, only when at least one file is indexed (`src/cli/commands/session-context.ts:38-43`). |
+| Search gaps | `db.getAnalytics(7)` | Up to 5 zero-result queries and up to 5 low-relevance queries from the last 7 days (`src/cli/commands/session-context.ts:45-63`). |
+| Annotations on modified files | `db.getAnnotations(path)` per changed file | `[NOTE]` lines for any annotations attached to files changed or added since `HEAD` (`src/cli/commands/session-context.ts:66-90`). |
+
+This briefing is composed from git, the index, search analytics, and annotations.
+It does not read saved checkpoints — those are surfaced by the
+[list_checkpoints](../tools/list-checkpoints.md) /
+[search_checkpoints](../tools/search-checkpoints.md) tools, not by this command.
 
 ## Flow
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant User
-    participant CLI as sessionContextCommand
-    participant Git as git CLI
+    actor User
+    participant CLI as session-context.ts
+    participant Git as git (Bun.spawn)
     participant DB as RagDB
-    User->>CLI: mimirs session-context [dir|--dir]
+    User->>CLI: mimirs session-context [dir] [--dir D]
     CLI->>Git: rev-parse --show-toplevel
-    Git-->>CLI: repo root (or null)
-    CLI->>Git: status --short
-    CLI->>Git: log --oneline -5
-    CLI->>DB: new RagDB(dir); getStatus()
+    alt inside a git repo
+        CLI->>Git: status --short
+        CLI->>Git: log --oneline -5
+    end
+    CLI->>DB: new RagDB(dir), getStatus()
     CLI->>DB: getAnalytics(7)
-    CLI->>Git: diff --name-only HEAD
-    CLI->>Git: ls-files --others --exclude-standard
-    CLI->>DB: getAnnotations(path) per modified file
-    DB-->>CLI: annotation rows
-    CLI-->>User: joined sections (or nothing)
-    CLI->>DB: db.close()
+    alt inside a git repo
+        CLI->>Git: diff --name-only HEAD
+        CLI->>Git: ls-files --others --exclude-standard
+        loop each changed file
+            CLI->>DB: getAnnotations(path)
+        end
+    end
+    CLI->>DB: close()
+    CLI-->>User: joined Markdown sections (if any)
 ```
 
-1. The command resolves the project directory from the first positional argument, the `--dir` flag, or the current directory (`src/cli/commands/session-context.ts:17`). Sections are built up in an array and only printed if at least one section has content.
-2. `git rev-parse --show-toplevel` checks whether the directory is in a repo at all. If it is not, the entire git block (status + log + modified-file annotations) is skipped.
-3. `git status --short` lists staged/unstaged/untracked changes; emitted under `## Uncommitted changes` only if the output is non-empty.
-4. `git log --oneline -5` gives the last five commits as `## Recent commits`.
-5. A `RagDB` is opened. If `getStatus().totalFiles > 0` an `## Index` line with file count, chunk count, and last-indexed timestamp is added. When the project has no index yet the section is suppressed (it would just be noise).
-6. `getAnalytics(7)` returns query stats over the last 7 days — a shorter window than `mimirs analytics` defaults to, because session-context is meant to highlight *recent* gaps. Only zero-result and low-score lists are kept, capped at 5 each, joined under `## Search gaps`.
-7. If a repo root was found, `git diff --name-only HEAD` and `git ls-files --others --exclude-standard` are unioned into one set of files the user is currently touching (modified + new-untracked).
-8. For each modified file, `db.getAnnotations(relPath)` returns persistent notes left by previous sessions. Annotations with a `symbolName` are rendered as `path • symbol`, otherwise just the path. Each note becomes a `[NOTE]` line under `## Annotations on modified files`.
-9. Sections are joined with blank lines and printed. If nothing accumulated (no repo, no index, no analytics, no annotations), nothing is printed.
+1. The user runs the command with an optional directory and/or `--dir`
+   (`src/cli/commands/session-context.ts:16-17`).
+2. It finds the git root via `git rev-parse --show-toplevel`; a `null` result
+   means the directory is not a git repo and all git sections are skipped
+   (`src/cli/commands/session-context.ts:21-22`).
+3. Inside a repo, it adds the working-tree status and the last five commits, each
+   only when non-empty (`src/cli/commands/session-context.ts:23-31`).
+4. It opens a `RagDB` and reads index status; the Index section appears only when
+   files are indexed (`src/cli/commands/session-context.ts:37-43`).
+5. It reads 7-day search analytics and, if any queries were logged, lists recent
+   zero-result and low-relevance queries
+   (`src/cli/commands/session-context.ts:45-63`).
+6. Back inside the repo, it collects files changed since `HEAD` plus untracked
+   files, then looks up annotations for each and prints them as `[NOTE]` lines
+   (`src/cli/commands/session-context.ts:66-90`).
+7. The database is closed and the non-empty sections are printed joined by blank
+   lines (`src/cli/commands/session-context.ts:94-100`).
 
 ## Inputs
 
-| Input | Where it comes from | Effect |
-|---|---|---|
-| `directory` (positional) | First arg if it does not start with `--` | Project directory to look at. |
-| `--dir D` | Long flag form of the same | Used when no positional is given. |
+| name | type | required | description |
+|------|------|----------|-------------|
+| directory | path (positional) | no | `args[1]`, used as the working directory when present and not starting with `--`. Falls back to `--dir`, then `.` (`src/cli/commands/session-context.ts:17`). |
+| `--dir` | path | no | Directory to inspect when no positional argument is given (`src/cli/commands/session-context.ts:17`). |
 
-The command does not write anywhere — there are no `--out`-style flags. Both `git` and `RagDB` errors are swallowed: `runGit` returns `null` on non-zero exit, and the DB block is wrapped in `try { ... } catch { /* No RAG index — skip DB sections */ }` (`src/cli/commands/session-context.ts:92-96`).
+The directory feeds both the git commands (run from the discovered git root) and
+the `RagDB` constructor.
 
 ## Outputs
 
-A single text block on stdout. Each section header is a markdown `## …`. The sections are emitted in this order, each one conditional on having content:
+| output | where it lands / shape / description |
+|--------|--------------------------------------|
+| session summary | stdout only. A single Markdown block of the non-empty sections joined by blank lines. If every section is empty, nothing is printed (`src/cli/commands/session-context.ts:98-100`). |
 
-1. `## Uncommitted changes` — `git status --short`.
-2. `## Recent commits` — last 5 commits, oneline.
-3. `## Index` — total files, total chunks, last indexed timestamp (or `"unknown"` when never indexed).
-4. `## Search gaps` — top 5 zero-result queries and top 5 low-relevance queries over the last 7 days.
-5. `## Annotations on modified files` — `[NOTE]` lines for every annotation row attached to a path that appears in `git diff --name-only HEAD` or the untracked list.
+## How git is invoked
 
-The output is *not* a checkpoint summary. Past checkpoints are not included here — for those use `list_checkpoints` or `search_checkpoints`. The page-packet item "recent checkpoints" describes the conceptual goal of the briefing, but the current implementation focuses on git state, index health, and annotations.
+A small helper, `runGit`, spawns `git` with `Bun.spawn`, captures stdout, and
+returns the trimmed output only when the process exits with code `0`; any thrown
+error or non-zero exit yields `null` (`src/cli/commands/session-context.ts:5-14`).
+This makes each git section self-guarding: outside a repo, or when a command
+fails, that section is simply absent rather than an error. The status, log,
+diff, and ls-files commands all run from the resolved git root, not the raw input
+directory (`src/cli/commands/session-context.ts:21-32`, `66-68`).
+
+## How annotations are matched to changed files
+
+The set of "files I'm working on" is the union of two git queries:
+`git diff --name-only HEAD` (tracked files changed since the last commit) and
+`git ls-files --others --exclude-standard` (untracked, non-ignored files). Their
+output lines are split, filtered for blanks, and collected into a set
+(`src/cli/commands/session-context.ts:67-77`). For each such path,
+`getAnnotations(relPath)` is called and every returned note becomes a `[NOTE]`
+line; if the note targets a symbol, the header shows `path • symbol`
+(`src/cli/commands/session-context.ts:80-85`). Because annotation paths are
+matched by exact string, only notes stored under the same relative path git
+reports will show up here.
 
 ## Branches and failure cases
 
-- Not a git repo: `gitRoot` is `null`, so all three git-derived sections are skipped. The DB block still runs (no index → also skipped, gracefully).
-- No index: `new RagDB(dir)` may throw if the DB file is missing or corrupt. The whole DB block is wrapped in a bare `try/catch`. The error is swallowed silently; only git output (if any) is printed.
-- Empty windows: `analytics.totalQueries === 0` skips the `## Search gaps` section entirely. If zero-result and low-score buckets are both empty but there were other queries, the section is still omitted because the inner `lines` array stays empty.
-- No modified files: the annotations loop never runs; nothing is added.
-- All sections empty: nothing is printed at all — there is no fallback "session-context found nothing" message. Scripting on top of this command should not assume a minimum amount of output.
+| branch | behavior |
+|--------|----------|
+| no positional directory | Uses `--dir`, then `.` (`src/cli/commands/session-context.ts:17`). |
+| not a git repo | `rev-parse` returns `null`; status, commits, and the annotations-on-changed-files section are all skipped (`src/cli/commands/session-context.ts:21-22`, `66`). |
+| clean working tree | `git status --short` is empty, so the Uncommitted changes section is omitted (`src/cli/commands/session-context.ts:24`). |
+| no commits | `git log` returns nothing usable; the Recent commits section is omitted (`src/cli/commands/session-context.ts:29`). |
+| no index / DB error | Opening `RagDB`, reading status, or analytics is wrapped in `try/catch`; on failure all index/analytics/annotation sections are skipped (`src/cli/commands/session-context.ts:36`, `92-93`). |
+| empty index | `getStatus().totalFiles === 0`, so the Index section is omitted (`src/cli/commands/session-context.ts:39`). |
+| no logged queries | `getAnalytics(7).totalQueries === 0`, so the Search gaps section is omitted (`src/cli/commands/session-context.ts:46`). |
+| queries but no gaps | If both zero-result and low-relevance lists are empty, the Search gaps section is omitted (`src/cli/commands/session-context.ts:60-62`). |
+| no changed files with notes | If no changed file has annotations, the Annotations section is omitted (`src/cli/commands/session-context.ts:87-89`). |
+| everything empty | Nothing is printed at all (`src/cli/commands/session-context.ts:98`). |
+| DB always closed | `db?.close()` runs in `finally`, so the handle is released even on error (`src/cli/commands/session-context.ts:94-96`). |
 
 ## Example
 
-```sh
-mimirs session-context
+```bash
+# Brief the current project
+bun run mimirs session-context
+
+# Brief a specific project directory
+bun run mimirs session-context /path/to/project
 ```
 
 Illustrative output:
 
 ```
 ## Uncommitted changes
- M src/server/index.ts
-?? scripts/new-thing.ts
+ M src/db/conversation.ts
+?? src/db/new-helper.ts
 
 ## Recent commits
-<sha> feat: validate links and files for flows
-<sha> feat: wiki state changes
-<sha> fix: wiki no strict signals
-<sha> fix: no bundled pages
-<sha> feat: flow based wiki
+1a2b3c4 fix: handle empty JSONL
+5d6e7f8 feat: tail conversation transcripts
 
 ## Index
-214 files, 4123 chunks (last indexed: 2026-05-27T09:31:14Z)
+312 files, 4821 chunks (last indexed: 2026-05-28T09:14:02.000Z)
 
 ## Search gaps
 Zero-result queries (last 7 days):
-  2× "rate limiter config"
+  3× "webhook retry policy"
 Low-relevance queries:
-  "embedding model swap" (score: 0.18)
+  "vector dimension mismatch" (score: 0.21)
 
 ## Annotations on modified files
-  [NOTE] src/server/index.ts • startServer: transport must connect before slow startup work or the client times out
+  [NOTE] src/db/conversation.ts • insertTurn: INSERT OR IGNORE; returns 0 on duplicate.
 ```
-
-## Composition with MCP tools
-
-This command is intentionally a shortcut for what an agent would otherwise stitch together by calling several MCP tools at session start:
-
-- `git_context` — produces uncommitted changes and recent commits.
-- `list_checkpoints` — the page packet lists this as a part of the briefing, but the current CLI does not call into checkpoint storage. If you need recent checkpoints, call that tool separately.
-- `get_annotations` — what `db.getAnnotations(relPath)` exposes; here it is filtered to only the files the user is currently editing instead of the whole project.
-- `search_analytics` — the underlying `getAnalytics(days)` is the same DB method.
-
-A new agent that wants the full briefing can run `mimirs session-context` once and skip the four tool calls.
-
-## Related flows
-
-- [tools/git-context](../tools/git-context.md) — same git output, MCP tool form.
-- [tools/list-checkpoints](../tools/list-checkpoints.md) — checkpoint listing (not called by this command yet; complementary).
-- [tools/get-annotations](../tools/get-annotations.md) — the annotation source.
-- [cli/analytics](analytics.md) — the longer-window version of the search-gaps section.
 
 ## Key source files
 
-- `src/cli/commands/session-context.ts` — section assembly, git wrappers, annotation lookup.
-- `src/db/index.ts` — `RagDB.getStatus`, `getAnalytics`, `getAnnotations`.
+- `src/cli/commands/session-context.ts` — directory resolution, the `runGit`
+  helper, section assembly, and final output.
+- `src/db/files.ts` — `getStatus`, the file/chunk/last-indexed summary.
+- `src/db/analytics.ts` — `getAnalytics`, source of the search-gap lists.
+- `src/db/annotations.ts` — `getAnnotations`, looked up per changed file.

@@ -1,99 +1,175 @@
 # Tool: git_context
 
-Use this tool to orient at the start of a session — before searching or editing. It runs a small set of plumbing `git` commands against the working tree, then annotates each touched file with whether the mimirs index already knows about it. The combined output tells you what is dirty, what landed recently, and which of those files are searchable through `read_relevant` / `search` versus which would need a re-index first.
+`git_context` gives an agent a quick orientation on the working tree before it
+starts searching or editing: what is uncommitted right now, what has been
+committed recently, and which files changed over a range. Crucially, every
+uncommitted path is tagged with whether the search index already knows about
+it, so the agent can tell apart "this file is in the index, I can search it"
+from "this file was just created and is not searchable yet". It is meant to be
+called at the start of a session to avoid redundant searches and conflicting
+edits on files someone is already working on.
 
-The handler is a thin shell wrapper. It does not write to the database, it does not embed anything, and it never modifies git state.
+The tool shells out to `git` for the actual data and consults the project
+database only to decide the index tags. It writes nothing.
 
-## Flow
+## How it works
+
+The handler is registered as the MCP tool `git_context` in
+`registerGitTools` (`src/tools/git-tools.ts:21-24`). Two small helpers do the
+git work: `runGit` spawns `git` with the given arguments and returns trimmed
+stdout on a zero exit code, or `null` on any non-zero exit or spawn failure
+(`src/tools/git-tools.ts:6-15`); `findGitRoot` runs
+`git rev-parse --show-toplevel` to locate the repository root
+(`src/tools/git-tools.ts:17-19`).
+
+After resolving the project directory and database with `resolveProject`
+(`src/tools/git-tools.ts:44`), the handler finds the git root. If the
+directory is not inside a git repository, it returns `Not a git repository.`
+and stops (`src/tools/git-tools.ts:46-49`). Otherwise it builds up to four
+report sections and joins the non-empty ones.
+
+The look-back point defaults to `HEAD~5` and can be overridden with `since`
+(`src/tools/git-tools.ts:51`). All git commands run with the **git root** as
+their working directory, not the originally passed project directory
+(`src/tools/git-tools.ts:55`, `src/tools/git-tools.ts:72`).
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Caller
-    participant Handler as git_context handler
-    participant Git as git CLI (Bun.spawn)
-    participant DB as RagDB.files
-    Caller->>Handler: { since?, include_diff?, files_only?, directory? }
-    Handler->>Git: git rev-parse --show-toplevel
-    Git-->>Handler: gitRoot or null
-    Handler->>Git: git status --short
-    Handler->>DB: getFileByPath(absPath) per status line
-    DB-->>Handler: row or null per file
-    Handler->>Git: git log --oneline sinceRef..HEAD
-    Handler->>Git: git diff --name-only sinceRef..HEAD
-    opt include_diff && !files_only
-        Handler->>Git: git diff HEAD
+    participant Agent
+    participant Tool as git_context
+    participant Git as git CLI (runGit)
+    participant DB as RagDB
+    Agent->>Tool: since?, include_diff?, files_only?, directory?
+    Tool->>Tool: resolveProject(directory) -> projectDir, db
+    Tool->>Git: rev-parse --show-toplevel
+    alt not a repo
+        Git-->>Tool: null
+        Tool-->>Agent: "Not a git repository."
+    else repo found
+        Tool->>Git: status --short
+        loop each changed path
+            Tool->>DB: getFileByPath(absPath)
+            DB-->>Tool: row or null -> [indexed]/[not indexed]
+        end
+        Tool->>Git: log --oneline since..HEAD (unless files_only)
+        Tool->>Git: diff --name-only since..HEAD
+        Tool->>Git: diff HEAD (only if include_diff and not files_only)
+        Tool-->>Agent: joined sections, or "Nothing to report..."
     end
-    Handler-->>Caller: joined sections text
 ```
 
-1. The caller invokes `git_context` with four optional arguments. The handler resolves the project directory through `resolveProject(directory, getDB)` to get the indexed `RagDB` handle `src/tools/git-tools.ts:44`.
-2. The handler shells out to `git rev-parse --show-toplevel` via `findGitRoot` to locate the repository root. If git is not installed, the directory is not a repo, or `git` exits non-zero, the wrapper returns `null` and the tool short-circuits with the literal string `Not a git repository.` `src/tools/git-tools.ts:17-19`, `src/tools/git-tools.ts:46-49`.
-3. `git status --short` lists working-tree changes. For each line, the handler parses the file portion (handling the ` -> ` rename arrow by taking the destination), resolves it to an absolute path against the git root, and calls `ragDb.getFileByPath(absPath)`. A row hit yields the `[indexed]` tag; a miss yields `[not indexed]` `src/tools/git-tools.ts:55-67`.
-4. Unless `files_only` is set, the handler appends recent commits from `git log --oneline <sinceRef>..HEAD` and the file list from `git diff --name-only <sinceRef>..HEAD`. `sinceRef` defaults to `HEAD~5` `src/tools/git-tools.ts:51`, `src/tools/git-tools.ts:71-82`.
-5. When `include_diff` is true and `files_only` is false, `git diff HEAD` is captured and clipped to the first 200 lines, with a trailing `[truncated]` marker if anything was cut `src/tools/git-tools.ts:85-93`.
-6. The handler joins the present sections with blank lines. If nothing produced output, it emits `Nothing to report (clean working tree, no recent commits in range).` `src/tools/git-tools.ts:95-100`.
+1. The agent calls the tool with optional `since`, `include_diff`,
+   `files_only`, and `directory` (`src/tools/git-tools.ts:25-42`).
+2. `resolveProject` resolves the directory (or `RAG_PROJECT_DIR` / cwd) and
+   returns the project path plus the database handle
+   (`src/tools/git-tools.ts:44`).
+3. `findGitRoot` locates the repository top level; a `null` result short-circuits
+   to the "Not a git repository." message
+   (`src/tools/git-tools.ts:46-49`).
+4. `git status --short` lists uncommitted changes; each line is parsed and the
+   path is looked up in the index to choose an `[indexed]` or `[not indexed]`
+   tag (`src/tools/git-tools.ts:55-67`).
+5. Unless `files_only` is set, `git log --oneline <since>..HEAD` produces the
+   recent-commits section (`src/tools/git-tools.ts:71-76`).
+6. `git diff --name-only <since>..HEAD` produces the changed-files section
+   (`src/tools/git-tools.ts:79-82`).
+7. When `include_diff` is set and `files_only` is not, `git diff HEAD`
+   produces a diff section, truncated to the first 200 lines
+   (`src/tools/git-tools.ts:85-93`).
+8. Non-empty sections are joined; if there are none, a clean-tree message is
+   returned (`src/tools/git-tools.ts:95-100`).
 
 ## Inputs
 
-| Name | Type | Default | Notes |
+| name | type | required | description |
 | --- | --- | --- | --- |
-| `since` | string | `HEAD~5` | Any value `git log` accepts — commit SHA, branch, tag, or ISO date. Used as `<since>..HEAD` in both `git log` and `git diff --name-only`. |
-| `include_diff` | boolean | `false` | When true, adds a fourth section with `git diff HEAD` truncated to 200 lines. Ignored when `files_only` is true. |
-| `files_only` | boolean | `false` | Skips recent commits and the diff body; status lines collapse to `<file>  [indexed|not indexed]` instead of the raw porcelain prefix. |
-| `directory` | string | `RAG_PROJECT_DIR` env or cwd | Resolved through `resolveProject`. The DB handle used for `[indexed]` lookups is the one for this directory; the git root is detected from the same directory. |
+| `since` | string | no | Commit ref, branch, or ISO date marking the start of the range. Defaults to `HEAD~5` (`src/tools/git-tools.ts:26-29`, `src/tools/git-tools.ts:51`). |
+| `include_diff` | boolean | no | When true (and `files_only` is false), append a unified diff of uncommitted changes, truncated to 200 lines. Defaults to false (`src/tools/git-tools.ts:30-33`, `src/tools/git-tools.ts:85-93`). |
+| `files_only` | boolean | no | When true, return paths only: drop commit messages and the diff body, and print just the file path plus index tag for uncommitted changes. Defaults to false (`src/tools/git-tools.ts:34-37`, `src/tools/git-tools.ts:64`). |
+| `directory` | string | no | Project directory. Falls back to `RAG_PROJECT_DIR`, then cwd (`src/tools/git-tools.ts:38-41`). |
 
 ## Outputs
 
-| Output | Shape |
+| output | where it lands / shape / description |
 | --- | --- |
-| MCP text content | One string with up to four markdown sections joined by blank lines, or a single sentinel line when there is no repo / nothing to report. |
-
-Section headers in order, when populated: `## Uncommitted changes`, `## Recent commits (since <ref>)`, `## Changed files (since <ref>)`, `## Diff` `src/tools/git-tools.ts:66-91`.
+| Uncommitted changes | `## Uncommitted changes` followed by one line per `git status --short` entry. Each line is suffixed with `  [indexed]` or `  [not indexed]`. With `files_only`, the porcelain status code is dropped and only the path plus tag remain (`src/tools/git-tools.ts:56-67`). |
+| Recent commits | `## Recent commits (since <ref>)` followed by `git log --oneline` output for `<since>..HEAD`. Omitted entirely when `files_only` is true (`src/tools/git-tools.ts:71-76`). |
+| Changed files | `## Changed files (since <ref>)` followed by `git diff --name-only` output for `<since>..HEAD` (`src/tools/git-tools.ts:79-82`). |
+| Diff | `## Diff` followed by `git diff HEAD`, capped at 200 lines with a trailing `[truncated]` marker when longer. Only present when `include_diff` is true and `files_only` is false (`src/tools/git-tools.ts:85-93`). |
+| Fallback messages | `Not a git repository.` when there is no git root, or `Nothing to report (clean working tree, no recent commits in range).` when every section was empty (`src/tools/git-tools.ts:48`, `src/tools/git-tools.ts:95-98`). |
 
 ## Index annotation
 
-Each uncommitted-change line is tagged with `[indexed]` or `[not indexed]`. The lookup goes through `RagDB.getFileByPath`, which delegates to `getFileByPath` in `src/db/files.ts`. That query matches by exact normalized path against the `files` table, so a hit means mimirs has at least one chunk row for that file and a miss means tools like `read_relevant` will not find it until you run `index_files`. Renamed files (porcelain `R  old -> new`) are tagged using the destination path, since that is what the index will store after the rename is committed and re-indexed.
+The reason this tool reaches into the database at all is the per-path index
+tag. For each uncommitted entry it parses the path out of the porcelain status
+line (slicing past the two-character status code and a space), follows a rename
+arrow `a -> b` to the destination path, resolves it to an absolute path against
+the git root, and looks it up with `ragDb.getFileByPath(absPath)`
+(`src/tools/git-tools.ts:59-63`). A non-null row means the file is already in
+the search index and is tagged `[indexed]`; otherwise `[not indexed]`. This is
+what lets the agent know a freshly created file will not yet appear in search
+results.
 
 ## Branches and failure cases
 
-- **Not a git repo.** `findGitRoot` returns `null` whenever `git rev-parse --show-toplevel` exits non-zero or `git` itself fails to spawn. The handler returns `Not a git repository.` and does no further work `src/tools/git-tools.ts:46-49`.
-- **Empty working tree.** When `git status --short` produces no output, the `## Uncommitted changes` section is omitted entirely rather than rendered with an "empty" placeholder `src/tools/git-tools.ts:55-68`.
-- **`files_only` suppresses commits and diff.** Recent-commit and `include_diff` sections are gated on `!files_only`; the changed-files section is always emitted when present `src/tools/git-tools.ts:71-93`.
-- **Diff truncation.** Diffs longer than 200 lines are clipped and marked with `[truncated]`. There is no way to raise this cap from arguments — read the raw diff with `git diff` if you need more.
-- **Nothing in range.** If every section is empty (clean tree, no commits in `<since>..HEAD`, no changed files), the tool returns the literal `Nothing to report` line so callers do not need to special-case empty text `src/tools/git-tools.ts:95-98`.
-- **`runGit` swallows errors.** Any non-zero exit or thrown error from a child `git` invocation returns `null`, which collapses that section silently. There is no error surfaced to the caller for partial failures.
+- **Not a git repository.** When `findGitRoot` returns `null`, the tool
+  returns `Not a git repository.` and runs nothing else
+  (`src/tools/git-tools.ts:46-49`).
+- **Clean tree, empty range.** If every git command yields empty output (no
+  status, no commits, no changed files), no section is pushed and the
+  "Nothing to report" message is returned (`src/tools/git-tools.ts:95-98`).
+- **`files_only` set.** The recent-commits section is skipped and the diff
+  section is skipped (the diff is also gated on `include_diff`); uncommitted
+  lines print path + tag instead of the full porcelain line
+  (`src/tools/git-tools.ts:64`, `src/tools/git-tools.ts:71`,
+  `src/tools/git-tools.ts:85`).
+- **`include_diff` without changes.** If `git diff HEAD` is empty, no diff
+  section is added even when `include_diff` is true
+  (`src/tools/git-tools.ts:86-87`).
+- **Long diff.** A diff over 200 lines is sliced to 200 and a `[truncated]`
+  marker is appended (`src/tools/git-tools.ts:88-91`).
+- **A git command fails.** `runGit` returns `null` on any non-zero exit or
+  thrown spawn error, and each section is guarded by a truthiness check, so a
+  failing or empty command simply omits its section rather than erroring the
+  whole call (`src/tools/git-tools.ts:6-15`, `src/tools/git-tools.ts:56`,
+  `src/tools/git-tools.ts:73`, `src/tools/git-tools.ts:80`).
+- **Renamed files.** A status line of the form `R  old -> new` is annotated by
+  the destination path, since that is the path that will exist on disk
+  (`src/tools/git-tools.ts:61`).
 
 ## Example
 
+Example arguments:
+
 ```json
 {
-  "name": "git_context",
-  "arguments": {
-    "since": "HEAD~10",
-    "files_only": true
-  }
+  "since": "HEAD~10",
+  "files_only": true
 }
 ```
 
-Illustrative output shape (synthetic paths):
+Illustrative output (values synthetic):
 
 ```
 ## Uncommitted changes
 src/example.ts  [indexed]
-wiki/new-page.md  [not indexed]
+src/new-thing.ts  [not indexed]
 
 ## Changed files (since HEAD~10)
 src/example.ts
-src/other.ts
+README.md
 ```
-
-## Related flows
-
-- [search_commits](search-commits.md) — semantic search over indexed git history.
-- [file_history](file-history.md) — commits that touched one file, served from the same indexed `git_commits` table.
 
 ## Key source files
 
-- `src/tools/git-tools.ts` — registers `git_context`, runs `git`, annotates lines with index status.
-- `src/db/files.ts` — backs `getFileByPath` used for the `[indexed]` lookup.
+- `src/tools/git-tools.ts` — the MCP tool handler plus the `runGit` and
+  `findGitRoot` helpers that wrap the git CLI.
+- `src/db/index.ts` — `RagDB.getFileByPath` is consulted to produce the
+  `[indexed]` / `[not indexed]` tags.
+
+## Related flows
+
+- [search_commits](search-commits.md) — semantic search over indexed commit
+  history, complementary to the raw `git log` shown here.
+- [file_history](file-history.md) — commit history for a single file.

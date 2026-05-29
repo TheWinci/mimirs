@@ -1,148 +1,280 @@
 # Tool: wiki
 
-The `wiki` tool is the single entry point for the mimirs wiki rebuild workflow. Every step — extracting prefetch data from the index, prompting for discovery, validating discovery, prompting for page writing, splitting page work by slug, and validating cross-links — is one invocation of this tool with a different `command` string. The handler is a thin wrapper around `runWikiRebuild` in `src/wiki/rebuild.ts`; the heavy lifting (graph build, PageRank, schema checks, link checking) lives there.
+The `wiki` tool drives the workflow that rebuilds this very documentation set.
+It is a single MCP tool whose behavior is selected by a string `command` using
+colon-separated selectors — `shape`, `prefetch:map:src/server.ts`,
+`discovery:page:tools/search`, `write:page:tools/search`, and so on. Each
+command does one step: gather structural facts about the codebase, hand the
+agent a prompt describing what to produce next, validate what the agent
+produced, or emit the inputs for writing a single page. The tool itself never
+writes finished documentation pages; it scaffolds the process and checks the
+intermediate artifacts so a human-plus-agent loop can produce them reliably.
 
-Use this page if you are running a wiki rebuild yourself, debugging a step that failed, or extending the workflow with a new selector.
+## How it works
 
-## Flow
+The handler is registered as the MCP tool `wiki` in `registerWikiTools`
+(`src/tools/wiki-tools.ts:23-32`). It accepts an optional `directory` and a
+required `command` string, resolves the project and database with
+`resolveProject`, and delegates the whole command to `runWikiRebuild`,
+catching any thrown error and returning it as `wiki(<command>) failed: ...`
+text (`src/tools/wiki-tools.ts:33-54`).
+
+`runWikiRebuild` first parses the command with `parseWikiCommand`, which splits
+on `:` into a `mode` (the first segment) and `selectors` (the rest), rejecting
+empty input and empty selector parts (`src/wiki/rebuild.ts:104-112`). It then
+dispatches on `mode`: `shape`, `prefetch`, `validate-discovery`,
+`validate-pages`, `discovery`, and `write`, throwing on anything else
+(`src/wiki/rebuild.ts:1009-1094`).
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Caller
-    participant Handler as wiki tool handler
-    participant Parser as parseWikiCommand
+    participant Agent
+    participant Tool as wiki
     participant Driver as runWikiRebuild
-    participant FS as wiki/_prefetch.json, wiki/_discovery.json, wiki/*.md
+    participant FS as wiki/ files
     participant DB as RagDB
-    Caller->>Handler: { command, directory? }
-    Handler->>Driver: runWikiRebuild(ctx, command)
-    Driver->>Parser: parseWikiCommand(input)
-    Parser-->>Driver: { mode, selectors[] }
-    alt mode = shape
-        Driver->>DB: buildPrefetch (graph, PageRank, status, annotations)
+    Agent->>Tool: command, directory?
+    Tool->>Driver: resolveProject -> ctx; runWikiRebuild(ctx, command)
+    Driver->>Driver: parseWikiCommand -> mode, selectors
+    alt shape
+        Driver->>DB: getGraph, chunk ranges, annotations
         Driver->>FS: write wiki/_prefetch.json
-        Driver-->>Handler: discoveryPrompt
-    else mode = prefetch[:metadata|:map[:<path>]|:annotations[:<path>]]
+        Driver-->>Agent: confirmation + discovery prompt
+    else prefetch
         Driver->>FS: read wiki/_prefetch.json
-        Driver-->>Handler: requested JSON slice
-    else mode = validate-discovery
+        Driver-->>Agent: selected JSON slice
+    else validate-discovery
         Driver->>FS: read wiki/_discovery.json
-        Driver-->>Handler: shape + path errors (or OK)
-    else mode = discovery[:flow:<id>|:page:<slug>]
+        Driver->>Driver: shape + path checks
+        Driver-->>Agent: pass / list of errors
+    else discovery
         Driver->>FS: read wiki/_discovery.json
-        Driver-->>Handler: compact list or one flow / one page
-    else mode = write[:page:<slug>]
+        Driver-->>Agent: whole-file or one flow/page JSON
+    else write
         Driver->>FS: read prefetch + discovery
-        Driver-->>Handler: coordinator prompt or per-page packet
-    else mode = validate-pages
-        Driver->>FS: scan wiki/**/*.md
-        Driver-->>Handler: broken-link report
+        Driver-->>Agent: page-writing prompt + inputs JSON
+    else validate-pages
+        Driver->>FS: scan wiki/*.md links
+        Driver-->>Agent: broken-link report
     end
-    Handler-->>Caller: text content
 ```
 
-1. The caller passes a single `command` string (and optional `directory`). The handler calls `resolveProject` for a `RagDB` handle, then forwards the command to `runWikiRebuild` with a `WikiContext` that carries the DB, project directory, and the running package version `src/tools/wiki-tools.ts:33-44`.
-2. `parseWikiCommand` splits the input on `:`. The first segment is the **mode**; the rest are **selectors**. Empty segments throw — `prefetch::map` is rejected as "empty selector parts are not allowed" `src/wiki/rebuild.ts:95-103`.
-3. The driver dispatches on `mode`. Each branch is independent: there is no implicit chaining. The caller is responsible for running the steps in order.
-4. Any thrown error inside `runWikiRebuild` is caught by the tool handler and reformatted as `wiki(<command>) failed: <message>`, so even fatal errors come back as a normal MCP text response `src/tools/wiki-tools.ts:45-53`.
+1. The agent calls the tool with a `command` and optional `directory`
+   (`src/tools/wiki-tools.ts:27-32`).
+2. The handler resolves the project context (database + project dir + version)
+   and calls `runWikiRebuild` (`src/tools/wiki-tools.ts:34-43`).
+3. `parseWikiCommand` turns the string into a mode plus selectors
+   (`src/wiki/rebuild.ts:104-112`).
+4. `shape` builds the structural snapshot from the index graph and writes it to
+   `wiki/_prefetch.json`, then returns the next-step prompt
+   (`src/wiki/rebuild.ts:1012-1023`).
+5. `prefetch` reads that file back and returns the requested slice as JSON
+   (`src/wiki/rebuild.ts:1025-1028`).
+6. `validate-discovery` reads `wiki/_discovery.json` and runs shape and
+   referenced-path checks (`src/wiki/rebuild.ts:1030-1041`).
+7. `discovery` returns the discovery file, or one flow/page from it
+   (`src/wiki/rebuild.ts:1048-1069`).
+8. `write` assembles and returns the inputs and prompt for writing one page
+   (`src/wiki/rebuild.ts:1071-1092`).
+9. `validate-pages` scans the written Markdown for broken relative links
+   (`src/wiki/rebuild.ts:1043-1046`).
 
 ## Inputs
 
-| Name | Type | Default | Notes |
+| name | type | required | description |
 | --- | --- | --- | --- |
-| `command` | string | required | Colon-separated `mode[:selector[:value]]`. See **Command grammar** below. |
-| `directory` | string | `RAG_PROJECT_DIR` env or cwd | Selects which project the rebuild reads from and writes into. The wiki output lives under `<directory>/wiki/`. |
+| `command` | string | yes | The workflow step plus selectors, joined by `:`. The first segment is the mode; later segments are selectors such as a file path, flow id, or page slug (`src/tools/wiki-tools.ts:29-31`, `src/wiki/rebuild.ts:104-112`). |
+| `directory` | string | no | Project directory. Falls back to `RAG_PROJECT_DIR`, then cwd, via `resolveProject` (`src/tools/wiki-tools.ts:28`, `src/tools/wiki-tools.ts:34`). |
+
+Beyond the call arguments, several commands read files the workflow itself
+produced: `wiki/_prefetch.json` and `wiki/_discovery.json`
+(`src/wiki/rebuild.ts:7-8`, `src/wiki/rebuild.ts:118-124`).
+
+## Supported commands
+
+| command | what it does | source |
+| --- | --- | --- |
+| `shape` | Build the structural snapshot and write `wiki/_prefetch.json`; return a prompt telling the agent to author discovery | `src/wiki/rebuild.ts:1012-1023` |
+| `prefetch` | Read `wiki/_prefetch.json` and return the whole object | `src/wiki/rebuild.ts:1025-1028`, `src/wiki/rebuild.ts:990` |
+| `prefetch:metadata` | Return just the prefetch `metadata` block | `src/wiki/rebuild.ts:991` |
+| `prefetch:map` | Return the whole file map | `src/wiki/rebuild.ts:992-994` |
+| `prefetch:map:<path>` | Return one file's map entry; errors if that path is not in the map | `src/wiki/rebuild.ts:995-998` |
+| `prefetch:annotations` | Return all grouped annotations | `src/wiki/rebuild.ts:1000-1002` |
+| `prefetch:annotations:<path>` | Return annotations for one file (empty array if none) | `src/wiki/rebuild.ts:1003-1004` |
+| `validate-discovery` | Read `wiki/_discovery.json`; run shape + path checks | `src/wiki/rebuild.ts:1030-1041` |
+| `discovery` | Return a compacted view of the whole discovery file | `src/wiki/rebuild.ts:1048-1051` |
+| `discovery:flow:<id>` | Return one flow object by id | `src/wiki/rebuild.ts:1052-1059` |
+| `discovery:page:<slug>` | Return one page object by slug | `src/wiki/rebuild.ts:1060-1067` |
+| `write` | Return the coordinator prompt for the writing phase | `src/wiki/rebuild.ts:1071-1073` |
+| `write:page:<slug>` | Return the page-writing prompt plus that page's inputs | `src/wiki/rebuild.ts:1074-1091` |
+| `validate-pages` | Scan `wiki/*.md` for broken relative links | `src/wiki/rebuild.ts:1043-1046` |
+
+The list of supported commands is also surfaced in the tool description itself
+(`src/tools/wiki-tools.ts:6-21`). The `:` character is reserved as the
+selector separator, and selectors that themselves contain `:` are rejected by
+`assertSafeSelector` (`src/wiki/rebuild.ts:130-134`).
+
+## Workflow order
+
+The commands are meant to run in sequence, each producing what the next
+consumes:
+
+1. **`shape`** — builds `wiki/_prefetch.json` from the index and prints a
+   prompt instructing the agent to write `wiki/_discovery.json`
+   (`src/wiki/rebuild.ts:1012-1023`, `src/wiki/rebuild.ts:266-270`).
+2. **`prefetch:*`** — lets the agent read slices of the snapshot (a file's
+   imports, its annotations, the metadata) while authoring discovery
+   (`src/wiki/rebuild.ts:987-1006`).
+3. The agent authors **`wiki/_discovery.json`** by hand following the prompt;
+   the tool does not write this file.
+4. **`validate-discovery`** — checks the discovery file's structure and that
+   every referenced source path exists; on success it tells the agent to ask
+   the human before proceeding to `write`
+   (`src/wiki/rebuild.ts:1030-1041`, `src/wiki/rebuild.ts:861-876`).
+5. **`write`** and **`write:page:<slug>`** — emit the prompt and inputs for
+   writing each page; the agent writes the actual `wiki/<slug>.md`
+   (`src/wiki/rebuild.ts:1071-1092`).
+6. **`validate-pages`** — after pages exist, verifies their internal links
+   resolve (`src/wiki/rebuild.ts:1043-1046`,
+   `src/wiki/rebuild.ts:907-922`).
 
 ## Outputs
 
-| Output | Where |
+| output | where it lands / shape / description |
 | --- | --- |
-| Per-command prompt or JSON slice or validation report | Returned as MCP text content. |
-| `wiki/_prefetch.json` | Written by `wiki(shape)` via `buildPrefetch` `src/wiki/rebuild.ts:903-916`. |
-| `wiki/_discovery.json` | **Not** written by the tool. The discovery prompt asks the agent to author it on disk; the tool only reads and validates it. |
-| `wiki/<slug>.md` | **Not** written by the tool. The write prompts return per-page packets the agent writes itself. |
+| `wiki/_prefetch.json` | Written only by `shape`. Holds project metadata, a per-file map (imports, importers, fan-in/out, PageRank, exports with line numbers), and annotations grouped by file (`src/wiki/rebuild.ts:1013-1015`, `src/wiki/rebuild.ts:174-242`). |
+| Step prompts | Most commands return prompt text guiding the next action — the discovery-authoring prompt after `shape`, the writing prompt for a page, and so on (`src/wiki/rebuild.ts:266-270`, `src/wiki/rebuild.ts:1083-1091`). |
+| JSON slices | `prefetch:*` and `discovery:*` return pretty-printed JSON of the requested portion (`src/wiki/rebuild.ts:262-264`). |
+| Validation reports | `validate-discovery` and `validate-pages` return either a pass message or a bulleted list of problems (`src/wiki/rebuild.ts:861-876`, `src/wiki/rebuild.ts:924-935`). |
+| `wiki/<slug>.md` | Produced by the agent during the writing phase, not by the tool. |
 
-## Command grammar
-
-Commands use `:` as the selector separator. `parseWikiCommand` rejects empty parts and `assertSafeSelector` rejects further `:` inside specific selector values (path, flow id, page slug) so user-provided values cannot smuggle extra segments `src/wiki/rebuild.ts:121-125`.
-
-| Command | Action |
-| --- | --- |
-| `shape` | Build prefetch from the index, write `wiki/_prefetch.json`, and return the discovery prompt. Also prepends a "stop: index is empty" warning when `getStatus` reports zero files `src/wiki/rebuild.ts:378-387`. |
-| `prefetch` | Return the entire `wiki/_prefetch.json` as JSON. |
-| `prefetch:metadata` | Return only the `metadata` block (project root, generated timestamp, last commit hash, mimirs version, index status). |
-| `prefetch:map` | Return the full file map (every node with imports, importedBy, fanIn, fanOut, PageRank, exports). |
-| `prefetch:map:<path>` | Return the one map entry whose `path` matches the normalized argument. Throws if no entry exists `src/wiki/rebuild.ts:886-893`. |
-| `prefetch:annotations` | Return all annotations grouped by file path. |
-| `prefetch:annotations:<path>` | Return the annotation array for one file (empty if none). |
-| `validate-discovery` | Read `wiki/_discovery.json`, run shape checks (`validateDiscoveryShape`) and path-existence checks (`validateDiscoveryPaths`), and return either "passed structural checks" or a bulleted list of errors `src/wiki/rebuild.ts:924-935`. |
-| `discovery` | Return a compact summary of all flows and pages (`id`/`slug`/`title`/`kind`/counts), without full evidence — useful for splitting writes by slug `src/wiki/rebuild.ts:521-540`. |
-| `discovery:flow:<id>` | Return the full discovery entry for one flow. |
-| `discovery:page:<slug>` | Return the full discovery entry for one page. |
-| `write` | Return the coordinator prompt: how to split the page-writing work by slug across subagents `src/wiki/rebuild.ts:389-407`. |
-| `write:page:<slug>` | Return a per-page packet (the page object, its referenced flows, prefetch map entries for `primaryFiles`, annotations for those files, and a flattened `evidence` list) plus the page-writer prompt for that slug. For pages whose `kind` starts with `overview:`, the prompt template differs `src/wiki/rebuild.ts:409-462`, `src/wiki/rebuild.ts:464-519`. |
-| `validate-pages` | Walk `wiki/**/*.md`, extract relative `.md` links, and report any that do not resolve to an existing file `src/wiki/rebuild.ts:779-816`. |
-
-### Workflow order
-
-```
-shape → (author wiki/_discovery.json) → validate-discovery → write → write:page:<slug>... → validate-pages
-```
-
-`shape` is the only command that writes a workflow JSON file. It also returns the prompt that instructs the agent to author `wiki/_discovery.json`. Once the file exists, `validate-discovery` is the gate before any page writing — `write` and `write:page:<slug>` both call `readDiscovery`, which throws if the file is missing or invalid JSON. After all pages are written, `validate-pages` is the closing check that no markdown link points at a nonexistent file.
+`wiki/_discovery.json` is read by `validate-discovery`, `discovery`, and
+`write`, but it is authored by the agent rather than written by the tool
+(`src/wiki/rebuild.ts:258-260`).
 
 ## State changes
 
-### `wiki/_prefetch.json` — absent → regenerated index snapshot
+### `wiki/_prefetch.json` regenerated by `shape`
 
-`wiki(shape)` calls `buildPrefetch(ctx)`, which builds a graph-shaped file map (sorted imports/importedBy, fanIn, fanOut, an iterated PageRank, and per-symbol export rows from chunk ranges) `src/wiki/rebuild.ts:165-209`. It groups annotations by file, then writes the whole structure to `wiki/_prefetch.json` with `writeJSON`. Reruns overwrite without merging — the file is intended to be regenerated whenever the index moves on `src/wiki/rebuild.ts:220-233`, `src/wiki/rebuild.ts:906-916`.
+- **Before:** a previous prefetch file, or none.
+- **After:** a fresh snapshot reflecting the current index graph.
+- **Why it matters:** every later step reads from this file, so it pins the
+  structural facts (imports, exports, PageRank, annotations) the rest of the
+  workflow builds on. `shape` calls `buildPrefetch`, which walks the dependency
+  graph and per-file chunk ranges, then `writeJSON` persists it
+  (`src/wiki/rebuild.ts:1013-1015`, `src/wiki/rebuild.ts:229-242`,
+  `src/wiki/rebuild.ts:244-247`).
 
-### `wiki/_discovery.json` — agent-authored → validated shape
+### `wiki/_discovery.json` validated, not written, by the tool
 
-The tool does not write `_discovery.json` itself. The `shape` prompt instructs the agent to author it, and `validate-discovery` runs two passes:
+- **Before:** discovery JSON authored by the agent.
+- **After:** unchanged on disk; the tool reports whether its shape and
+  referenced paths are valid.
+- **Why it matters:** validation gates the writing phase. `validate-discovery`
+  reads the file and runs `validateDiscoveryShape` and
+  `validateDiscoveryPaths`; a clean run prompts the agent to confirm with the
+  human before writing pages (`src/wiki/rebuild.ts:1030-1041`,
+  `src/wiki/rebuild.ts:762-859`, `src/wiki/rebuild.ts:726-736`).
 
-- **`validateDiscoveryShape`** checks the top-level `metadata`/`flows`/`pages`; that every flow has a unique `id` without `:`; that every page has a `kind` and `slug`; that overview pages use the canonical slug for their kind and appear at most once per kind; that broad reserved slugs (`api`, `endpoints`, `events`, `glossary`, `messages`, `modules`, `overview`, `queues`, `routes`, etc.) are rejected; that non-overview pages have exactly one `flowIds` entry and no two pages share a flow id; and that state-change items have `item`, `from`, `to`, and `description` `src/wiki/rebuild.ts:656-753`.
-- **`validateDiscoveryPaths`** collects every `path` referenced in `flows[].files`, `flows[].evidence`, `flows[].stateChanges[].files`, `flows[].stateChanges[].evidence`, and `pages[].primaryFiles`, then asserts each exists on disk under the project directory `src/wiki/rebuild.ts:587-630`.
+## Validation
 
-If both pass, the response is `wiki/_discovery.json passed structural checks.` Otherwise the response is a bulleted error list and the caller is told to fix and re-run `src/wiki/rebuild.ts:755-770`.
+`validate-discovery` runs two independent checks and concatenates their errors
+(`src/wiki/rebuild.ts:1033-1036`):
+
+- **Shape checks** (`validateDiscoveryShape`, `src/wiki/rebuild.ts:762-859`):
+  requires top-level `metadata`, a `flows` array, and a `pages` array; flow ids
+  must be present, unique, and free of `:`; page slugs must be present, unique,
+  and free of `:`; each non-overview page must list exactly one flow id, and
+  that id must exist and not be shared with another page; `inputs` and
+  `outputs` must each have at least one non-empty string; certain broad slugs
+  (`api`, `entities`, `glossary`, `routes`, and others) are rejected as too
+  broad in favor of one page per concrete flow
+  (`src/wiki/rebuild.ts:775-789`, `src/wiki/rebuild.ts:830-832`).
+- **Path checks** (`validateDiscoveryPaths`, `src/wiki/rebuild.ts:726-736`):
+  collects every source path referenced anywhere in the discovery file — flow
+  files, evidence, state-change files and evidence, and page `primaryFiles`
+  (`src/wiki/rebuild.ts:693-723`) — and reports any that do not exist under the
+  project directory.
+
+`validate-pages` is a separate, later check over the finished Markdown. It
+reads every `.md` file under `wiki/`, extracts relative `.md` links (skipping
+absolute paths and external `scheme:` URLs), resolves each against its file's
+directory, and reports any that point at a missing file
+(`src/wiki/rebuild.ts:885-922`, `src/wiki/rebuild.ts:878`).
 
 ## Branches and failure cases
 
-- **Empty selector parts.** `prefetch::map` or a trailing colon throws `Invalid wiki command ... Empty selector parts are not allowed.` `src/wiki/rebuild.ts:99-101`.
-- **`:` inside a user-provided value.** `assertSafeSelector` blocks path, flow id, and page slug values that contain `:`, since the selector grammar reserves it `src/wiki/rebuild.ts:121-125`.
-- **Unknown mode or selector.** `Unknown wiki command '<input>'` for unknown modes, `Unknown prefetch selector '<x>'` for unknown prefetch sub-selectors, `Unknown discovery selector '<x>'` for `discovery:<x>`, and `Unknown write selector '<x>'` for anything after `write:` other than `page` `src/wiki/rebuild.ts:881-988`.
-- **Missing prefetch.json.** `wiki(prefetch...)`, `wiki(discovery...)`, and `wiki(validate-discovery)` all read JSON eagerly; if the file is absent they bubble up the read error wrapped by the handler as `wiki(<command>) failed: ...`. `write:page:<slug>` is more lenient — it falls back to an empty prefetch when `wiki/_prefetch.json` does not exist, so page writing can still get the discovery packet `src/wiki/rebuild.ts:972-976`.
-- **Empty index on `shape`.** When `buildPrefetch` reports `totalFiles === 0`, the response includes a "Stop: index is empty" block instructing the caller to run `index_files` and call `shape` again `src/wiki/rebuild.ts:378-387`.
-- **`prefetch:map:<path>` miss.** Throws `No prefetch map entry found for '<path>'.` rather than returning empty `src/wiki/rebuild.ts:889-892`.
-- **`discovery:flow:<id>` / `discovery:page:<slug>` miss.** Throws `No flow found for id '<id>'.` or `No page found for slug '<slug>'.` `src/wiki/rebuild.ts:946-961`.
-- **`write:page:<slug>` for unknown slug.** `buildPagePacket` throws `No page found for slug '<slug>'.` `src/wiki/rebuild.ts:853-856`.
-- **Broken cross-links.** `validate-pages` returns a list of `<file> → <target>` lines for every relative `.md` link whose resolved target does not exist. The caller is told to fix and re-run `src/wiki/rebuild.ts:818-829`.
+- **Empty or malformed command.** `parseWikiCommand` throws on empty input or
+  any empty selector segment; the handler turns the throw into a
+  `wiki(<command>) failed: ...` message (`src/wiki/rebuild.ts:106-110`,
+  `src/tools/wiki-tools.ts:45-53`).
+- **Unknown mode or selector.** Any mode outside the known set, or an
+  unrecognized selector under `prefetch`/`discovery`/`write`, throws a
+  descriptive error (`src/wiki/rebuild.ts:1094`,
+  `src/wiki/rebuild.ts:1006`, `src/wiki/rebuild.ts:1068`,
+  `src/wiki/rebuild.ts:1074`).
+- **Missing prefetch/discovery file.** `prefetch`, `discovery`,
+  `validate-discovery`, and `write` read JSON from disk; a missing or invalid
+  file surfaces as a thrown read/parse error (for `validate-discovery` it is
+  caught and reported as `Could not read valid JSON`)
+  (`src/wiki/rebuild.ts:254-260`, `src/wiki/rebuild.ts:1038-1040`).
+- **`prefetch:map:<path>` not found.** If the path is not present in the map,
+  the command throws `No prefetch map entry found for '<path>'`
+  (`src/wiki/rebuild.ts:996-997`).
+- **`prefetch:annotations:<path>` with no notes.** Returns an empty array
+  rather than erroring (`src/wiki/rebuild.ts:1004`).
+- **Missing flow id / page slug.** `discovery:flow`, `discovery:page`, and
+  `write:page` throw a usage hint when their selector is absent, and a
+  not-found error when the id/slug does not match
+  (`src/wiki/rebuild.ts:1052-1066`, `src/wiki/rebuild.ts:1075-1077`,
+  `src/wiki/rebuild.ts:959-961`).
+- **Empty index at `shape` time.** `prefetchReadiness` adds a warning to the
+  `shape` response when the index reports zero files, since discovery should
+  not be drafted from raw source-tree guesses
+  (`src/wiki/rebuild.ts:399-405`, `src/wiki/rebuild.ts:1016-1019`).
+- **Selector containing a reserved `:`.** Path, flow-id, and slug selectors are
+  guarded by `assertSafeSelector`, which rejects values containing `:`
+  (`src/wiki/rebuild.ts:130-134`).
 
 ## Example
 
-```json
-{ "name": "wiki", "arguments": { "command": "shape" } }
-```
+Start the workflow:
 
 ```json
-{ "name": "wiki", "arguments": { "command": "prefetch:map:src/server.ts" } }
+{ "command": "shape" }
 ```
 
-```json
-{ "name": "wiki", "arguments": { "command": "validate-discovery" } }
-```
+Inspect one file's structure while drafting discovery:
 
 ```json
-{ "name": "wiki", "arguments": { "command": "write:page:tools/search" } }
+{ "command": "prefetch:map:src/server/index.ts" }
 ```
 
+Validate the authored discovery file:
+
 ```json
-{ "name": "wiki", "arguments": { "command": "validate-pages" } }
+{ "command": "validate-discovery" }
+```
+
+Get the inputs to write a single page:
+
+```json
+{ "command": "write:page:tools/search" }
+```
+
+Check links after pages are written:
+
+```json
+{ "command": "validate-pages" }
 ```
 
 ## Key source files
 
-- `src/tools/wiki-tools.ts` — registers the MCP tool, lists supported commands in the description, forwards to `runWikiRebuild`, and wraps thrown errors in a graceful text response.
-- `src/wiki/rebuild.ts` — owns everything else: command parsing, prefetch construction (graph map, PageRank, annotations), discovery shape + path validation, the discovery / coordinator / per-page prompts, and the `wiki/` link checker.
-- `src/db/index.ts` — supplies `RagDB.getGraph`, `getStatus`, `getAnnotations`, `getFileChunkRanges` used by `buildPrefetch`.
+- `src/tools/wiki-tools.ts` — the thin MCP handler: command schema, the
+  supported-command list, and error wrapping.
+- `src/wiki/rebuild.ts` — the whole workflow: command parsing
+  (`parseWikiCommand`), the prefetch builder (`buildPrefetch`), the dispatcher
+  (`runWikiRebuild`), and the shape and link validators.
+- `src/db/index.ts` — `RagDB` supplies the dependency graph, chunk ranges, and
+  annotations that `shape` turns into the prefetch snapshot.

@@ -1,197 +1,150 @@
 # CLI: demo
 
-`mimirs demo [dir]` is a guided walkthrough aimed at first-time users.
-It runs the four most-useful read paths — index, `search`,
-`read_relevant`, and `search_symbols` listing mode — against a real
-project directory, with a fixed sample query, and prints the kind of
-output an agent would see from the MCP tools. Reach for it when you
-have just installed mimirs and want to confirm that everything works
-end to end before wiring it into Claude Code or another IDE.
+`mimirs demo` is a guided, first-run walkthrough. It indexes a directory and then runs three of mimirs' core retrieval features against it — semantic file search, ranked code-chunk reading, and a most-referenced-symbols listing — printing colorized output with short pauses between sections. The goal is to let a brand-new user see, in one command, what mimirs does and what its output looks like before wiring it into an editor.
 
-The demo always indexes the target directory first; it does not assume
-an existing index. The "sample data" is whatever code lives at the
-path you pass — there is no bundled corpus.
+It does not ship its own sample corpus. It indexes whatever directory you point it at — the current directory by default — so the output reflects your real project (`src/cli/commands/demo.ts:37`, `src/cli/commands/demo.ts:45-56`).
 
-## Flow
+## How it works
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User
-    participant CLI as demoCommand
-    participant Idx as indexDirectory
-    participant Hybrid as search/searchChunks
+    participant User
+    participant Cmd as demoCommand
+    participant Indexer as indexDirectory
+    participant Search as hybrid search
     participant DB as RagDB
-    User->>CLI: mimirs demo [dir]
-    CLI->>CLI: resolve dir, loadConfig(dir)
-    CLI->>DB: new RagDB(dir)
-    CLI->>Idx: indexDirectory(dir, db, config, progress)
-    Idx-->>CLI: { indexed, skipped, pruned }
-    CLI->>User: print "Done: X indexed, ..."
-    CLI->>Hybrid: search(demoQuery, db, top=3, ...)
-    Hybrid-->>CLI: ranked file results
-    CLI->>User: print top 3 with score + snippet
-    CLI->>Hybrid: searchChunks(demoQuery, db, top=2, threshold=0.3, ...)
-    Hybrid-->>CLI: ranked chunks with line ranges
-    CLI->>User: print chunks (path:start-end, entityName, content)
-    CLI->>DB: searchSymbols(undefined, false, undefined, 200)
-    DB-->>CLI: full export listing
-    CLI->>CLI: filter !isReexport, sort by referenceCount, take 5
-    CLI->>User: print top 5 most-imported symbols
-    CLI->>User: print "Done" footer with init hint
-    CLI->>DB: close()
+    User->>Cmd: mimirs demo [dir]
+    Cmd->>DB: open RagDB(dir), loadConfig(dir)
+    Cmd->>Indexer: indexDirectory(dir, db, config, progress)
+    Indexer-->>Cmd: { indexed, skipped, pruned }
+    Cmd->>Search: search(demoQuery) — top files
+    Search-->>Cmd: ranked file results + snippets
+    Cmd->>Search: searchChunks(demoQuery) — top chunks
+    Search-->>Cmd: ranked chunks with line ranges
+    Cmd->>DB: searchSymbols() listing
+    DB-->>Cmd: symbols sorted by reference count
+    Cmd->>User: print "init" hint + docs link
+    Cmd->>DB: db.close()
 ```
 
-1. The user runs `mimirs demo` optionally with a directory. The CLI
-   resolves the first positional argument to an absolute path; if it
-   starts with `--` or is missing, `.` is used
-   (`src/cli/commands/demo.ts:37`).
-2. The CLI prints a header, opens a fresh `RagDB` on that directory,
-   and calls `loadConfig(dir)` so the demo uses the project's
-   embedding model, hybrid weight, and ignore lists.
-3. `indexDirectory` is invoked with a custom progress callback. The
-   callback parses the `"Found N files to index"` event and, from
-   that point on, suppresses per-file chatter via
-   `createQuietProgress`, so the demo's "step 1" output stays compact
-   even on big projects (`src/cli/commands/demo.ts:48-56`).
-4. The indexer returns counts for `indexed`, `skipped` and `pruned`.
-   The CLI prints them and pauses 500ms to let the user follow along
-   (`src/cli/commands/demo.ts:57-60`).
-5. **Step 2 — `search`**: The demo runs `search` with the fixed query
-   `"AST-aware chunking with tree-sitter"`, takes the top 3, prints
-   each as `score  relative-path` followed by the first snippet (up
-   to 3 lines, wrapped at 96 columns)
-   (`src/cli/commands/demo.ts:62-80`).
-6. **Step 3 — `read_relevant`**: The demo calls `searchChunks` with
-   `top=2` and `threshold=0.3` and prints each chunk with its line
-   range, entity name, and up to 18 lines of content. This is the
-   same shape that the `read_relevant` MCP tool returns to agents
-   (`src/cli/commands/demo.ts:82-99`).
-7. **Step 4 — `search_symbols` listing**: The demo lists up to 200
-   exported symbols, filters out re-exports, sorts by
-   `referenceCount` descending, and prints the top 5 with their
-   importer count and module count
-   (`src/cli/commands/demo.ts:101-118`).
-8. The footer prints a hint to run `bunx mimirs init --ide claude` (or
-   another IDE) and the docs URL, then the DB is closed
-   (`src/cli/commands/demo.ts:120-125`).
+1. The target directory is resolved from the first positional argument, or `.` when none is given or the first argument is a flag (`src/cli/commands/demo.ts:37`).
+2. The command opens the database for that directory and loads its configuration (`src/cli/commands/demo.ts:45-46`).
+3. Section 1 indexes the directory. A progress callback prints live progress; once it sees a `Found N files to index` message it switches to a quieter progress renderer scaled to that file count. When indexing finishes it prints a `Done: N indexed, N skipped, N pruned` summary (`src/cli/commands/demo.ts:42-59`).
+4. Section 2 runs `search` for a fixed demo query and prints up to three ranked files, each with its score and the first snippet, trimmed to a few lines (`src/cli/commands/demo.ts:64-79`).
+5. Section 3 runs `searchChunks` for the same query and prints up to two ranked chunks with their score, file path, line range, optional entity name, and a longer content preview (`src/cli/commands/demo.ts:82-98`).
+6. Section 4 lists indexed symbols, keeps only non-reexports with at least one importer, sorts by reference count, and prints the top five most-referenced symbols (`src/cli/commands/demo.ts:101-117`).
+7. It prints a closing hint showing how to add mimirs to an editor with `init`, plus a docs link, then closes the database (`src/cli/commands/demo.ts:120-125`).
+
+Between each section there is a half-second pause so the output reads as a paced walkthrough rather than a wall of text (`src/cli/commands/demo.ts:21-23`, `src/cli/commands/demo.ts:60`).
 
 ## Inputs
 
-| Input | Source | Notes |
-| --- | --- | --- |
-| `directory` | first positional arg | Optional. Resolved against the shell CWD; defaults to `.`. The argument is only accepted as a directory when it does not start with `--`. |
-
-The demo also reads project config from disk via `loadConfig(dir)` —
-specifically `hybridWeight` and `generated` are passed into the
-`search` and `searchChunks` calls. Embedding model selection is
-governed by whatever the config and `RagDB` agree on.
+| name | type | required | description |
+| --- | --- | --- | --- |
+| directory | positional string | no | Directory to index and demo against. Used when present and not starting with `--`; otherwise the current directory `.`. Resolved to an absolute path (`src/cli/commands/demo.ts:37`). |
 
 ## Outputs
 
-| Output | What happens |
+| output | where it lands / shape / description |
 | --- | --- |
-| Interactive demo output | Multi-section ANSI-colored text on stdout, with short pauses between sections to make the walkthrough readable. |
+| Index summary | `Done: N indexed, N skipped, N pruned` printed after indexing (`src/cli/commands/demo.ts:57-59`). |
+| Search section | Up to three ranked files: score, project-relative path, and the first snippet trimmed to three lines at 96 columns (`src/cli/commands/demo.ts:68-79`). |
+| Read-relevant section | Up to two ranked chunks: score, path with `:start-end` line range, optional entity name, and content preview up to 18 lines (`src/cli/commands/demo.ts:86-98`). |
+| Symbols section | Up to five symbols by import count: name, type, importer count, module count, and path (`src/cli/commands/demo.ts:108-117`). |
+| Closing hint | The `init` example and docs URL printed at the end (`src/cli/commands/demo.ts:120-123`). |
+| Persisted index | The directory is fully indexed into `.mimirs/`; this is a real side effect, not a throwaway. See State changes. |
 
-The demo also has a real side effect: indexing the directory. After
-the run, the project's `.mimirs` database contains a current index for
-that path. Subsequent searches (CLI or MCP) will return results
-without re-indexing.
+## The fixed demo query
 
-## What the four steps look like
+All retrieval sections use one hard-coded query string, `"AST-aware chunking with tree-sitter"` (`src/cli/commands/demo.ts:62`). This is chosen to surface mimirs' own indexing internals when the demo is run inside a codebase that mentions chunking, but against an unrelated project it may return nothing — the demo handles that gracefully (see Branches). The same query feeds both the file search and the chunk search so the two sections illustrate the difference between file-level and chunk-level retrieval on identical input.
 
-The shapes match the MCP tool output one-to-one — the demo is the
-fastest way to learn them.
+## What each section shows
 
-- `search` rows: `score  path` + truncated snippet block.
-- `read_relevant` rows: `[score]  path:start-end  entityName` + an
-  18-line excerpt of the chunk's content. This mirrors the format
-  the agent receives.
-- `search_symbols` (listing mode) rows: symbol name, symbol type,
-  importer count, count of distinct modules that import it. The
-  listing comes from `db.searchSymbols(undefined, false, undefined,
-  200)` — the first argument is the query, which is omitted to
-  request the export listing mode.
+| Section | Call | Shape shown |
+| --- | --- | --- |
+| 2. search | `search(query, db, 3, 0, config.hybridWeight, config.generated)`, then sliced to 3 | Ranked files: `score  path` plus first snippet (`src/cli/commands/demo.ts:67-70`) |
+| 3. read_relevant | `searchChunks(query, db, 2, 0.3, config.hybridWeight, config.generated)` | Ranked chunks: `[score] path:start-end entityName` plus content (`src/cli/commands/demo.ts:85-90`) |
+| 4. search_symbols | `db.searchSymbols(undefined, false, undefined, 200)`, filtered and sorted | Top symbols by importer count: `name (type)  N importers across M modules` (`src/cli/commands/demo.ts:102-112`) |
+
+The chunk search passes a `0.3` relevance threshold, so section 3 only shows chunks above that score, while section 2's file search uses threshold `0` (`src/cli/commands/demo.ts:67`, `src/cli/commands/demo.ts:85`). Both searches read `config.hybridWeight` and `config.generated` so the demo honors the project's configured blend of keyword vs semantic ranking and its generated-file handling.
+
+## State changes
+
+### Project index in `.mimirs/`
+
+- **Before:** the directory may be unindexed or have a stale index.
+- **After:** the directory is freshly indexed — files added, unchanged ones skipped, deleted ones pruned.
+- This is a genuine, persistent side effect. `indexDirectory` writes into the real `RagDB` for the directory, the same database the editor's MCP server would use. The returned counts (`indexed`, `skipped`, `pruned`) are printed as the section-1 summary (`src/cli/commands/demo.ts:56-59`). Running the demo is therefore equivalent to indexing the project, not a sandboxed dry run.
 
 ## Branches and failure cases
 
-- **No matching `search` results**: when the fixed sample query
-  returns nothing (very small projects, or projects with no
-  tree-sitter or AST content), step 2 prints
-  `"No results — try a query related to your project."`
-  (`src/cli/commands/demo.ts:77-79`).
-- **No chunks above threshold for `read_relevant`**: step 3 prints
-  `"No chunks above threshold."` and moves on
-  (`src/cli/commands/demo.ts:96-98`).
-- **No exported symbols indexed**: step 4 prints
-  `"No exported symbols indexed yet."`
-  (`src/cli/commands/demo.ts:115-117`). This will happen on
-  freshly-indexed projects with only non-code content, or when the
-  symbol table is empty.
-- **Empty directory or all files pruned**: `indexDirectory` still
-  reports zeros and the demo continues, but every later step will
-  fall into its "empty" branch.
-
-## Audience: first-time users
-
-The demo is intentionally scripted. Pauses, headers like
-`--- 1. Index your project ---`, color codes (cyan headers, yellow
-scores, magenta importer counts, dim snippet bodies), and the final
-init hint are all aimed at someone seeing mimirs output for the first
-time. It is not meant to be parsed by a tool or piped into a buffer —
-the ANSI codes will leak. For machine consumption, use the
-corresponding MCP tools directly.
+- **No directory argument or a leading flag:** defaults to the current directory `.` (`src/cli/commands/demo.ts:37`).
+- **Progress mode switch:** the progress callback uses the quiet renderer only after it parses a `Found N files to index` message; before that it falls back to the standard CLI progress renderer (`src/cli/commands/demo.ts:49-54`).
+- **No search results:** section 2 prints `No results — try a query related to your project.` (`src/cli/commands/demo.ts:77-78`).
+- **No chunks above threshold:** section 3 prints `No chunks above threshold.` (`src/cli/commands/demo.ts:96-97`).
+- **Missing line range on a chunk:** when `startLine` or `endLine` is null the `:start-end` suffix is omitted (`src/cli/commands/demo.ts:88`).
+- **Chunk without an entity name:** the entity label is left blank (`src/cli/commands/demo.ts:89`).
+- **No qualifying symbols:** section 4 prints `No exported symbols indexed yet.`; symbols that are re-exports or have zero importers are filtered out before ranking (`src/cli/commands/demo.ts:104-116`).
+- **Long content:** `renderBlock` truncates each section's text to a maximum number of lines (3 for search, 18 for chunks) and wraps long lines at 96 columns, appending a `… (+N more lines)` marker when truncated (`src/cli/commands/demo.ts:25-34`).
 
 ## Example
 
+```bash
+# Demo against the current project
+mimirs demo
+
+# Demo against another checkout
+mimirs demo /path/to/project
+```
+
+Illustrative output (values synthetic):
+
 ```
 mimirs demo
-# → mimirs demo
-#   Running against: /Users/example/project
-#
-#   --- 1. Index your project ---
-#   ...
-#   Done: 124 indexed, 0 skipped, 0 pruned
-#
-#   --- 2. search — ranked files for a query ---
-#   > search "AST-aware chunking with tree-sitter"
-#     0.8412  src/indexing/chunker.ts
-#       export async function chunkText(...)
-#
-#   --- 3. read_relevant — ranked chunks with exact line ranges ---
-#   ...
-#
-#   --- 4. search_symbols — most-referenced symbols in the codebase ---
-#   ...
-#
-#   --- Done ---
-#   Add mimirs to your editor:
-#     bunx mimirs init --ide claude
+Running against: /path/to/project
+
+--- 1. Index your project ---
+Indexing files with AST-aware chunking...
+
+Done: 128 indexed, 4 skipped, 0 pruned
+
+--- 2. search — ranked files for a query ---
+> search "AST-aware chunking with tree-sitter"
+
+  0.8123  src/indexing/chunker.ts
+      // splits a file into AST-aware chunks
+      …
+
+--- 3. read_relevant — ranked chunks with exact line ranges ---
+> read_relevant "AST-aware chunking with tree-sitter"
+
+  [0.79] src/indexing/chunker.ts:10-48  chunkFile
+      export function chunkFile(...) {
+      …
+
+--- 4. search_symbols — most-referenced symbols in the codebase ---
+> search_symbols   # listing mode, ranked by import count
+
+  RagDB (class)  37 importers across 21 modules
+    src/db/index.ts
+
+--- Done ---
+Add mimirs to your editor:
+  bunx mimirs init --ide claude   # or: cursor, windsurf, copilot, jetbrains, all
 ```
 
-## Open questions
+## Related commands
 
-- The discovery packet asked whether the demo indexes a sample or uses
-  an existing index. The source answers it: the demo always calls
-  `indexDirectory(dir, db, config, progress)` first
-  (`src/cli/commands/demo.ts:56`), so it indexes whatever directory
-  you point it at. There is no bundled sample corpus. The "sample
-  data" is your own project.
+- [cli/search](./search.md) — the standalone search command that section 2 demonstrates.
+- [cli/read](./read.md) — the read-relevant command that section 3 demonstrates.
+- [cli/init](./init.md) — the editor-wiring command the closing hint points to.
 
 ## Key source files
 
-- `src/cli/commands/demo.ts` — the entire scripted demo.
-- `src/indexing/indexer.ts` — `indexDirectory` does the actual file
-  indexing.
-- `src/search/hybrid.ts` — `search` and `searchChunks` power steps 2
-  and 3.
-- `src/db/index.ts` — `RagDB.searchSymbols` powers step 4.
-- `src/cli/progress.ts` — `cliProgress` and `createQuietProgress`
-  control how indexing chatter is rendered.
-
-## Related flows
-
-- [cli/search](./search.md) — the standalone CLI for the `search`
-  step shown by the demo.
-- [cli/map](./map.md) — text dependency graph from the same DB the
-  demo just populated.
+- `src/cli/commands/demo.ts` — the entire walkthrough: indexing, the three retrieval sections, rendering helpers, and the closing hint.
+- `src/indexing/indexer.ts` — `indexDirectory`, which performs the section-1 indexing and returns the counts.
+- `src/search/hybrid.ts` — `search` and `searchChunks`, the retrieval functions driving sections 2 and 3.
+- `src/db/index.ts` — `RagDB`, including `searchSymbols` used by section 4.
+- `src/cli/progress.ts` — `cliProgress` and `createQuietProgress` for indexing progress.
+- `src/config/index.ts` — `loadConfig`, supplying `hybridWeight` and `generated`.

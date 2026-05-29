@@ -1,205 +1,154 @@
 # Tool: index_files
 
-`index_files` is the MCP tool that runs the mimirs indexing pipeline. It scans
-files in a project, splits them into chunks, embeds them, writes graph data,
-and (when called without patterns) prunes rows for files that no longer exist
-or are now excluded. Call it after a large refactor, after pulling new code, or
-the first time a project is opened. For most everyday work the file watcher
-does this on save; `index_files` is the manual lever for the cases the watcher
-missed.
+`index_files` rebuilds the semantic search index for a project so that later calls to search, symbol lookup, and the dependency-graph tools see the current state of the code. It is the tool you call after creating or editing files when you want those changes to be findable. It reads files from disk, splits them into chunks, embeds each chunk, and writes the results into the on-disk SQLite database under `.mimirs/index.db`.
 
-The tool wraps `indexDirectory` and adds two things on top: it writes
-percentage progress to `.mimirs/status` while indexing runs so other processes
-can see what is happening, and it surfaces lock-contention as a "query-only"
-fallback when another mimirs instance is already indexing the same project
-(`src/tools/index-tools.ts:7-92`).
+The tool has two modes that differ only in one thing: whether it deletes index rows for files that are no longer present. A full run (no `patterns`) reconciles the whole index against the project config and removes stale rows. A scoped run (with `patterns`) refreshes or adds only the matching files and never deletes anything outside that set.
 
-## Flow
+The handler lives in `registerIndexTools` and delegates almost all work to `indexDirectory`; see `src/tools/index-tools.ts:24-91` and `src/indexing/indexer.ts:695-799`.
+
+## How it works
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Caller as MCP caller
+    participant Caller
     participant Handler as index_files handler
     participant Indexer as indexDirectory
     participant Lock as tryAcquireIndexLock
-    participant DB as RagDB
+    participant DB as SQLite index
     participant Status as .mimirs/status
-    Caller->>Handler: { directory?, patterns? }
-    Handler->>Handler: resolveProject + override config.include if patterns
-    Handler->>Indexer: indexDirectory(dir, db, config, onProgress, _, { prune: !patterns })
+
+    Caller->>Handler: directory?, patterns?
+    Handler->>Handler: resolveProject + build config
+    Handler->>Indexer: indexDirectory(dir, db, config, onProgress, prune)
     Indexer->>Lock: tryAcquireIndexLock(dir)
-    alt lock taken by another process
+    alt another process holds the lock
         Lock-->>Indexer: null
-        Indexer-->>Handler: { locked: true, lockReason }
-        Handler->>Status: write "mode: query-only"
-        Handler-->>Caller: "Indexing skipped" + existing index counts
+        Indexer-->>Handler: result.locked = true
+        Handler->>Status: "mode: query-only"
+        Handler-->>Caller: "Indexing skipped" + existing counts
     else lock acquired
-        Lock-->>Indexer: token
-        Indexer->>Indexer: collectFiles + load embedder
+        Lock-->>Indexer: lock token
+        Indexer->>Indexer: collectFiles (include/exclude)
+        Indexer->>Handler: "Found N files to index"
+        Handler->>Status: "0/N files"
         loop each matched file
-            Indexer->>DB: upsert file, chunks, imports, exports, symbol_refs
-            Indexer->>Status: progress callback writes percent
+            Indexer->>DB: upsert file + chunks + graph rows
+            Indexer->>Handler: "file:done"
+            Handler->>Status: "k/N files (pct%)"
         end
-        opt prune mode (no patterns)
-            Indexer->>DB: pruneDeleted(existingPaths)
+        opt full run only
+            Indexer->>DB: pruneDeleted(matched paths)
         end
-        Indexer-->>Handler: { indexed, skipped, pruned, errors }
-        Handler->>Status: write "done" + totals
+        Indexer->>DB: resolveImports + resolveAllSymbolRefs
+        Indexer-->>Handler: indexed/skipped/pruned counts
+        Handler->>Status: "done" + totals
         Handler-->>Caller: "Indexing complete" summary
     end
 ```
 
-1. Caller passes optional `directory` and optional `patterns`. `resolveProject`
-   loads `.mimirs/config.json` for that directory and opens the `RagDB`
-   (`src/tools/index-tools.ts:25`).
-2. If `patterns` is set, the handler overrides `config.include` with the array
-   in place, so only those globs are scanned (`src/tools/index-tools.ts:26`).
-   Otherwise the project-wide include list is used.
-3. The handler calls `indexDirectory` with `prune: !patterns`. Prune runs only
-   on full-project invocations (`src/tools/index-tools.ts:53`).
-4. `indexDirectory` calls `tryAcquireIndexLock`, a per-directory PID lock at
-   `.mimirs/index.lock` (`src/utils/index-lock.ts:28-65`).
-5. When another live PID owns the lock, the run short-circuits with
-   `result.locked = true` and the caller is told the server can still answer
-   queries against the existing index (`src/indexing/indexer.ts:722-730`,
-   `src/tools/index-tools.ts:67-81`).
-6. With the lock held, `indexDirectory` collects files, eagerly loads the
-   embedder, then iterates each path. For every file the chain runs
-   `processFile`, which writes `files`, `chunks`, `file_imports`,
-   `file_exports`, and `symbol_refs` rows.
-7. The handler's `onProgress` callback turns the `Found N files to index` and
-   `file:done` messages into `0/N files` and `K/N files (P%)` lines, written
-   to `.mimirs/status` (`src/tools/index-tools.ts:31-53`).
-8. When prune is on, `pruneDeleted` removes every `files` row whose path is
-   not in the just-collected set; cascade-deletes drop the chunk rows
-   (`src/db/files.ts:273-298`).
-9. The handler finishes by writing one more status line with the totals from
-   `db.getStatus()` and returning a text summary to the caller
-   (`src/tools/index-tools.ts:55-90`).
+1. The caller passes an optional `directory` and optional `patterns` array. The handler calls `resolveProject` to turn the directory into an absolute path, load `.mimirs/config.json`, and open the database (`src/tools/index.ts:22-37`). When `patterns` are supplied, the handler overrides the config's `include` list with those patterns; otherwise it uses the config as-is (`src/tools/index-tools.ts:25-26`).
+2. The handler calls `indexDirectory`, passing a progress callback and `{ prune: !patterns }` so pruning happens only on full runs (`src/tools/index-tools.ts:31-53`).
+3. `indexDirectory` first checks the directory is safe to index (not a home or root directory) via `checkIndexDir`, then normalizes the path to forward slashes (`src/indexing/indexer.ts:707-715`).
+4. It tries to take a per-directory process lock. If another live mimirs process owns it, indexing is skipped and the result is marked locked (`src/indexing/indexer.ts:722-730`).
+5. `collectFiles` walks the directory and keeps files that pass the include filter and fail the exclude filter (`src/indexing/indexer.ts:210-217`, `src/indexing/indexer.ts:734`). The count is reported as `Found N files to index`.
+6. For each matched file, `processFile` reads it once, hashes it, and skips it when the stored hash matches — only changed or new files are re-embedded and rewritten (`src/indexing/indexer.ts:404-412`). Each file ends with a `file:done` progress message.
+7. On a full run, `pruneDeleted` removes index rows for any file no longer in the matched set (`src/indexing/indexer.ts:774-782`).
+8. When at least one file was re-indexed, the indexer resolves cross-file import paths and then symbol references, so the dependency-graph tools have fresh edges (`src/indexing/indexer.ts:785-793`).
+9. The handler reads final totals from `getStatus` and returns a plain-text summary; the lock is always released in a `finally` block (`src/tools/index-tools.ts:55-90`, `src/indexing/indexer.ts:796-798`).
 
 ## Inputs
 
-| Name | Type | Required | Description |
+| name | type | required | description |
 | --- | --- | --- | --- |
-| `directory` | string | no | Project root. Defaults to `RAG_PROJECT_DIR` env or current working directory (`src/tools/index-tools.ts:11-16`). |
-| `patterns` | string[] | no | Refresh only these include globs, e.g. `["**/*.md", "src/**/*.ts"]`. When set, the project's `include` config is replaced for this run and prune is disabled (`src/tools/index-tools.ts:17-22`). |
+| `directory` | string | no | Directory to index. Defaults to the `RAG_PROJECT_DIR` environment variable, then the current working directory. Resolved to an absolute path and must exist (`src/tools/index.ts:26-33`). |
+| `patterns` | string[] | no | Include globs such as `["src/**/*.ts", "**/*.md"]`. When present, only matching files are refreshed or added and nothing outside the set is deleted. When absent, the project's configured `include` list is used and a full reconcile (with pruning) runs (`src/tools/index-tools.ts:17-26`). |
 
 ## Outputs
 
-| Output | Where it lands |
+| output | where it lands / shape / description |
 | --- | --- |
-| `indexed`, `skipped`, `pruned` counts | Returned in the text response to the caller (`src/tools/index-tools.ts:83-90`). |
-| Refreshed `files`, `chunks`, `file_imports`, `file_exports`, `symbol_refs` rows | `.mimirs/index.db` via `processFile` and downstream graph writers. |
-| Progress lines | `.mimirs/status` text file, overwritten on every callback (`src/server/index.ts:100-108`). |
-| `errors` array | Joined and appended to the response text when `result.errors` is non-empty (`src/tools/index-tools.ts:87`). |
+| Result summary | Returned as MCP text content. Normal runs read `Indexing complete:` with `Indexed`, `Skipped (unchanged)`, `Pruned (deleted)`, and an optional `Errors` line (`src/tools/index-tools.ts:83-90`). |
+| Locked summary | When another process owns the lock, the text instead reads `Indexing skipped:` with the lock reason and the existing file/chunk counts (`src/tools/index-tools.ts:67-80`). |
+| Refreshed index | Rows in the `files`, `chunks`, `file_imports`, `file_exports`, and `symbol_refs` tables are updated for changed files and removed for pruned files (see State changes). |
+| Status file | When the server passes a status writer, per-file progress and a final `done` block are written to `.mimirs/status` (`src/server/index.ts:95-108`, `src/tools/index-tools.ts:31-64`). |
 
 ## State changes
 
-- **`files` and `chunks` tables refreshed.** Before the run, the DB holds the
-  previous snapshot of file hashes and chunk rows. After the run, every
-  modified or new file has fresh rows; unchanged files are skipped by hash
-  comparison (`src/tools/index-tools.ts:24-65`). Cascade-deletes through
-  `ON DELETE CASCADE` on `chunks.file_id` keep chunk rows in sync with their
-  file row (`src/db/index.ts:131-141`).
-- **Deleted-file rows pruned (prune mode only).** Before: removed-from-disk
-  files still have stale rows. After: those rows are gone, along with their
-  chunks and `vec_chunks` entries (`src/db/files.ts:273-298`). Pattern-scoped
-  runs deliberately skip this so a `patterns: ["**/*.md"]` call does not
-  delete every TypeScript file (`src/indexing/indexer.ts:774-779`).
-- **`.mimirs/status` overwritten.** The status file moves from whatever the
-  previous run left to "0/N files" → "K/N files (P%)" → "done\nindexed: X,
-  skipped: Y, pruned: Z\ntotal files: F, total chunks: C". When the lock is
-  held by another process, an extra line `mode: query-only (another mimirs
-  process owns indexing)` is inserted (`src/tools/index-tools.ts:55-64`).
+### `files` and `chunks` rows
 
-## Full vs pattern-scoped indexing
+Before a run these tables hold the previous index snapshot. After it, every changed file has been rewritten and (on full runs) deleted files are gone.
 
-The shape of the call decides whether the index can shrink:
+For a changed file, `upsertFileStart` updates the existing row in place rather than deleting and reinserting, so the `files.id` stays stable and any references that point at it remain valid; it deletes the file's old chunk rows (and their vector embeddings) first, then `insertChunkBatch` writes the new chunks (`src/db/files.ts:39-69`, `src/db/files.ts:82-108`). New files get a fresh `files` row and chunks. Unchanged files (matching hash) are left untouched and counted as skipped.
 
-- **No `patterns` (default).** The project's `include` config is used,
-  `prune: true` is passed to `indexDirectory`, and `pruneDeleted` runs at the
-  end. A file deleted from disk or removed from `include`/added to `exclude`
-  drops out of the index in this pass.
-- **With `patterns`.** The include list is replaced by the supplied array for
-  this run only, and `prune: false` is forwarded. The runner re-indexes the
-  matched files and leaves every other row untouched. This is the right shape
-  for "refresh the markdown" or "re-pick-up these three changed files"; it is
-  not the right shape for shrinking. To remove files from the index, update
-  `.mimirs/config.json` excludes and call `index_files` without patterns.
+This matters because chunks are the unit search returns. A stale chunk set would make search point at code that no longer exists.
 
-This split is what the tool description in `src/tools/index-tools.ts:9-22`
-documents and what `prune: !patterns` enforces.
+### `file_imports`, `file_exports`, and `symbol_refs` rows
 
-## Query-only fallback
+For each re-indexed file, `upsertFileGraph` deletes the file's existing import and export rows and writes the freshly parsed ones, and the symbol-reference rewrite deletes and repopulates `symbol_refs` for the file (`src/db/graph.ts:720-742`, `src/db/graph.ts:17`). These three tables back the dependency-graph tools ([depends_on](../tools/depends-on.md), [depended_on_by](../tools/depended-on-by.md), and [find_usages](../tools/find-usages.md)).
 
-A project can have several mimirs processes pointed at the same
-`.mimirs/index.db` — one per IDE window plus the CLI, for example.
-Concurrent `processFile` calls on the same path race past each other and
-produce duplicate chunk rows. `tryAcquireIndexLock` funnels writes through a
-single process by writing a PID into `.mimirs/index.lock`. Other processes
-get `null` back and skip writing entirely (`src/utils/index-lock.ts:28-65`).
+Although these tables declare `ON DELETE CASCADE` foreign keys in the schema, that cascade is inert: bun:sqlite leaves `PRAGMA foreign_keys` off, so the database never auto-deletes child rows. Every delete here is performed explicitly in code — by `upsertFileGraph`, by the symbol-ref rewrite, and by `pruneDeleted`/`removeFile` — never by the engine (`src/db/graph.ts:727-728`).
 
-When the index_files handler sees `result.locked === true`, it does two
-things: it inserts the `mode: query-only` line into the status file so
-operators can see why nothing changed, and it returns a multi-line text
-response that names the existing file and chunk counts so the caller knows
-the server is still useful for reads (`src/tools/index-tools.ts:67-81`). Stale
-locks from crashed processes are reclaimed automatically on the next attempt
-via `isPidAlive` (`src/utils/index-lock.ts:91-98`).
+### `.mimirs/status` file
+
+Before a run the status file holds whatever the server last wrote. During the run the progress callback rewrites it to `0/N files`, then `k/N files (pct%)` as each file completes, and finally a `done` block listing the indexed/skipped/pruned counts and the database totals (`src/tools/index-tools.ts:34-64`). The file write itself happens in the server's `writeStatus`, which appends a process identifier line and writes to `.mimirs/status` (`src/server/index.ts:100-108`). When the index handler is invoked outside a server context, no status writer is passed and these writes are skipped (`src/tools/index-tools.ts:32`).
 
 ## Branches and failure cases
 
-- **Lock held by another live PID.** Tool returns the "Indexing skipped" text
-  and leaves the index untouched.
-- **Status writer absent.** When the server does not pass a `writeStatus`
-  function, the progress callback bails out at line 1 and only the text
-  response is produced (`src/tools/index-tools.ts:32`).
-- **Per-file errors.** `indexDirectory` catches per-file exceptions and
-  appends them to `result.errors`; the run keeps going. The handler joins
-  them into the response when any are present (`src/tools/index-tools.ts:87`,
-  `src/indexing/indexer.ts:764-770`).
-- **Unsafe directory.** `checkIndexDir` throws before the lock is acquired if
-  the directory looks like a home or root path (`src/indexing/indexer.ts:707-711`).
-- **Abort.** When the caller's signal aborts, the loop breaks and the partial
-  `IndexResult` is returned (`src/indexing/indexer.ts:705`, `746`).
+| Condition | Behavior |
+| --- | --- |
+| No `patterns` (full run) | Uses configured `include`; runs with `prune: true`, so deleted/now-excluded files are removed (`src/tools/index-tools.ts:26`, `src/tools/index-tools.ts:53`). |
+| `patterns` provided (scoped run) | Overrides `include` with the patterns; runs with `prune: false`, leaving files outside the set untouched (`src/tools/index-tools.ts:26`, `src/indexing/indexer.ts:774`). |
+| Another process holds the lock | `indexDirectory` returns early with `locked: true`; the handler emits the query-only summary and the existing index stays usable (`src/indexing/indexer.ts:722-730`, `src/tools/index-tools.ts:67-80`). |
+| Unsafe directory | `checkIndexDir` rejects home/root-style directories and `indexDirectory` throws before any lock or write (`src/indexing/indexer.ts:707-711`). |
+| Directory does not exist | `resolveProject` throws `Directory does not exist` before indexing begins (`src/tools/index.ts:30-32`). |
+| File unchanged | Hash matches the stored hash, so the file is skipped and counted in `skipped` (`src/indexing/indexer.ts:409-412`). |
+| File too large | Files over 50 MB are skipped without reading fully into memory (`src/indexing/indexer.ts:395-402`). |
+| Minified/obfuscated file | Average line length over 1000 chars marks the file as unstructured and skips it (`src/indexing/indexer.ts:419-425`). |
+| Unsupported extension or empty content | Skipped after parsing (`src/indexing/indexer.ts:432-440`). |
+| Per-file error | Caught, appended to `result.errors`, and reported in the summary; other files still process (`src/indexing/indexer.ts:764-768`, `src/tools/index-tools.ts:87`). |
+| Abort signal | When an `AbortSignal` (passed by the file watcher, not by this tool) fires, the loop stops between files and pruning/resolution is skipped (`src/indexing/indexer.ts:745-746`, `src/indexing/indexer.ts:772`). |
+| No files re-indexed | Import and symbol resolution are skipped entirely, since there is nothing new to resolve (`src/indexing/indexer.ts:785`). |
+
+The tool itself does not abort on large projects; a project exceeding the warn threshold of 200,000 files is logged but still indexed (`src/indexing/indexer.ts:59-63`).
 
 ## Example
 
+Full reconcile of the current project:
+
+```json
+{}
+```
+
+Refresh only Markdown and TypeScript under `src/`, leaving everything else in the index alone:
+
 ```json
 {
-  "tool": "index_files",
-  "arguments": {
-    "directory": "/path/to/project",
-    "patterns": ["src/**/*.ts", "**/*.md"]
-  }
+  "directory": "/Users/example/repos/myproject",
+  "patterns": ["**/*.md", "src/**/*.ts"]
 }
 ```
 
-Calling without `patterns` indexes the whole project from `.mimirs/config.json`
-and prunes deleted or excluded files. The illustrative response text on
-success is:
+A normal completion returns text shaped like:
 
 ```
 Indexing complete:
   Indexed: 12
-  Skipped (unchanged): 174
-  Pruned (deleted): 0
+  Skipped (unchanged): 340
+  Pruned (deleted): 2
 ```
+
+To shrink the index, edit the `exclude` list in `.mimirs/config.json` and run `index_files` with no `patterns`, so a full run prunes the now-excluded files (`src/tools/index-tools.ts:21`).
 
 ## Key source files
 
-- `src/tools/index-tools.ts` — MCP handler, progress callback, status writes.
-- `src/indexing/indexer.ts` — `indexDirectory` orchestrates collection,
-  embedder load, per-file processing, and pruning.
-- `src/utils/index-lock.ts` — process-level lock that gates writers.
-- `src/db/files.ts` — `pruneDeleted` and `removeFile` cascade logic.
-- `src/server/index.ts` — provides the `writeStatus` writer that the tool
-  callback feeds.
+- `src/tools/index-tools.ts` — registers `index_files` (and the sibling `index_status` and `remove_file` tools); builds the progress callback and the summary text.
+- `src/indexing/indexer.ts` — `indexDirectory` orchestration: locking, file collection, per-file processing, pruning, and graph resolution.
+- `src/utils/index-lock.ts` — the per-directory process lock that funnels concurrent indexers into one writer.
+- `src/db/files.ts` — `upsertFileStart`, `insertChunkBatch`, `pruneDeleted`, and `getStatus` that read and write the `files`/`chunks` tables.
+- `src/db/graph.ts` — `upsertFileGraph` and the symbol-ref rewrite that maintain the import/export/reference tables.
 
-## Related flows
+## Related tools
 
-- [Tool: index_status](./index-status.md) — read-only view of the same DB.
-- [Tool: remove_file](./remove-file.md) — surgical delete without pruning.
-- [Server start](../server/start.md) — owns the long-lived index lock
-  and provides `writeStatus`.
+- [index_status](../tools/index-status.md) reports the current counts without changing anything.
+- [remove_file](../tools/remove-file.md) deletes one file's rows without a full reconcile.

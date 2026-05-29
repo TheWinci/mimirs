@@ -1,160 +1,194 @@
 # Tool: search_conversation
 
-The `search_conversation` MCP tool searches across past Claude Code
-conversation turns that have been indexed into the project DB. It is the
-"have we discussed this before?" tool — agents call it before
-re-investigating a topic that may already have a decision attached to
-it. The handler runs a hybrid vector + BM25 search over conversation
-chunks and returns a small, ranked list of turns with their tool use
-and referenced files surfaced.
+`search_conversation` lets an agent search its own past Claude Code
+conversations — earlier user requests, assistant replies, and the tool
+calls that happened inside them. It answers questions like "did we already
+decide how to handle X?" or "which files did we touch when we discussed Y?"
+without re-deriving the answer from scratch. It is the read side of the
+conversation store; the write side is the live conversation tail that runs
+inside `mimirs serve` (see [server/start](../server/start.md)).
 
-The handler lives at `src/tools/conversation-tools.ts:8-87`. The data it
-queries is written by the conversation tail worker, which the MCP
-server starts at boot and which appends new turns to the
-`conversation_turns` / `conversation_chunks` tables as the JSONL
-transcript grows.
+The tool reads the same `conversation_turns` / `conversation_chunks` tables
+that the server fills while it watches your session's JSONL transcript, so
+results are only as fresh as what has already been indexed.
+
+## How it works
+
+The handler is registered as the MCP tool `search_conversation` in
+`registerConversationTools` (`src/tools/conversation-tools.ts:8`). On each
+call it resolves the project directory and opens that project's database via
+`resolveProject` (`src/tools/index.ts:21-37`), then runs a hybrid search that
+blends semantic similarity with keyword matching.
+
+Two independent retrievals run against the conversation tables:
+
+- A **vector search**. The query string is embedded with the same model used
+  for indexing (`embed`, `src/embeddings/embed.ts:78-86`) and the resulting
+  vector is matched against `vec_conversation`, joined back to the turn rows
+  (`searchConversation`, `src/db/conversation.ts:126-182`).
+- A **keyword (BM25) search** over the FTS index `fts_conversation`
+  (`textSearchConversation`, `src/db/conversation.ts:184-241`).
+
+The two result lists are merged and deduplicated by turn id, then each turn's
+final score is a weighted blend of its vector score and its text score:
+`hybridWeight * vecScore + (1 - hybridWeight) * txtScore`
+(`src/tools/conversation-tools.ts:59-62`). `hybridWeight` comes from project
+config and defaults to `0.7`, i.e. 70% semantic / 30% keyword
+(`src/config/index.ts:23`). Turns are then sorted by blended score and the
+top `top` are formatted into a text block.
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Client as "MCP client"
-    participant Handler as "search_conversation handler"
-    participant Emb as "embed()"
-    participant Vec as "vec_conversation"
-    participant Fts as "fts_conversation"
-    participant Merge as "hybrid merge by turnId"
-
-    Client->>Handler: tool call (query, sessionId?, top?)
-    Handler->>Handler: resolveProject(directory)
-    Handler->>Emb: embed(query)
-    Handler->>Vec: searchConversation(emb, top, sessionId?)
-    Handler->>Fts: textSearchConversation(query, top, sessionId?)
-    Handler->>Merge: scoreMap by turnId, score = w*vec + (1-w)*txt
-    Merge-->>Handler: top N ranked turns
-    Handler-->>Client: "Turn N (ts) [tools] snippet... Files: ..."
+    participant Agent
+    participant Tool as search_conversation
+    participant Embed as embed()
+    participant DB as RagDB (conversation tables)
+    Agent->>Tool: query, sessionId?, top, directory?
+    Tool->>Tool: resolveProject(directory) -> db, config
+    Tool->>Embed: embed(query)
+    Embed-->>Tool: query vector
+    Tool->>DB: searchConversation(vector, top, sessionId)
+    DB-->>Tool: vector-ranked turns
+    Tool->>DB: textSearchConversation(query, top, sessionId)
+    DB-->>Tool: keyword-ranked turns (or FTS error)
+    Tool->>Tool: merge by turnId, blend scores, sort, slice top
+    alt no turns matched
+        Tool-->>Agent: "No conversation results found..."
+    else turns found
+        Tool-->>Agent: formatted turns (index, time, tools, snippet, files)
+    end
 ```
 
-1. The client invokes `search_conversation` with a query, an optional
-   `sessionId` scope, and an optional `top` (default `5`)
+1. The agent calls the tool with a natural-language `query`, an optional
+   `sessionId` filter, a `top` count (default 5), and an optional `directory`
    (`src/tools/conversation-tools.ts:11-28`).
-2. `resolveProject` opens the right project DB and surfaces the
-   `hybridWeight` from config (`src/tools/conversation-tools.ts:30`,
-   `src/tools/conversation-tools.ts:44`).
-3. The query is embedded once with `embed(query)` and passed to
-   `ragDb.searchConversation(embedding, top, sessionId)`, which runs the
-   vector search over `vec_conversation`
-   (`src/tools/conversation-tools.ts:33-34`).
-4. `ragDb.textSearchConversation(query, top, sessionId)` runs the BM25
-   leg over `fts_conversation`. The call is wrapped in a try/catch and
-   falls back to vector-only on FTS error
+2. `resolveProject` turns `directory` (or `RAG_PROJECT_DIR` / cwd) into an
+   absolute path, loads that project's config, applies the embedding model
+   settings, and returns the project's `RagDB` handle
+   (`src/tools/index.ts:21-37`).
+3. The query text is embedded into a single vector with mean pooling and L2
+   normalization (`src/embeddings/embed.ts:78-86`).
+4. The vector is matched against `vec_conversation` and joined to turn data;
+   results are deduplicated by turn so each turn appears once
+   (`src/db/conversation.ts:149-179`).
+5. A keyword search over `fts_conversation` runs; if it throws, the error is
+   logged and the keyword list is left empty
    (`src/tools/conversation-tools.ts:36-41`).
-5. Results from both legs are merged in a `Map<turnId, ...>`: vector
-   rows seed the map, then BM25 rows either contribute their score to an
-   existing entry or insert a new entry with vector score zero
-   (`src/tools/conversation-tools.ts:45-57`).
-6. Each entry's final score is `hybridWeight * vecScore + (1 -
-   hybridWeight) * txtScore`. The map is sorted by score and sliced to
-   `top` (`src/tools/conversation-tools.ts:59-62`).
-7. Each turn is formatted as `Turn N (timestamp) [tool1, tool2]` with a
-   snippet truncated to 200 chars and a `Files: ...` line listing the
-   first five referenced files
-   (`src/tools/conversation-tools.ts:73-81`).
+6. The two lists are merged into a per-turn score map and re-scored with the
+   hybrid weight, sorted descending, and truncated to `top`
+   (`src/tools/conversation-tools.ts:43-62`).
+7. With no surviving turns, a fixed empty-state message is returned
+   (`src/tools/conversation-tools.ts:64-71`).
+8. Otherwise each turn is rendered as a header line plus a truncated snippet
+   and optional file list (`src/tools/conversation-tools.ts:73-85`).
 
 ## Inputs
 
-- `query` — required string, 1 to 2000 chars
-  (`src/tools/conversation-tools.ts:12`).
-- `sessionId` — optional. When set, the SQL queries filter to that
-  session only. Omit to search across every indexed session
-  (`src/tools/conversation-tools.ts:17-20`).
-- `top` — optional positive integer, default `5`
-  (`src/tools/conversation-tools.ts:21-27`).
-- `directory` — optional project root override
-  (`src/tools/conversation-tools.ts:13-16`).
+| name | type | required | description |
+| --- | --- | --- | --- |
+| `query` | string (1–2000 chars) | yes | Natural-language text to search for across conversation history (`src/tools/conversation-tools.ts:12`). |
+| `directory` | string | no | Project directory to search. Falls back to `RAG_PROJECT_DIR`, then cwd (`src/tools/conversation-tools.ts:13-16`). |
+| `sessionId` | string | no | Restrict results to one session. Omit to search every indexed session (`src/tools/conversation-tools.ts:17-20`). |
+| `top` | integer ≥ 1 | no | Number of turns to return; defaults to 5 (`src/tools/conversation-tools.ts:21-27`). |
 
 ## Outputs
 
-- Text content listing the ranked turns. Each block contains:
-  - Header line: `Turn <turnIndex> (<timestamp>)` followed by a
-    bracketed tool list when the turn invoked any tools
-    (`src/tools/conversation-tools.ts:75`).
-  - Snippet line: first 200 chars of the chunk that matched, with `...`
-    appended (`src/tools/conversation-tools.ts:79`).
-  - Optional `Files: ...` line listing the first five
-    `filesReferenced` entries (`src/tools/conversation-tools.ts:76-78`).
-- No write side effects: this tool does not call `db.logQuery`, so it
-  is not visible in `search_analytics`.
+| output | where it lands / shape / description |
+| --- | --- |
+| Ranked turns | A single text block in the MCP response. Each turn is one entry: `Turn <index> (<timestamp>) [tool1, tool2]`, then a snippet truncated to 200 characters with a trailing `...`, then an optional `Files: a, b, ...` line listing up to 5 referenced files (`src/tools/conversation-tools.ts:73-85`). |
+| Empty-state message | When nothing matched: `No conversation results found. The conversation may not be indexed yet.` (`src/tools/conversation-tools.ts:64-71`). |
 
-## Hybrid scoring and FTS fallback
-
-The merge formula is `hybridWeight * vec + (1 - hybridWeight) * txt`
-applied to each turn that appears in either leg. When the FTS query
-throws — typically because of unusual tokens in the query —
-`bm25Results` stays empty and the formula collapses to vector-only
-(`src/tools/conversation-tools.ts:36-41`). This mirrors the same
-fallback pattern in the codebase-side `search` (`src/search/hybrid.ts:330-334`).
-
-`hybridWeight` is sourced from the project config, so it tracks the
-same dial as code search — there is no separate conversation-only
-weight (`src/tools/conversation-tools.ts:44`).
+Each turn carries the fields read from the join: `turnIndex`, `timestamp`,
+`toolsUsed`, `filesReferenced`, and `snippet`. The `toolsUsed` and
+`filesReferenced` arrays are parsed from JSON columns on the turn row, so a
+turn with no tools or files simply omits those fragments
+(`src/db/conversation.ts:166-176`, `src/tools/conversation-tools.ts:75-78`).
 
 ## Where the turn data comes from
 
-The conversation index is populated by a background tail worker that
-the MCP server starts at boot. The worker watches the Claude Code
-JSONL transcript for the current session, parses new lines into
-`conversation_turns` + `conversation_chunks`, embeds each chunk, and
-inserts the rows the search query later reads. This means the tool
-only returns content that the tail has already absorbed; a turn the
-client just sent will appear once the tail flushes (debounced by 1.5
-seconds in the indexer). The CLI command `mimirs conversation index`
-can be used to backfill sessions whose JSONL exists on disk but has
-never been tailed.
+This tool never indexes anything; it only reads. The rows it searches are
+written by the conversation indexer that the server starts. When
+`mimirs serve` boots, it discovers your Claude Code sessions, tails the most
+recent one, and back-indexes older un-indexed sessions in the background; the
+tail watches the JSONL transcript and, after a debounce, indexes new turns
+from a saved byte offset into `conversation_turns`, `conversation_chunks`,
+and `vec_conversation` (see [server/start](../server/start.md) and
+[cli/conversation](../cli/conversation.md)). If the server has not indexed a
+session yet, this tool returns the empty-state message.
 
 ## Branches and failure cases
 
-- Empty result: returns "No conversation results found. The conversation
-  may not be indexed yet." This happens when the index has zero rows for
-  the requested session, or when both retrieval legs return no rows
+- **Keyword search fails, vector still works.** If
+  `textSearchConversation` throws (for example a malformed FTS expression),
+  the error is logged at debug level and the keyword list stays empty, so the
+  blend degrades to vector-only scoring rather than failing the call
+  (`src/tools/conversation-tools.ts:37-41`).
+- **Nothing indexed / no matches.** When both retrievals come back empty, or
+  when a `sessionId` filter excludes every candidate, the score map is empty
+  and the fixed "No conversation results found" message is returned
   (`src/tools/conversation-tools.ts:64-71`).
-- FTS failure: debug-logged and ignored; vector-only ranking still
-  works (`src/tools/conversation-tools.ts:36-41`).
-- Session-scoped search with no matches: the message is identical to
-  the global empty case — there is no diagnostic about whether the
-  `sessionId` was even known to the index.
+- **Session filter.** When `sessionId` is set, both retrievals over-fetch
+  (`topK * 10` candidate rows instead of `topK * 3`) and then drop any row
+  whose `session_id` does not match, so a tight filter still has enough
+  candidates to fill `top` results (`src/db/conversation.ts:155`,
+  `src/db/conversation.ts:164`, `src/db/conversation.ts:214`,
+  `src/db/conversation.ts:223`).
+- **Turn deduplication.** A single turn can produce several chunks, so each
+  retrieval keeps a `seenTurns` set and emits a turn only once, stopping once
+  `topK` distinct turns are collected (`src/db/conversation.ts:157-179`,
+  `src/db/conversation.ts:216-238`).
+- **Empty `query`.** Rejected by the schema before the handler runs; `query`
+  must be at least one character (`src/tools/conversation-tools.ts:12`).
+- **Missing directory.** If the resolved directory does not exist,
+  `resolveProject` throws before any search runs
+  (`src/tools/index.ts:28-30`).
+
+## Scoring details
+
+The vector branch turns SQLite-vec distance into a similarity with
+`1 / (1 + distance)` (`src/db/conversation.ts:175`). The keyword branch turns
+the FTS `rank` into a comparable score with `1 / (1 + |rank|)`
+(`src/db/conversation.ts:234`). Because both land in a `0..1`-ish range, the
+hybrid blend in the handler can weight them directly without further
+normalization.
 
 ## Example
 
+Example arguments:
+
 ```json
 {
-  "query": "decision about hybrid weight default",
-  "top": 3
+  "query": "why did we switch the embedding model",
+  "top": 3,
+  "sessionId": "abc123-session-uuid"
 }
 ```
 
-Response shape (illustrative):
+Illustrative response text (values synthetic):
 
 ```
-Turn 42 (2026-04-12T11:08:00Z) [search, read_relevant]
-  We agreed the default hybridWeight should stay at 0.5 because BM25 is too brittle...
-  Files: src/config/index.ts, src/search/hybrid.ts
+Turn 42 (2026-05-20T14:03:00Z) [Read, Edit]
+  We decided to move to the smaller model because indexing latency on large...
+  Files: src/embeddings/embed.ts, src/config/index.ts
 
-Turn 17 (2026-04-09T18:11:00Z)
-  Re-read the eval suite — top-1 drops above weight 0.7 on the doc-heavy queries...
+Turn 51 (2026-05-20T14:18:00Z) [Bash]
+  Benchmarked both models; the quality drop was within noise so we kept...
 ```
-
-## Related flows
-
-- `server/start` — boots the conversation tail that populates the data
-  this tool reads.
-- `cli/conversation` — CLI counterpart for indexing and searching
-  conversation history offline.
 
 ## Key source files
 
-- `src/tools/conversation-tools.ts` — handler, merge, formatting.
-- `src/embeddings/embed.ts` — `embed(query)` used by the vector leg.
-- `src/db/conversation.ts` — `searchConversation` and
-  `textSearchConversation` queries against the conversation tables.
-- `src/db/index.ts` — `RagDB.searchConversation` /
-  `RagDB.textSearchConversation` thin wrappers.
+- `src/tools/conversation-tools.ts` — the MCP tool handler: hybrid merge,
+  scoring, empty-state, and output formatting.
+- `src/db/conversation.ts` — `searchConversation` (vector) and
+  `textSearchConversation` (keyword) over the conversation tables.
+- `src/embeddings/embed.ts` — `embed` turns the query string into a vector.
+- `src/db/index.ts` — `RagDB` wraps the database and exposes the two
+  conversation search methods used here.
+
+## Related flows
+
+- [server/start](../server/start.md) — starts the conversation tail that
+  writes the turn rows this tool reads.
+- [cli/conversation](../cli/conversation.md) — the CLI counterpart for
+  indexing and searching conversation history outside the server.

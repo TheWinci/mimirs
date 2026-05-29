@@ -1,132 +1,154 @@
 # CLI: benchmark-models
 
-`mimirs benchmark-models` compares several embedding models on the same fixture of queries. For each model it reconfigures the embedder, builds a *fresh temporary index*, runs the benchmark, prints per-model metrics, and at the end emits a markdown comparison table plus a baseline-vs-candidate diff that hints whether any candidate beats the first model by enough recall to be worth switching.
+`mimirs benchmark-models` answers a single question: *which embedding model retrieves best for this codebase?* It takes one labeled query file and a list of candidate models, then for each model it builds a throwaway index, runs the same benchmark over it, and prints a side-by-side comparison table. Where [benchmark](benchmark.md) scores one fixed configuration, this command sweeps several models so you can choose one before committing it to config.
 
-This is the command you run before changing `config.embeddingModel` or the default model in source — it gives you a controlled like-for-like read on how each candidate retrieves on a real codebase.
+The whole flow lives in one file, `src/cli/commands/benchmark-models.ts`. It reuses the scoring logic from `src/search/benchmark.ts` and the indexing pipeline from `src/indexing/indexer.ts`; its own job is to swap the active embedder per model, index into an isolated temp directory, collect metrics, and report them.
 
-## Flow
+## What it does, step by step
+
+For each model the command reconfigures the global embedder, creates a temporary index directory, indexes the project there, benchmarks the same queries against it, records the metrics and index time, then deletes the temp directory. After all models run it restores the default embedder and prints the comparison (`src/cli/commands/benchmark-models.ts:59-117`).
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant User
-    participant CLI as benchmarkModelsCommand
-    participant Embed as configureEmbedder
+    actor User
+    participant Cmd as benchmarkModelsCommand
+    participant Embed as configureEmbedder / resetEmbedder
     participant Indexer as indexDirectory
-    participant Runner as runBenchmark
-    User->>CLI: mimirs benchmark-models <fixture> --models a,b,c [--dir D --top N]
-    CLI->>CLI: loadBenchmarkQueries(fixture)
-    loop per model
-        CLI->>Embed: configureEmbedder(id, dim); resetEmbedder()
-        CLI->>CLI: mkdir .rag-eval-<model-id> (temp DB dir)
-        CLI->>Indexer: indexDirectory(dir, tmpDb, config)
-        Indexer-->>CLI: indexResult + indexTimeMs
-        CLI->>Runner: runBenchmark(queries, tmpDb, dir, top, hybridWeight)
-        Runner-->>CLI: BenchmarkSummary
-        CLI->>CLI: db.close() + rm temp dir
+    participant Bench as runBenchmark
+    User->>Cmd: mimirs benchmark-models q.json --models a,b
+    Cmd->>Cmd: parse models, loadBenchmarkQueries
+    loop each model
+        Cmd->>Embed: configureEmbedder(id, dim) + resetEmbedder
+        Cmd->>Cmd: create temp DB dir
+        Cmd->>Indexer: indexDirectory(dir, tmpDb, config)
+        Indexer-->>Cmd: indexed file count + time
+        Cmd->>Bench: runBenchmark(queries, tmpDb, dir, top)
+        Bench-->>Cmd: recall@K, MRR, zero-miss
+        Cmd->>Cmd: close + delete temp DB
     end
-    CLI->>Embed: restore DEFAULT_MODEL_ID
-    CLI-->>User: markdown comparison table + baseline diff
+    Cmd->>Embed: restore default embedder
+    Cmd-->>User: comparison table + vs-baseline deltas
 ```
 
-1. Parse the fixture path and `--models a,b,c` flag. Missing fixture or missing `--models` → usage + `exit(1)` (`src/cli/commands/benchmark-models.ts:32-51`). The usage block also lists known model ids and their dimensions.
-2. Each comma-separated model is resolved through `parseModelArg`. Known ids in `KNOWN_MODELS` resolve to their hard-coded `(id, dim)`. Unknown ids must use `model-id:dim` format; otherwise `parseModelArg` throws (`src/cli/commands/benchmark-models.ts:22-30`).
-3. Queries are loaded once with `loadBenchmarkQueries`, shared across all models — same fixture, no re-read.
-4. For each model: `configureEmbedder(id, dim)` updates the embedder config, `resetEmbedder()` discards the previously-loaded pipeline so the next embed call loads the new one (`src/cli/commands/benchmark-models.ts:62-64`).
-5. A fresh temp directory `<dir>/.rag-eval-<model-id-with-slashes-dashed>` is created. If it already exists from a prior run it is wiped first. A new `RagDB` is opened *against the project dir* but with the *temp dir* as its DB location — the constructor takes `(projectDir, dbDir)`. This keeps the production `.mimirs/index.db` untouched.
-6. `indexDirectory(dir, db, config, onProgress)` runs a full index. The progress callback rewrites the same line with `\r` so the terminal shows live progress. `indexTimeMs` is measured around the call.
-7. `runBenchmark(queries, db, dir, top, config.hybridWeight)` returns the same `BenchmarkSummary` shape as `mimirs benchmark` (recall@K, MRR, zero-miss rate).
-8. The temp DB is closed and the temp directory is removed *in a `finally`* so a crashed model run still cleans up.
-9. After the loop, the embedder is restored to `DEFAULT_MODEL_ID` / `DEFAULT_EMBEDDING_DIM` so a follow-up command in the same process sees the original config.
-10. The comparison table is printed in markdown (`| Model | Dim | Recall@K | MRR | Zero-miss | Index time |`). When more than one model was run, each model is also compared against the *first* model in the `--models` list. The first model acts as the baseline.
+1. The user runs the command with a query file and a `--models` list. Without a query file, the command prints usage (including the known-model list) and exits 1 (`src/cli/commands/benchmark-models.ts:33-41`).
+2. The command resolves the project dir, loads config, computes top-K, and reads `--models`. A missing `--models` flag prints an error and exits 1 (`src/cli/commands/benchmark-models.ts:43-51`).
+3. The model list is split on commas and each entry is parsed into an id and embedding dimension; the query file is loaded and validated by `loadBenchmarkQueries` (`src/cli/commands/benchmark-models.ts:53-54`).
+4. For each model, `configureEmbedder` sets the active model id and dimension, and `resetEmbedder` clears the cached pipeline so the next embedding call loads the new model (`src/cli/commands/benchmark-models.ts:63-64`).
+5. A temp directory named `.rag-eval-<model-id>` is created under the project dir (slashes in the id replaced with dashes); any pre-existing one is removed first. A `RagDB` is opened with this temp dir as its index location, keeping the real index untouched (`src/cli/commands/benchmark-models.ts:67-73`).
+6. `indexDirectory` indexes the project into the temp DB, streaming progress to the same stdout line; the elapsed time and indexed-file count are recorded (`src/cli/commands/benchmark-models.ts:77-83`).
+7. `runBenchmark` scores the queries against the temp index using the config's hybrid weight, producing recall@K, MRR and zero-miss rate (`src/cli/commands/benchmark-models.ts:87`).
+8. In a `finally` block the temp DB is closed and its directory deleted, so a benchmark failure still cleans up (`src/cli/commands/benchmark-models.ts:94-98`).
+9. After the loop, the embedder is restored to the default model and dimension (`src/cli/commands/benchmark-models.ts:102-103`).
+10. A Markdown comparison table is printed, and when more than one model ran, each later model is compared against the first as a baseline with recall/MRR deltas and a recommendation (`src/cli/commands/benchmark-models.ts:106-137`).
 
-## Inputs
+## Models compared on the same fixture
 
-| Input | Where it comes from | Effect |
-|---|---|---|
-| `fixture` (positional) | First arg | JSON file of `{ query, expected[] }` — same format as `mimirs benchmark`. Required. |
-| `--dir D` | CLI flag (default `.`) | Project directory to index and search against. |
-| `--top N` | CLI flag (default `config.benchmarkTopK`) | top-K used for recall and as the search depth. |
-| `--models a,b,...` | CLI flag, required | Comma-separated list. Each item is either a known model id or `id:dim`. The order matters — index 0 is the baseline. |
+Every model is judged on the *same* query file with the *same* top-K, so the only variable is the embedding model. Four models are recognized by name, each with a fixed embedding dimension (`src/cli/commands/benchmark-models.ts:15-20`):
 
-### Known models
-
-These are hard-coded in `KNOWN_MODELS` (`src/cli/commands/benchmark-models.ts:15-20`):
-
-| Id | Dim |
-|---|---|
+| Model id | Dim |
+| --- | --- |
 | `Xenova/all-MiniLM-L6-v2` | 384 |
 | `Xenova/bge-small-en-v1.5` | 384 |
 | `Xenova/jina-embeddings-v2-small-en` | 512 |
 | `jinaai/jina-embeddings-v2-base-code` | 768 |
 
-Any other model must be passed as `model-id:dim`, e.g. `--models my-org/custom-model:512`. The dim is required because the SQLite vector column has a fixed dimensionality per index and must be set up before indexing.
+`Xenova/all-MiniLM-L6-v2` is also the project default embedder, so it is what the embedder is restored to after the run (`src/embeddings/embed.ts:16-17`,`213`). Any model not in the table can still be benchmarked by passing it as `model-id:dim` (for example `some-org/model:768`); a bare unknown id with no dimension throws (`src/cli/commands/benchmark-models.ts:22-30`).
+
+## Inputs
+
+| Name | Type | Required | Description |
+| --- | --- | --- | --- |
+| `fixture` | positional path | yes | Path to the JSON query file, the same `{ query, expected }` array format used by [benchmark](benchmark.md). Missing value prints usage and exits 1 (`src/cli/commands/benchmark-models.ts:33-41`). |
+| `--models` | comma list | yes | Models to compare. Each entry is either a known id or `model-id:dim`. Missing flag exits 1 (`src/cli/commands/benchmark-models.ts:46-53`). |
+| `--dir` | path | no | Project directory to index and benchmark. Defaults to `.` (`src/cli/commands/benchmark-models.ts:43`). |
+| `--top` | integer | no | Top-K cutoff for scoring. Defaults to the config `benchmarkTopK` (default 5) (`src/cli/commands/benchmark-models.ts:45`). |
 
 ## Outputs
 
-- **Stdout, per-model block**: indexing progress (`\r`-overwritten), final `Indexed N files in Ts`, then `Recall@K`, `MRR`, `Zero-miss` lines.
-- **Stdout, final**: a markdown comparison table with one row per model.
-- **Baseline diff** (when 2+ models): each candidate compared against the first model — recall delta in percentage points, MRR delta absolute, and one of three verdicts:
-  - `>5pp recall improvement → consider making it default`
-  - `Marginal improvement — document but keep current default`
-  - `No recall improvement`
-- **Filesystem side effects**: a temp index dir per model under `<projectDir>/.rag-eval-<model-id>/`. Always removed in `finally`, even on error.
-
-## State changes
-
-- `KNOWN_MODELS` embedder config — flipped per iteration through `configureEmbedder` / `resetEmbedder`, then restored to `DEFAULT_MODEL_ID` after the loop. If the command crashes between iterations, the embedder is left configured for the last-tried model in the *current* process — but since this is a CLI command that exits after, that does not leak into the production server.
-- Temp index DBs — created under `<dir>/.rag-eval-<model-id>/` and removed at the end of each iteration. They are not the same directory as `.mimirs/`, so the production index is never touched.
+| Output | Where it lands / shape / description |
+| --- | --- |
+| Per-model progress | Streamed to stdout during each model's run: a header line, indexing progress, indexed-file count and time, then recall/MRR/zero-miss (`src/cli/commands/benchmark-models.ts:60-93`). |
+| Comparison table | A Markdown table printed after all models complete, with columns Model, Dim, Recall@K, MRR, Zero-miss, Index time (`src/cli/commands/benchmark-models.ts:106-117`). |
+| Baseline deltas | When more than one model ran, per-candidate recall (in percentage points) and MRR differences versus the first model, plus a one-line recommendation (`src/cli/commands/benchmark-models.ts:120-137`). |
 
 ## How model selection feeds back into config
 
-The command does not write to `.mimirsrc` or any config file. The verdict in the baseline diff is advisory: read it, decide whether to swap, then update `embeddingModel` and `embeddingDim` in the project config yourself. The `>5pp` threshold is an opinionated cutoff — small absolute differences with high variance fixtures should not move the needle. Use `mimirs benchmark` once after the swap to confirm the index built with the new model still meets `benchmarkMinRecall` / `benchmarkMinMrr`.
+This command does not edit config. It changes the active embedder only in process — via `configureEmbedder` — and restores the default before exiting, so the project's stored configuration is never touched (`src/cli/commands/benchmark-models.ts:102-103`). The recommendation lines tell you what *to do*, not what was done: when a candidate beats the baseline by more than 5 percentage points of recall the command suggests making it the default; a smaller positive gain suggests documenting it but keeping the current default; no gain prints "No recall improvement" (`src/cli/commands/benchmark-models.ts:129-135`). Acting on that advice — switching the project to the winning model — is a separate, manual config change.
+
+## State changes
+
+| State | Before | After | Why it matters |
+| --- | --- | --- | --- |
+| Active embedder | Whatever was configured (default `all-MiniLM-L6-v2`) | Reset to each model in turn, then restored to default | Lets each model embed both the index and the queries; restoring avoids leaking a non-default embedder into later code in the same process (`src/cli/commands/benchmark-models.ts:63-64`,`102-103`). |
+| Temp index dir | Absent | Created `.rag-eval-<model>` per model, then deleted | Keeps each model's index isolated from the real index and from other models; the `finally` block guarantees deletion even on error (`src/cli/commands/benchmark-models.ts:67-69`,`94-98`). |
+
+The project's real index and config are read-only throughout; the only persistent file system changes are the temporary directories, which are removed by the time the command finishes.
 
 ## Branches and failure cases
 
-- Missing fixture / missing `--models` → usage + `exit(1)`; usage also dumps the `KNOWN_MODELS` list.
-- Unknown model without `:dim` suffix → `parseModelArg` throws with a hint and the list of known models.
-- An existing `<dir>/.rag-eval-<id>/` from a previous run is removed with `rmSync(..., { recursive: true })` before re-creating, so reruns are idempotent.
-- An exception during indexing or benchmarking still hits the `finally` block: temp DB closes and temp directory is removed.
-- Single-model run: the comparison block at the bottom is skipped because `results.length > 1` gates the baseline diff loop. The markdown table is still printed.
+- **Missing query file** — prints usage with the known-model list and exits 1 (`src/cli/commands/benchmark-models.ts:33-41`).
+- **Missing `--models`** — prints an error with an example and exits 1 (`src/cli/commands/benchmark-models.ts:48-51`).
+- **Known model id** — resolved to its preset dimension (`src/cli/commands/benchmark-models.ts:22-23`).
+- **`model-id:dim` form** — split on `:` into id and parsed integer dimension (`src/cli/commands/benchmark-models.ts:25-28`).
+- **Unknown id with no dimension** — `parseModelArg` throws listing the known models (`src/cli/commands/benchmark-models.ts:29`).
+- **Stale temp dir present** — removed before re-creating, so a previous interrupted run does not corrupt results (`src/cli/commands/benchmark-models.ts:68`).
+- **Index or benchmark error mid-model** — the `finally` block still closes the DB and deletes the temp dir; the error then propagates and ends the command (`src/cli/commands/benchmark-models.ts:94-98`).
+- **Single model** — the table prints, but the baseline-delta block is skipped because it requires more than one result (`src/cli/commands/benchmark-models.ts:120`).
+- **Recommendation tiers** — candidate vs baseline recall: `>5pp` suggests making it default, `>0` suggests documenting it, otherwise "No recall improvement" (`src/cli/commands/benchmark-models.ts:129-135`).
+- **Invalid query file** — `loadBenchmarkQueries` throws on a non-array file or any entry missing `query`/`expected` (`src/search/benchmark.ts:29-44`).
 
 ## Example
 
-```sh
-mimirs benchmark-models evals/retrieval.json \
-  --models Xenova/all-MiniLM-L6-v2,Xenova/bge-small-en-v1.5,jinaai/jina-embeddings-v2-base-code \
-  --top 10
+```bash
+bun run mimirs benchmark-models queries.json \
+  --models Xenova/all-MiniLM-L6-v2,jinaai/jina-embeddings-v2-base-code \
+  --dir . --top 5
 ```
 
-Illustrative table:
+Illustrative comparison output:
 
 ```
+Comparing 2 models on 12 queries (top-5)...
+
+--- Xenova/all-MiniLM-L6-v2 (384d) ---
+  Indexing...
+  Indexed 120 files in 8.4s
+  Running benchmark...
+  Recall@5: 78.0%
+  MRR: 0.640
+  Zero-miss: 8.3%
+
+--- jinaai/jina-embeddings-v2-base-code (768d) ---
+  Indexing...
+  Indexed 120 files in 22.1s
+  Running benchmark...
+  Recall@5: 86.5%
+  MRR: 0.710
+  Zero-miss: 0.0%
+
+
 === Comparison ===
 
-| Model | Dim | Recall@10 | MRR | Zero-miss | Index time |
+| Model | Dim | Recall@5 | MRR | Zero-miss | Index time |
 |---|---|---|---|---|---|
-| Xenova/all-MiniLM-L6-v2 | 384 | 71.0% | 0.612 | 12.0% | 18.4s |
-| Xenova/bge-small-en-v1.5 | 384 | 78.0% | 0.701 | 8.0% | 19.1s |
-| jinaai/jina-embeddings-v2-base-code | 768 | 81.0% | 0.733 | 6.0% | 41.7s |
-
-Xenova/bge-small-en-v1.5 vs Xenova/all-MiniLM-L6-v2:
-  Recall: +7.0pp
-  MRR: +0.089
-  → Candidate shows >5pp recall improvement — consider making it default
+| Xenova/all-MiniLM-L6-v2 | 384 | 78.0% | 0.640 | 8.3% | 8.4s |
+| jinaai/jina-embeddings-v2-base-code | 768 | 86.5% | 0.710 | 0.0% | 22.1s |
 
 jinaai/jina-embeddings-v2-base-code vs Xenova/all-MiniLM-L6-v2:
-  Recall: +10.0pp
-  MRR: +0.121
+  Recall: +8.5pp
+  MRR: +0.070
   → Candidate shows >5pp recall improvement — consider making it default
 ```
 
-## Related flows
+## Related
 
-- [cli/benchmark](benchmark.md) — single-model retrieval benchmark. This command reuses `loadBenchmarkQueries` and `runBenchmark` from the same module.
-- [cli/eval](eval.md) — agent-simulation A/B (not used here, but shares the fixture-on-disk pattern).
+- [benchmark](benchmark.md) — scores one fixed configuration against a query file and exits non-zero below thresholds. `benchmark-models` reuses the same query format and the same scoring code to compare several embedding models at once.
 
 ## Key source files
 
-- `src/cli/commands/benchmark-models.ts` — model loop, temp DB lifecycle, comparison table.
-- `src/embeddings/embed.ts` — `configureEmbedder`, `resetEmbedder`, `DEFAULT_MODEL_ID`, `DEFAULT_EMBEDDING_DIM`.
-- `src/indexing/indexer.ts` — `indexDirectory`, run once per model.
-- `src/search/benchmark.ts` — `loadBenchmarkQueries`, `runBenchmark`, `BenchmarkSummary`.
+- `src/cli/commands/benchmark-models.ts` — the entire command: model parsing, per-model index+benchmark loop, temp-dir lifecycle, comparison table and recommendations.
+- `src/search/benchmark.ts` — `loadBenchmarkQueries` and `runBenchmark`, shared with the single-config benchmark.
+- `src/embeddings/embed.ts` — `configureEmbedder`/`resetEmbedder` and the default model constants used to swap and restore the active embedder.
+- `src/indexing/indexer.ts` — `indexDirectory`, which builds each model's temporary index.
+- `src/config/index.ts` — supplies `benchmarkTopK` and `hybridWeight`.

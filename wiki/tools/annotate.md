@@ -1,114 +1,116 @@
 # Tool: annotate
 
-`annotate` attaches a persistent note to a file (and optionally a symbol inside it). The note is embedded so it can later be retrieved semantically by `get_annotations`, and it surfaces inline as a `[NOTE]` block in `read_relevant` results. The handler is registered in `src/tools/annotation-tools.ts:8-39` and writes through `db.upsertAnnotation`, which is defined in `src/db/annotations.ts:4-66`.
+`annotate` attaches a persistent note to a file or a symbol inside a file. The note is stored in the project's local index and later surfaces automatically, inline, when someone runs [read_relevant](read-relevant.md) over code in that file. It is the mechanism for leaving durable warnings that outlive a single session — "this function has a known race condition", "don't refactor until the auth rewrite lands", "this workaround exists because the upstream library is broken".
 
-The intended use is the moment an agent reads code that contains a known bug, a race condition, a fragile area, a non-obvious constraint, or a workaround. Writing a short note now means the next session — or the next agent on a different machine — sees the warning attached to the file without having to re-derive it.
+Use it the moment you read code and notice something worth remembering: a bug, fragile code, a non-obvious constraint, or a workaround that needs context. A later session reading the same file will see the note without having to ask for it.
 
-## Flow
+The handler is registered in `src/tools/annotation-tools.ts:8-39`. It embeds the note text, then upserts a row keyed by file path plus optional symbol.
+
+## How it works
 
 ```mermaid
 sequenceDiagram
   autonumber
-  participant Caller as Caller (MCP)
-  participant Handler as annotate handler
+  participant Caller
+  participant Tool as annotate handler
   participant Embed as embed()
-  participant DB as RagDB.upsertAnnotation
-  participant SQLite as annotations + fts + vec tables
+  participant DB as upsertAnnotation
+  participant SQLite as annotations + vec + fts
 
-  Caller->>Handler: { path, note, symbol?, author?, directory? }
-  Handler->>Handler: resolveProject(directory)
-  Handler->>Embed: embed("symbol: note" or "note")
-  Embed-->>Handler: Float32Array embedding
-  Handler->>DB: upsertAnnotation(path, note, embedding, symbol, author)
-  DB->>SQLite: SELECT existing row by (path, symbol_name)
-  alt existing row
-    DB->>SQLite: UPDATE annotations + refresh fts + vec
-  else new row
-    DB->>SQLite: INSERT row + fts + vec
+  Caller->>Tool: path, note, symbol?, author?, directory?
+  Tool->>Tool: resolveProject(directory) -> RagDB
+  Tool->>Embed: embed(symbol ? "symbol: note" : note)
+  Embed-->>Tool: Float32Array embedding
+  Tool->>DB: upsertAnnotation(path, note, embedding, symbol, author)
+  DB->>SQLite: SELECT existing row by path + symbol
+  alt row already exists
+    DB->>SQLite: UPDATE note/author/updated_at,<br>replace vector + FTS
+  else no existing row
+    DB->>SQLite: INSERT new row, add vector + FTS
   end
-  DB-->>Handler: annotation id
-  Handler-->>Caller: "Annotation #<id> saved for <target>"
+  DB-->>Tool: annotation id
+  Tool-->>Caller: "Annotation #id saved for <target>"
 ```
 
-1. The MCP client calls the tool with `path`, `note`, and optional `symbol`, `author`, and `directory`. The schema lives at `src/tools/annotation-tools.ts:11-26`.
-2. `resolveProject` resolves the project directory to a `RagDB` instance, so the right database is used when the caller works across multiple projects.
-3. The handler builds the embedding text: when a `symbol` is given it prefixes it as `${symbol}: ${note}`, otherwise it just embeds the note (`src/tools/annotation-tools.ts:30-31`). The prefix gives the symbol name semantic weight in vector search.
-4. `embed` returns a `Float32Array`. The call is `await`ed, so the handler does not return until the embedding is ready.
-5. `upsertAnnotation` runs inside a `db.transaction` (`src/db/annotations.ts:14-65`). It first looks up an existing row keyed by `(path, symbol_name)` — with a null-aware branch for file-level notes (`src/db/annotations.ts:16-28`).
-6. If a row exists, the FTS row is removed, the `annotations` row is updated, the FTS index is re-inserted, and the vector row is replaced (`src/db/annotations.ts:32-47`). If no row exists, a fresh row is inserted into all three tables (`src/db/annotations.ts:48-61`).
-7. The handler returns a one-line confirmation string: `Annotation #<id> saved for <path>` or `… for <path>  •  <symbol>` (`src/tools/annotation-tools.ts:34-37`).
+1. The caller invokes the tool with a `path` and `note`, plus optional `symbol`, `author`, and `directory`. The schema requires `path` (1–500 chars) and `note` (1–2000 chars) (`src/tools/annotation-tools.ts:11-26`).
+2. `resolveProject` turns the optional `directory` into the project's `RagDB` handle. When omitted it falls back to the `RAG_PROJECT_DIR` environment variable or the current working directory (`src/tools/annotation-tools.ts:28`).
+3. The text to embed is built. If a `symbol` was given, the embedded text is `` `${symbol}: ${note}` ``; otherwise it is the bare note. This biases the vector toward the symbol name so later semantic search over notes ranks it correctly (`src/tools/annotation-tools.ts:30-31`).
+4. `embed` returns the vector for that text.
+5. `upsertAnnotation` is called with the path, note, embedding, the symbol (or `null`), and the author (defaulting to `"agent"`) (`src/tools/annotation-tools.ts:32`).
+6. Inside a single transaction, it first looks for an existing row. The lookup branches on whether a symbol was supplied: with a symbol it matches `path = ? AND symbol_name = ?`; without one it matches `path = ? AND symbol_name IS NULL` (`src/db/annotations.ts:15-28`).
+7. If a row exists, the note, author, and `updated_at` are updated in place, and the full-text and vector index entries for that row are deleted and re-inserted so search stays consistent (`src/db/annotations.ts:32-47`).
+8. If no row exists, a new row is inserted with both `created_at` and `updated_at` set to now, and matching vector and full-text rows are added (`src/db/annotations.ts:48-61`).
+9. The handler returns a one-line confirmation containing the id and a human-readable target (the path, or `` `path  •  symbol` `` when a symbol was given) (`src/tools/annotation-tools.ts:34-37`).
 
 ## Inputs
 
-| Input | Required | Notes |
-|---|---|---|
-| `path` | yes | File path relative to project root. 1–500 chars (`src/tools/annotation-tools.ts:12`). |
-| `note` | yes | Note text, 1–2000 chars (`src/tools/annotation-tools.ts:13`). |
-| `symbol` | no | Symbol name (function, class, etc.). Omit for a file-level note. The pair `(path, symbol)` is the upsert key. |
-| `author` | no | Free-form label. Defaults to `"agent"` (`src/tools/annotation-tools.ts:32`). |
-| `directory` | no | Project directory. Defaults to `RAG_PROJECT_DIR` env or cwd, resolved by `resolveProject`. |
+| name | type | required | description |
+|------|------|----------|-------------|
+| `path` | string (1–500) | yes | File path the note applies to, relative to the project root. This is the key used when notes are matched against [read_relevant](read-relevant.md) results, so it must match the indexed relative path. |
+| `note` | string (1–2000) | yes | The note text. Stored verbatim and also embedded for semantic search. |
+| `symbol` | string | no | A symbol name (function, class, etc.) the note applies to. Omit for a file-level note. Determines which key the upsert matches and whether the note surfaces only on a matching code chunk. |
+| `author` | string | no | A label for who wrote the note, e.g. `agent` or `human`. Defaults to `agent` when omitted. |
+| `directory` | string | no | Project directory to operate on. Defaults to the `RAG_PROJECT_DIR` env var or the current working directory. |
 
 ## Outputs
 
-| Output | Where | Notes |
-|---|---|---|
-| Confirmation text | MCP response | `Annotation #<id> saved for <target>` where target is `path` or `path  •  symbol`. |
-| `annotations` row | SQLite | Inserted or updated row with `note`, `author`, `created_at`, `updated_at`. |
-| `fts_annotations` row | SQLite | FTS index keeps the note searchable by keyword. |
-| `vec_annotations` row | SQLite | Vector row with the embedding, joined later by `searchAnnotations`. |
+| output | where it lands / shape / description |
+|--------|--------------------------------------|
+| Confirmation text | Returned to the caller as a single text block: `Annotation #<id> saved for <target>`, where `<target>` is the path, or `path  •  symbol` when a symbol was supplied (`src/tools/annotation-tools.ts:34-37`). |
+| `annotations` row | Inserted or updated in the `annotations` table with `path`, `symbol_name`, `note`, `author`, `created_at`, and `updated_at` (`src/db/annotations.ts:38-52`). |
+| Vector entry | A row in `vec_annotations` holding the embedding, used by semantic search over notes (`src/db/annotations.ts:43-45`, `src/db/annotations.ts:57-60`). |
+| Full-text entry | A row in `fts_annotations` over the note text (`src/db/annotations.ts:41`, `src/db/annotations.ts:56`). |
 
 ## State changes
 
-`annotations` row — `null` or previous note for `(path, symbol)` → upserted note with refreshed embedding, FTS, and author. The transaction in `src/db/annotations.ts:14-65` makes the three tables move together: if the embedding write failed in the middle of an update, the FTS row and the annotations row would not be left out of sync.
+**`annotations` row for a `path` + `symbol` key**
 
-## Why the note is embedded
+- Before: no row for that key, or a previous note under the same key.
+- After: a row whose `note`, `author`, and `updated_at` reflect this call, with matching vector and full-text entries.
 
-Embedding the note (with the symbol prefixed when present) means `get_annotations` can rank notes by semantic relevance to a query, not only by exact file path. It also means `read_relevant` can surface notes for files that come back in search results, because the same chunks come from the same code locations. The embedding lives in `vec_annotations` and is rewritten on every update so stale vectors never linger.
+This is an upsert, not an append. A second call with the same `path` and the same `symbol` (or both file-level, i.e. no symbol) overwrites the earlier note rather than creating a second row — the lookup at `src/db/annotations.ts:15-28` finds the existing row and the `UPDATE` branch at `src/db/annotations.ts:37-40` replaces its contents. Two notes can coexist on the same file only if they target different symbols, or one is file-level and the other is symbol-scoped.
 
-## Upsert behavior
-
-The lookup uses `path = ? AND symbol_name = ?` when a `symbol` is supplied, and `path = ? AND symbol_name IS NULL` for file-level notes (`src/db/annotations.ts:16-28`). Calling `annotate` twice with the same `(path, symbol)` therefore overwrites the previous note rather than producing duplicates. To keep multiple distinct notes on one file, pass a different `symbol` value (or call once at file level and again at a specific symbol).
-
-## How the note surfaces later
-
-`read_relevant` batch-loads annotations per file from the same `getAnnotations` helper and prints matching ones as `[NOTE]` blocks above the chunk. That is why the embedding text uses `symbol: note` rather than `note` alone — when a chunk corresponds to a function, the symbol prefix helps the note bubble up for the right chunk. See `tools/read-relevant.md` for the surfacing logic.
+The write matters because the note becomes visible to future readers without any extra step. When [read_relevant](read-relevant.md) returns chunks, it fetches the annotations for each result's file and prints any that apply as `[NOTE]` lines above the chunk content. A file-level note (no symbol) shows on every chunk of that file; a symbol-scoped note shows only on the chunk whose entity matches the symbol name (`src/tools/search.ts:170-203`).
 
 ## Branches and failure cases
 
-- Missing `path` or `note` rejected by Zod before the handler runs.
-- `note` longer than 2000 chars rejected by Zod (`src/tools/annotation-tools.ts:13`).
-- `embed` can throw if the embedding model is unavailable; the error propagates to the MCP client and no row is written.
-- The DB write is wrapped in a transaction (`src/db/annotations.ts:14`, `:62-65`), so a partial state across the three tables is not visible to readers.
+- **Symbol given vs file-level.** The presence of `symbol` selects which existing-row lookup runs and what gets embedded. A symbol-scoped note and a file-level note on the same path are distinct rows (`src/db/annotations.ts:15-28`, `src/tools/annotation-tools.ts:30`).
+- **Existing row vs new row.** Inside `upsertAnnotation` the two paths diverge: update-in-place (preserving the original `created_at`) versus a fresh insert (`src/db/annotations.ts:32-61`).
+- **Author default.** When `author` is omitted the handler passes `"agent"`, so the stored row is never authored by an empty value through this tool (`src/tools/annotation-tools.ts:32`).
+- **Directory resolution.** An invalid or unwritable project directory surfaces as an error from `resolveProject` / the underlying `RagDB` open, not from this handler's own logic.
+- **No empty-result branch.** Unlike the read tools, `annotate` always performs a write and always returns the confirmation line; there is no "nothing found" path.
+- **Atomicity.** Both the update and insert paths run inside one SQLite transaction, so the base row and its vector and full-text entries move together (`src/db/annotations.ts:14`, `src/db/annotations.ts:62-64`).
 
 ## Example
 
+Arguments to attach a symbol-scoped note:
+
 ```json
 {
-  "name": "annotate",
-  "arguments": {
-    "path": "src/example.ts",
-    "symbol": "computeScore",
-    "note": "computeScore double-counts ties; see issue 42. Avoid changing the comparator until that lands.",
-    "author": "agent"
-  }
+  "path": "src/example.ts",
+  "symbol": "parseConfig",
+  "note": "Returns undefined on malformed YAML instead of throwing — callers must null-check.",
+  "author": "agent"
 }
 ```
 
-Response text:
+Returned text:
 
 ```
-Annotation #17 saved for src/example.ts  •  computeScore
+Annotation #7 saved for src/example.ts  •  parseConfig
 ```
+
+Calling again later with the same `path` and `symbol` but a revised `note` updates annotation `#7` in place rather than creating `#8`.
+
+## Related tools
+
+- [get_annotations](get-annotations.md) — read notes back for a file or search across all notes.
+- [delete_annotation](delete-annotation.md) — remove a note by its id once it no longer applies.
+- [read_relevant](read-relevant.md) — where saved notes surface inline as `[NOTE]` lines on matching chunks.
 
 ## Key source files
 
-- `src/tools/annotation-tools.ts` — MCP tool registration and handler (`registerAnnotationTools` at line 7).
-- `src/db/annotations.ts` — `upsertAnnotation` plus the FTS/vector triple-write under one transaction.
-- `src/embeddings/embed.ts` — used to embed the note text.
-- `src/db/index.ts` — exposes `RagDB.upsertAnnotation` as the entry point used by the handler.
-
-## Related flows
-
-- [get_annotations](get-annotations.md) — reads back the notes written here.
-- [delete_annotation](delete-annotation.md) — removes a note once the underlying problem is gone.
-- [read_relevant](read-relevant.md) — surfaces these notes inline as `[NOTE]` blocks above relevant chunks.
+- `src/tools/annotation-tools.ts` — registers the `annotate` tool, builds the embed text, and formats the confirmation.
+- `src/db/annotations.ts` — `upsertAnnotation` and the SQL that performs the keyed upsert plus vector and full-text maintenance.
+- `src/db/index.ts` — the `RagDB` class that exposes `upsertAnnotation` as a method and defines the `annotations`, `vec_annotations`, and `fts_annotations` tables.
+- `src/tools/search.ts` — consumes annotations and renders the `[NOTE]` blocks in `read_relevant` output (`src/tools/search.ts:170-203`).

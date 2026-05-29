@@ -1,174 +1,143 @@
 # Tool: project_map
 
-`project_map` builds a structured view of the project's import graph. It
-turns the dependency edges stored in `file_imports` into a readable map of
-which files depend on which, with optional zoom-out to directories and an
-optional JSON shape carrying fan-in / fan-out metrics.
+The `project_map` MCP tool turns the codebase's import graph into a readable map: which files import which, what each file exports, and how connected each one is. It is faster than opening dozens of files and reading their import statements, and it can zoom into the neighborhood around a single file so you only see what is nearby. It answers "how does this code fit together?" without you having to trace imports by hand.
 
-Reach for it when you need orientation in an unfamiliar codebase, or when you
-want to find a file's neighborhood without opening every file to read its
-imports. It is faster than reading import statements across many files and
-catches re-exports that grep can miss.
+The handler is registered in `src/tools/graph-tools.ts:8-51`. The map itself is built by `generateProjectMap` in `src/graph/resolver.ts:181-225`.
 
-## Flow
+## When to use it
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Caller as MCP caller
-    participant Handler as project_map handler
-    participant Resolver as generateProjectMap
-    participant DB as RagDB
-    Caller->>Handler: { directory?, focus?, zoom?, format? }
-    Handler->>Handler: resolveProject(directory)
-    Handler->>Resolver: generateProjectMap(db, { projectDir, focus, zoom, format })
-    alt focus is set
-        Resolver->>DB: getFileByPath(resolve(projectDir, focus))
-        DB-->>Resolver: file row or null
-        Resolver->>DB: getSubgraph([fileId], maxHops = 2)
-    else no focus
-        Resolver->>DB: getGraph()
-    end
-    DB-->>Resolver: { nodes, edges }
-    alt empty graph
-        Resolver-->>Handler: "No files indexed or no dependencies found."
-    else file zoom + text
-        Resolver-->>Handler: file-level prose map
-    else file zoom + json
-        Resolver-->>Handler: JSON nodes/edges with fanIn/fanOut
-    else directory zoom + text
-        Resolver-->>Handler: directory-level prose map
-    else directory zoom + json
-        Resolver-->>Handler: JSON directories/edges with import counts
-    end
-    Handler-->>Caller: map text (text format appends a hint footer)
-```
-
-1. Caller provides an optional `directory`, `focus`, `zoom` and `format`. The
-   handler resolves the project and opens the DB
-   (`src/tools/graph-tools.ts:29-30`).
-2. `generateProjectMap` is called with the resolved `projectDir`, `focus`,
-   `zoom` (default `file`), and `format` (default `text`)
-   (`src/tools/graph-tools.ts:32-37`).
-3. When `focus` is set, the resolver loads that one file row and asks the DB
-   for a two-hop neighborhood subgraph; otherwise it pulls the full graph
-   (`src/graph/resolver.ts:195-204`).
-4. An empty graph short-circuits to a "no dependencies found" message — in
-   JSON form, an empty `{ level, nodes, edges, directories }` envelope
-   (`src/graph/resolver.ts:206-211`).
-5. The renderer picks one of four code paths based on `zoom` and `format`
-   (`src/graph/resolver.ts:213-225`).
-6. In JSON `file` mode, each node carries `exports`, `fanIn`, `fanOut`
-   counted off the edge list; each edge carries `from`, `to`, and the
-   original import `source` string (`src/graph/resolver.ts:358-391`). In
-   text `file` mode, the renderer groups nodes by "no importers" vs others
-   and prints the up-to-eight first exports plus the depends-on and
-   depended-on-by sets per node (`src/graph/resolver.ts:228-309`).
-7. In `directory` zoom, nodes are bucketed by `dirname(relPath)`; cross-
-   directory edges are deduplicated with import counts. Text and JSON
-   versions print directory file lists and the edge table
-   (`src/graph/resolver.ts:311-449`).
-8. When the response is text, the handler appends a short hint footer
-   pointing at `search`, `depends_on`, and `depended_on_by` so a follow-up
-   query is one step away (`src/tools/graph-tools.ts:39-49`).
+Use `project_map` to understand structure: the layering of the project, what a module connects to, or a file's neighborhood before changing it. The edges it draws are real resolved imports, so it reflects what the code actually depends on. For a single file's direct dependencies or importers in isolation, [depends_on](depends-on.md) and [depended_on_by](depended-on-by.md) are more targeted.
 
 ## Inputs
 
-| Name | Type | Required | Description |
+| name | type | required | description |
 | --- | --- | --- | --- |
-| `directory` | string | no | Project directory. Defaults to `RAG_PROJECT_DIR` or cwd. |
-| `focus` | string | no | Project-relative path. When set, the resolver fetches a two-hop subgraph around that file. When the file is not in the index, the resolver returns the empty-graph message (`src/graph/resolver.ts:195-201`). |
-| `zoom` | `"file"` \| `"directory"` | no | `file` (default) lists individual files. `directory` aggregates files by their parent directory and counts cross-directory edges. |
-| `format` | `"text"` \| `"json"` | no | `text` (default) is prose with sections and a hint footer. `json` is a structured envelope for tooling. |
+| `focus` | string | no | A project-relative file path. When set, the map is limited to that file's neighborhood instead of the whole project. |
+| `zoom` | enum `file` \| `directory` | no | Granularity. `file` (default) shows individual files; `directory` collapses files into their directories — better for large projects. |
+| `format` | enum `text` \| `json` | no | Output shape. `text` (default) is human-readable; `json` is structured data carrying fan-in/fan-out metrics. |
+| `directory` | string | no | Which project to map. Defaults to `RAG_PROJECT_DIR` or the cwd. |
+
+The handler resolves the project, then calls `generateProjectMap` with `zoom ?? "file"` and `format ?? "text"`, passing `focus` through untouched `src/tools/graph-tools.ts:30-37`.
 
 ## Outputs
 
-| Format | Shape |
+| output | where it lands / shape / description |
 | --- | --- |
-| `text` + `file` | `## Project Map (file-level, N files)`, then `### Files With No Importers` and `### Files`, each node printed with `exports`, `depends_on`, `depended_on_by` (`src/graph/resolver.ts:266-308`). |
-| `text` + `directory` | `## Project Map (directory-level, N directories)`, then `### Directories` listing files per directory and `### Dependencies` showing cross-directory edges with import counts (`src/graph/resolver.ts:338-355`). |
-| `json` + `file` | `{ level: "file", nodes: [{ path, exports[], fanIn, fanOut }], edges: [{ from, to, source }] }` (`src/graph/resolver.ts:377-390`). |
-| `json` + `directory` | `{ level: "directory", directories: [{ path, fileCount, files, totalExports, fanIn, fanOut }], edges: [{ from, to, importCount }] }` (`src/graph/resolver.ts:434-448`). |
+| Text map | A single MCP text block. A `## Project Map` heading with the file or directory count, then per-node sections listing exports, `depends_on`, and `depended_on_by`. A footer suggests `search` / `depends_on` / `depended_on_by`. |
+| JSON map | A single text block containing a JSON string: `{ level, nodes, edges }` for file zoom or `{ level, directories, edges }` for directory zoom, with fan-in/fan-out numbers. No footer is appended. |
 
-## Focus and zoom
+The handler appends the tip footer only for the text format; the JSON branch returns the raw JSON string `src/tools/graph-tools.ts:39-49`.
 
-- **No focus, file zoom.** Calls `db.getGraph()` for the whole project. On a
-  large codebase this can be a long output — switch to `zoom: "directory"`
-  to keep the response manageable.
-- **`focus` set, file zoom.** The resolver calls `db.getSubgraph([file.id],
-  maxHops)` with `maxHops` fixed at `2` (`src/graph/resolver.ts:188-198`).
-  The hop limit is hard-coded in this code path; if you need a wider window,
-  call again on a different focus file. When the focus path is not in the
-  index the subgraph is empty and the empty message is returned.
-- **Directory zoom.** Same data, regrouped by parent directory. Useful for
-  large monorepos where the file-level output is too noisy.
+## How a map is built
 
-## Output formats: text vs JSON
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Caller
+  participant Handler as project_map handler<br>(src/tools/graph-tools.ts)
+  participant Gen as generateProjectMap<br>(src/graph/resolver.ts)
+  participant DB as RagDB
+  Caller->>Handler: focus, zoom, format
+  Handler->>Handler: resolveProject
+  Handler->>Gen: generateProjectMap(db, options)
+  alt focus given
+    Gen->>DB: getFileByPath(focus) then getSubgraph(id, maxHops)
+  else no focus
+    Gen->>DB: getGraph() (whole project)
+  end
+  DB-->>Gen: nodes + edges
+  Gen->>Gen: pick text/json + file/directory renderer
+  Gen-->>Handler: map string
+  Handler-->>Caller: text (+footer) or raw JSON
+```
 
-The text format is meant to be read by a human or pasted into a chat. The
-JSON format is meant for tools that want to compute on the graph — for
-example, sorting by `fanIn` to find leaf utilities or by `fanOut` to find
-god-files. JSON file-mode also keeps the full `exports` array per node so
-downstream tools can match symbols without a second call. JSON output skips
-the hint footer; only the text branch appends it
-(`src/tools/graph-tools.ts:39-49`).
+1. The handler resolves the project directory and database `src/tools/graph-tools.ts:30`.
+2. It invokes `generateProjectMap` with the focus, zoom, and format options `src/tools/graph-tools.ts:32-37`.
+3. If `focus` is given, the file is looked up by its absolute path and its neighborhood is fetched with `getSubgraph(file.id, maxHops)`; if the file is not in the index, an empty graph is used. Without focus, the whole project graph is loaded with `getGraph()` `src/graph/resolver.ts:195-204`.
+4. `getSubgraph` does a breadth-first walk over the import edges, expanding `maxHops` (default 2) in both directions — following imports and importers `src/db/graph.ts:834-945`. `getGraph` loads every file as a node and every resolved import as an edge `src/db/graph.ts:780-832`.
+5. The renderer is chosen by format then zoom: JSON+directory, JSON+file, text+directory, or text+file `src/graph/resolver.ts:213-224`.
+6. The map string is returned; the handler wraps it appropriately for the format `src/tools/graph-tools.ts:39-49`.
+
+## Source of truth: dependency edges in the database
+
+Every edge in the map is a resolved import recorded during indexing. Both `getGraph` and `getSubgraph` build edges from `file_imports` rows where `resolved_file_id IS NOT NULL`, joining back to `files` for the paths `src/db/graph.ts:815-828`, `925-940`. Unresolved imports (e.g. external packages that could not be matched to an indexed file) carry a null `resolved_file_id` and so never become edges. Each node's exports come from the `file_exports` table `src/db/graph.ts:790-808`. This means the map only ever shows relationships that the indexer actually resolved — if the index is stale or a file was never indexed, that connection will be missing.
+
+## Focus: a file's neighborhood
+
+By default the map covers the entire project, which can be large. Passing `focus` narrows it to the files within `maxHops` import-edges of the focused file. The neighborhood is computed by `getSubgraph`, which starts from the focused file's id and walks outward two hops by default, collecting both the files it imports and the files that import it `src/graph/resolver.ts:195-198`, `src/db/graph.ts:838-870`. A subtlety worth knowing: the focus path must already be in the index — if `getFileByPath` returns nothing, the graph is empty and you get the "No files indexed or no dependencies found." message rather than an error `src/graph/resolver.ts:196-211`.
+
+## Zoom levels: file vs directory
+
+| zoom | what a node is | what it shows |
+| --- | --- | --- |
+| `file` (default) | one indexed file | exports (first 8, then `+N more`), `depends_on` list, `depended_on_by` list | 
+| `directory` | one directory | files in it, and directory-to-directory dependency counts |
+
+In text file-zoom, files are split into two sections — "Files With No Importers" and "Files" — so structural roots (nothing imports them) are easy to spot `src/graph/resolver.ts:253-306`. In directory zoom, files are grouped by `dirname` and cross-directory edges are deduplicated into counts like `src/a -> src/b (3 imports)` `src/graph/resolver.ts:311-356`.
+
+## Fan-in and fan-out metrics (JSON)
+
+The JSON format adds quantitative connectivity. In file-zoom JSON, each node gets a `fanIn` (how many files import it) and `fanOut` (how many files it imports), counted by walking the edge list `src/graph/resolver.ts:358-391`. In directory-zoom JSON, each directory reports `fileCount`, `totalExports`, and a `fanIn`/`fanOut` measured as the number of distinct other directories pointing in or out `src/graph/resolver.ts:393-449`. These metrics let an agent rank files or directories by how central they are, which the text format does not surface numerically.
 
 ## Branches and failure cases
 
-- **Focus path not indexed.** The DB lookup misses, the subgraph is empty,
-  and the response is the no-files message. There is no error; the caller
-  still gets a 200 with explanatory text (`src/graph/resolver.ts:195-211`).
-- **Empty project DB.** Same no-files message; JSON returns
-  `{"level":"file","nodes":[],"edges":[],"directories":[]}`.
-- **Unresolved imports.** `getDependsOn` / `getGraph` skip imports whose
-  `resolved_file_id` is null, so external packages and unresolved relative
-  paths do not appear as nodes. The project map is strictly the in-project
-  edge set.
+- **No `focus`** — the whole project graph is loaded via `getGraph()` `src/graph/resolver.ts:202-204`.
+- **`focus` resolves to an indexed file** — the two-hop neighborhood is returned `src/graph/resolver.ts:196-198`.
+- **`focus` not found in index** — the graph is empty and an empty-state result is returned `src/graph/resolver.ts:199-201`.
+- **Empty graph (no nodes)** — JSON returns `{ level, nodes: [], edges: [], directories: [] }`; text returns "No files indexed or no dependencies found." `src/graph/resolver.ts:206-211`.
+- **`format` json** — the handler returns the JSON string with no footer `src/tools/graph-tools.ts:39-43`.
+- **`format` text (default)** — the handler appends the next-steps tip footer `src/tools/graph-tools.ts:45-49`.
+- **More than 8 exports on a node (text file-zoom)** — only the first 8 are listed, followed by `+N more` `src/graph/resolver.ts:273-279`.
+
+This tool reads the graph tables only; it does not write to the database and does not log an analytics row.
 
 ## Example
 
+Focus on one file, directory zoom, JSON output:
+
 ```json
 {
-  "tool": "project_map",
-  "arguments": {
-    "focus": "src/server/index.ts",
-    "zoom": "file",
-    "format": "text"
-  }
+  "focus": "src/db/index.ts",
+  "zoom": "file",
+  "format": "json"
 }
 ```
 
-Illustrative response shape (values truncated, names obviously synthetic):
+Illustrative JSON shape (file zoom):
+
+```json
+{
+  "level": "file",
+  "nodes": [
+    { "path": "src/db/index.ts", "exports": [{ "name": "RagDB", "type": "class" }], "fanIn": 54, "fanOut": 10 }
+  ],
+  "edges": [
+    { "from": "src/db/index.ts", "to": "src/db/search.ts", "source": "./search" }
+  ]
+}
+```
+
+Illustrative text shape (file zoom, no focus):
 
 ```
-## Project Map (file-level, 7 files)
+## Project Map (file-level, 42 files)
 
 ### Files With No Importers
-  src/server/index.ts
-    exports: startServer (function)
-    depends_on: src/tools/index.ts, src/db/index.ts
+  src/cli.ts
+    exports: main (function)
+    depends_on: src/server/index.ts
 
 ### Files
-  src/tools/index.ts
-    exports: registerAllTools (function)
-    depends_on: src/tools/graph-tools.ts
-    depended_on_by: src/server/index.ts
+  src/db/index.ts
+    exports: RagDB (class)
+    depended_on_by: src/tools/index.ts, src/search/hybrid.ts
 
 ── Tip: call search("<topic>") to find files related to a specific area, or depends_on/depended_on_by for a single file's connections. ──
 ```
 
 ## Key source files
 
-- `src/tools/graph-tools.ts` — MCP handler that forwards arguments and
-  appends the text-mode hint footer.
-- `src/graph/resolver.ts` — `generateProjectMap` plus the four render
-  functions for the text and JSON variants.
-- `src/db/graph.ts` — `getGraph` and `getSubgraph` queries against
-  `file_imports` / `file_exports`.
-
-## Related flows
-
-- [Tool: depends_on](./depends-on.md) — single-file outbound edges, same DB
-  source.
-- [Tool: depended_on_by](./depended-on-by.md) — single-file inbound edges.
-- [CLI: map](../cli/map.md) — CLI wrapper that prints the same map.
+- `src/tools/graph-tools.ts` — registers `project_map`, resolves options, formats the text footer.
+- `src/graph/resolver.ts` — `generateProjectMap` and the four text/JSON renderers.
+- `src/db/graph.ts` — `getGraph` and `getSubgraph` build nodes and edges from `file_imports` and `file_exports`.
+- `src/db/index.ts` — `RagDB` exposes `getGraph`, `getSubgraph`, and `getFileByPath`.

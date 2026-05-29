@@ -1,14 +1,26 @@
 # CLI: annotations
 
-`mimirs annotations [dir] [--path P]` prints all annotations stored for
-a project, optionally filtered to a single file. It is a read-only
-view — it does not create, update, or delete anything. Use it when you
-want to skim every persistent note an agent (or you) has left across
-the codebase, or when you want to inspect the notes attached to one
-specific file before editing it.
+`mimirs annotations` prints the notes attached to a project's files. Annotations
+are short caveats — a known bug, a fragile invariant, a workaround — that earlier
+sessions recorded so future readers see them in context. This command is the
+read-only viewer for those notes from a terminal. It is the listing counterpart
+to the [get_annotations](../tools/get-annotations.md) MCP tool; the writing side
+lives in the [annotate](../tools/annotate.md) tool, which this command never
+calls (`src/cli/commands/annotations.ts:1-27`).
 
-Annotations themselves are written by the MCP `annotate` tool (or by
-the underlying DB calls). This CLI just reads them back.
+## What it does
+
+The command resolves the project directory, opens the project's `RagDB`, fetches
+annotations (optionally filtered to one path), and prints each one. It writes
+nothing back: there is no insert, update, or delete anywhere in the function. To
+create or remove a note, use the [annotate](../tools/annotate.md) /
+[delete_annotation](../tools/delete-annotation.md) tools instead
+(`src/cli/commands/annotations.ts:5-27`).
+
+The project directory can be given two ways. If the first positional argument
+exists and does not start with `--`, it is treated as the directory; otherwise
+the `--dir` flag is used, defaulting to `.`. The chosen path is resolved to an
+absolute path (`src/cli/commands/annotations.ts:6`).
 
 ## Flow
 
@@ -16,121 +28,117 @@ the underlying DB calls). This CLI just reads them back.
 sequenceDiagram
     autonumber
     actor User
-    participant CLI as annotationsCommand
+    participant CLI as annotations.ts
     participant DB as RagDB
-    participant Ann as db/annotations.ts
-    User->>CLI: mimirs annotations [dir] [--path P]
-    CLI->>CLI: resolve dir, read --path flag
+    User->>CLI: mimirs annotations [dir] [--path P] [--dir D]
+    CLI->>CLI: resolve dir (positional or --dir, default ".")
     CLI->>DB: new RagDB(dir)
     CLI->>DB: getAnnotations(filterPath)
-    DB->>Ann: getAnnotations(db, path)
-    Ann-->>DB: rows
-    DB-->>CLI: annotation list
-    alt list is empty
-        CLI->>User: "No annotations [for <path>]."
+    DB-->>CLI: AnnotationRow[] (newest first)
+    alt no rows
+        CLI-->>User: "No annotations..." message
     else has rows
         loop each annotation
-            CLI->>User: "#id path[ • symbol][ author]\n  note\n  (updatedAt)"
+            CLI-->>User: id, path[, symbol][, author], note, updatedAt
         end
     end
     CLI->>DB: close()
 ```
 
-1. The user invokes the command. The directory is taken from the first
-   positional argument (when it does not start with `--`), then from
-   `--dir`, and finally defaults to `.`
+1. The user runs the command, optionally passing a directory positionally, a
+   `--path` filter, and/or `--dir` (`src/cli/commands/annotations.ts:5-7`).
+2. The directory is resolved — positional first, then `--dir`, then `.`
    (`src/cli/commands/annotations.ts:6`).
-2. `--path` is read with the shared `getFlag` helper. When set, it is
-   passed as the filter into `db.getAnnotations`. The filter is a
-   single path string; there is no glob or directory matching here
-   (`src/cli/commands/annotations.ts:7-9`).
-3. `RagDB` opens the project DB.
-4. `db.getAnnotations(filterPath)` returns rows for the whole project
-   or for the one path. With no filter every annotation row in the
-   project is returned.
-5. If the result list is empty, the CLI prints
-   `No annotations for <path>.` (when a filter was set) or
-   `No annotations found.` (when no filter was set), then closes the
-   DB and returns. The command always exits 0.
-6. Otherwise, each annotation is rendered as a small three-line block:
-   the id and target on line 1, the note on line 2, and the
-   `updatedAt` timestamp on line 3. A blank line separates entries.
+3. A `RagDB` is opened on that directory, reading `.mimirs/index.db`
+   (`src/cli/commands/annotations.ts:8`).
+4. `getAnnotations(filterPath)` runs `SELECT * FROM annotations`, adding
+   `AND path = ?` only when `--path` was given, ordered by `updated_at`
+   descending (`src/cli/commands/annotations.ts:9`, `src/db/annotations.ts:101-135`).
+5. If nothing matches, a message is printed and the database is closed early
+   (`src/cli/commands/annotations.ts:11-15`).
+6. Otherwise each annotation is printed as a small block
+   (`src/cli/commands/annotations.ts:17-24`).
+7. The database is closed (`src/cli/commands/annotations.ts:26`).
 
 ## Inputs
 
-| Input | Source | Notes |
-| --- | --- | --- |
-| `directory` | first positional arg or `--dir` | Optional. Defaults to `.`. The positional form is accepted only when the first arg does not start with `--`. |
-| `--path` | flag | Optional. A single file path. When present, only annotations on that path are returned. |
-| `--dir` | flag | Optional. Alternate way to pass the project directory. The positional form takes precedence when provided. |
+| name | type | required | description |
+|------|------|----------|-------------|
+| directory | path (positional) | no | `args[1]`, used as the project directory only when present and not starting with `--`. Falls back to `--dir`, then `.` (`src/cli/commands/annotations.ts:6`). |
+| `--path` | path string | no | Restricts the listing to annotations whose stored `path` equals this value exactly. Omitted means all annotations (`src/cli/commands/annotations.ts:7`, `src/db/annotations.ts:105-108`). |
+| `--dir` | path | no | Project directory, used when no positional directory is given (`src/cli/commands/annotations.ts:6`). |
 
 ## Outputs
 
-| Output | What happens |
-| --- | --- |
-| Formatted annotation listing | One block per row, written to stdout. Each block carries the row id, the path, an optional symbol name, an optional author tag, the note body, and the last-updated timestamp. |
+| output | where it lands / shape / description |
+|--------|--------------------------------------|
+| annotation listing | stdout. Per annotation: `#<id>  <path>` (with `  •  <symbol>` appended when a symbol name is stored, and ` [<author>]` when an author is stored), then an indented note line, then an indented `(<updatedAt>)` line, then a blank line (`src/cli/commands/annotations.ts:17-24`). |
+| empty-state message | stdout. `No annotations for <path>.` when `--path` was given, otherwise `No annotations found.` (`src/cli/commands/annotations.ts:12`). |
 
-When the result set is empty, a single short message is printed
-instead.
+## Output format
 
-The exact rendered shape (from `src/cli/commands/annotations.ts:17-23`):
+Each row is printed across three lines. The header combines the id and target:
+the target is just the file path, or `path  •  symbolName` when the annotation
+was attached to a specific symbol. An author, when stored, is shown in brackets
+after the target. The second line is the note text; the third is the
+`updatedAt` timestamp in parentheses
+(`src/cli/commands/annotations.ts:18-23`). The underlying rows carry `id`,
+`path`, `symbolName`, `note`, `author`, `createdAt`, and `updatedAt`; this
+command surfaces all of these except `createdAt`
+(`src/db/annotations.ts:101-135`).
 
-```
-#<id>  <path>[  •  <symbolName>][ [<author>]]
-  <note>
-  (<updatedAt>)
-```
+Rows come back ordered by `updated_at` descending, so the most recently
+touched annotations print first (`src/db/annotations.ts:118`).
 
-`symbolName` and the `[author]` segment are conditional: they are
-omitted when the underlying row stored a null. The timestamp is the
-row's `updated_at` column (set on each upsert in
-`src/db/annotations.ts:38-40`).
+## Read-only by design
 
-## Read-only behaviour
-
-The CLI never calls the write side of the annotations module. It only
-invokes `db.getAnnotations(...)` which runs a `SELECT` and returns
-rows. To add or change a note, use the `annotate` MCP tool. To remove
-one, use `delete_annotation`. This split keeps the CLI safe to run
-casually — there is no flag here that mutates state.
+Nothing in this flow mutates state. The only `RagDB` call is `getAnnotations`,
+followed by `close()`. There is no path that inserts, updates, or deletes a row,
+so running `annotations` repeatedly is side-effect free
+(`src/cli/commands/annotations.ts:9-26`). Writing notes is a separate concern
+handled by the [annotate](../tools/annotate.md) tool.
 
 ## Branches and failure cases
 
-- **No annotations stored**: the command prints
-  `No annotations found.` and exits 0.
-- **`--path` filter with no matches**: the command prints
-  `No annotations for <path>.` and exits 0. There is no fuzzy match —
-  the filter is a literal path equality check inside
-  `getAnnotations`.
-- **Path string mismatches**: annotations are stored under whatever
-  path the writer supplied. If you pass a relative path here but the
-  annotation was stored as absolute (or vice versa), the filter will
-  miss. Re-run without `--path` to see what is actually stored.
+| branch | behavior |
+|--------|----------|
+| positional directory given | First arg not starting with `--` becomes the directory (`src/cli/commands/annotations.ts:6`). |
+| no positional directory | Uses `--dir`, then defaults to `.` (`src/cli/commands/annotations.ts:6`). |
+| `--path` given, matches | Lists only annotations whose `path` equals it exactly (`src/db/annotations.ts:105-108`). |
+| `--path` given, no match | Prints `No annotations for <path>.` and returns after closing the db (`src/cli/commands/annotations.ts:12-14`). |
+| no `--path`, none stored | Prints `No annotations found.` and returns (`src/cli/commands/annotations.ts:12-14`). |
+| annotation has a symbol | Header shows `path  •  symbol` (`src/cli/commands/annotations.ts:18`). |
+| annotation has an author | Header appends ` [author]` (`src/cli/commands/annotations.ts:19`). |
+
+A subtle point: `--path` matches the stored `path` string exactly, not a prefix
+or glob. Notes are stored under whatever path string the writer used, so a filter
+only matches if it is byte-for-byte identical
+(`src/db/annotations.ts:105-108`).
 
 ## Example
 
-```
-mimirs annotations
-# → #12  src/server/index.ts  •  startServer  [agent]
-#       Watcher does not pick up symlinks; pass absolute paths.
-#       (2026-04-12T15:08:11.000Z)
+```bash
+# All annotations in the current project
+bun run mimirs annotations
 
-mimirs annotations --path src/db/files.ts
-# → No annotations for src/db/files.ts.
+# Only annotations on one file
+bun run mimirs annotations --path src/conversation/indexer.ts
+
+# Point at a different project directory positionally
+bun run mimirs annotations /path/to/project --path src/db/index.ts
+```
+
+Illustrative output:
+
+```
+#6  src/conversation/indexer.ts  •  startConversationTail [agent]
+  Potential multi-server race: tailing is not guarded by the index lock.
+  (2026-05-28T14:30:12.360Z)
 ```
 
 ## Key source files
 
-- `src/cli/commands/annotations.ts` — the CLI entrypoint
-  (`annotationsCommand`). The whole command is 27 lines.
-- `src/db/index.ts` — `RagDB.getAnnotations` forwards to the
-  annotations module (`src/db/index.ts:779-781`).
-- `src/db/annotations.ts` — the actual `getAnnotations` query, plus
-  the write paths used by the `annotate` tool but not by this CLI.
-
-## Related flows
-
-- [tools/get-annotations](../tools/get-annotations.md) — MCP tool with
-  the same read behavior plus a semantic search mode.
-- [tools/annotate](../tools/annotate.md) — the writer counterpart;
-  this CLI is the read side of the same store.
+- `src/cli/commands/annotations.ts` — directory resolution, the single read call,
+  and output formatting.
+- `src/db/annotations.ts` — `getAnnotations`, which builds the optional path
+  filter and orders rows newest-first.

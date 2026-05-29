@@ -1,143 +1,104 @@
 # Tool: write_relevant
 
-The `write_relevant` MCP tool answers "where should I put this?". The
-caller passes the content they want to add — a function body, a
-documentation paragraph, a class — and the tool returns the most
-semantically appropriate existing files and a per-file insertion anchor.
-It is meant to be called *before* writing new code so the addition lands
-next to related code instead of in a new file.
+The `write_relevant` MCP tool answers a question you face before writing code, not after: "where should this new function (or doc section) go?" You hand it the content you intend to add, and it returns the existing files whose code is most similar in meaning, each with a concrete insertion point and an anchor string you can match against. It turns "find the right home for this" into a ranked shortlist instead of a manual hunt.
 
-Internally it reuses the same chunk retrieval pipeline as
-`read_relevant`, then collapses the results to the best chunk per file
-and formats them as insertion candidates. The handler lives at
-`src/tools/search.ts:276-345`.
+The handler is registered in `src/tools/search.ts:276-345`. It reuses the chunk-level search engine `searchChunks` in `src/search/hybrid.ts:470-554`.
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Client as "MCP client"
-    participant Handler as "write_relevant handler"
-    participant Chunks as "searchChunks()"
-    participant Vec as "vec_chunks + fts_chunks"
+## When to use it
 
-    Client->>Handler: tool call (content, top?, threshold?)
-    Handler->>Handler: resolveProject(directory)
-    Handler->>Chunks: searchChunks(content, db, topN*3, threshold, hybridWeight, generated)
-    Chunks->>Vec: hybrid retrieval over chunks
-    Chunks-->>Handler: ChunkResult[] (no file dedup)
-    Handler->>Handler: keep best-scoring chunk per file, take top N
-    Handler-->>Client: list of [score] path / insert-after / anchor lines
-```
-
-1. The client passes the candidate content as `content` (1–5000 chars)
-   plus optional `top` (default `3`) and `threshold` (default `0.3`)
-   (`src/tools/search.ts:280-297`).
-2. The handler opens the project DB through `resolveProject`
-   (`src/tools/search.ts:299`).
-3. It calls `searchChunks(content, db, topN*3, threshold, hybridWeight,
-   generated)`. The `topN*3` over-fetch leaves room for the per-file
-   collapse step below (`src/tools/search.ts:302-309`).
-4. Each chunk is keyed by file path, and the highest-scoring chunk wins
-   per file (`src/tools/search.ts:317-324`).
-5. The remaining candidates are sorted by score and sliced to `topN`
-   (`src/tools/search.ts:326-328`).
-6. For each candidate, the tool builds an insertion description:
-   - When the chunk has an `entityName`, the suggestion is
-     `after \`entityName\` (chunk N)`.
-   - Otherwise, it falls back to `after chunk N`.
-   - The anchor is the last 150 characters of the chunk body, trimmed —
-     this gives the caller a unique fingerprint to find the spot in the
-     file (`src/tools/search.ts:330-338`).
-7. The handler appends a tip suggesting `read_relevant` against the same
-   query to inspect the surrounding code (`src/tools/search.ts:340-343`).
+Use `write_relevant` before adding a new function, class, or documentation section, when you are unsure which file it belongs in. It is the write-time counterpart to [read_relevant](read-relevant.md): both run the same chunk search, but `read_relevant` returns code for you to read, while `write_relevant` collapses results to one suggestion per file and tells you where to insert after.
 
 ## Inputs
 
-- `content` — required string, 1 to 5000 characters. This is what the
-  caller wants to write; it is fed into the hybrid retrieval pipeline as
-  if it were a query (`src/tools/search.ts:280`).
-- `top` — optional positive integer. Caps the number of candidate files
-  in the output (default `3`) (`src/tools/search.ts:285-290`,
-  `src/tools/search.ts:301`).
-- `threshold` — optional 0–1 minimum relevance score (default `0.3`),
-  forwarded to `searchChunks` (`src/tools/search.ts:291-296`).
-- `directory` — optional project root override
-  (`src/tools/search.ts:281-284`).
+| name | type | required | description |
+| --- | --- | --- | --- |
+| `content` | string (1–5000 chars) | yes | The code or doc text you want to add. This is embedded and matched against existing chunks. |
+| `top` | integer (≥1) | no | Number of candidate locations (files) to return. Defaults to 3. |
+| `threshold` | number (0–1) | no | Minimum relevance score for a chunk to be considered. Defaults to 0.3. |
+| `directory` | string | no | Which project to search. Defaults to `RAG_PROJECT_DIR` or the cwd. |
 
-Note: this tool exposes `content`/`top`/`threshold`/`directory`. It does
-not currently accept `extensions`, `dirs`, or `excludeDirs` filters even
-though `searchChunks` supports them (`src/tools/search.ts:280-297`).
+There are no path-scoping filters on this tool — the call into `searchChunks` passes no filter `src/tools/search.ts:302-309`. The query text is the `content` itself, so the more representative your snippet, the better the match.
 
 ## Outputs
 
-- Text content with one block per candidate file:
-  `[score] path` / `Insert after \`entityName\` (chunk N)` / `Anchor:
-  ...trailing 150 chars`. Blocks are separated by `---`
-  (`src/tools/search.ts:330-338`).
-- A trailing tip line that points to `read_relevant`
-  (`src/tools/search.ts:341`).
-- Side effect: one row in `query_log` is written inside `searchChunks`
-  with the content used as the "query" string — `write_relevant`
-  invocations show up alongside real searches in
-  `search_analytics`. This is worth knowing when reading analytics
-  output (`src/search/hybrid.ts:544-551`).
+| output | where it lands / shape / description |
+| --- | --- |
+| Candidate insertion points | A single MCP text block. One entry per file: `[score] path`, an `Insert after ...` line naming the entity (or chunk) to insert after, and an `Anchor: ...` line showing the last ~150 chars of that chunk so you can locate the exact spot. Entries are joined by `---`. A footer suggests calling `read_relevant`. |
+| Empty-result message | When no chunk clears the threshold, a text block suggesting `index_files`. |
 
-## Picking the anchor
+The output is built in `src/tools/search.ts:330-343`. The `Insert after` line reads `after \`entityName\` (chunk N)` when the chunk has an entity, otherwise `after chunk N` `src/tools/search.ts:332-334`. The anchor is the chunk's trailing 150 characters, trimmed `src/tools/search.ts:335`.
 
-The anchor is intentionally lightweight: the last 150 characters of the
-top-scoring chunk in the file, with whitespace trimmed. The intent is to
-let an editor or follow-up tool locate the insertion point by searching
-for that suffix rather than relying on line numbers that may drift
-(`src/tools/search.ts:335-336`). When the chunk has an `entityName`
-(function name, class name, exported constant), the message also tells
-the caller they should insert after that entity — which usually
-translates to "right after the closing brace of that symbol".
+## How a suggestion is produced
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Caller
+  participant Handler as write_relevant handler<br>(src/tools/search.ts)
+  participant Svc as searchChunks()<br>(src/search/hybrid.ts)
+  participant DB as RagDB
+  Caller->>Handler: content, top, threshold
+  Handler->>Handler: resolveProject
+  Handler->>Svc: searchChunks(content, db, top*3, threshold, weight)
+  Svc->>DB: embed + vector + BM25 chunk search, boosts
+  Svc-->>Handler: ranked ChunkResult[]
+  Handler->>Handler: best chunk per file, take top N
+  Handler->>Handler: build path + insert-after + anchor
+  Handler-->>Caller: candidates + read_relevant tip
+```
+
+1. The handler resolves the project database and config `src/tools/search.ts:299`.
+2. It computes `topN = top ?? 3` and asks for `topN * 3` chunks — over-fetching so that after collapsing to one chunk per file there are still enough distinct files to fill `topN` slots `src/tools/search.ts:301-309`.
+3. `searchChunks` embeds the `content`, runs the hybrid vector + keyword chunk search, applies the path/filename/graph boosts, and returns ranked chunks `src/search/hybrid.ts:470-554`. The threshold (default 0.3) is forwarded so weak matches are dropped `src/tools/search.ts:302-309`.
+4. The handler keeps the single best-scoring chunk per file, building a `Map` keyed by path `src/tools/search.ts:318-324`.
+5. It sorts those per-file bests by score and slices to `topN` `src/tools/search.ts:326-328`.
+6. For each candidate it formats the path, the insert-after target, and the anchor `src/tools/search.ts:330-338`.
+7. It returns the text block with a footer pointing at `read_relevant` `src/tools/search.ts:340-343`.
+
+The result is "best place per file", not "best chunks overall" — this is why the over-fetch and per-file dedupe exist, and it is the key difference from `read_relevant`, which returns multiple chunks from the same file.
+
+## Anchors and insertion points
+
+The point of the anchor is to give a precise, matchable target rather than a line number that may drift. Each candidate names the entity to insert after (e.g. a function or class) when the matched chunk has an `entityName`, and falls back to the chunk index otherwise `src/tools/search.ts:332-334`. The anchor string is the literal tail of that chunk's content — `r.content.slice(-150).trim()` — so you can grep for it to find exactly where the chunk ends and your new code should begin `src/tools/search.ts:335`.
 
 ## Branches and failure cases
 
-- Empty index or all chunks below `threshold`: returns a single message
-  "No relevant location found. The index may be empty — try
-  `index_files` first." (`src/tools/search.ts:311-315`).
-- Sparse fan-out: when fewer than `topN` distinct files survive the
-  per-file collapse, the response simply contains fewer blocks; there is
-  no padding.
+- **No chunk clears the threshold** — returns "No relevant location found. The index may be empty — try index_files first." `src/tools/search.ts:311-315`.
+- **`top` omitted** — defaults to 3 candidate files `src/tools/search.ts:301`.
+- **`threshold` omitted** — defaults to 0.3, forwarded to `searchChunks` `src/tools/search.ts:302-309`.
+- **Fewer matching files than `top`** — only as many candidates as there are distinct files are returned, since dedupe happens before the slice `src/tools/search.ts:318-328`.
+- **Matched chunk has no entity name** — the insert-after target degrades to `after chunk N` `src/tools/search.ts:332-334`.
+- **Full-text search throws inside `searchChunks`** — caught there; the search falls back to vector-only results rather than failing `src/search/hybrid.ts:485-489`.
+
+This tool is read-only: it suggests where to write but writes nothing itself. Unlike file-level [search](search.md) and [read_relevant](read-relevant.md), it does not record an analytics row, because `searchChunks` logs internally while this handler simply consumes the returned chunks.
 
 ## Example
 
 ```json
 {
-  "content": "function lower-cases a path and matches it against a list of glob patterns to decide if a file is generated",
+  "content": "export function debounceIndex(fn: () => void, ms: number) {\n  let t: Timer;\n  return () => { clearTimeout(t); t = setTimeout(fn, ms); };\n}",
   "top": 3,
   "threshold": 0.3
 }
 ```
 
-Response shape (illustrative):
+Illustrative output shape:
 
 ```
-[0.78] src/example/generated.ts
-  Insert after `buildGeneratedMatcher` (chunk 4)
-  Anchor: ...return (p: string) => patterns.some((re) => re.test(p));
+[0.71] src/utils/debounce.ts
+  Insert after `throttle` (chunk 2)
+  Anchor: ...return () => { if (!pending) { pending = true; queueMicrotask(flush); } };
 
 ---
 
-[0.61] src/example/config.ts
-  Insert after `loadConfig` (chunk 2)
-  Anchor: ...config.generated = config.generated ?? [];
+[0.58] src/indexing/watcher.ts
+  Insert after chunk 5
+  Anchor: ...watcher.on("change", (p) => scheduleReindex(p));
 
 ── Tip: call read_relevant with your content query to see the surrounding code at the insertion point. ──
 ```
 
-## Related flows
-
-- `read_relevant` — same retrieval substrate; use it to inspect the
-  proposed insertion site before writing.
-- `search` — when you would rather scan a list of files than chunk
-  bodies for placement decisions.
-
 ## Key source files
 
-- `src/tools/search.ts` — handler, per-file collapse, anchor format.
-- `src/search/hybrid.ts` — `searchChunks` retrieval and analytics
-  logging.
-- `src/db/index.ts` — `RagDB` wrappers used by the retrieval path.
+- `src/tools/search.ts` — registers `write_relevant`, dedupes to best-per-file, formats the insert-after and anchor lines.
+- `src/search/hybrid.ts` — `searchChunks` provides the ranked chunks the handler turns into insertion candidates.

@@ -1,187 +1,190 @@
 # Tool: search_commits
 
-The `search_commits` MCP tool runs a semantic search over indexed git
-commit messages and diff summaries. It is meant for "why was this code
-changed?" or "what did this author work on?" questions where the commit
-log carries the answer. The handler is at
-`src/tools/git-history-tools.ts:34-109` and runs a hybrid vector + FTS
-merge with a fixed `0.7` weight that favours the vector leg, then
-optionally filters by author, date window, and file path.
+`search_commits` is semantic search over a project's git history. Instead of
+grepping commit messages, an agent asks a question in plain language — "why did
+we switch the embedding model", "when did we add the lock" — and gets back the
+commits most relevant to it, ranked. It is the answer to "why was this code
+written this way" when the reasoning lives in commit messages rather than the
+code itself. It can also narrow by author, date range, and touched file path.
 
-The data this tool queries is written by the git history indexer, which
-walks the repo with `git log` and inserts rows into `git_commits` plus
-embeddings into `vec_git_commits`. If the index is empty, the tool
-returns a hint pointing at `index_files` or `mimirs history index`.
+The tool reads from indexed commit rows; it does not run `git log`. The commits
+must be ingested into the database first (see [cli/history](../cli/history.md)),
+and the tool reports a clear hint when nothing is indexed yet.
+
+## How it works
+
+The handler is registered as the MCP tool `search_commits` in
+`registerGitHistoryTools` (`src/tools/git-history-tools.ts:34-37`). After
+resolving the project and database with `resolveProject`
+(`src/tools/git-history-tools.ts:56`), it first checks how many commits are
+indexed via `getGitHistoryStatus()`; if the count is zero it returns an
+indexing hint and stops (`src/tools/git-history-tools.ts:58-66`).
+
+When there is history, the query string is embedded
+(`embed`, `src/embeddings/embed.ts:78-86`) and two retrievals run:
+
+- A **vector search** over `vec_git_commits`, joined back to `git_commits`,
+  scoring each row as `1 / (1 + distance)`
+  (`searchGitCommits`, `src/db/git-history.ts:154-187`).
+- A **keyword (BM25/FTS) search** over `fts_git_commits`, which indexes commit
+  message and diff summary text, scoring as `1 / (1 + |rank|)`
+  (`textSearchGitCommits`, `src/db/git-history.ts:189-225`).
+
+The two lists are merged and deduplicated by commit hash. A commit found by
+both is re-scored with a fixed blend `0.7 * vectorScore + 0.3 * textScore`; a
+commit found only in the text list keeps `0.3 * textScore`
+(`src/tools/git-history-tools.ts:75-88`). Results are then filtered by
+`threshold`, sorted by score, and truncated to `top`
+(`src/tools/git-history-tools.ts:90-93`).
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Client as "MCP client"
-    participant Handler as "search_commits handler"
-    participant Status as "getGitHistoryStatus"
-    participant Emb as "embed()"
-    participant Vec as "searchGitCommits"
-    participant Fts as "textSearchGitCommits"
-
-    Client->>Handler: tool call (query, top?, author?, since?, until?, path?, threshold?)
-    Handler->>Status: ragDb.getGitHistoryStatus()
-    alt totalCommits == 0
-        Handler-->>Client: "No git history indexed. Run index_files() first."
-    else has commits
-        Handler->>Emb: embed(query)
-        Handler->>Vec: ragDb.searchGitCommits(emb, top, author, since, until, path)
-        Handler->>Fts: ragDb.textSearchGitCommits(query, top, author, since, until, path)
-        Handler->>Handler: hybrid merge by hash, threshold filter, sort, slice
-        Handler-->>Client: ranked commits with shortHash, date, author, message, files
+    participant Agent
+    participant Tool as search_commits
+    participant Embed as embed()
+    participant DB as RagDB (git history)
+    Agent->>Tool: query, top, author?, since?, until?, path?, threshold?, directory?
+    Tool->>Tool: resolveProject(directory) -> db
+    Tool->>DB: getGitHistoryStatus()
+    alt no commits indexed
+        DB-->>Tool: totalCommits = 0
+        Tool-->>Agent: "No git history indexed. Run ..."
+    else commits present
+        Tool->>Embed: embed(query)
+        Embed-->>Tool: query vector
+        Tool->>DB: searchGitCommits(vector, top, filters)
+        Tool->>DB: textSearchGitCommits(query, top, filters)
+        DB-->>Tool: vector + text commit rows
+        Tool->>Tool: merge by hash, blend 0.7/0.3, threshold, sort, slice top
+        alt nothing passes
+            Tool-->>Agent: "No commits found matching ..."
+        else hits
+            Tool-->>Agent: header + formatted commit list
+        end
     end
 ```
 
-1. The client calls `search_commits` with a query and any filters
+1. The agent calls with a `query` and optional `top`, `author`, `since`,
+   `until`, `path`, `threshold`, and `directory`
    (`src/tools/git-history-tools.ts:38-54`).
-2. The handler resolves the project DB and reads
-   `ragDb.getGitHistoryStatus()` to confirm there are indexed commits
-   (`src/tools/git-history-tools.ts:56-58`).
-3. When `totalCommits` is `0`, it short-circuits with a hint telling the
-   caller to run `index_files()` or `mimirs history index`
-   (`src/tools/git-history-tools.ts:59-66`).
-4. Otherwise it embeds the query and runs the vector leg via
-   `searchGitCommits(emb, top, author, since, until, path)` against
-   `vec_git_commits` (`src/tools/git-history-tools.ts:68-71`).
-5. The BM25 leg runs `textSearchGitCommits(query, top, author, since,
-   until, path)` against `fts_git_commits` (which indexes both `message`
-   and `diff_summary`) (`src/tools/git-history-tools.ts:72`).
-6. Results are merged in a `Map<hash, ...>`. Vector rows seed the map.
-   Each text row either contributes to an existing entry as
-   `0.7 * vec + 0.3 * txt`, or inserts a new entry with score
-   `0.3 * txt` (vector-side score treated as 0)
-   (`src/tools/git-history-tools.ts:74-88`).
-7. The merged list is filtered by `threshold`, sorted by score
-   descending, and sliced to `top`
-   (`src/tools/git-history-tools.ts:90-93`).
-8. Each surviving commit is rendered by `formatCommitResult` — a
-   numbered entry with `shortHash`, score, ISO date (date portion
-   only), `@authorName`, optional `[merge]` and ref tags, the message's
-   first line, and the first five changed files plus `+N more` and
-   diff stats (`src/tools/git-history-tools.ts:7-19`,
-   `src/tools/git-history-tools.ts:104-107`).
+2. The project database is resolved (`src/tools/git-history-tools.ts:56`).
+3. `getGitHistoryStatus()` returns the indexed commit count; a zero count
+   short-circuits to the indexing hint
+   (`src/tools/git-history-tools.ts:58-66`).
+4. The query is embedded into a vector
+   (`src/tools/git-history-tools.ts:68`).
+5. The vector search and the FTS search each run with the same filters and an
+   over-fetch limit, then apply the filters in code
+   (`src/tools/git-history-tools.ts:71-72`, `src/db/git-history.ts:154-225`).
+6. Results merge by commit hash; overlapping commits get the blended score,
+   text-only commits get the weighted text score
+   (`src/tools/git-history-tools.ts:75-88`).
+7. The merged set is filtered by `threshold`, sorted descending, and cut to
+   `top` (`src/tools/git-history-tools.ts:90-93`).
+8. An empty result set yields a "No commits found" message; otherwise a header
+   plus one formatted block per commit is returned
+   (`src/tools/git-history-tools.ts:95-107`).
 
 ## Inputs
 
-- `query` — required string up to 2000 chars. Used for both the
-  embedding and the FTS query
-  (`src/tools/git-history-tools.ts:39`).
-- `top` — optional positive integer, default `10`. Caps both the
-  per-leg fetch and the final output
-  (`src/tools/git-history-tools.ts:40-41`).
-- `author` — optional case-insensitive substring match against author
-  name or email, applied at the SQL layer
-  (`src/tools/git-history-tools.ts:42-43`).
-- `since` / `until` — optional ISO dates that bound `git_commits.date`
-  on either side (`src/tools/git-history-tools.ts:44-47`).
-- `path` — optional substring match against rows in
-  `git_commit_files.file_path`; commits that touched a matching path
-  are kept (`src/tools/git-history-tools.ts:48-49`).
-- `threshold` — optional 0–1 minimum score, default `0`
-  (`src/tools/git-history-tools.ts:50-51`).
-- `directory` — optional project root override
-  (`src/tools/git-history-tools.ts:52-53`).
+| name | type | required | description |
+| --- | --- | --- | --- |
+| `query` | string (≤2000 chars) | yes | Natural-language search query, embedded and matched against commit text (`src/tools/git-history-tools.ts:39`). |
+| `top` | integer ≥ 1 | no | Maximum commits to return; defaults to 10 (`src/tools/git-history-tools.ts:40-41`). |
+| `author` | string | no | Case-insensitive substring match against author name or email (`src/tools/git-history-tools.ts:42-43`, `src/db/git-history.ts:145-146`). |
+| `since` | string (ISO date) | no | Keep only commits with `date >= since` (string comparison) (`src/tools/git-history-tools.ts:44-45`, `src/db/git-history.ts:147`). |
+| `until` | string (ISO date) | no | Keep only commits with `date <= until` (`src/tools/git-history-tools.ts:46-47`, `src/db/git-history.ts:148`). |
+| `path` | string | no | Keep only commits where some changed file path contains this substring (`src/tools/git-history-tools.ts:48-49`, `src/db/git-history.ts:149`). |
+| `threshold` | number 0–1 | no | Minimum blended relevance score; defaults to 0 (no filtering) (`src/tools/git-history-tools.ts:50-51`, `src/tools/git-history-tools.ts:91`). |
+| `directory` | string | no | Project directory; falls back to `RAG_PROJECT_DIR`, then cwd (`src/tools/git-history-tools.ts:52-53`). |
 
 ## Outputs
 
-- Text content with a header `## Results for "..." (N commits, M
-  indexed)` followed by numbered blocks
-  (`src/tools/git-history-tools.ts:104`).
-- Each block uses the format defined in `formatCommitResult`:
-  - Line 1: `1. **<shortHash>** (<score>) — <yyyy-mm-dd> —
-    @<authorName>` plus `[merge]` and `(refs)` tags when applicable.
-  - Line 2: first line of the commit message.
-  - Line 3: `Files: a.ts, b.ts, ... +K more (+<insertions>
-    -<deletions>)`. Only the first five files are listed
-    (`src/tools/git-history-tools.ts:7-19`).
-- No write side effects.
+| output | where it lands / shape / description |
+| --- | --- |
+| Header | `## Results for "<query>" (<n> commits, <total> indexed)` where `<total>` is the indexed commit count (`src/tools/git-history-tools.ts:104`). |
+| Ranked commits | One block per commit, each rendered by `formatCommitResult` (`src/tools/git-history-tools.ts:7-19`). Line 1: rank, **short hash**, score to 2 decimals, date (date portion only), `@author`, plus `[merge]` for merge commits and `(refs)` when refs exist. Line 2: first line of the message. Line 3: up to 5 changed file paths (`+N more` beyond that) and `(+insertions -deletions)`. |
+| Empty-index hint | `No git history indexed. Run \`index_files()\` or \`mimirs history index\` first.` when nothing is indexed (`src/tools/git-history-tools.ts:60-65`). |
+| No-match message | `No commits found matching "<query>"` (with `by <author>` appended when an author filter was set) when every candidate was filtered out (`src/tools/git-history-tools.ts:95-101`). |
 
-## Hybrid scoring with 0.7 weight
+The per-commit fields (`shortHash`, `score`, `date`, `authorName`, `isMerge`,
+`refs`, `message`, `filesChanged`, `insertions`, `deletions`) come from the
+`GitCommitSearchResult` rows produced by the database search functions
+(`src/db/git-history.ts:160-186`).
 
-Unlike the codebase search, this tool uses a hard-coded
-`HYBRID_WEIGHT = 0.7` rather than the config-driven `hybridWeight`
-(`src/tools/git-history-tools.ts:76`). The reasoning is that commit
-messages are often short, so BM25 carries less signal than it does for
-full source files; favouring the vector leg keeps the ranking sensible
-when the user's query has no exact word overlap with the message.
+## Scoring and the hybrid blend
 
-Each leg's score is normalised to 0–1 before the merge. The two
-formulas applied are:
+| branch | score formula | source |
+| --- | --- | --- |
+| Vector only | `1 / (1 + distance)` | `src/db/git-history.ts:177-180` |
+| Text (FTS) only | `0.3 * (1 / (1 + abs(rank)))` | `src/db/git-history.ts:211-214`, `src/tools/git-history-tools.ts:86` |
+| Found by both | `0.7 * vectorScore + 0.3 * textScore` | `src/tools/git-history-tools.ts:84` |
 
-- Commit appears in both legs: `score = 0.7 * vecScore + 0.3 * txtScore`.
-- Commit appears only in FTS: `score = 0.3 * txtScore` (vector score
-  treated as 0).
-- Commit appears only in the vector leg: keeps its `vecScore` as-is
-  (the FTS branch is what does the rewrite)
-  (`src/tools/git-history-tools.ts:78-88`).
-
-## Empty-index hint
-
-The status check at `src/tools/git-history-tools.ts:58-66` is the only
-branch in this tool that explicitly tells the caller *how* to populate
-the data: `index_files()` triggers the full indexing pipeline (which
-includes history indexing when the config enables it), and
-`mimirs history index` is the CLI that does only history. This is
-intentional: a brand-new mimirs project will have an empty
-`git_commits` table and an unhelpful "no results" message would be
-misleading.
+The 70/30 weight is a constant in the handler, `HYBRID_WEIGHT = 0.7`
+(`src/tools/git-history-tools.ts:76`); it is not the configurable
+`hybridWeight` used by code search.
 
 ## Branches and failure cases
 
-- Empty git index: short-circuit with the "Run `index_files()` ..."
-  hint (`src/tools/git-history-tools.ts:59-66`).
-- No matches after merge + threshold: returns "No commits found
-  matching ..." with the query and optional author echoed back
-  (`src/tools/git-history-tools.ts:95-102`).
-- Filters are applied at the SQL layer (vector and FTS each), so the
-  hybrid merge sees an already-filtered candidate set; a commit that
-  matches the query but fails an author/date/path filter never enters
-  the score map.
+- **No history indexed.** A zero `totalCommits` from `getGitHistoryStatus()`
+  returns the indexing hint and runs no search
+  (`src/tools/git-history-tools.ts:58-66`).
+- **No matches after filtering.** When merging and filtering leave an empty
+  list, the no-match message is returned, naming the author filter when
+  present (`src/tools/git-history-tools.ts:95-101`).
+- **Filters set.** When any of `author`/`since`/`until`/`path` is provided,
+  each search over-fetches `topK * 5` rows (instead of `topK * 2`) and applies
+  the filters in code afterward, so a narrow filter still has candidates to
+  fill `top` (`src/db/git-history.ts:163`, `src/db/git-history.ts:198`,
+  `src/db/git-history.ts:137-152`).
+- **Threshold.** Commits whose blended score is below `threshold` are dropped
+  before sorting; with the default `0` nothing is dropped
+  (`src/tools/git-history-tools.ts:91`).
+- **Date comparison is lexical.** `since`/`until` compare the stored ISO
+  `date` string directly, so they assume ISO-8601 input
+  (`src/db/git-history.ts:147-148`).
+- **Author / path matching is substring.** Both use `includes`, so a partial
+  name or path fragment matches (`src/db/git-history.ts:145-149`).
 
 ## Example
 
+Example arguments:
+
 ```json
 {
-  "query": "switch from local llama to sentence-transformers",
+  "query": "why did we add the index lock",
   "top": 5,
-  "author": "alice",
-  "since": "2025-01-01",
-  "path": "src/embeddings"
+  "author": "winci",
+  "since": "2026-01-01"
 }
 ```
 
-Response shape (illustrative):
+Illustrative output (values synthetic):
 
 ```
-## Results for "switch from local llama to sentence-transformers" (3 commits, 412 indexed)
+## Results for "why did we add the index lock" (2 commits, 412 indexed)
 
-1. **<commit-sha>** (0.81) — 2025-03-14 — @alice
-   feat: replace ollama embedder with all-minilm transformers backend
-   Files: src/example/embed.ts, src/example/config.ts +1 more (+220 -84)
+1. **<short-sha>** (0.82) — 2026-02-14 — @winci
+   fix: guard concurrent indexing with a file lock
+   Files: src/indexing/indexer.ts, src/server/index.ts (+64 -12)
 
-2. **<commit-sha>** (0.46) — 2025-03-21 — @alice
-   fix: tokenizer init for non-bge models
-   Files: src/example/embed.ts (+12 -3)
+2. **<short-sha>** (0.55) — 2026-02-10 — @winci [merge]
+   Merge branch 'locking'
+   Files: src/indexing/lock.ts +3 more (+120 -4)
 ```
-
-## Related flows
-
-- `file_history` — exposed by the same `registerGitHistoryTools` entry
-  point; returns commits that touched a specific file, sorted by date
-  rather than by relevance (`src/tools/git-history-tools.ts:111-142`).
-- `cli/history` — CLI counterpart for backfilling and inspecting the
-  git history index.
 
 ## Key source files
 
-- `src/tools/git-history-tools.ts` — handler, scoring constants, output
-  format.
-- `src/embeddings/embed.ts` — `embed(query)` used by the vector leg.
-- `src/db/git-history.ts` — `searchGitCommits`, `textSearchGitCommits`,
-  `getGitHistoryStatus` SQL.
-- `src/db/index.ts` — `RagDB.searchGitCommits` /
-  `RagDB.textSearchGitCommits` thin wrappers.
+- `src/tools/git-history-tools.ts` — the MCP handler: empty-index check,
+  hybrid merge with the 0.7 weight, threshold, and commit formatting.
+- `src/db/git-history.ts` — `searchGitCommits` (vector), `textSearchGitCommits`
+  (FTS), `applyFilters`, and `getGitHistoryStatus`.
+- `src/embeddings/embed.ts` — `embed` turns the query string into a vector.
+- `src/db/index.ts` — `RagDB` wraps these git-history database operations.
+
+## Related flows
+
+- [file_history](file-history.md) — the sibling tool in the same file that
+  lists commits touching one file, sorted by date rather than relevance.
+- [cli/history](../cli/history.md) — indexes the commit rows this tool reads.

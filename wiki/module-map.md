@@ -1,93 +1,71 @@
 # Module map
 
-This page is for someone trying to figure out where to put a new feature or follow an import. It maps the top-level directories under `src/`, says what each owns, and names the boundaries that must not be crossed.
+This page is for anyone deciding which directory a change belongs in. It lays out the top-level folders under `src/`, what each one is responsible for, and — most importantly — the direction imports are allowed to flow between them. mimirs has a layered shape: two entry layers (the CLI and the MCP server) sit on top of a service layer, which sits on top of a storage-and-utilities foundation. Keeping changes on the right side of those boundaries is what keeps the codebase from tangling.
 
-## The directories at a glance
+## The layers and their direction
+
+The dependency rule is one-directional: **entry points depend on services, services depend on storage + embeddings + utils, and the foundation depends on nobody above it.** A handler should never be imported by a service; the database layer should never import a tool or a CLI command.
 
 ```mermaid
-flowchart TB
-  CLI[cli/] --> Config[config/]
-  CLI --> Indexing[indexing/]
-  CLI --> Search[search/]
-  CLI --> DB[(db/)]
-  ServerDir[server/] --> Tools[tools/]
-  ServerDir --> Indexing
-  ServerDir --> Watcher[indexing/watcher]
-  ServerDir --> Conversation[conversation/]
-  ServerDir --> Config
-  ServerDir --> Utils[utils/]
-  Tools --> DB
-  Tools --> Search
-  Tools --> Indexing
-  Tools --> GraphMod[graph/]
-  Tools --> Conversation
-  Tools --> GitMod[git/]
-  Tools --> WikiMod[wiki/]
-  Indexing --> DB
-  Indexing --> Embeddings[embeddings/]
-  Indexing --> GraphMod
-  Search --> DB
-  Search --> Embeddings
-  GraphMod --> DB
-  Conversation --> DB
-  Conversation --> Embeddings
-  GitMod --> DB
-  GitMod --> Embeddings
-  WikiMod --> DB
-  WikiMod --> Search
+graph TD
+  subgraph entry[Entry layer]
+    cli[cli/ — argv router]
+    server[server/ — MCP boot]
+    tools[tools/ — MCP handlers]
+  end
+  subgraph services[Service layer]
+    indexing[indexing/]
+    search[search/]
+    graph_pkg[graph/]
+    conversation[conversation/]
+    git[git/]
+    wiki[wiki/]
+  end
+  subgraph foundation[Foundation]
+    db[db/ — RagDB]
+    embeddings[embeddings/]
+    config[config/]
+    utils[utils/]
+  end
+  cli --> tools
+  cli --> services
+  server --> tools
+  server --> services
+  tools --> services
+  tools --> db
+  services --> db
+  services --> embeddings
+  services --> utils
+  indexing --> graph_pkg
+  db --> embeddings
 ```
 
-`cli/` and `server/` are entry-point packages. `tools/`, `indexing/`, `search/`, `graph/`, `conversation/`, `git/`, and `wiki/` are services. `db/`, `embeddings/`, `config/`, and `utils/` are leaves — they have no upstream dependency on a service or entry point.
+## Entry layer: cli/, server/, tools/
 
-## Entry points: cli/ and server/
+There are two front doors and they share their handlers. `src/cli/index.ts` is the argv router: its `main` function reads `command` and dispatches to one command module per subcommand — `serve`, `init`, `index`, `search`, `read`, `status`, `remove`, `analytics`, `map`, `history`, `checkpoint`, and the rest (`src/cli/index.ts:85-139`). Each command module under `src/cli/commands/` opens its own `RagDB` and calls service functions directly. `src/server/index.ts` is the other door: `startServer` builds an `McpServer`, hands it to `registerAllTools`, and connects a stdio transport (`src/server/index.ts:88-207`).
 
-`src/cli/index.ts:85-159` is the `mimirs` shell dispatcher: a giant `switch` on `args[0]` that delegates to a per-command module under `src/cli/commands/`. Every command file opens its own `RagDB`, calls `loadConfig`, and either runs a one-shot job or prints a result. The `serve` command is special — it dynamically imports the server module so a native-dep failure on Apple Silicon's SQLite still leaves `mimirs doctor` working (`src/cli/index.ts:16-18`, `src/cli/commands/serve.ts:12-49`).
+Both doors share the `src/tools/` layer through one contract. The MCP server registers every tool family from `registerAllTools` (`src/tools/index.ts:39-56`), and every handler resolves its target project through `resolveProject`, which validates the directory, loads config, applies the embedding config, and returns `{ projectDir, db, config }` (`src/tools/index.ts:21-37`). That shared resolution is *why* the server and CLI can expose the same capability without duplicating project setup: a tool handler and the matching CLI command both end up calling the same service with the same `RagDB`. The seam to add an MCP tool is one import plus one `registerXTools(...)` call in `registerAllTools`; to add a CLI command, one `case` in the `main` switch plus a command module. See [mimirs serve](server/start.md) and [index_files](tools/index-files.md).
 
-`src/server/index.ts` is the long-running MCP process. It depends on `src/tools/index.ts:1-16` for tool registration and on `src/indexing/indexer.ts`, `src/indexing/watcher.ts`, and `src/conversation/indexer.ts` for background work. The server is the only thing in the project that does signal handling, status-file writes, and the index-lock dance — those concerns are not shared with the CLI.
+## Service layer: indexing, search, graph, conversation, git, wiki
 
-See [mimirs serve](cli/serve.md) and [mimirs init](cli/init.md) for two flows that exercise this split.
+The services do the real work and are called by both entry layers. `src/indexing/` turns files into rows: `indexDirectory` and `indexFile` scan, chunk, parse, embed, and upsert (`src/indexing/indexer.ts:681-695`). It is the most-imported service — server boot, the `index_files` handler, several CLI commands, and benchmarks all call it. `src/search/` ranks: `search` and `searchChunks` run hybrid vector + full-text retrieval (`src/search/hybrid.ts:313-397`). `src/graph/` resolves the import/symbol graph that indexing populates; `src/conversation/` parses and indexes session JSONL; `src/git/` parses and indexes commit history.
 
-## The tools surface
+These services are siblings, not a chain — with one deliberate exception. The indexer imports the graph resolver (`src/indexing/indexer.ts:3` region, where `graph/resolver.ts` is among its imports) because resolving imports is part of building the index. The search service does *not* import the indexer; it reads the graph the indexer already wrote, straight from the database (`src/search/hybrid.ts:301-311`). Keep that boundary: cross-service coupling belongs at write time (indexing computes the graph) not at read time (search consumes it). The [search](tools/search.md) flow shows the read side.
 
-`src/tools/index.ts` is the only thing the server imports from `tools/`. It exposes two contracts:
+## Foundation: db, embeddings, config, utils
 
-- `resolveProject(directory, getDB)` (`src/tools/index.ts:21-37`) turns an optional `directory` argument into `{ projectDir, db, config }`. Every tool handler calls this on its way in. It centralizes path resolution, config loading, and embedding-model activation, so individual tool files don't reimplement it. This is also why the same tool can be used by the server on behalf of an editor and by a CLI command on behalf of a human — `resolveProject` doesn't care about the caller.
-- `registerAllTools(server, getDB, getConnectedDBs, writeStatus)` (`src/tools/index.ts:39-56`) wires every per-topic registrar (search, index, graph, conversation, checkpoint, annotation, analytics, git, git-history, server-info, wiki). Adding a new MCP tool means adding a new `registerX` import and one call here.
+The bottom layer is shared by everything above and imports nothing above itself. `src/db/index.ts` exports the `RagDB` class (`src/db/index.ts:89`), which composes the per-concern store modules (`files`, `search`, `graph`, `conversation`, `checkpoints`, `annotations`, `analytics`, `git-history`) and is the single object both doors read and write — its fan-in of more than fifty reflects that every command, tool, service, and test reaches storage through it. `src/embeddings/` owns the model and vector dimension; both `db/` and the indexing and search services depend on it, which is why the embedding model is effectively a project-wide contract rather than a service-local detail. `src/config/` loads and validates the per-project config consumed by `resolveProject`. `src/utils/` holds the leaf helpers — the process-level index lock (`src/utils/index-lock.ts`), path normalization, the home-directory guard, and logging — that any layer may call.
 
-See [server_info](tools/server-info.md) and [search](tools/search.md) for two handlers that use the same `resolveProject` pattern.
+## The wiki module as a self-contained sub-pipeline
 
-## Services: indexing, search, graph, conversation, git, wiki
-
-Each service directory owns one capability and is reachable through `RagDB`:
-
-- `src/indexing/indexer.ts:695-799` exports `indexDirectory`, which walks the include globs, hashes each file, calls the chunker and embedder, writes rows through `RagDB`, and resolves the graph at the end. `indexFile` (`src/indexing/indexer.ts:682-693`) is the single-file variant the watcher calls.
-- `src/indexing/watcher.ts` watches the project dir for changes and re-runs `indexFile` plus graph resolution. It only ever runs in the lock-holding server.
-- `src/search/hybrid.ts:313-397` is the hybrid vector + FTS pipeline used by both the `search` tool and the `mimirs search` CLI.
-- `src/graph/resolver.ts` walks `file_imports` and rewrites them with resolved file ids; it's called by both `indexDirectory` (after a full pass) and the watcher (after a single-file pass).
-- `src/conversation/` reads Claude Code's session JSONL files and indexes turns.
-- `src/git/indexer.ts` walks `git log` output and writes commit rows plus embeddings.
-
-The wiki module is unusual. `src/wiki/rebuild.ts` is a self-contained sub-pipeline: it owns its own discovery JSON, its own prompt-building code, and its own validators. It depends on `RagDB` for indexed-file content and on `src/search` for retrieval, but nothing in the rest of the codebase imports from `wiki/` except the tool handler at `src/tools/wiki-tools.ts`. The intent is that wiki generation can be ripped out or replaced without touching the indexing or search layers.
-
-## Leaves: db, embeddings, config, utils
-
-`src/db/index.ts:89-845` exposes `RagDB`, a thin class wrapping `bun:sqlite` plus `sqlite-vec`. All schema and migrations live here; everything above goes through these methods rather than running SQL directly. Per-table helpers live in `src/db/files.ts`, `src/db/search.ts`, `src/db/graph.ts`, `src/db/conversation.ts`, `src/db/checkpoints.ts`, `src/db/annotations.ts`, `src/db/analytics.ts`, and `src/db/git-history.ts`; `RagDB` is the facade.
-
-`src/embeddings/embed.ts` is a process-level singleton model loader. Services depend on it directly. Configuration of model id and dim happens once per `resolveProject` via `applyEmbeddingConfig` in `src/config/index.ts:166-170`.
-
-`src/config/index.ts:131-160` owns the on-disk `.mimirs/config.json`: parsing, defaults, validation, and embedding-config application. See [Configuration](configuration.md) for the surface this module presents.
-
-`src/utils/` holds things that don't belong to one service: `index-lock.ts` (process lock), `dir-guard.ts` (refuses to index `$HOME` or `/`), `log.ts` (structured log levels), and `path.ts` (normalized slash handling for cross-platform globs).
-
-## Why the imports flow one way
-
-Every service depends on `src/db/index.ts` and (if it deals with vectors) on `src/embeddings/embed.ts`. Tool handlers depend on services. The server depends on tools and on the indexer/watcher directly (because it owns the lifecycle of background indexing). The CLI depends on services directly (because each command is a one-shot job, not a long-lived process). Nothing in `db/`, `embeddings/`, `config/`, or `utils/` imports from a service — the leaves stay unaware of which entry point opened them, which is what lets the test suite and the benchmark scripts construct a `RagDB` directly without going through either front door.
+`src/wiki/` is its own corner of the codebase rather than a peer service. It is a single module, `src/wiki/rebuild.ts`, which defines the entire wiki rebuild workflow and its data shapes — the prefetch, planning, and page structures all live there (`src/wiki/rebuild.ts:9-86`). It depends only on the foundation: it imports `RagDB` and `AnnotationRow` from the database and `normalizePath` from utils, and nothing else from the service layer (`src/wiki/rebuild.ts:4-5`). It is reached through exactly one thin handler, `src/tools/wiki-tools.ts`, which calls `runWikiRebuild` (`src/tools/wiki-tools.ts:3`). That isolation is intentional: the wiki sub-pipeline can be changed without touching indexing, search, or the graph, and it reuses the same `RagDB` the rest of the system already maintains rather than building its own store.
 
 ## Key source files
 
-- `src/cli/index.ts` — top-level CLI command switch.
-- `src/server/index.ts` — MCP server process and its lifecycle.
-- `src/tools/index.ts` — tool registration and the `resolveProject` contract.
-- `src/indexing/indexer.ts` — `indexDirectory` and `indexFile`, the writer for `files`/`chunks`/graph rows.
-- `src/search/hybrid.ts` — hybrid search service used by both front doors.
-- `src/db/index.ts` — `RagDB` facade over SQLite with the full schema.
+- `src/cli/index.ts` — the argv router (`main`) that dispatches each subcommand to a `commands/` module; the CLI front door.
+- `src/server/index.ts` — `startServer`; the MCP front door that registers tools and runs background services.
+- `src/tools/index.ts` — `registerAllTools` and `resolveProject`; the shared seam that lets the server and CLI use the same handlers and project setup.
+- `src/indexing/indexer.ts` — `indexDirectory`/`indexFile`; the central indexing service and the one place a service imports the graph layer.
+- `src/search/hybrid.ts` — `search`/`searchChunks`; the ranking service that reads the graph from storage instead of importing the indexer.
+- `src/db/index.ts` — `RagDB`; the foundation store every layer depends on, importing only embeddings and its own store modules.
+- `src/wiki/rebuild.ts` — the self-contained wiki rebuild sub-pipeline, depending only on the database and utils.

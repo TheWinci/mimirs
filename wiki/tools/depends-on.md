@@ -1,115 +1,105 @@
 # Tool: depends_on
 
-`depends_on` lists the resolved files that one file imports. It reads the
-`file_imports` table directly so the answer reflects what the indexer
-resolved, not what a regex over import lines would suggest. Use it when you
-want to know what a single file relies on without scanning the file by hand
-or building the whole project map.
+`depends_on` lists the files a given file imports — its outgoing, resolved dependencies. You give it one file, and it returns every other indexed file that file pulls in, along with the raw import source string from the code. It answers "what does this file rely on?" and is the inverse of [depended_on_by](../tools/depended-on-by.md), which answers "what relies on this file?".
 
-It is the outbound direction of the import graph. `depended_on_by` is the
-inverse — same DB, opposite edge.
+It reads from the import edges recorded during indexing rather than re-parsing the file, so it reflects the *resolved* graph: only imports that point at another file already in the index appear. The handler is registered in `registerGraphTools` (`src/tools/graph-tools.ts:109-140`); the query lives in `getDependsOn` (`src/db/graph.ts:966-975`).
 
-## Flow
+## How it works
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Caller as MCP caller
+    participant Caller
     participant Handler as depends_on handler
     participant DB as RagDB
-    participant Imports as file_imports table
-    Caller->>Handler: { file, directory? }
-    Handler->>Handler: resolveProject(directory)
-    Handler->>DB: getFileByPath(resolve(projectDir, file))
-    alt file not in index
-        DB-->>Handler: undefined
-        Handler-->>Caller: "File \"{file}\" not found in index."
+    participant Graph as getDependsOn query
+
+    Caller->>Handler: file, directory?
+    Handler->>Handler: resolve file to absolute path
+    Handler->>DB: getFileByPath(absPath)
+    alt file not indexed
+        DB-->>Handler: null
+        Handler-->>Caller: "File not found in index"
     else file present
-        Handler->>DB: getDependsOn(fileRecord.id)
-        DB->>Imports: SELECT f.path, fi.source WHERE fi.file_id = ? AND fi.resolved_file_id IS NOT NULL
-        Imports-->>DB: rows
-        alt no deps
-            DB-->>Handler: []
-            Handler-->>Caller: "{file} has no indexed dependencies."
-        else has deps
-            DB-->>Handler: rows
-            Handler-->>Caller: "{file} depends on N files:" + per-row "  {rel}  (import: {source})"
+        DB-->>Handler: file record (id)
+        Handler->>Graph: getDependsOn(fileId)
+        Graph-->>Handler: resolved imports (path, source)
+        alt no dependencies
+            Handler-->>Caller: "has no indexed dependencies"
+        else has dependencies
+            Handler-->>Caller: list of relative paths + import source
         end
     end
 ```
 
-1. The caller passes a project-relative `file` and an optional `directory`.
-   The handler resolves both and opens the DB
-   (`src/tools/graph-tools.ts:109-120`).
-2. The path is resolved against the project root and looked up via
-   `getFileByPath` (`src/tools/graph-tools.ts:122-126`).
-3. Missing rows return an explanatory "not found in index" message — useful
-   feedback when the path is a typo or the file is excluded by config.
-4. With a row, `getDependsOn(fileId)` runs the dependency query: a join
-   against `files` where `file_imports.file_id = ?` and `resolved_file_id IS
-   NOT NULL` (`src/db/graph.ts:965-975`).
-5. Empty results return a "no indexed dependencies" message — common for
-   leaf files like type-only modules.
-6. Non-empty results are formatted one per line as `  {relativePath}  (import:
-   {source})`. The `source` field is the literal import specifier from the
-   source code (e.g. `./utils/log`), preserved on the `file_imports` row.
+1. The caller passes a `file` path (relative to the project) and an optional `directory`. The handler resolves the project and database via `resolveProject` (`src/tools/graph-tools.ts:119-120`).
+2. The handler joins the project directory with the supplied `file` to form an absolute path and looks up the file's index row with `getFileByPath` (`src/tools/graph-tools.ts:122-123`).
+3. If no row exists, the file is not in the index and the handler returns `File "<file>" not found in index.` (`src/tools/graph-tools.ts:124-126`).
+4. Otherwise it calls `getDependsOn` with the file's id. That query reads the `file_imports` table, joining each import to the `files` row it resolves to, and returns the imported file's `path` plus the original `source` string. It only includes rows whose `resolved_file_id IS NOT NULL` — that is, imports that were successfully matched to another indexed file (`src/db/graph.ts:966-975`).
+5. If the file imports nothing resolvable, the handler returns `<file> has no indexed dependencies.` (`src/tools/graph-tools.ts:129-131`).
+6. Otherwise it formats one line per dependency: the dependency path made relative to the project, followed by the import source string in parentheses (`src/tools/graph-tools.ts:133-138`).
 
 ## Inputs
 
-| Name | Type | Required | Description |
+| name | type | required | description |
 | --- | --- | --- | --- |
-| `file` | string | yes | Path relative to the project root. The handler `resolve`s it against `projectDir` before looking up the row (`src/tools/graph-tools.ts:122`). |
-| `directory` | string | no | Project directory. Defaults to `RAG_PROJECT_DIR` or cwd. |
+| `file` | string | yes | File path relative to the project root. It is joined to the resolved project directory and looked up by absolute path (`src/tools/graph-tools.ts:113`, `src/tools/graph-tools.ts:122-123`). |
+| `directory` | string | no | Project directory. Defaults to the `RAG_PROJECT_DIR` environment variable, then the current working directory (`src/tools/graph-tools.ts:114-117`). |
 
 ## Outputs
 
-| Output | Shape |
+| output | where it lands / shape / description |
 | --- | --- |
-| Text response | Header `{file} depends on N file(s):` then one line per dependency: `  {relPath}  (import: {importSource})`. |
-| Empty / missing branches | Single-line message: `File "{file}" not found in index.` or `{file} has no indexed dependencies.` |
+| Dependency list | MCP text content. A header line states how many files the target depends on, followed by one indented line per dependency: the dependency path relative to the project and the import source string, formatted as `  <path>  (import: <source>)` (`src/tools/graph-tools.ts:133-136`). |
+| File-not-found message | When the target file is not indexed, a single line: `File "<file>" not found in index.` (`src/tools/graph-tools.ts:125`). |
+| No-dependencies message | When the file resolves no imports, a single line: `<file> has no indexed dependencies.` (`src/tools/graph-tools.ts:130`). |
 
-Each row in the underlying query carries `{ path, source }` — the resolved
-target file's path and the original import specifier. The relative path is
-computed against `projectDir` for display (`src/tools/graph-tools.ts:135`).
+The `source` value is the import specifier exactly as written in the code (for example `../db/index` or `zod`), preserved from indexing. This tool only reads — it changes no state.
 
 ## Edge data: the import source string
 
-The `source` column on `file_imports` is the literal specifier from the
-source file — `./utils/log`, `path`, `../db/index`, etc. — copied in as the
-indexer parsed it. The resolver attaches a `resolved_file_id` when the
-specifier maps to another indexed file (`src/graph/resolver.ts:23-61`).
-`depends_on` only returns rows where this id is non-null, so external
-packages like `path`, `zod`, or any unresolved relative import are filtered
-out. The result is the strict in-project edge set.
+Each returned edge carries two fields from the `file_imports` table: the resolved target file (joined via `resolved_file_id` to `files.path`) and the `source` string. The `source` is the literal module specifier the importing file used. It is useful because the resolved path tells you *which* file is depended on, while the source tells you *how* the import was written — handy for spotting relative-vs-aliased imports or confirming that two edges with different specifiers resolve to the same file (`src/db/graph.ts:969-972`).
 
-This is also why `depends_on` and `depended_on_by` form clean inverses: both
-filter on the same `resolved_file_id IS NOT NULL` predicate, just on
-opposite sides of the join (`src/db/graph.ts:965-987`).
+## depends_on vs depended_on_by
+
+Both tools query the same `file_imports` table; they differ only in which side of the edge they pivot on.
+
+| | depends_on | depended_on_by |
+| --- | --- | --- |
+| Question answered | What does this file import? | What imports this file? |
+| Direction | Outgoing edges | Incoming edges |
+| Query pivot | `WHERE fi.file_id = ?`, join on `resolved_file_id` | `WHERE fi.resolved_file_id = ?`, join on `file_id` |
+| Source location | `src/db/graph.ts:966-975` | `src/db/graph.ts:978-987` |
+| Use it to | Understand a file's own requirements | Gauge the blast radius before changing a file |
 
 ## Branches and failure cases
 
-- **File not in index.** Returns `File "{file}" not found in index.` and
-  exits. The path is resolved against `projectDir` first, so absolute paths
-  work too as long as they match a stored row (`src/tools/graph-tools.ts:122-126`).
-- **No resolved dependencies.** Returns `{file} has no indexed dependencies.`
-  This is the expected output for type-only files, config files with only
-  external imports, or files whose imports the resolver could not pin to an
-  indexed file.
-- **External imports only.** Treated the same as "no indexed dependencies"
-  — the resolver only emits edges for in-project files.
+| Condition | Behavior |
+| --- | --- |
+| File not in index | Returns `File "<file>" not found in index.` before any graph query (`src/tools/graph-tools.ts:124-126`). |
+| File has no resolved imports | Returns `<file> has no indexed dependencies.` — this also happens when every import points at an external package or an unindexed file, since unresolved edges are excluded (`src/tools/graph-tools.ts:129-131`, `src/db/graph.ts:972`). |
+| File has resolved imports | Lists each, count in the header pluralized correctly (`src/tools/graph-tools.ts:133`). |
+| Unresolved imports | Never appear: the query requires `resolved_file_id IS NOT NULL`, so imports of third-party modules or files outside the index are silently omitted (`src/db/graph.ts:972`). |
+| Stale index | Edges reflect the last index run. Imports added or removed since then show only after [index_files](../tools/index-files.md) re-runs and re-resolves the graph. |
 
 ## Example
 
+List what a file depends on in the current project:
+
+```json
+{ "file": "src/tools/graph-tools.ts" }
+```
+
+In a specific project:
+
 ```json
 {
-  "tool": "depends_on",
-  "arguments": {
-    "file": "src/tools/graph-tools.ts"
-  }
+  "file": "src/server/index.ts",
+  "directory": "/Users/example/repos/myproject"
 }
 ```
 
-Illustrative response:
+A successful response is shaped like:
 
 ```
 src/tools/graph-tools.ts depends on 2 files:
@@ -120,15 +110,11 @@ src/tools/graph-tools.ts depends on 2 files:
 
 ## Key source files
 
-- `src/tools/graph-tools.ts` — MCP handler, lookup and formatting.
-- `src/db/graph.ts` — `getDependsOn` query joining `file_imports` to
-  `files`.
-- `src/graph/resolver.ts` — populates `resolved_file_id` on
-  `file_imports`; this tool only sees rows where the resolver succeeded.
+- `src/tools/graph-tools.ts` — registers `depends_on`, resolves the file, and formats the output.
+- `src/db/index.ts` — `RagDB.getFileByPath` and `RagDB.getDependsOn` delegate to the file and graph stores.
+- `src/db/graph.ts` — `getDependsOn` runs the `file_imports` join that produces the resolved outgoing edges.
 
-## Related flows
+## Related tools
 
-- [Tool: depended_on_by](./depended-on-by.md) — the inverse direction over
-  the same edge table.
-- [Tool: project_map](./project-map.md) — wider view; uses the same edges
-  to render a neighborhood or full graph.
+- [depended_on_by](../tools/depended-on-by.md) is the reverse direction — who imports this file.
+- `project_map` visualizes these edges across many files at once instead of for a single file.

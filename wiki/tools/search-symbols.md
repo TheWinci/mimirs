@@ -1,157 +1,130 @@
 # Tool: search_symbols
 
-The `search_symbols` MCP tool looks up exported symbols by name against
-the pre-built `file_exports` table. Unlike `search`, it is not semantic:
-it walks the symbol index and returns the matching definitions plus
-enrichment data — child count for a class, importer module count for a
-re-export, and a flag noting whether the row is a re-export. Agents use
-it when they already know the name of a function, class, type, or enum
-and want to jump to where it is declared.
+The `search_symbols` MCP tool finds where a named symbol — a function, class, interface, type, or enum — is defined, by name rather than by meaning. When you already know the identifier you are after, this is faster and more precise than semantic search: it looks the name up directly in the persisted export index instead of embedding a query. It can also list every export in the project when you give it no name at all.
 
-When `symbol` is omitted, it switches to "list all exports" mode, which
-is useful for browsing exported APIs by `type`. The handler is at
-`src/tools/search.ts:218-274` and delegates to `searchSymbols` in
-`src/db/search.ts`.
+The handler is registered in `src/tools/search.ts:218-274`. The lookup itself runs in `searchSymbols` in `src/db/search.ts:237-406`.
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Client as "MCP client"
-    participant Handler as "search_symbols handler"
-    participant DB as "RagDB.searchSymbols"
-    participant Exports as "file_exports"
-    participant Chunks as "chunks (for snippet)"
-    participant Imports as "file_imports (refs)"
+## When to use it
 
-    Client->>Handler: tool call (symbol?, type?, exact?, top?)
-    Handler->>Handler: resolveProject(directory)
-    Handler->>DB: searchSymbols(query?, exact, type, topK)
-    DB->>Exports: SELECT exports matching name/type
-    DB->>Chunks: LEFT JOIN best chunk by file_id + name
-    DB->>Imports: SELECT importers of matching files
-    DB->>DB: compose hasChildren, referenceCount, isReexport
-    DB-->>Handler: SymbolResult[]
-    Handler-->>Client: formatted lines + find_usages tip
-```
+Use `search_symbols` when you know the symbol name and want its definition location. Compare it with the neighbouring tools:
 
-1. The client calls `search_symbols` with an optional symbol name, type
-   filter, exact-match flag, and a row cap (`src/tools/search.ts:222-245`).
-2. `resolveProject` opens the right project DB
-   (`src/tools/search.ts:247`).
-3. `ragDb.searchSymbols(symbol, exact ?? false, type, top)` runs against
-   `file_exports`. When `symbol` is missing, the function takes the
-   "listing" branch with a default cap of 200; when present, the default
-   cap is 20 (`src/tools/search.ts:249`,
-   `src/db/search.ts` — `isListing = !query`).
-4. The query pulls the matching `file_exports` rows together with their
-   `path`, `name`, `type`, and `is_reexport` flag, then joins to `chunks`
-   on `(file_id, lower(entity_name))` to pick up a snippet for the result
-   (`src/db/search.ts:357-406`).
-5. A second pass aggregates `file_imports` to count distinct importer
-   files and distinct importer module dirs (basename of each importer's
-   parent directory) (`src/db/search.ts:357-406`).
-6. Each row is returned with `hasChildren`, `childCount`,
-   `referenceCount`, `referenceModuleCount`, `referenceModules`, and
-   `isReexport` populated.
-7. The handler prints `path  •  symbolName (type, N children, M refs / K
-   modules, re-export)` for each result and truncates the snippet to 300
-   characters (`src/tools/search.ts:258-267`).
-8. The footer suggests `find_usages("<topSymbol>")` for follow-up
-   exploration (`src/tools/search.ts:269-270`).
+| tool | answers | matched by |
+| --- | --- | --- |
+| `search_symbols` | "where is `RagDB` defined?" | exact or substring of the export name |
+| [search](search.md) | "where does X happen?" | semantic + keyword over file content |
+| [find_usages](find-usages.md) | "who calls `RagDB`?" | call sites, not the definition |
+
+The footer of every result nudges toward `find_usages` and `read_relevant` as natural next steps `src/tools/search.ts:269-270`.
 
 ## Inputs
 
-- `symbol` — optional name (1–200 chars). Omit to switch to listing mode
-  (`src/tools/search.ts:222-226`).
-- `exact` — optional boolean. Defaults to `false`, i.e. substring match
-  on the lowercased name (`src/tools/search.ts:227-230`,
-  `src/tools/search.ts:249`).
-- `type` — optional enum:
-  `function | class | interface | type | enum | export`. Filters the
-  result set by `file_exports.type` (`src/tools/search.ts:231-234`).
-- `top` — optional positive integer. Defaults vary by mode: 20 when
-  searching, 200 when listing (`src/tools/search.ts:239-244`,
-  default applied inside `searchSymbols`).
-- `directory` — optional project root override
-  (`src/tools/search.ts:235-238`).
+| name | type | required | description |
+| --- | --- | --- | --- |
+| `symbol` | string (≤200 chars) | no | Symbol name to look up. Omit to list all exports. |
+| `exact` | boolean | no | Require an exact (case-insensitive) name match. Defaults to false, which does a substring match. |
+| `type` | enum | no | Restrict to one kind: `function`, `class`, `interface`, `type`, `enum`, or `export`. |
+| `top` | integer (≥1) | no | Max results. Defaults to 20 when a name is given, 200 when listing. |
+| `directory` | string | no | Which project to query. Defaults to `RAG_PROJECT_DIR` or the cwd. |
+
+There are no path filters here — this tool queries the symbol table, not file content. The handler forwards the params straight to `ragDb.searchSymbols(symbol, exact ?? false, type, top)` `src/tools/search.ts:249`.
 
 ## Outputs
 
-- Text content with one block per symbol:
-  `path  •  name (type, N children, M refs, K modules, re-export?)`
-  optionally followed by a 300-char snippet of the defining chunk
-  (`src/tools/search.ts:258-267`).
-- A trailing tip pointing at `find_usages` with the top symbol pre-filled
-  (`src/tools/search.ts:269-270`).
-- No side effects on the DB: this is a pure read path.
+| output | where it lands / shape / description |
+| --- | --- |
+| Symbol matches | A single MCP text block. One entry per match: `path • symbolName (metadata)` plus a snippet of the definition truncated to 300 chars, joined by `---` separators. A footer suggests `find_usages` / `read_relevant` on the first match. |
+| Empty-result message | When nothing matches, a text block such as `No exported symbols matching "..." found.` |
 
-## Enrichment fields
+Each entry's metadata is assembled from the enrichment fields described below `src/tools/search.ts:258-267`.
 
-- `hasChildren` / `childCount` — set when the joined chunk has child
-  chunks in the parent-id index. For a class export, this signals that
-  it has methods you can drill into (`src/db/search.ts:357-406`).
-- `referenceCount` — number of distinct importer **files**, computed
-  from `file_imports.resolved_file_id` matching the symbol's defining
-  file (`src/db/search.ts:357-406`).
-- `referenceModuleCount` / `referenceModules` — distinct importer
-  directories (parent of importer file), useful for spotting symbols
-  imported by many subsystems vs by a single subsystem.
-- `isReexport` — true when the row in `file_exports` has
-  `is_reexport = 1`; the symbol is re-exported from another file, not
-  defined locally (`src/db/search.ts:357-406`).
+## How a lookup runs
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Caller
+  participant Handler as search_symbols handler<br>(src/tools/search.ts)
+  participant DB as RagDB.searchSymbols<br>(src/db/search.ts)
+  Caller->>Handler: symbol, exact, type, top
+  Handler->>Handler: resolveProject
+  Handler->>DB: searchSymbols(symbol, exact, type, top)
+  DB->>DB: base query over file_exports + files
+  DB->>DB: batch-load chunks, child counts, refs
+  DB->>DB: compose enrichment per row
+  DB-->>Handler: SymbolResult[]
+  Handler->>Handler: format path • name (metadata) + snippet
+  Handler-->>Caller: results + find_usages tip
+```
+
+1. The handler resolves the project database (config is not needed here) `src/tools/search.ts:247`.
+2. It calls `searchSymbols`, defaulting `exact` to false `src/tools/search.ts:249`.
+3. `searchSymbols` decides listing vs lookup: an empty `query` means "list all", which sets the default limit to 200 instead of 20 `src/db/search.ts:244-245`.
+4. The base query joins `file_exports` to `files` so each export comes with its file path. A name is matched with `LOWER(fe.name) LIKE LOWER(?)` — exact uses the raw string, otherwise it is wrapped in `%...%` for substring matching — and a `type` filter adds `AND fe.type = ?` `src/db/search.ts:253-274`.
+5. Supporting data is batch-loaded with plain `IN` queries rather than per-row subqueries: candidate chunks, child counts, sibling exports, and resolved imports `src/db/search.ts:294-368`. Batches are capped at 499 ids to stay under SQLite's parameter limit `src/db/search.ts:408-423`.
+6. Each base row is composed into a result with its enrichment fields `src/db/search.ts:371-405`.
+7. The handler renders each result and returns the text block `src/tools/search.ts:258-272`.
+
+## List-all-exports mode
+
+When `symbol` is omitted, the tool returns every export, optionally narrowed by `type`. In source this is the `isListing` branch: with no `query` the WHERE clause becomes `WHERE 1=1` (plus any type filter) and the default limit jumps to 200 `src/db/search.ts:244-266`. Results are ordered by symbol name `src/db/search.ts:273`. This is how you enumerate, say, every exported `interface` in a project at once.
+
+## Enrichment data
+
+Beyond the path and name, each result carries metadata computed from the graph tables. The handler surfaces it as the parenthetical after the symbol name `src/tools/search.ts:258-267`:
+
+| field | meaning | how it is computed |
+| --- | --- | --- |
+| `symbolType` | function / class / interface / etc. | the `type` column on `file_exports` `src/db/search.ts:395` |
+| `hasChildren` / `childCount` | the symbol's definition chunk has nested sub-chunks (e.g. methods inside a class) | counts chunks whose `parent_id` is the symbol's definition chunk `src/db/search.ts:313-326`, `375` |
+| `referenceCount` | how many files import this symbol | resolved imports whose name matches and whose target is a file that defines the name `src/db/search.ts:377-385`, `400` |
+| `referenceModuleCount` | how many distinct directories those importers live in | distinct `dirname` of importer paths `src/db/search.ts:386`, `401` |
+| `isReexport` | the export is a re-export, not the original definition | the `is_reexport` column `src/db/search.ts:403` |
+
+In the rendered output these become labels: the type is always shown, `childCount children` appears when there are children, `referenceCount refs, referenceModuleCount modules` appears when there are any references, and `re-export` appears for re-exports `src/tools/search.ts:261-264`. The `snippet`, when present, is the first definition chunk's body, picked as the lowest-`chunk_index` chunk whose `entity_name` matches the symbol `src/db/search.ts:303-311`, `396`.
 
 ## Branches and failure cases
 
-- No matches: returns "No exported symbols ..." with the search
-  filter description (`src/tools/search.ts:251-256`).
-- Listing mode (`symbol` omitted): pages of up to `top ?? 200` symbols,
-  optionally filtered by `type`. The "no results" line drops the
-  `matching "..."` phrase when only `type` is set
-  (`src/tools/search.ts:251-256`).
-- Substring vs exact: with `exact: false`, the SQL uses a
-  `lower(name) LIKE '%query%'`-style filter, so very short queries can
-  match a lot of rows; the `top` cap protects the output.
+- **No matches** — returns text describing the empty filter, e.g. `matching "<symbol>"` when a name was given, or `of type "<type>"` when only a type filter was given `src/tools/search.ts:251-255`.
+- **Substring vs exact** — default is substring (`%query%`); `exact: true` switches to a case-insensitive exact compare `src/db/search.ts:260-263`.
+- **No `symbol`, no `type`** — lists all exports up to the 200 default `src/db/search.ts:244-266`.
+- **`type` without `symbol`** — lists all exports of that kind `src/db/search.ts:264-271`.
+- **`top` omitted** — 20 for a lookup, 200 for a listing `src/db/search.ts:245`.
+- **Base query returns nothing** — `searchSymbols` short-circuits and returns `[]` before any enrichment work `src/db/search.ts:289`.
+- **Symbol has no matching definition chunk** — `snippet` and `chunkIndex` are null, `childCount` is 0, and the entry shows only its type `src/db/search.ts:374-375`, `396-397`.
+
+This tool reads the symbol index; it does not write anything and does not log an analytics row. If the index is empty or stale, run [index_files](index-files.md) first so `file_exports` is populated.
 
 ## Example
 
+Find every class whose name contains "DB":
+
 ```json
 {
-  "symbol": "indexFile",
-  "exact": false,
-  "type": "function",
-  "top": 5
+  "symbol": "DB",
+  "type": "class"
 }
 ```
 
-Response shape (illustrative):
+Illustrative output shape:
 
 ```
-src/example.ts  •  indexFile (function, 12 refs, 4 modules)
-export async function indexFile(path: string, db: RagDB) { ... }
+src/db/index.ts  •  RagDB (class, 60 children, 54 refs, 30 modules)
+export class RagDB { ... }
 
----
-
-src/cli/example.ts  •  indexFiles (function, 3 refs, 2 modules)
-...
-
-── Tip: call find_usages("indexFile") to see all call sites, or read_relevant("indexFile") for full context. ──
+── Tip: call find_usages("RagDB") to see all call sites, or read_relevant("RagDB") for full context. ──
 ```
 
-Listing all `enum` exports:
+List every exported interface in the project:
 
 ```json
-{ "type": "enum", "top": 20 }
+{
+  "type": "interface",
+  "top": 500
+}
 ```
-
-## Related flows
-
-- `find_usages` — same `symbol_refs` substrate, but returns call sites
-  instead of definitions.
-- `search` — semantic search; use when you don't know the symbol name
-  yet.
 
 ## Key source files
 
-- `src/tools/search.ts` — handler, schema, output formatting.
-- `src/db/search.ts` — `searchSymbols` query, enrichment composition.
-- `src/db/index.ts` — `RagDB.searchSymbols` thin wrapper.
+- `src/tools/search.ts` — registers `search_symbols`, formats the metadata line and footer.
+- `src/db/search.ts` — `searchSymbols` runs the export lookup and computes enrichment from the graph tables.
+- `src/db/index.ts` — `RagDB.searchSymbols` is the thin method that delegates into `src/db/search.ts`.
