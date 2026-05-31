@@ -11,6 +11,13 @@ user-invocable: true
 Use the `wiki` MCP tool as the source of truth. This skill is only a workflow
 wrapper; do not invent a separate wiki structure.
 
+The generation prose — discovery rules, the source-first writing contract, the
+self-check, and the per-page prompts (flow, screen, overview) — is served from
+markdown, using packaged defaults unless a project overrides them. To customize
+it for a project, run `wiki(eject)` once: it writes the defaults to
+`.mimirs/wiki/*.md` for you to edit, and a file there overrides the packaged
+default. Edit instructions in `.mimirs/wiki/`, never the generated `wiki/` output.
+
 ## Core Rule
 
 The wiki is flow-first. Create one page for one concrete trigger:

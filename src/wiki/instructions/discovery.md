@@ -1,0 +1,177 @@
+You are discovering wiki flows for this project.
+
+Your job is to create `wiki/_discovery.json`. Do not write final wiki pages yet.
+
+Use the prefetch data and mimirs tools to find real project flows. A flow must have a trigger, a path through code, an observable outcome, and evidence. Do not treat plain helpers, types, config objects, database tables, or folders as flows by themselves.
+
+For each flow, also capture important item state changes. An item is a project-specific thing whose state changes during the flow, such as an order, job, file, index row, cache entry, session, message, or checkpoint. Only record state changes you can support with source evidence.
+
+Granularity rules:
+
+1. Default to one flow and one page per externally triggered behavior.
+2. HTTP routes and API endpoints must be split by concrete method and route, such as `POST /checkout`. Do not create one broad `api`, `endpoints`, or `routes` page.
+3. Messages, events, queue topics, and consumers must be split by concrete message, topic, event, or handler. Do not create one broad `messages`, `events`, or `queues` page.
+4. CLI subcommands, MCP tools, workers, jobs, schedules, webhooks, and server starts each get their own flow and page when they have separate triggers.
+5. Do not create glossary, entity, or generic data-flow pages. The only non-flow pages allowed are the six overview kinds described below.
+6. If many flows share the same files, keep separate pages and connect them with `relatedFlows`; do not merge them into one category page.
+7. Every flow page should have a category `kind`, usually matching the referenced flow kind, such as `tool`, `command`, `route`, `message`, `job`, or `schedule`. Every flow page must have exactly one `flowIds` item. Add `inputs` and `outputs` arrays when they help explain the flow; omit either one when there is no meaningful value.
+8. Frontend UI screens (route components, top-level views mounted by a router or app shell) use kind `screen`. One screen flow per route. User interactions within a screen (button clicks, form submits, mutations) are not separate flows; capture them in the screen flow's `interactions[]` array. Do not create a separate page per interaction.
+9. Detect screens structurally: look for a router or app-shell module that maps URL paths or route ids to component modules, and follow each mapping to its top-level component. Do not assume framework conventions; verify by reading the router and the rendered component.
+
+Start here:
+
+1. Call `wiki(prefetch:metadata)` to understand the generated prefetch.
+2. Call `wiki(prefetch:map)` to inspect the file-level project map.
+3. Use mimirs tools such as `read_relevant`, `search`, `project_map`, `depends_on`, `depended_on_by`, `search_symbols`, and `find_usages` to discover and verify each likely flow.
+4. Use focused reads like `wiki(prefetch:map:<path>)` and `wiki(prefetch:annotations:<path>)` when the full sections are too large.
+
+Discovery coverage checklist:
+
+1. First identify how this project exposes externally triggered behavior. Do not assume the trigger style from generic framework names.
+2. Look for the project's own registration, routing, dispatch, subscription, scheduling, and command patterns. Use filenames, imports, exports, project map centrality, and direct code reads to infer those patterns.
+3. For each trigger family you find, enumerate the concrete triggers from source code before writing discovery. Examples of trigger families include HTTP routes, RPC procedures, message topics, event listeners, CLI subcommands, workers, jobs, schedules, webhooks, MCP tools, and server starts. This list is not exhaustive.
+4. Create one flow per concrete externally triggered behavior, even when several flows share the same handler, service, or files.
+5. Verify each candidate flow by following it from trigger to at least one observable outcome, such as a response, database access, network call, file operation, queue publish, cache update, process start, or scheduled side effect.
+6. Inspect declarative, generated, decorator-based, config-driven, or framework-magic layers directly before deciding coverage is complete.
+7. Do not omit thin wrappers, aliases, or forwarding flows if they are externally callable. Keep them separate and connect them with `relatedFlows`.
+8. If coverage is uncertain, record the uncertainty in `openQuestions` instead of silently skipping the candidate.
+9. For each verified flow, list the concrete items whose state changes. Use `from: null` when the item is created, `to: null` when it is deleted, and plain labels such as `queued`, `indexed`, `written`, `cached`, or `returned` when the code uses implicit states instead of enum values.
+10. When a flow depends on concrete caller-provided values or external conditions, list them in the page `inputs` array. Inputs can be request parameters, command flags, tool arguments, file paths, config values, environment variables, messages, schedules, or user actions. Omit `inputs` when there is no meaningful input.
+11. When a flow has concrete outputs or visible side effects, list them in the page `outputs` array. Outputs can be responses, returned text, written files, database rows, index updates, spawned processes, published messages, logs, or other visible side effects. Do not list inputs as outputs. Omit `outputs` when there is no meaningful output.
+12. Every `mustCover`, `inputs`, and `outputs` item must name behavior, a parameter, a table, or a metric you verified in source during discovery. Do not list a feature, table name, field, or metric you have not confirmed exists. A wrong `mustCover` item is worse than a missing one: it forces the page writer either to repeat the error or to break character correcting it. When in doubt, leave it out and record the uncertainty in `openQuestions`.
+
+Overview pages (second pass):
+
+After you have enumerated every concrete flow, re-read the flow set and evaluate the six overview page kinds below. Emit an overview page only when its trigger fires for this project. At most one page per kind. Overview pages live at the wiki root (e.g. `wiki/architecture.md`), have no `flowIds` requirement, and must cite at least three source files in `primaryFiles`. If a second-pass overview reveals a flow you missed, go back and add the missing flow to `flows[]` before finalizing.
+
+Each overview page must (a) cite at least three source files with line ranges in its body, (b) link to at least two flow pages it ties together, and (c) include one diagram. The diagram requirement is waived only for `overview:configuration`. If you cannot meet these constraints honestly, do not write the page.
+
+The six kinds, with triggers:
+
+- `overview:architecture` — components and how they talk. Trigger: at least two distinct runtime components or process boundaries (e.g. CLI + server, client + worker, app + queue consumer). Slug: `architecture`.
+- `overview:data-model` — persistent state: schemas, files written to disk, cache layout. Trigger: project owns persistent state (SQL/ORM files, embedded DB deps, writes outside tmp). Skip for stateless libraries. Slug: `data-model`.
+- `overview:module-map` — top-level packages/dirs, their responsibilities, and the import boundaries between them. Trigger: at least four top-level source directories with distinct roles. Slug: `module-map`.
+- `overview:runtime-lifecycle` — boot → ready → handle → shutdown, with where state is initialized. Trigger: at least one long-running process (server, daemon, worker). Skip for CLIs that exit per invocation. Slug: `runtime-lifecycle`.
+- `overview:configuration` — env vars, config files, flag precedence. Trigger: configuration surface beyond roughly five knobs, or multi-source precedence (env > file > defaults). No diagram required. Slug: `configuration`.
+- `overview:integrations` — external services the project talks to (databases, APIs, queues, model providers). Trigger: at least two external services or providers. Slug: `integrations`.
+
+Create `wiki/_discovery.json` with this shape:
+
+```json
+{
+  "metadata": {
+    "schemaVersion": {{schemaVersion}},
+    "prefetchCommitHash": "<from prefetch metadata>",
+    "createdAt": "<iso timestamp>"
+  },
+  "flows": [
+    {
+      "id": "<stable-flow-id>",
+      "title": "<human title for one concrete trigger>",
+      "kind": "<route|endpoint|message|consumer|worker|job|schedule|command|tool|screen|server-start|other-flow>",
+      "summary": "<what this one flow does>",
+      "confidence": "<high|medium|low>",
+      "entrypoints": [
+        "<method + route, command, tool name, topic, schedule, or other trigger>"
+      ],
+      "files": [
+        {
+          "path": "<root-relative source path>",
+          "role": "<entrypoint|handler|service|store|other>"
+        }
+      ],
+      "evidence": [
+        {
+          "path": "<root-relative source path>",
+          "startLine": 1,
+          "endLine": 2
+        }
+      ],
+      "stateChanges": [
+        {
+          "item": "<domain item or artifact whose state changes>",
+          "from": "<previous state or null when created>",
+          "to": "<next state or null when deleted>",
+          "trigger": "<code action that causes the change>",
+          "description": "<plain-language explanation of the change>",
+          "files": [
+            {
+              "path": "<root-relative source path>",
+              "role": "<writer|store|publisher|other>"
+            }
+          ],
+          "evidence": [
+            {
+              "path": "<root-relative source path>",
+              "startLine": 1,
+              "endLine": 2
+            }
+          ]
+        }
+      ],
+      "relatedFlows": [
+        "<other-flow-id>"
+      ],
+      "interactions": [
+        {
+          "name": "<short user action label, e.g. submit, delete row, toggle filter>",
+          "trigger": "<concrete UI event, e.g. click on Save button, submit of search form>",
+          "description": "<what the handler does in plain language>",
+          "files": [
+            {
+              "path": "<root-relative source path>",
+              "role": "<handler|mutation|api-call|other>"
+            }
+          ],
+          "evidence": [
+            {
+              "path": "<root-relative source path>",
+              "startLine": 1,
+              "endLine": 2
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "slug": "<category>/<specific-flow-slug>",
+      "title": "<same concrete flow title>",
+      "kind": "<same category as the referenced flow kind, such as tool|command|route|message|job|schedule|screen>",
+      "flowIds": [
+        "<stable-flow-id>"
+      ],
+      "primaryFiles": [
+        "<root-relative source path>"
+      ],
+      "mustCover": [
+        "<important behavior this page must explain>"
+      ],
+      "inputs": [
+        "<optional request parameter, command flag, tool argument, config value, file path, message, schedule, or user action>"
+      ],
+      "outputs": [
+        "<optional response, returned value, persisted artifact, or side effect this page must describe>"
+      ],
+      "openQuestions": []
+    },
+    {
+      "slug": "<one of: architecture|data-model|module-map|runtime-lifecycle|configuration|integrations>",
+      "title": "<human title for the overview>",
+      "kind": "<matching overview:* kind>",
+      "primaryFiles": [
+        "<root-relative source path 1>",
+        "<root-relative source path 2>",
+        "<root-relative source path 3>"
+      ],
+      "mustCover": [
+        "<topic this overview must explain>"
+      ],
+      "openQuestions": []
+    }
+  ]
+}
+```
+
+When `wiki/_discovery.json` is written, call `wiki(validate-discovery)`.

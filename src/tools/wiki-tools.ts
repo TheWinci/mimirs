@@ -18,6 +18,8 @@ const COMMANDS = [
   "write",
   "write:page:<slug>",
   "validate-pages",
+  "eject",
+  "eject:force",
 ];
 
 export function registerWikiTools(server: McpServer, getDB: GetDB) {
