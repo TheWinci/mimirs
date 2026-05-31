@@ -18,6 +18,7 @@ project wiki. Editing them customizes how *this project's* wiki is written.
 - `page-flow.md` — the prompt for a single backend flow page (route, command, tool, message, job).
 - `page-screen.md` — the prompt for a single frontend UI screen page.
 - `page-overview.md` — the prompt for a bird's-eye overview page.
+- `changelog.md` — the prompt for writing one `wiki/CHANGELOG.md` entry (the `changelog` step).
 
 ## Tokens
 
@@ -28,6 +29,8 @@ project wiki. Editing them customizes how *this project's* wiki is written.
   shared blocks live in their own files: edit one, and every page inherits it.
 - `{{slug}}` (in the `page-*.md` files) — the page being written.
 - `{{schemaVersion}}` (in `discovery.md`) — the current discovery schema version.
+- `{{currentCommit}}` / `{{date}}` (in `changelog.md`) — the source commit the
+  wiki was generated from and today's date, for the entry header.
 - `{{kind}}`, `{{kindDescription}}`, `{{diagramGuidance}}`, `{{diagramSelfCheck}}`
   (in `page-overview.md`) — overview pages vary by kind (architecture,
   data-model, configuration, …). These values are chosen in code from the

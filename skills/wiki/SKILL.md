@@ -48,6 +48,7 @@ flows.
 9. For each slug, call `wiki(write:page:<slug>)`.
 10. Write only the assigned page under `wiki/`.
 11. After all page writers finish, call `wiki(validate-pages)` and fix any broken relative `.md` links it reports.
+12. Before committing the updated pages, call `wiki(changelog)` and follow the returned prompt: it diffs the pending `wiki/` changes and has you prepend one entry to `wiki/CHANGELOG.md` — a curated summary of the behavior changes for an incremental update, or a single line for a full regeneration. Then commit the pages and the changelog together.
 
 ## Discovery Shape
 

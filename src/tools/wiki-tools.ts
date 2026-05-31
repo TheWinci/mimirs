@@ -18,6 +18,7 @@ const COMMANDS = [
   "write",
   "write:page:<slug>",
   "validate-pages",
+  "changelog",
   "eject",
   "eject:force",
 ];

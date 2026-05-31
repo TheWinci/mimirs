@@ -174,13 +174,73 @@ function assertSafeSelector(value: string, label: string) {
 }
 
 async function lastCommitHash(projectDir: string): Promise<string | null> {
+  return (await gitOutput(projectDir, ["rev-parse", "HEAD"]))?.trim() || null;
+}
+
+// Runs git and returns stdout (trimmed by callers), or null on any failure —
+// not a git repo, command error, git missing. Callers degrade gracefully.
+async function gitOutput(projectDir: string, args: string[]): Promise<string | null> {
   try {
-    const proc = Bun.spawn(["git", "rev-parse", "HEAD"], { cwd: projectDir, stdout: "pipe", stderr: "pipe" });
-    const output = (await new Response(proc.stdout).text()).trim();
-    return (await proc.exited) === 0 && output ? output : null;
+    const proc = Bun.spawn(["git", ...args], { cwd: projectDir, stdout: "pipe", stderr: "ignore" });
+    const output = await new Response(proc.stdout).text();
+    return (await proc.exited) === 0 ? output : null;
   } catch {
     return null;
   }
+}
+
+// At or above this fraction of pages changing, an update is treated as a full
+// regeneration: the diff is mostly LLM rewording, so it gets a one-line entry
+// instead of a summarized diff.
+const FULL_REGEN_PAGE_FRACTION = 0.6;
+
+function slugFromWikiPath(path: string): string {
+  return normalizePath(path).replace(/^wiki\//, "").replace(/\.md$/, "");
+}
+
+// The pending wiki page changes vs HEAD — run before committing an update.
+// Diffing the working tree needs no remembered baseline commit (it is exactly
+// "this update's changes"), which sidesteps the dropped/rewritten-history
+// problem entirely. JSON state files and the changelog itself are excluded; the
+// diff is gathered only for an incremental update (a full regen gets a one-liner).
+async function pendingWikiChanges(projectDir: string): Promise<{
+  pages: { slug: string; state: "modified" | "added" | "deleted" }[];
+  total: number;
+  fullRegen: boolean;
+  diff: string;
+}> {
+  const status = (await gitOutput(projectDir, ["status", "--porcelain", "--", "wiki"])) ?? "";
+  const pages: { path: string; slug: string; state: "modified" | "added" | "deleted" }[] = [];
+  for (const line of status.split("\n").filter(Boolean)) {
+    const code = line.slice(0, 2);
+    let path = line.slice(3).trim();
+    if (path.includes(" -> ")) path = path.split(" -> ")[1]; // rename: take the new path
+    if (path.startsWith('"') && path.endsWith('"')) path = path.slice(1, -1);
+    if (!path.endsWith(".md") || path.endsWith("CHANGELOG.md")) continue;
+    const state = code.includes("?") || code.includes("A") ? "added" : code.includes("D") ? "deleted" : "modified";
+    pages.push({ path, slug: slugFromWikiPath(path), state });
+  }
+
+  const dir = wikiDir(projectDir);
+  const total = existsSync(dir) ? (await collectMarkdownFiles(dir)).filter((p) => !p.endsWith("CHANGELOG.md")).length : 0;
+  const fullRegen = total > 0 && pages.length / total >= FULL_REGEN_PAGE_FRACTION;
+
+  let diff = "";
+  if (!fullRegen && pages.length) {
+    const parts: string[] = [];
+    const modified = pages.filter((p) => p.state !== "added").map((p) => p.path);
+    if (modified.length) {
+      const out = await gitOutput(projectDir, ["diff", "HEAD", "--", ...modified]);
+      if (out?.trim()) parts.push(out.trim());
+    }
+    for (const added of pages.filter((p) => p.state === "added")) {
+      const content = await readFile(join(projectDir, added.path), "utf-8").catch(() => "");
+      if (content) parts.push(`### New page: ${added.slug}\n\n${content}`);
+    }
+    diff = parts.join("\n\n");
+  }
+
+  return { pages: pages.map(({ slug, state }) => ({ slug, state })), total, fullRegen, diff };
 }
 
 function computePageRank(paths: string[], edges: { fromPath: string; toPath: string }[]): Map<string, number> {
@@ -838,6 +898,7 @@ export async function runWikiRebuild(ctx: WikiContext, input: string): Promise<s
       "page-flow",
       "page-overview",
       "page-screen",
+      "changelog",
     ];
     const written: string[] = [];
     const skipped: string[] = [];
@@ -862,5 +923,36 @@ export async function runWikiRebuild(ctx: WikiContext, input: string): Promise<s
     ].join("\n");
   }
 
-  throw new Error(`Unknown wiki command '${input}'. Try \`shape\`, \`prefetch\`, \`validate-discovery\`, \`discovery\`, \`write\`, \`eject\`, or \`validate-pages\`.`);
+  if (command.mode === "changelog") {
+    const currentFull = await lastCommitHash(ctx.projectDir);
+    const currentCommit = currentFull ? currentFull.slice(0, 7) : "unknown";
+    const date = new Date().toISOString().slice(0, 10);
+    const { pages, total, fullRegen, diff } = await pendingWikiChanges(ctx.projectDir);
+
+    const updateType =
+      pages.length === 0
+        ? "none (no pending wiki changes)"
+        : fullRegen
+          ? `full regeneration (${pages.length} of ${total} pages changed)`
+          : `incremental (${pages.length} page${pages.length === 1 ? "" : "s"} changed)`;
+
+    const prompt = await renderInstruction(ctx.projectDir, "changelog", { currentCommit, date });
+    const signal = [
+      "## Changelog signal",
+      "",
+      `- Stamp: [${currentCommit}] - ${date}`,
+      `- Update type: ${updateType}`,
+      "",
+      "### Changed pages",
+      "",
+      pages.length ? pages.map((p) => `- ${p.slug} (${p.state})`).join("\n") : "(none)",
+      ...(fullRegen || !pages.length
+        ? []
+        : ["", "### Wiki diff (summarize the behavior changes it reveals — ignore rewording)", "", diff || "(empty)"]),
+    ].join("\n");
+
+    return [prompt, "", signal].join("\n");
+  }
+
+  throw new Error(`Unknown wiki command '${input}'. Try \`shape\`, \`prefetch\`, \`validate-discovery\`, \`discovery\`, \`write\`, \`changelog\`, \`eject\`, or \`validate-pages\`.`);
 }
