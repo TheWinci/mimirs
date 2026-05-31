@@ -1,194 +1,182 @@
-# Server: MCP stdio start
+# Start the MCP server
 
-When an editor or agent launches `mimirs serve`, it starts a long-running MCP server that speaks over stdio. That server is what answers tool calls like search, read_relevant, and the rest. This page traces its whole life: how it boots, the order it does startup work in, how it keeps the index fresh while running, and how it shuts down. Everything here lives in `startServer` in `src/server/index.ts:88-387`.
+The `serve` command boots the long-lived process that an editor or agent talks to over stdio. It is the only entry point that turns a project directory into a live MCP endpoint: it registers every tool, answers the MCP handshake, opens the project's SQLite index, and then keeps the index fresh in the background by re-scanning the project and tailing conversation transcripts.
 
-The central design tension is that an MCP client expects a fast `initialize` handshake, but the server also has slow work to do (loading an embedding model, scanning files, indexing). The server resolves this by connecting the transport *first* and doing the slow work *after*, in the background. If it indexed before connecting, the client could time out, close the pipes, and the server's later writes would hit EPIPE (`src/server/index.ts:199-203`).
+The startup path is deliberately ordered so that the slow, fallible work (opening native SQLite, scanning the whole project, loading the embedding model) happens *after* the client is already connected. A boot that crashes still leaves a readable trail: a `.mimirs/status` file recording the phase it reached, and a `.mimirs/server-error.log` with the stack. This page walks the boot from `mimirs serve` to a running watcher, and names every branch that can change the outcome.
 
-## Lifecycle at a glance
+## When you would use it
 
-The server moves through four broad stages: **boot** (register tools, connect transport), **ready** (transport connected, tools answerable), **handle** (serve tool calls while indexing and watching in the background), and **shutdown** (release the lock, close DBs, exit). Each phase is written to a status file so an external client can see where the server is.
+This is what your MCP client (an IDE extension, an agent runtime) actually launches. The generated MCP config runs `mimirs@latest serve` with `RAG_PROJECT_DIR` pointed at the project (`src/cli/setup.ts:222`). You rarely run `mimirs serve` by hand — but when the index seems stale, the tools return errors, or the client reports "connection closed", the boot order and the status file are where you look first.
+
+## The boot sequence
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant Client as MCP client
-    participant Srv as startServer
+    participant Serve as serveCommand
+    participant Server as startServer
     participant Status as .mimirs/status
-    participant Idx as indexDirectory
-    participant Wat as startWatcher
-    participant Conv as startConversationTail
-    Srv->>Status: write "starting"
-    Srv->>Srv: register shutdown handlers
-    Srv->>Srv: create McpServer + registerAllTools
-    Srv->>Client: connect stdio transport
-    Client-->>Srv: initialize handshake answered
-    Srv->>Srv: preflight getDB (open index)
-    Srv->>Srv: tryAcquireIndexLock
-    alt lock acquired
-        Srv->>Idx: index in background
-        Idx-->>Status: progress, then "done"
-        Idx->>Wat: start file watcher
-    else lock held by another process
-        Srv->>Status: "done — query-only"
+    participant DB as RagDB (index.db)
+    participant BG as Background index + watchers
+
+    Client->>Serve: launch "mimirs serve" (stdin/stdout)
+    Serve->>Server: dynamic import + startServer()
+    Server->>Status: write "starting"
+    Server->>Server: register signal/stdin handlers
+    Server->>Server: registerAllTools(server, ...)
+    Server->>Status: write "tools registered"
+    Server->>Client: connect StdioServerTransport
+    Server->>Status: write "transport connected"
+    Server->>DB: preflight open (getDB)
+    alt permanent DB error
+        Server->>Status: write "error" + fix hint
+        Server-->>Client: stays connected, tools throw
+    else transient DB error
+        Server->>Status: write "starting" (retry later)
+    else DB opened
+        Server->>BG: acquire index lock + start indexing
+        BG->>Status: write progress, then "done"
+        BG->>BG: start file watcher + conversation watcher
     end
-    Srv->>Conv: tail current session JSONL
-    Note over Srv: server stays alive handling tool calls
-    Client--xSrv: stdin EOF / signal
-    Srv->>Status: "interrupted"
-    Srv->>Srv: close watchers, release lock, close DBs, exit
+    Client->>Server: stdin EOF / SIGINT / SIGTERM / SIGHUP
+    Server->>Status: write "interrupted"
+    Server->>DB: close all, release lock, exit
 ```
 
-1. Before anything else, the server writes a `starting` status so any stale status from a previous instance is overwritten right away (`src/server/index.ts:88-110`).
-2. Signal, stdin, and crash handlers are registered immediately, so even a crash *during* startup writes a clean exit status instead of leaving the file stale (`src/server/index.ts:112-173`).
-3. An `McpServer` is created and every tool is registered via `registerAllTools`, which is handed the DB accessor, the connected-DB lister, and the status writer (`src/server/index.ts:181-190`, `src/tools/index.ts:39`).
-4. The stdio transport is connected immediately so the client's `initialize` is answered before slow work begins (`src/server/index.ts:203-207`).
-5. A preflight `getDB` opens the index to catch fatal problems (e.g. missing SQLite) early (`src/server/index.ts:215-217`).
-6. `tryAcquireIndexLock` decides whether this process owns indexing for the project (`src/server/index.ts:269`).
-7. If it holds the lock, `indexDirectory` runs in the background and, on completion, starts a file watcher (`src/server/index.ts:285-346`).
-8. If another process already holds the lock, this one skips indexing and reports query-only mode (`src/server/index.ts:270-277`).
-9. Regardless of the lock, the server discovers conversation sessions and tails the current one, indexing older sessions in the background (`src/server/index.ts:354-385`).
-10. The server then stays alive handling tool calls until stdin closes or a signal arrives, at which point `cleanup` runs (`src/server/index.ts:140-150`).
-
-## Boot phases written to the status file
-
-The server keeps an external breadcrumb at `.mimirs/status`. Every meaningful step calls `writeStatus`, which writes the phase text plus an instance id (`pid:<pid>`) so a reader can tell which process owns the file (`src/server/index.ts:96-110`). The phases written in order are: the initial `starting`, then `phase: creating server`, `phase: tools registered`, `phase: connecting transport`, `phase: transport connected`, then indexing progress like `0/N files` and `processedFiles/totalFiles (pct%)`, and finally `done` with version, indexed/skipped/pruned counts, and total file/chunk counts (`src/server/index.ts:179-207`, `285-331`). When the watcher later reacts to a file change, it rewrites a `done` status with a `watcher:` line so clients see ongoing activity (`src/server/index.ts:335-346`).
-
-If the project directory is the home directory or otherwise unsafe (`checkIndexDir`), no status path is set and status writes are skipped entirely; auto-index and the watcher are also skipped (`src/server/index.ts:91-95`, `175-177`).
-
-## Transport-first ordering
-
-Tool registration and transport connect happen before any config I/O, session discovery, or indexing. This is deliberate: connecting first means the client's handshake is answered quickly, avoiding a timeout that would close the pipes and break later writes (`src/server/index.ts:199-207`). Both the registration block and the connect block are wrapped in try/catch; a failure in either writes a crash log and an `error` status, then rethrows (`src/server/index.ts:191-212`).
-
-## Process-level index lock and query-only fallback
-
-A single project can have several mimirs servers pointed at it — one per IDE window, for example. They share one `.mimirs/index.db`, and if more than one ran the indexer they would double-insert chunk rows. To prevent that, indexing is gated by a per-directory file lock at `.mimirs/index.lock` containing the holder's PID (`src/utils/index-lock.ts:18-30`). `tryAcquireIndexLock` returns a lock token if it can claim it, or `null` if another *live* process holds it; stale locks whose PID is dead are reclaimed automatically (`src/utils/index-lock.ts:40-64`,`91-98`). The lock is reentrant within one process via a refcount, so the server can hold it for its lifetime while `indexDirectory` also wraps each run (`src/utils/index-lock.ts:9-15`,`34-38`).
-
-When the server gets the lock, it runs the background indexer and watcher. When it does not, it logs that another process owns indexing, writes a `done` status marked `mode: query-only`, and skips all indexing work — but it still registers tools and serves queries against the shared DB (`src/server/index.ts:269-277`).
-
-## Background index and watcher
-
-Indexing never blocks startup. After the transport is connected and the lock is held, `indexDirectory` is invoked without `await`; its progress callback drives the status file (`src/server/index.ts:285-321`). The callback recognizes several message kinds — `file:done` increments a counter, `scanning files` and model-loading messages are surfaced verbatim, and a `Found N files to index` message seeds the total (`src/server/index.ts:286-315`). When indexing resolves, the server writes the final `done` status from the DB's `getStatus()` and only then calls `startWatcher`, so the watcher starts after the initial pass completes (`src/server/index.ts:322-346`). If indexing rejects, the server writes an `error` status and logs a warning but stays up (`src/server/index.ts:347-350`).
-
-## Conversation tailing for the current session
-
-After indexing is arranged, the server discovers the project's conversation sessions via `discoverSessions` and, if any exist, tails the most recent one — assumed to be the current session — with `startConversationTail`, which follows the session's JSONL file and indexes new turns as it grows (`src/server/index.ts:354-366`). Older sessions are checked against the DB and re-indexed in the background only when missing or stale (`src/server/index.ts:368-384`). Conversation tailing runs regardless of the index lock, so query-only instances still tail too.
-
-Note a known race here: conversation tailing is **not** guarded by the index lock. If a second process indexes the same turns first, `indexConversation` can return `turnsIndexed: 0` while the DB read offset still advances, and `startConversationTail` only advances its in-memory offset/turn index when `turnsIndexed > 0` — so a duplicate-only pass can leave local state stale and later cycles may assign wrong turn indexes or reprocess old bytes (`src/conversation/indexer.ts:90`).
-
-## Shutdown handlers
-
-Shutdown is centralized in `cleanup`, which sets a `shuttingDown` flag, writes an `interrupted` exit status, closes both watchers, releases the index lock, closes every open DB, and exits 0 (`src/server/index.ts:140-150`). It is wired to several triggers (`src/server/index.ts:154-173`):
-
-| Trigger | Reason string | Why it fires |
-| --- | --- | --- |
-| stdin `end` | `stdin closed` | IDE window closed; the client end of the pipe is gone |
-| stdin `error` | `stdin error` | Pipe error |
-| `SIGINT` / `SIGTERM` / `SIGHUP` | the signal name | Manual or OS-initiated termination |
-| `uncaughtException` | `uncaught exception: …` | A thrown error nothing handled |
-| `unhandledRejection` | `unhandled rejection: …` | A rejected promise nothing caught |
-
-`writeExitStatus` only overwrites the status file if this instance still owns it and the status is not already `done` or `error`, so a newer instance's status is never clobbered (`src/server/index.ts:119-138`).
-
-## Permanent vs transient DB open errors
-
-The preflight `getDB` can fail. The server classifies the error: messages containing `database is locked` or `SQLITE_BUSY` are **transient** — another process briefly held the DB — so the error is not cached and the next tool call retries `getDB`; status is written as `starting` with a "Will retry" note (`src/server/index.ts:218-247`). Any other failure is **permanent**: it is stored in `permanentError` so every later tool call throws a clear message via the `getDB` guard, and status is written as `error` with a targeted fix (`brew install sqlite`, set `RAG_DB_DIR`, or check the README) (`src/server/index.ts:35-37`,`221-234`). In both cases startup indexing is skipped because it needs an open DB, and `startServer` returns early (`src/server/index.ts:252-255`).
-
-## Crash logging to .mimirs/server-error.log
-
-If startup throws before or during transport connect, the MCP client would otherwise just see "Connection closed" with no detail. `writeStartupError` writes the message, stack, and a "run `bunx mimirs doctor`" hint to `.mimirs/server-error.log` so the failure is diagnosable outside stderr (`src/server/index.ts:62-86`). It is called from both the tool-registration and transport-connect catch blocks (`src/server/index.ts:194`,`209`).
+1. The MCP client launches the process. The CLI dispatch in `src/cli/index.ts:107` matches the `serve` verb and calls `serveCommand()`.
+2. `serveCommand` reads the project directory from `RAG_PROJECT_DIR` (falling back to `process.cwd()`), prints a startup line to stderr, then **dynamically** imports the server module. The dynamic import is load-bearing: `src/server/index.ts` has a top-level `await import("../../package.json")` and pulls in native modules (`bun:sqlite`, `sqlite-vec`). A static import that failed at module-load time would crash the CLI before any handler ran, leaving no status file and no log (`src/cli/commands/serve.ts:8-14`).
+3. `startServer()` writes the first status line, `starting`, as the very first action — overwriting any stale `interrupted` left by a previous instance (`src/server/index.ts:88-110`).
+4. It registers shutdown handlers *before* doing real work, so a crash mid-boot still records an exit reason (`src/server/index.ts:152-173`).
+5. It constructs the `McpServer` and calls `registerAllTools`, wiring up every tool group, then writes `tools registered` (`src/server/index.ts:181-190`).
+6. It connects the stdio transport **immediately**, so the client's `initialize` handshake is answered before any slow work, then writes `transport connected` (`src/server/index.ts:199-207`).
+7. It opens the project's SQLite database as a preflight check. Failures here branch on whether the error is permanent or transient (see [Branches and failure cases](#branches-and-failure-cases)).
+8. With the DB open and the directory safe, it tries to acquire a per-project index lock. The lock holder runs the background full index, writes progress to status, and on completion starts the file watcher and the conversation-folder watcher (`src/server/index.ts:269-362`).
+9. On stdin EOF or a termination signal, the cleanup handler writes `interrupted`, closes the watchers and DB, releases the lock, and exits (`src/server/index.ts:140-163`).
 
 ## Inputs
 
-| Name | Type | Required | Description |
+| name | type | required | description |
 | --- | --- | --- | --- |
-| `RAG_PROJECT_DIR` | env path | no | Project directory to serve. Falls back to `process.cwd()`. Drives the status path, index location, and session discovery (`src/server/index.ts:91`). |
-| `RAG_DB_DIR` | env path | no | Overrides where the index database lives. Read inside `RagDB`; when set, a write failure suggests pointing it at a writable directory (`src/db/index.ts:97-112`). |
-| `LOG_LEVEL` | env string | no | Log verbosity; defaults to `warn`. Read by the logger (`src/utils/log.ts:20`). |
+| `RAG_PROJECT_DIR` | env var | no | The project to serve. Read in both `serveCommand` and `startServer`; falls back to `process.cwd()` when unset (`src/server/index.ts:91`). If the resolved directory is a system-level path like `$HOME` or `/`, indexing and watching are skipped (see the home-directory guard below). |
+| `RAG_DB_DIR` | env var | no | Where the SQLite index lives. When set, `RagDB` writes `index.db` there instead of `<project>/.mimirs`; when a write fails, the error hint tells the user to set this (`src/db/index.ts:103-104`, `src/server/index.ts:224`). |
+| stdin EOF | process signal | n/a | The MCP client closing the pipe (for example, the editor window closing) fires `stdin.on("end")`, which triggers a clean shutdown (`src/server/index.ts:154-157`). |
+| `SIGINT` / `SIGTERM` / `SIGHUP` | OS signal | n/a | Each is wired to `cleanup` with the signal name as the reason (`src/server/index.ts:161-163`). |
 
 ## Outputs
 
-| Output | Where it lands / shape / description |
+| output | where it lands / shape / description |
 | --- | --- |
-| Registered MCP tools | Attached to the `McpServer` and answerable over stdio after connect (`src/server/index.ts:189`, `src/tools/index.ts:39`). |
-| Background index | Updated `.mimirs/index.db` from `indexDirectory`, only when the lock is held (`src/server/index.ts:285-331`). |
-| File watcher | A `Watcher` that re-indexes on file change and updates status; started after the initial index (`src/server/index.ts:335-346`). |
-| Conversation tail | A second `Watcher` following the current session's JSONL, appending turns to the DB (`src/server/index.ts:361-366`). |
-| `.mimirs/status` updates | Phase text plus instance id, written at every lifecycle step (`src/server/index.ts:100-110`). |
-| `.mimirs/server-error.log` | Crash diagnostics, only on a startup failure (`src/server/index.ts:62-86`). |
+| `.mimirs/status` | A small text file rewritten at each phase: `starting` (with version and timestamp), `tools registered`, `transport connected`, indexing progress like `12/40 files (30%)`, a final `done` block with totals, or `error` / `interrupted`. Each line set ends with `pid:<n>` so an instance only overwrites its own status (`src/server/index.ts:100-138`). |
+| Registered MCP tools | Every tool group attached to the `McpServer` and served over stdio once the transport connects (`src/server/index.ts:189`, `src/tools/index.ts:39-56`). |
+| Index rows in `index.db` | The background full index inserts/updates file and chunk rows (plus vector and FTS entries), prunes deleted files, and resolves imports and symbol references (`src/server/index.ts:285-332`, `src/indexing/indexer.ts:745-793`). |
+| `.mimirs/server-error.log` | On a startup crash, the message, stack, and the hint `bunx mimirs doctor` are written here so the failure is visible outside stderr (`src/server/index.ts:62-86`, `src/cli/commands/serve.ts:20-35`). |
+
+## Tool registration
+
+`registerAllTools` is a thin fan-out: it calls one `registerXTools(server, getDB, ...)` per group — search, indexing, graph, conversation, checkpoints, annotations, analytics, git, git history, server info, and wiki (`src/tools/index.ts:39-56`). Two callbacks are threaded through so tools can reach process state without importing the server: `getDB`, which lazily opens (and caches) one `RagDB` per project directory, and `writeStatus`, which lets the indexing tools push progress into the same status file the boot phases use. The connected-DB list is passed to the server-info tools so they can report open connections.
+
+Registration is wrapped in a `try/catch`. If it throws, the server writes the crash log, sets status to `error` with `phase: tool registration failed`, and rethrows — the boot stops before the transport connects (`src/server/index.ts:191-197`).
+
+## Transport before slow work
+
+The order is intentional. `StdioServerTransport` is connected right after tools are registered, and only then does the server touch config, the database, or the project files (`src/server/index.ts:199-207`). The comment in source spells out the failure this avoids: if the client's `initialize` handshake is not answered before slow startup work, the client may time out, close the pipes, and the server's later stderr writes hit `EPIPE`. Answering the handshake first means the client sees a live server immediately, and the heavy indexing happens in the background without blocking any tool call.
+
+## DB preflight: permanent vs transient
+
+After the transport is up, the server opens the database once as a preflight, by calling `getDB(startupDir)` (`src/server/index.ts:215-217`). This catches a broken native SQLite (for example, missing Homebrew SQLite on macOS) or an unwritable index directory early, with a clear message, rather than letting the first tool call fail cryptically.
+
+The error handling splits on whether the failure can be retried:
+
+| Error class | Detection | What happens | Status written |
+| --- | --- | --- | --- |
+| Transient | message contains `database is locked` or `SQLITE_BUSY` | Not cached. The next tool call re-runs `getDB`, which may succeed. | `starting` + `Will retry on next tool call` |
+| Permanent | anything else (permission failure, missing native lib) | Cached in `permanentError`; every later tool call hits the guard at the top of `getDB` and gets the same clear message | `error` + a targeted fix hint |
+
+The fix hint is chosen from the message: `brew install sqlite` for the macOS case, "set `RAG_DB_DIR` to a writable directory" for `EROFS`/`EACCES`, or a generic README pointer otherwise (`src/server/index.ts:218-256`). In both error cases the function `return`s early — startup indexing is skipped because it needs an open DB. The transient path keeps the server connected so a retry can recover; the permanent path keeps it connected too, but every tool call throws the cached error until the environment is fixed (`src/server/index.ts:34-37`).
+
+## The index lock gates all background work
+
+Multiple MCP servers can run against the same `.mimirs/index.db` — one per IDE window is common. Concurrent indexers racing on the same file double-insert chunk rows. To prevent that, exactly one server per project directory performs indexing and watching; the rest serve queries only.
+
+This is enforced by `tryAcquireIndexLock`, which writes the current PID to `.mimirs/index.lock` with the exclusive `wx` flag. If a live process already holds it, the call returns `null`; a lock left by a dead PID is reclaimed automatically, and the lock is reentrant within one process via a refcount (`src/utils/index-lock.ts:28-65`). The startup path only enters the indexing block when the lock is held (`src/server/index.ts:269-279`). A query-only instance writes a terminal `done` status reading `mode: query-only (another mimirs process owns indexing)` and does nothing further with the project files.
+
+The same lock is acquired a second time, reentrantly, inside `indexDirectory` itself, so a single full-index run is also protected even when invoked outside the server (`src/indexing/indexer.ts:722-730`).
+
+## Background full index, then watchers
+
+When the lock is acquired, the server kicks off `indexDirectory(startupDir, startupDb, startupConfig, onProgress)` **without awaiting it** — the boot returns and the index builds in the background (`src/server/index.ts:285`). The progress callback translates indexer messages into status lines: it counts `file:done` events into a `processed/total` percentage, surfaces `scanning files` and `Loading embedding model` messages verbatim, and parses `Found N files to index` to seed the total (`src/server/index.ts:285-321`).
+
+Inside `indexDirectory` the work is: re-check the directory is safe to index, acquire the (reentrant) lock, collect matching files, eagerly load the embedding model, process each file into chunks, prune files that no longer exist, then resolve imports and symbol references across the project (`src/indexing/indexer.ts:734-793`).
+
+When the index promise resolves, the server reads the DB totals and writes a `done` block (`indexed`/`skipped`/`pruned` counts plus total files and chunks), then starts the file watcher (`src/server/index.ts:322-346`). `startWatcher` does a recursive `fs.watch` on the project, filters events through the configured include/exclude globs, debounces each path by two seconds, and funnels indexing through a serial queue so re-index and graph-resolution work never interleave. Each settled event either re-indexes the file (and re-resolves imports for it and its importers) or removes a deleted file (`src/indexing/watcher.ts:16-117`).
+
+Independently of the file index — it is started right after kicking off `indexDirectory`, not gated on its completion — the server starts a conversation-folder watcher with `startConversationFolderWatch` against the project's Claude Code transcripts directory (`src/server/index.ts:357-361`). On startup it backfills every existing `*.jsonl` transcript from its stored byte offset, then watches the folder so live sessions and any later session stay current. Both the backfill and live events drain through one serial queue, and re-reading the offset from the DB on every pass makes the work idempotent: a pass that finds no new bytes returns 0 and changes nothing, so `turn_count` can never desync (`src/conversation/indexer.ts:97-117`, `src/conversation/indexer.ts:162-233`). This is what lets one agent's findings become searchable to another in near real time.
 
 ## State changes
 
-| State | Before | After | Why it matters |
-| --- | --- | --- | --- |
-| `.mimirs/status` | Stale text, often `interrupted` from a prior run | `starting` → phase lines → `done` (with totals and watcher progress) | Lets editors and `doctor` show the server's real state (`src/server/index.ts:100-110`,`322-348`). |
-| Index lock | None / stale PID | Held by this PID, or `null` if another live process owns it | Only the holder indexes and watches; others run query-only, preventing double-inserts (`src/server/index.ts:269-280`, `src/utils/index-lock.ts:28-64`). |
-| RAG index | Previous snapshot | Refreshed by the background index, then kept current by the watcher | Search results reflect the current code (`src/server/index.ts:285-346`). |
-| Conversation index | Previously indexed turns (or empty) | Turns appended as the session JSONL grows | `search_conversation` can recall the live session (`src/server/index.ts:354-385`). |
+### `.mimirs/status` — none → written, at every phase
+
+`writeStatus` rewrites the status file with the given text plus the instance id `pid:<n>`. It is a no-op once shutdown has begun, and it best-effort-creates `.mimirs/` first (`src/server/index.ts:100-108`). It is called for every boot phase (`starting`, `creating server`, `tools registered`, `connecting transport`, `transport connected`), for each chunk of indexing progress, and for the final `done` / `error` / `interrupted` line. This is the single source of truth an IDE polls to show "indexing 30%" or "ready", which is why it matters that an instance only overwrites status that carries its own pid.
+
+### `.mimirs/index.lock` — none → acquired (one instance only)
+
+`tryAcquireIndexLock(startupDir)` either returns a lock token or `null` (`src/server/index.ts:269`). Acquiring it is what grants this instance the right to write the index and run watchers; failing to acquire it downgrades the instance to query-only. The token is released during cleanup, which unlinks the lock file only if it still contains this process's PID (`src/utils/index-lock.ts:67-89`). This change matters because it is the boundary between "this server keeps the index fresh" and "this server only reads" — get it wrong and two processes corrupt the chunk table.
+
+### `index.db` file/chunk rows — none/stale → indexed
+
+The background `indexDirectory` run inserts and updates file and chunk rows (and their vector and FTS entries), prunes files that no longer exist, and resolves cross-file import and symbol edges (`src/server/index.ts:285-332`, `src/indexing/indexer.ts:745-793`). The result counts (`indexed`, `skipped`, `pruned`) and the post-run totals from `getStatus` are written into the `done` status line. After this completes, the file watcher keeps these rows in sync as the project changes.
 
 ## Branches and failure cases
 
-- **Unsafe directory (home-dir trap)** — `checkIndexDir` returns unsafe: no status path, auto-index and watcher skipped; tools still register and the conversation tail still runs (`src/server/index.ts:91-95`,`175-177`,`260`).
-- **Tool registration throws** — crash log + `error` status, rethrow (`src/server/index.ts:191-197`).
-- **Transport connect throws** — crash log + `error` status, rethrow (`src/server/index.ts:208-212`).
-- **Permanent DB open error** — cached in `permanentError`, `error` status with a fix, indexing skipped, early return (`src/server/index.ts:231-255`).
-- **Transient DB open error** — not cached, `starting` status with retry note, indexing skipped, early return; next tool call retries (`src/server/index.ts:227-255`).
-- **Lock not acquired** — query-only mode, indexing/watcher skipped, `done` status with `mode: query-only` (`src/server/index.ts:270-277`).
-- **Lock acquired** — background index runs, then watcher starts on success (`src/server/index.ts:279-346`).
-- **Background indexing rejects** — `error` status + warning log, server stays up (`src/server/index.ts:347-350`).
-- **No conversation sessions found** — tailing is skipped entirely (`src/server/index.ts:356`).
-- **Older session already current** — skipped; only missing or stale sessions are re-indexed (`src/server/index.ts:370-371`).
-- **Shutdown while owning status** — `interrupted` written; if a newer instance owns the file, or status is already `done`/`error`, the write is skipped (`src/server/index.ts:119-138`).
+- **Server module fails to load.** The dynamic import in `serveCommand` is wrapped in `try/catch`; on failure it writes `server-error.log` and a `status` of `error` with `phase: module load failed`, then rethrows (`src/cli/commands/serve.ts:13-49`).
+- **Home-directory / system-directory trap.** `checkIndexDir` rejects `$HOME`, `/`, `/Users`, `/tmp`, and similar (`src/utils/dir-guard.ts:9-39`). When the resolved project dir is one of these, `isHomeDirTrap` is true: the status path is set to `null` (so *no* status file is written), and the entire index/watch block is skipped — the server still registers tools and serves queries (`src/server/index.ts:92-95`, `src/server/index.ts:175-260`).
+- **Tool registration throws.** Caught before the transport connects; writes `error` status and the crash log, then rethrows so boot aborts (`src/server/index.ts:191-197`).
+- **Transport connect throws.** Caught with its own `error` status (`phase: transport failed`) and crash log, then rethrows (`src/server/index.ts:208-212`).
+- **DB preflight — transient lock.** Logged as transient, not cached; status stays `starting`; indexing is skipped this boot but tool calls retry `getDB` (`src/server/index.ts:227-230`, `src/server/index.ts:255`).
+- **DB preflight — permanent failure.** Cached in `permanentError`; every tool call throws the cached message with a fix hint; status is `error` (`src/server/index.ts:231-235`).
+- **Index lock held by another process.** `tryAcquireIndexLock` returns `null`; the instance writes a `done` / `query-only` status and skips indexing and the file watcher (`src/server/index.ts:269-277`). Note the conversation-folder watcher is inside the same `if (indexLock)` block, so a query-only instance does not tail transcripts either.
+- **Background index rejects.** The `.catch` on the index promise writes an `error` status and logs a warning, but does not crash the server — tools keep working against whatever was already indexed (`src/server/index.ts:347-350`).
+- **Conversations folder missing.** Both the backfill scan and the `fs.watch` are wrapped so a non-existent transcripts directory is tolerated; the watch (when it can be created) picks the folder up once it appears (`src/conversation/indexer.ts:193-223`).
+- **Shutdown.** stdin `end`, stdin `error`, `SIGINT`, `SIGTERM`, `SIGHUP`, an uncaught exception, and an unhandled rejection all route to `cleanup`, which sets `shuttingDown`, writes `interrupted` (only over this instance's own non-terminal status), closes both watchers, releases the lock, closes every open DB, and exits 0 (`src/server/index.ts:140-173`). `writeExitStatus` refuses to clobber a status that another instance owns or that already reads `done`/`error` (`src/server/index.ts:119-138`).
 
 ## Example: lifecycle phases
 
-A healthy boot writes this sequence to `.mimirs/status` (instance id appended each time; values synthetic):
+A clean boot rewrites `.mimirs/status` through roughly this sequence (values are illustrative):
 
 ```
-starting
-version: <version>
-started: <iso-timestamp>
----
-starting
-version: <version>
-phase: tools registered
----
-starting
-version: <version>
-phase: transport connected
----
-0/120 files
----
-84/120 files (70%)
----
-done
-version: <version>
-finished: <iso-timestamp>
-indexed: 12, skipped: 108, pruned: 0
-total files: 120, total chunks: 1450
+starting / version: <v> / started: <iso>
+starting / phase: creating server
+starting / phase: tools registered
+starting / phase: connecting transport
+starting / phase: transport connected
+0/40 files
+12/40 files (30%)
+done / version: <v> / finished: <iso>
+     indexed: 12, skipped: 28, pruned: 0
+     total files: 40, total chunks: 512
 ```
 
-On shutdown (stdin EOF or signal), assuming this instance still owns the file:
+A second server on the same project instead lands on a single terminal line:
 
 ```
-interrupted
-version: <version>
-stopped: <iso-timestamp>
-reason: stdin closed
-pid:<pid>
+done / version: <v> / mode: query-only (another mimirs process owns indexing)
 ```
-
-## Related
-
-- [serve](../cli/serve.md) — the CLI command that invokes this boot flow.
-- [index_files](../tools/index-files.md) — the tool form of the indexing that runs here in the background.
-- [search_conversation](../tools/search-conversation.md) — consumes the conversation turns this flow tails.
-- [server_info](../tools/server-info.md) — reports the open DB connections this flow tracks.
 
 ## Key source files
 
-- `src/server/index.ts` — the entire boot, ready, handle, and shutdown lifecycle.
-- `src/tools/index.ts` — `registerAllTools`, which attaches every MCP tool to the server.
-- `src/utils/index-lock.ts` — the process-level lock gating indexing and watching.
-- `src/indexing/indexer.ts` — `indexDirectory`, the background indexing pass.
-- `src/indexing/watcher.ts` — `startWatcher`, which keeps the index current after the initial pass.
-- `src/conversation/indexer.ts` — `startConversationTail` and `indexConversation` for session indexing.
+- `src/cli/commands/serve.ts` — the `serve` entry point; dynamically imports the server and records module-load failures.
+- `src/server/index.ts` — `startServer`, the whole boot sequence: status writes, tool registration, transport, DB preflight, lock gating, background index and watchers, and shutdown handlers.
+- `src/tools/index.ts` — `registerAllTools`, the fan-out that attaches every tool group to the MCP server.
+- `src/indexing/indexer.ts` — `indexDirectory`, the background full-index run that populates `index.db`.
+- `src/indexing/watcher.ts` — `startWatcher`, the debounced recursive file watcher that keeps the index fresh.
+- `src/conversation/indexer.ts` — `startConversationFolderWatch`, the transcript-folder backfill-and-tail watcher.
+- `src/utils/index-lock.ts` — `tryAcquireIndexLock`, the per-project lock that elects the single indexing instance.
+- `src/utils/dir-guard.ts` — `checkIndexDir`, the guard that refuses to index system-level directories.
+- `src/db/index.ts` — the `RagDB` constructor, where `RAG_DB_DIR` is resolved and write failures surface.
+
+## Related flows
+
+- [index_files](../tools/index-files.md) and [Index command](../cli/index.md) — the same `indexDirectory` run, triggered on demand instead of at boot.
+- [Conversation search](../cli/conversation.md) — the transcript index that the conversation-folder watcher keeps current.
+- [doctor](../cli/doctor.md) — the diagnostic the startup error hints point users toward.

@@ -1,146 +1,290 @@
 # CLI: benchmark
 
-`mimirs benchmark` scores how good the search index is at finding the *right* files. You give it a file of labeled queries — each query paired with the file paths a correct search should surface — and it runs every query through the real hybrid search, then reports relevance metrics. Unlike [eval](eval.md), which compares search against an empty baseline, benchmark measures search quality on its own terms against a ground-truth label set. It is the command to wire into CI: if quality drops below configured thresholds, it exits non-zero.
+`mimirs benchmark <file>` measures how good the search index is at finding the
+files you expect. You write a small JSON file of queries paired with the file
+paths that *should* come back, run the command, and it reports recall and mean
+reciprocal rank (MRR). If quality drops below configured thresholds the process
+exits non-zero, so the command doubles as a CI gate that fails a build when a
+change makes search worse.
 
-The command file itself is a thin orchestrator. It parses arguments, loads the query file, opens the index, runs the benchmark, prints the report, and then decides the exit code. The scoring logic lives in `src/search/benchmark.ts`.
+This is the regression-testing tool for retrieval quality. Use it after tuning
+the hybrid scoring weight, swapping an embedding model, or changing chunking,
+to confirm the index still surfaces the right files. It runs real searches
+against the live database for the project directory — it does not re-index and
+does not mutate any stored state.
 
-## What it measures
+## Trigger and flow
 
-For each query the benchmark runs one hybrid search and compares the returned file paths against the query's expected files. From those comparisons it derives three summary numbers (`src/search/benchmark.ts:98-104`):
-
-- **Recall@K** — the average, across queries, of the fraction of a query's expected files that appeared in the top-K results.
-- **MRR (mean reciprocal rank)** — the average of `1 / rank` of the first expected file found per query, where rank is 1-based. A correct file at position 1 scores 1.0; at position 3 scores 0.33; never found scores 0.
-- **Zero-miss rate** — the fraction of queries where *none* of the expected files appeared at all.
-
-Precision is not computed. The metrics are recall-oriented: they ask "did we find the files we should have", not "how much of what we returned was relevant".
+The command is dispatched from the CLI router. When the first argument is
+`benchmark`, the router calls the handler with the raw argument list and a
+`getFlag` helper that reads `--flag value` pairs out of `args` (`src/cli/index.ts:136-137`).
 
 ```mermaid
 sequenceDiagram
-    autonumber
-    actor User
-    participant Cmd as benchmarkCommand
-    participant Loader as loadBenchmarkQueries
-    participant Runner as runBenchmark
-    participant Search as search (hybrid)
-    participant Report as formatBenchmarkReport
-    User->>Cmd: mimirs benchmark queries.json --dir . --top 5
-    Cmd->>Loader: read + validate query file
-    Loader-->>Cmd: BenchmarkQuery[]
-    Cmd->>Runner: runBenchmark(queries, db, dir, top)
-    loop each query
-        Runner->>Search: hybrid search (query text)
-        Search-->>Runner: ranked results
-        Note over Runner: compute recall + reciprocal rank vs expected files
-    end
-    Runner-->>Cmd: BenchmarkSummary (recall@K, MRR, zero-miss)
-    Cmd->>Report: formatBenchmarkReport(summary, top)
-    Report-->>User: metrics + missed/partial query list
-    Cmd->>Cmd: exit 1 if recall < min or MRR < min
+  autonumber
+  participant User
+  participant Router as cli/index.ts
+  participant Handler as benchmarkCommand
+  participant Loader as loadBenchmarkQueries
+  participant Runner as runBenchmark
+  participant Search as hybrid search
+  participant DB as RagDB
+  User->>Router: mimirs benchmark queries.json --top 10
+  Router->>Handler: benchmarkCommand(args, getFlag)
+  Handler->>Handler: read <file> arg, exit 1 if missing
+  Handler->>DB: new RagDB(dir)
+  Handler->>Handler: loadConfig(dir), resolve --top
+  Handler->>Loader: loadBenchmarkQueries(file)
+  Loader-->>Handler: BenchmarkQuery[] (or throw on bad JSON)
+  loop each query
+    Runner->>Search: search(query, db, topK, ...)
+    Search->>DB: vector + BM25 lookup
+    Search-->>Runner: ranked file results
+    Runner->>Runner: compute recall + reciprocal rank
+  end
+  Runner-->>Handler: BenchmarkSummary
+  Handler->>User: print formatted report
+  Handler->>DB: db.close()
+  Handler->>Handler: exit 1 if recall < min OR mrr < min
 ```
 
-1. The user runs the command with a query file and optional flags. `benchmarkCommand` requires the first positional argument; without it, it prints a usage line and exits 1 (`src/cli/commands/benchmark.ts:8-12`).
-2. `loadBenchmarkQueries` reads and JSON-parses the file, validating that it is an array and that every entry has a `query` string and a non-empty `expected` array (`src/search/benchmark.ts:29-44`).
-3. The command logs how many queries it will run and against which directory (`src/cli/commands/benchmark.ts:20`).
-4. `runBenchmark` loads config (for the hybrid weight) and loops over the queries (`src/search/benchmark.ts:59-64`).
-5. For each query it runs the hybrid `search` with the requested top-K (`src/search/benchmark.ts:65`).
-6. It normalizes expected paths and computes per-query recall and reciprocal rank by matching result paths against expected paths (`src/search/benchmark.ts:67-95`).
-7. `runBenchmark` averages the per-query numbers into the summary metrics (`src/search/benchmark.ts:98-104`).
-8. `formatBenchmarkReport` prints the headline metrics plus per-query failure and partial-match detail (`src/search/benchmark.ts:107-138`).
-9. After closing the index, the command compares recall and MRR against the configured minimums and exits 1 if either is below threshold (`src/cli/commands/benchmark.ts:25-30`).
+1. The user runs `mimirs benchmark <file>` with an optional `--dir` and
+   `--top`. The router matches the `benchmark` case and invokes the handler
+   `benchmarkCommand` (`src/cli/index.ts:136-137`).
+2. The handler reads the query file path from `args[1]`. If it is absent it
+   prints a usage line and exits with code `1` (`src/cli/commands/benchmark.ts:9-13`).
+3. It resolves the target directory from `--dir` (defaulting to the current
+   directory), opens the project database with `new RagDB(dir)`, and loads the
+   project config (`src/cli/commands/benchmark.ts:15-17`).
+4. It resolves how many results each query should retrieve. The `--top` flag is
+   parsed through `intFlag`, falling back to `config.benchmarkTopK` (default
+   `5`) and requiring a value of at least `1` (`src/cli/commands/benchmark.ts:18`).
+5. It loads and validates the query file, then prints a one-line status of how
+   many queries will run against which directory (`src/cli/commands/benchmark.ts:20-21`).
+6. `runBenchmark` runs each query through the same hybrid search the rest of
+   mimirs uses, scoring whether the expected files appear in the top-K results
+   (`src/cli/commands/benchmark.ts:23`).
+7. The summary is formatted into a human-readable report and printed; the
+   database handle is closed (`src/cli/commands/benchmark.ts:24-26`).
+8. Finally, the handler compares the measured recall and MRR against the
+   configured minimums and calls `process.exit(1)` if either falls short
+   (`src/cli/commands/benchmark.ts:29-31`).
 
-## Fixture file format
+## Loading the benchmark queries
 
-The query file is a JSON array. Each element has one required string and one required non-empty array, defined by the `BenchmarkQuery` interface (`src/search/benchmark.ts:7-10`):
+The query file is read and parsed by `loadBenchmarkQueries`, which expects a
+JSON array of `{ query, expected }` objects (`src/search/benchmark.ts:29-44`).
+The shape is fixed by the `BenchmarkQuery` interface: `query` is the search
+string, and `expected` is an array of file paths (relative or absolute) that
+the search should return for that query (`src/search/benchmark.ts:7-10`).
 
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `query` | string | yes | The search query text, passed directly to hybrid search. |
-| `expected` | string[] | yes, non-empty | File paths a correct search should surface. May be relative (resolved against the project dir) or absolute. |
+Validation is strict and fails fast. If the top-level JSON is not an array, the
+loader throws `Benchmark file must be a JSON array of { query, expected }
+objects` (`src/search/benchmark.ts:33-35`). For each entry, a missing `query`,
+a non-array `expected`, or an empty `expected` list throws an error naming the
+offending entry (`src/search/benchmark.ts:37-41`). These throws are not caught
+inside the handler, so a malformed file surfaces as a stack trace and a
+non-zero exit from the runtime rather than a clean usage message.
 
-A query whose `expected` array is empty or missing causes load to throw, so unlike the eval fixture there is no "no expected files" case here.
+A minimal queries file looks like this:
+
+```json
+[
+  { "query": "how does hybrid search merge scores", "expected": ["src/search/hybrid.ts"] },
+  { "query": "where are CLI flags parsed", "expected": ["src/cli/flags.ts"] }
+]
+```
+
+## Running the benchmark and scoring
+
+`runBenchmark` is the scoring engine (`src/search/benchmark.ts:52-105`). It
+loads the config for the project directory and picks the hybrid weight from the
+optional `hybridWeight` argument, falling back to `config.hybridWeight`
+(default `0.7`) (`src/search/benchmark.ts:59-60`). The CLI does not pass an
+override, so the benchmark uses the project's configured weight — the same one
+real searches use.
+
+For each query it calls `search(q.query, db, topK, 0, weight,
+config.generated)` — the file-level hybrid search that fuses vector similarity
+with BM25 keyword matching and deduplicates by file path
+(`src/search/benchmark.ts:65`). The threshold argument is `0`, so no results
+are filtered by score. The returned `DedupedResult[]` carries one entry per
+file path with its best score (`src/search/hybrid.ts:39-43`), which is exactly
+the granularity the benchmark needs because expectations are expressed as file
+paths.
+
+Path matching is deliberately lenient. Expected paths are normalized: absolute
+paths (those starting with `/`) are kept as-is, and relative ones are resolved
+against the project directory (`src/search/benchmark.ts:46-50`). A result
+counts as a match if the result path equals the expected path, or either one
+ends with the other (`src/search/benchmark.ts:71-73`). The suffix check means
+`src/search/hybrid.ts` matches a fully-resolved absolute path ending in that
+suffix, so you can write short relative paths in the query file without
+worrying about the absolute form stored in the index.
+
+Two per-query metrics are computed:
+
+| Metric | Meaning | How it is computed |
+| --- | --- | --- |
+| `recall` | Fraction of the expected files that appeared in the top-K results | `found.length / expected.length` (`src/search/benchmark.ts:71-74`) |
+| `reciprocalRank` | `1 / rank` of the *first* expected file in the ranked results, `0` if none appear | Scans results in order, stops at the first expected match (`src/search/benchmark.ts:77-86`) |
+| `hit` | Whether at least one expected file was found | `found.length > 0` (`src/search/benchmark.ts:94`) |
+
+After all queries run, the per-query numbers are aggregated into a
+`BenchmarkSummary` (`src/search/benchmark.ts:98-104`):
+
+- `recallAtK` is the mean of every query's `recall`.
+- `mrr` is the mean of every query's `reciprocalRank`.
+- `zeroMissRate` is the fraction of queries where `hit` was false — queries that
+  surfaced *none* of their expected files.
+- `total` is the query count, and `results` keeps the full per-query detail used
+  by the report.
+
+All three averages guard against an empty query set by returning `0` when
+`total` is `0`, so a zero-length (but still valid) array does not divide by
+zero (`src/search/benchmark.ts:99-102`).
+
+## The report
+
+`formatBenchmarkReport` turns the summary into the printed text
+(`src/search/benchmark.ts:107-139`). The header reports the query count and
+top-K, followed by `Recall@K` as a percentage, `MRR` to three decimals, and the
+zero-miss rate as a percentage with the absolute miss count in parentheses
+(`src/search/benchmark.ts:110-113`).
+
+The report then drills into problems so you can see *why* a number is low,
+rather than just the aggregate:
+
+- **Missed queries** — every query with `hit === false` is listed with its
+  expected files and what actually came back (or `(no results)` when the search
+  returned nothing) (`src/search/benchmark.ts:116-127`).
+- **Partial matches** — queries that found *some* but not all expected files
+  (`hit` true, `recall < 1`) are listed with their recall percentage
+  (`src/search/benchmark.ts:130-136`).
+
+A clean run with no misses and no partials prints only the four summary lines.
+
+```text
+Benchmark results (2 queries, top-5):
+  Recall@5:      50.0%
+  MRR:            0.500
+  Zero-miss rate: 50.0% (1 queries)
+
+Missed queries (no expected file in results):
+  "where are CLI flags parsed"
+    expected: src/cli/flags.ts
+    got:      src/cli/index.ts, src/cli/commands/search-cmd.ts
+```
+
+## Exit code and CI gating
+
+The non-zero exit is what makes this command useful in automation. After
+printing the report and closing the database, the handler checks both quality
+gates: if `summary.recallAtK < config.benchmarkMinRecall` **or**
+`summary.mrr < config.benchmarkMinMrr`, it calls `process.exit(1)`
+(`src/cli/commands/benchmark.ts:29-31`). Either threshold failing is enough to
+fail the run.
+
+The default thresholds are `benchmarkMinRecall = 0.8` and `benchmarkMinMrr =
+0.6`, both configurable in the project config and validated to the `0..1` range
+(`src/config/index.ts:33-34`). A run that meets or exceeds both thresholds
+falls through to a normal exit (code `0`).
+
+| Outcome | Exit code | Cause |
+| --- | --- | --- |
+| Missing `<file>` argument | `1` | Usage printed, no work done (`src/cli/commands/benchmark.ts:10-13`) |
+| Recall or MRR below threshold | `1` | Either gate failed (`src/cli/commands/benchmark.ts:29-31`) |
+| Both gates passed | `0` | Normal completion |
+| Malformed query file | non-zero | Uncaught throw from the loader (`src/search/benchmark.ts:33-41`) |
+| Bad `--top` value | `1` | `CliFlagError` caught by the router (`src/cli/flags.ts:40-52`, `src/cli/index.ts:97-100`) |
 
 ## Inputs
 
 | Name | Type | Required | Description |
 | --- | --- | --- | --- |
-| `fixture` | positional path | yes | Path to the JSON query file. Missing value prints usage and exits 1 (`src/cli/commands/benchmark.ts:8-12`). |
-| `--dir` | path | no | Project directory whose index is queried. Defaults to `.`, resolved to an absolute path (`src/cli/commands/benchmark.ts:14`). |
-| `--top` | integer | no | Top-K cutoff for each search. Defaults to the project's `benchmarkTopK` config value (default 5) (`src/cli/commands/benchmark.ts:17`, `src/config/index.ts:32`). |
+| `<file>` | path (positional `args[1]`) | Yes | Path to the JSON query file. Resolved to an absolute path before loading. Missing value triggers the usage message and exit `1`. |
+| `--dir D` | path flag | No | Project directory whose index is benchmarked. Defaults to the current directory. Determines which `RagDB` is opened and where the config is loaded from (`src/cli/commands/benchmark.ts:15-17`). |
+| `--top N` | integer flag | No | Number of results retrieved per query (the K in recall@K and the cutoff for MRR). Defaults to `config.benchmarkTopK` (`5`), must be `>= 1` (`src/cli/commands/benchmark.ts:18`). |
 
-The pass/fail thresholds are not flags; they come from config: `benchmarkMinRecall` (default 0.8) and `benchmarkMinMrr` (default 0.6) (`src/config/index.ts:33-34`).
+The query file itself contributes structured input: each entry's `query` string
+and its `expected` file-path list, validated by `loadBenchmarkQueries`.
 
 ## Outputs
 
 | Output | Where it lands / shape / description |
 | --- | --- |
-| Benchmark report | Printed to stdout. A header with query count and top-K, three metric lines (Recall@K, MRR, Zero-miss rate), an optional "Missed queries" block listing each fully-missed query with its expected and got paths, and an optional "Partial matches" block for queries that found some but not all expected files (`src/search/benchmark.ts:107-138`). |
-| Exit code | 0 when recall and MRR both meet their minimums; 1 when either falls below, making the command usable as a CI gate (`src/cli/commands/benchmark.ts:25-30`). |
-
-## Metrics reference
-
-| Metric | Meaning | How computed |
-| --- | --- | --- |
-| Recall@K | Avg fraction of a query's expected files present in top-K | `found.length / expected.length`, averaged over queries (`src/search/benchmark.ts:74`,`99`) |
-| MRR | Avg reciprocal rank of first expected file | `1 / (i + 1)` of first match, 0 if none, averaged (`src/search/benchmark.ts:77-86`,`100`) |
-| Zero-miss rate | Fraction of queries finding none of their expected files | `misses / total` (`src/search/benchmark.ts:101-102`) |
-
-Precision and F-score are intentionally absent — the code computes only the three metrics above.
+| Status line | Printed to stdout before scoring: how many queries run against which directory (`src/cli/commands/benchmark.ts:21`). |
+| Benchmark report | Printed to stdout: recall@K, MRR, zero-miss rate, plus per-query miss and partial-match detail (`src/search/benchmark.ts:107-139`). |
+| Exit code | `0` when both thresholds pass, `1` when recall or MRR falls below the configured minimum, also `1` on missing argument or bad flag (`src/cli/commands/benchmark.ts:29-31`). |
 
 ## State changes
 
-The benchmark does not write any persistent state. It opens the index for reading and closes it before deciding the exit code (`src/cli/commands/benchmark.ts:15`,`25`). The only observable side effect besides stdout is the process exit code.
+This command does not write to the index, config, or any persistent store. It
+opens a `RagDB` connection, runs read-only searches, and closes the handle
+before exiting (`src/cli/commands/benchmark.ts:16`, `src/cli/commands/benchmark.ts:26`).
+The only externally observable effects are the printed report and the process
+exit code. No rows are inserted, no files are re-indexed, and the query file is
+read but never modified.
 
 ## Branches and failure cases
 
-- **Missing fixture argument** — prints usage and exits 1 (`src/cli/commands/benchmark.ts:8-12`).
-- **File not an array** — `loadBenchmarkQueries` throws "Benchmark file must be a JSON array of { query, expected } objects" (`src/search/benchmark.ts:33-35`).
-- **Entry missing `query` or with empty/missing `expected`** — throws an error naming the offending entry (`src/search/benchmark.ts:37-41`).
-- **Invalid JSON** — `JSON.parse` throws before validation (`src/search/benchmark.ts:31`).
-- **`--top` omitted** — falls back to `benchmarkTopK` (default 5) (`src/cli/commands/benchmark.ts:17`).
-- **Path matching** — an expected file counts as found when a result path equals it, ends with it, or is a suffix of it, so relative and absolute forms both match; relative expected paths are first resolved against the project dir (`src/search/benchmark.ts:46-50`,`71-73`).
-- **No results for a query** — recall and reciprocal rank are 0, the query counts as a miss, and the report shows "got: (no results)" (`src/search/benchmark.ts:122-125`).
-- **Below threshold** — recall below `benchmarkMinRecall` or MRR below `benchmarkMinMrr` exits 1; both at or above pass with exit 0 (`src/cli/commands/benchmark.ts:25-30`).
-- **Empty query set guard** — when there are zero queries, all averages are reported as 0 rather than dividing by zero (`src/search/benchmark.ts:99-102`).
+- **Missing query file argument** — `args[1]` is undefined, so the handler
+  prints `Usage: mimirs benchmark <file> [--dir D] [--top N]` and exits `1`
+  before opening the database (`src/cli/commands/benchmark.ts:10-13`).
+- **Invalid `--top` value** — a non-integer or sub-`1` value makes `intFlag`
+  throw a `CliFlagError`; the router's `try/catch` prints the message and exits
+  `1` rather than crashing (`src/cli/flags.ts:46-52`, `src/cli/index.ts:97-100`).
+- **Malformed query file** — non-array JSON or an entry missing `query` /
+  `expected` throws inside `loadBenchmarkQueries`. This is not caught in the
+  handler, so it propagates as a runtime error and non-zero exit
+  (`src/search/benchmark.ts:33-41`).
+- **Query that returns no results** — recorded as a miss; the report lists it
+  under missed queries with `got: (no results)` (`src/search/benchmark.ts:122-125`).
+- **Partial recall** — a query that finds some but not all expected files has
+  `recall` between `0` and `1` and `hit === true`; it appears in the partial
+  matches section (`src/search/benchmark.ts:130-136`).
+- **Empty query array** — a valid empty array passes validation; the aggregates
+  guard against division by zero and return `0` for recall and MRR, which then
+  fails both default thresholds and exits `1` (`src/search/benchmark.ts:99-102`).
+- **Below-threshold quality** — either `recallAtK < benchmarkMinRecall` or
+  `mrr < benchmarkMinMrr` triggers exit `1` (`src/cli/commands/benchmark.ts:29-31`).
+- **FTS unavailable** — inside the hybrid search, if the BM25 text query fails
+  it logs at debug level and falls back to vector-only results, so the benchmark
+  still completes (`src/search/hybrid.ts:330-334`).
 
 ## Example
 
 ```bash
-# queries.json:
-# [
-#   { "query": "open the database", "expected": ["src/db/index.ts"] },
-#   { "query": "hybrid search ranking", "expected": ["src/search/hybrid.ts"] }
-# ]
+# Run the default top-5 benchmark against the current project
+mimirs benchmark queries.json
 
-bun run mimirs benchmark queries.json --dir . --top 5
+# Benchmark a specific project with a wider top-10 cutoff
+mimirs benchmark ./bench/queries.json --dir ../other-project --top 10
 ```
 
-Illustrative report shape:
+In CI, the exit code is the contract:
 
-```
-Running 2 benchmark queries against /path/to/project...
-
-Benchmark results (2 queries, top-5):
-  Recall@5:      75.0%
-  MRR:            0.667
-  Zero-miss rate: 0.0% (0 queries)
-
-Partial matches (some expected files missing):
-  "hybrid search ranking" — recall: 50%
+```bash
+mimirs benchmark queries.json || {
+  echo "Search quality regressed below thresholds"
+  exit 1
+}
 ```
 
-If recall@5 had been below 80% or MRR below 0.6, the command would print the same report and then exit with code 1.
+## Related commands
 
-## Relationship to benchmark-models
-
-`benchmark` measures retrieval quality with whatever embedding model the index was built with. [benchmark-models](benchmark-models.md) is the broader experiment: it re-embeds and re-runs the same kind of query set across multiple candidate embedding models so you can pick the best one. Use `benchmark` for a single-config regression gate; use `benchmark-models` when choosing or comparing models.
-
-## Open questions
-
-- The fixture schema is the current `BenchmarkQuery` shape (`query`, `expected`); it is not formally frozen.
+- [benchmark-models](benchmark-models.md) — reuses the same `runBenchmark`
+  engine to compare retrieval quality across multiple embedding models, rather
+  than gating a single index against thresholds.
+- [eval](eval.md) — a sibling quality-evaluation command in the same CLI family.
 
 ## Key source files
 
-- `src/cli/commands/benchmark.ts` — command entry: argument parsing, orchestration, threshold-based exit code.
-- `src/search/benchmark.ts` — query loading, per-query scoring, summary metrics, report formatting.
-- `src/config/index.ts` — supplies `benchmarkTopK`, `benchmarkMinRecall`, `benchmarkMinMrr`, and `hybridWeight`.
-- `src/search/hybrid.ts` — the `search` function each query runs through.
+| File | Role |
+| --- | --- |
+| `src/cli/index.ts` | CLI router; dispatches the `benchmark` case to the handler and catches flag errors. |
+| `src/cli/commands/benchmark.ts` | Command handler: argument parsing, config loading, orchestration, report printing, and the threshold exit. |
+| `src/search/benchmark.ts` | Scoring service: query loading/validation, per-query recall and reciprocal rank, summary aggregation, and report formatting. |
+| `src/search/hybrid.ts` | The `search` function each query runs through; defines `DedupedResult`. |
+| `src/config/index.ts` | Defines `benchmarkTopK`, `benchmarkMinRecall`, `benchmarkMinMrr`, and `hybridWeight` defaults. |
+| `src/cli/flags.ts` | `intFlag` validation for `--top`. |

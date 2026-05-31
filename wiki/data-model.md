@@ -1,71 +1,112 @@
-# Data model
+# Data Model
 
-This page is the schema reference for anyone changing how mimirs stores state. Everything mimirs persists lives in one SQLite database per project at `.mimirs/index.db`, opened and migrated by the `RagDB` class. This page covers every table, how the vector and full-text indices stay in sync with their base tables, what cascades when a file is removed (and what does not), and where embeddings are written versus read. Per-feature write paths live on the linked flow pages; this page is the map of the storage itself.
+This page is the map of everything mimirs keeps on disk. It explains where the persistent state lives, how the SQLite schema is laid out, which tables back which features, and the few invariants that hold the whole index together. Read it when you are about to add a table, change a column, alter how embeddings are stored, or debug why an index will not open. The per-feature behavior (how a search runs, how a checkpoint is written) lives on the flow pages linked below; here we cover only the shape of the stored data and the contracts around it.
 
-## One database, one schema bootstrap
+## Where state lives
 
-`RagDB` opens `.mimirs/index.db`, sets WAL journaling and a 5-second busy timeout, loads the `sqlite-vec` extension, and runs `initSchema()` (`src/db/index.ts:118-123`). `initSchema` creates every table with `CREATE TABLE IF NOT EXISTS`, so opening an existing database is idempotent, then runs a series of in-place migrations and clean-ups (`src/db/index.ts:125-373`). The schema text in that one method is the source of truth — there is no separate migration directory. To add a table or column, edit `initSchema` and, if existing databases need backfilling, add a migration helper alongside `migrateChunksEntityColumns` and friends (`src/db/index.ts:369-373`).
+Everything mimirs persists for a project sits in one directory: `.mimirs/` at the project root. It holds exactly two things that matter — a JSON config file and a single SQLite database.
 
-The active embedding dimension is baked into every vector table at creation time via `getEmbeddingDim()` interpolated into the `vec0` column type, e.g. `embedding FLOAT[${getEmbeddingDim()}]` (`src/db/index.ts:146-149`). This is the data-model side of the embedding contract: a database built with one model's dimension cannot be queried with a different-dimension model, because the `vec0` columns are fixed-width.
+The database is opened in the `RagDB` constructor (`src/db/index.ts:90-140`). By default it resolves to `<projectDir>/.mimirs/index.db`, but the location is overridable: if the `RAG_DB_DIR` environment variable is set, the whole `.mimirs` directory is placed there instead (`src/db/index.ts:101-106`). This matters for read-only checkouts and sandboxes — when the project tree cannot be written, you point `RAG_DB_DIR` at a writable path. The constructor creates the directory eagerly and translates a read-only or permission-denied failure (`EROFS`/`EACCES`) into an actionable error that names exactly which env var to set (`src/db/index.ts:108-123`).
+
+Opening the database does three things before any query runs: it switches the journal to WAL mode and sets a 5-second busy timeout so concurrent mimirs processes (one per IDE window) do not immediately error on lock contention, it loads the `sqlite-vec` extension that provides the vector tables, and it runs the embedding-dimension guard and the schema bootstrap (`src/db/index.ts:134-139`). On macOS the constructor first repoints `bun:sqlite` at a Homebrew-built libsqlite3, because Apple's bundled SQLite cannot load extensions and `sqlite-vec` would fail (`src/db/index.ts:41-62`).
 
 ```mermaid
-erDiagram
-  files ||--o{ chunks : "file_id (cascade)"
-  files ||--o{ file_imports : "file_id (cascade)"
-  files ||--o{ file_exports : "file_id (cascade)"
-  files ||--o{ symbol_refs : "file_id (cascade)"
-  chunks ||--o{ symbol_refs : "chunk_id (cascade)"
-  chunks ||--o| vec_chunks : "chunk_id (manual)"
-  chunks ||--o| fts_chunks : "rowid (trigger)"
-  file_exports ||--o{ symbol_refs : "resolved_export_id (set null)"
-  conversation_sessions ||--o{ conversation_turns : "session_id"
-  conversation_turns ||--o{ conversation_chunks : "turn_id (cascade)"
-  conversation_chunks ||--o| vec_conversation : "chunk_id"
-  conversation_checkpoints ||--o| vec_checkpoints : "checkpoint_id"
-  git_commits ||--o{ git_commit_files : "commit_id (cascade)"
-  git_commits ||--o| vec_git_commits : "commit_id"
-  annotations ||--o| vec_annotations : "annotation_id"
-  annotations ||--o| fts_annotations : "rowid (manual)"
+graph TD
+  ProjectDir[".mimirs/ directory<br>(or RAG_DB_DIR)"]
+  ProjectDir --> ConfigFile["config.json<br>indexing + embedding settings"]
+  ProjectDir --> DbFile["index.db<br>single SQLite database (WAL)"]
+
+  DbFile --> CodeGroup["Code index<br>files, chunks, graph"]
+  DbFile --> ConvGroup["Conversation index<br>sessions, turns, checkpoints"]
+  DbFile --> GitGroup["Git index<br>commits + per-file stats"]
+  DbFile --> MetaGroup["Metadata<br>annotations, query_log"]
+
+  CodeGroup --> VecExt["sqlite-vec virtual tables<br>(vec_*) + fts5 (fts_*)"]
+  ConvGroup --> VecExt
+  GitGroup --> VecExt
+  MetaGroup --> VecExt
 ```
 
-## Core code-index tables
+## config.json on disk
 
-The code index is rooted at **`files`**: id, unique `path`, content `hash`, and `indexed_at` (`src/db/index.ts:127-132`). The hash is how re-indexing decides whether a file changed; clearing it forces a re-emit, which the `symbol_refs` backfill exploits (`src/db/index.ts:387-404`).
+The config file is `.mimirs/config.json`. It is loaded by `loadConfig` (`src/config/index.ts:132-160`), which has a deliberately simple contract: what is on disk is what runs. There is no merge of partial user config over defaults. If the file is missing, the full default config is written to disk so a user can edit it directly, and those defaults are used (`src/config/index.ts:136-140`). If the file exists but is invalid JSON, or fails schema validation, mimirs logs a warning and falls back to the complete defaults rather than running with a half-applied config (`src/config/index.ts:142-159`).
 
-Each file's content is split into **`chunks`** — one row per function, class, or section — carrying `chunk_index`, the `snippet` text, optional `entity_name`/`chunk_type`, `start_line`/`end_line` for navigation, and a `content_hash`. Chunks reference `files(id)` with `ON DELETE CASCADE` (`src/db/index.ts:134-144`). The TypeScript view of a chunk is `StoredChunk`, which also exposes `parentId` for the parent/child grouping used in search (`src/db/types.ts:1-11`); `parent_id` is added by a migration rather than the base `CREATE TABLE` (`src/db/index.ts:370`).
+The schema is a Zod object, `RagConfigSchema` (`src/config/index.ts:17-35`), and `RagConfig` is its inferred type. The fields that change stored data are:
 
-The dependency graph is three tables. **`file_imports`** records each import statement: `source`, the imported `names`, a `resolved_file_id` pointing at the imported file (or `NULL` if unresolved), and default/namespace flags (`src/db/index.ts:168-176`). **`file_exports`** records each exported symbol with its `name`, `type`, and re-export metadata (`src/db/index.ts:178-186`). **`symbol_refs`** records each in-code reference: the `chunk_id` and `file_id` where it occurs, the symbol `name`, the `line`, and a `resolved_export_id` linking the reference to the export it resolves to (`src/db/index.ts:194-201`). Together these answer "who imports this file", "who calls this symbol", and "where is this defined" — the data behind [search](tools/search.md)'s graph boost and the find-usages tooling.
+| Field | Default | What it controls |
+| --- | --- | --- |
+| `include` / `exclude` / `generated` | large built-in globs | which files get indexed at all (`src/config/index.ts:40-113`) |
+| `chunkSize` / `chunkOverlap` | 512 / 50 | how source is split into `chunks` rows |
+| `embeddingModel` / `embeddingDim` | unset (→ MiniLM / 384) | which model produces vectors and how wide they are |
+| `incrementalChunks`, `embeddingMerge`, `parentGroupingMinCount` | false / true / 2 | chunking + embedding strategy |
+| `hybridWeight` / `searchTopK` | 0.7 / 10 | query-time blend and result count, not stored shape |
 
-The two indices that make code search fast are derived from `chunks`, not stored independently. **`vec_chunks`** is a `sqlite-vec` virtual table keyed by `chunk_id` holding the embedding vector (`src/db/index.ts:146-149`). **`fts_chunks`** is an FTS5 contentless table mirroring the `snippet` column, kept in sync by three triggers — `chunks_ai`, `chunks_ad`, `chunks_au` — that insert, tombstone, and re-insert FTS rows on every chunk insert/delete/update (`src/db/index.ts:151-166`). The hybrid search service queries `vec_chunks` for vector neighbors and `fts_chunks` for keyword hits, then merges them; both ultimately resolve back to `chunks` rows.
+The two embedding fields are the ones with a hard link to the database. The glob `include`/`exclude`/`generated` lists are normalized to forward slashes at parse time so a Windows-style `node_modules\**` still works as a POSIX glob (`src/config/index.ts:12-15`).
 
-## Auxiliary tables
+## The embedding-dimension contract
 
-Beyond the code index, the same database holds five more record types, each with its own search indices.
+Every vector column in the database is a fixed-width `FLOAT[N]` declared by the `sqlite-vec` extension. `N` is whatever the configured embedding model produces, defaulting to 384 for the bundled `Xenova/all-MiniLM-L6-v2` model (`src/embeddings/embed.ts:16-17`). A vector table built at one width cannot accept vectors of another width, so the configured model and the stored index must agree forever — or until the index is rebuilt.
 
-**Conversation history** spans three tables. `conversation_sessions` tracks each indexed session by `session_id`, its JSONL path, counts, and a `read_offset` for incremental tailing (`src/db/index.ts:208-219`). `conversation_turns` holds one row per user/assistant exchange, unique on `(session_id, turn_index)`, with the text, tools used, files referenced, and a summary (`src/db/index.ts:221-233`). `conversation_chunks` splits turn text for retrieval and cascades from `conversation_turns` (`src/db/index.ts:235-240`); it has its own `vec_conversation` and `fts_conversation` indices with the same trigger pattern as code chunks (`src/db/index.ts:242-262`).
+Two pieces of code enforce this. First, the dimension is applied *before* the schema is created. The `RagDB` constructor calls `applyEmbeddingConfigFromDisk` (`src/config/index.ts:182-203`), a synchronous best-effort reader that pulls only `embeddingModel` and `embeddingDim` out of `config.json` and configures the embedder, so that when `initSchema` later writes `FLOAT[${getEmbeddingDim()}]` the tables are created at the right width by construction (`src/db/index.ts:125-139`). The constructor is synchronous and cannot await the async `loadConfig`, which is why a second, narrower reader exists; the async path still owns writing defaults and surfacing validation warnings.
 
-**Checkpoints** live in `conversation_checkpoints`: a `type` (decision, milestone, blocker, etc.), `title`, `summary`, JSON `files_involved` and `tags`, plus an inline `embedding BLOB`, tagged to the session and turn that created them (`src/db/index.ts:266-277`). Their vectors are also mirrored into a `vec_checkpoints` virtual table for similarity search (`src/db/index.ts:282-285`). The TypeScript shape is `CheckpointRow` (`src/db/types.ts:71-81`). See [create_checkpoint](tools/create-checkpoint.md) for the write path.
+Second, if the database already exists, the constructor runs `assertEmbeddingDimCompatible` (`src/db/index.ts:149-168`) before touching the schema. It reads the stored `CREATE TABLE` SQL for `vec_chunks` out of `sqlite_master`, parses the declared `FLOAT[N]`, and compares it to the currently configured dimension. On a mismatch it throws immediately with a message naming both widths and telling the maintainer to restore the previous embedding settings or delete the index — never to silently re-create tables. The stored index wins. This turns an otherwise cryptic vec0 insert failure that would surface deep inside an indexing run into a clear, early error.
 
-**Git history** is `git_commits` (unique `hash`, message, author, date, JSON `files_changed`, line counts, merge flag, `diff_summary`) plus a `git_commit_files` join table keyed by `(commit_id, file_path)` that cascades on commit delete and is indexed by path for per-file history (`src/db/index.ts:297-321`). Commits get both a `vec_git_commits` vector index and an `fts_git_commits` table over `message` and `diff_summary`, again trigger-synced (`src/db/index.ts:323-342`). `GitCommitRow` is the row shape (`src/db/types.ts:83-97`). Per-file commit history is read back through [file_history](tools/file-history.md).
+## Core code tables: files → chunks → vectors
 
-**Annotations** live in the `annotations` table (path, optional `symbol_name`, `note`, `author`, timestamps) with an `idx_ann_path` index, an `fts_annotations` FTS table, and a `vec_annotations` vector table (`src/db/index.ts:346-366`). The TypeScript view is `AnnotationRow` (`src/db/types.ts:47-55`).
+The heart of the index is a three-layer split created in `initSchema` (`src/db/index.ts:170-200`). The `files` table is one row per indexed file, keyed by a unique `path` with a content `hash` and an `indexed_at` timestamp; the hash is how the indexer decides whether a file changed. The `chunks` table is one row per semantic unit (a function, class, or markdown section) carved out of a file, holding the `snippet` text, the entity name and type, the `start_line`/`end_line` range, a `content_hash`, and a `parent_id` for nesting. A `chunks.file_id` foreign key cascades on delete, so removing a file drops its chunks.
 
-**Search analytics** live in `query_log`: the `query` text, `result_count`, `top_score`, `top_path`, `duration_ms`, and `created_at` (`src/db/index.ts:287-295`). Every hybrid search call appends one row through `logQuery`, which the analytics reporting reads back via `getAnalytics`/`getAnalyticsTrend` (`src/db/analytics.ts:3-69`).
+The chunk text exists in three forms at once, and keeping them in sync is the central invariant of this part of the schema:
 
-## Cascade behavior on file removal
+- The plain row in `chunks` is the source of truth.
+- `vec_chunks` is a `sqlite-vec` virtual table (`vec0`) holding the embedding vector for each chunk, keyed by `chunk_id`.
+- `fts_chunks` is an FTS5 virtual table providing keyword search, declared as an external-content table over `chunks` (`content='chunks'`).
 
-Removing a file is not a single `DELETE`, because the vector tables do not participate in SQLite foreign-key cascades. `vec_chunks` is a `sqlite-vec` virtual table; deleting a `chunks` row would orphan its vector. So `removeFile` runs a transaction that first deletes each chunk's `vec_chunks` row by id, then deletes the `chunks` rows, then the `files` row (`src/db/files.ts:254-267`). The same manual-vector-then-base pattern is used on re-index, where `upsertFileStart` deletes old `vec_chunks` and `chunks` before re-inserting, deliberately preserving `files.id` so that `file_imports.resolved_file_id` foreign keys keep pointing at the file (`src/db/files.ts:40-60`). When deleting the file row, the `ON DELETE CASCADE` on `chunks`, `file_imports`, `file_exports`, and `symbol_refs` cleans up the relational side automatically — the manual step exists only for the virtual vector table. The invariant to preserve when changing removal logic: every `vec_*` row must be deleted explicitly before its base row, and a file's id must survive a re-index.
+FTS5 external-content tables do not auto-update, so three triggers — `chunks_ai`, `chunks_ad`, `chunks_au` — mirror every insert, delete, and update of a `chunks` row into `fts_chunks` (`src/db/index.ts:202-211`). The vector table needs special handling: a `vec0` virtual table cannot be a foreign-key child, so the cascade that cleans up `chunks` can never reach it. A fourth trigger, `chunks_vec_ad`, fires on every `chunks` delete and removes the matching `vec_chunks` row (`src/db/index.ts:218-220`). This is why the file-upsert path can simply `DELETE FROM chunks` and trust that both the FTS and vector mirrors clean themselves up from one place, rather than every caller remembering a manual vector delete (`src/db/files.ts:43-57`). At query time, vector search joins back from `vec_chunks` to `chunks` (`src/db/search.ts:67`, `src/db/search.ts:152`). This shape — base table, `vec_*` sibling, `fts_*` sibling, sync triggers — repeats for conversation chunks, checkpoints, git commits, and annotations.
 
-## Where embeddings are written and read
+## Graph tables: imports, exports, and symbol references
 
-Embeddings are written into the `vec_*` virtual tables, never the base tables (the one exception being the inline `embedding BLOB` column on `conversation_checkpoints`, which is written in addition to `vec_checkpoints`). Chunk vectors are written by `insertChunkBatch` as raw bytes — `new Uint8Array(embedding.buffer)` — into `vec_chunks` right after the matching `chunks` insert (`src/db/files.ts:93-101`). Annotation vectors are written into `vec_annotations` the same way, deleting any prior vector first on update so an edited note never carries a stale embedding (`src/db/annotations.ts:42-60`). Checkpoint and git-commit vectors follow the identical write-once pattern into their own tables.
+Three tables turn the flat file/chunk store into a dependency and call graph, all created in `initSchema` (`src/db/index.ts:222-260`). `file_imports` records each import statement of a file: the `source` string, the imported `names`, flags for default and namespace imports, and a `resolved_file_id` that points at the imported file once the resolver has matched it (or `NULL` for externals, set to null on delete). `file_exports` records each exported symbol with its `name`, `type`, and re-export bookkeeping. `symbol_refs` records each identifier occurrence inside a chunk — its `name`, `line`, the owning `chunk_id` and `file_id`, and a `resolved_export_id` that links the reference to the `file_exports` row it actually calls.
 
-They are read back during similarity search: the hybrid search service embeds the query and asks `vec_chunks` for nearest neighbors; checkpoint, conversation, annotation, and commit searches each query their respective `vec_*` table. The contract is symmetric — the same embedding model and dimension that wrote a vector must be active when reading it, which is why the dimension is fixed into the `vec0` column at schema creation (`src/db/index.ts:146-149`) and the embedding config is applied before any tool runs. See [index_files](tools/index-files.md) for how chunk embeddings get written during indexing and [annotate](tools/annotate.md) for the annotation write path.
+These power [`project_map`](tools/project-map.md), `depends_on`/`depended_on_by`, and `find_usages`. The contract is that references are written unresolved and resolved in a second pass: `upsertSymbolRefs` replaces all of a file's refs with `resolved_export_id` set to `NULL` (`src/db/graph.ts:11-26`), and `resolveSymbolRefs` later matches each ref name against the file's resolved imports and the target's exports to fill in the link (`src/db/graph.ts:38-90`). Refs that match nothing (locals, type references, unresolved externals) stay `NULL`, and usage lookups fall back to FTS for those. A row of indexes on `file_id`, `resolved_file_id`, `name`, and `resolved_export_id` keeps these joins fast (`src/db/index.ts:242-260`).
+
+## Conversation tables: sessions, turns, chunks, checkpoints
+
+A parallel index covers Claude Code session transcripts (`src/db/index.ts:262-338`). `conversation_sessions` is one row per `.jsonl` transcript file, tracking its path, start time, turn and token counts, and crucially a `read_offset` and `file_mtime` so re-indexing only reads the new tail of an append-only log (`src/db/conversation.ts:5-22`). `conversation_turns` is one row per user/assistant exchange, storing both texts plus JSON-encoded `tools_used` and `files_referenced` arrays, uniquely keyed by `(session_id, turn_index)` so re-indexing the same turn is ignored. `conversation_chunks` is the embeddable text of a turn, with its own `vec_conversation` and `fts_conversation` siblings and the same three sync triggers (`conv_chunks_ai/ad/au`, `src/db/index.ts:307-316`). Inserting a turn is one transaction that writes the turn, then each chunk, then each chunk's vector, and bails if the turn was a duplicate (`src/db/conversation.ts:56-115`). This backs [`search_conversation`](tools/search-conversation.md).
+
+Checkpoints are durable agent notes stored in `conversation_checkpoints` (`src/db/index.ts:320-333`): `type`, `title`, `summary`, and JSON-encoded `files_involved` and `tags`. Their embeddings live in a separate `vec_checkpoints` table — the base table has no embedding column, deliberately matching the chunks/`vec_chunks` split (`src/db/checkpoints.ts:18-45`). Writing a checkpoint is a transaction that inserts the row, grabs `last_insert_rowid()`, then inserts the vector keyed by that id; search joins `vec_checkpoints` back to the base table and converts vec distance to a `1/(1+distance)` score (`src/db/checkpoints.ts:91-144`). This backs [`create_checkpoint`](tools/create-checkpoint.md). Note checkpoints have no FTS sibling — they are vector-search and list-only.
+
+## Git history: commits and per-file stats
+
+When commit history is indexed, two tables store it (`src/db/index.ts:350-386`). `git_commits` is one row per commit, uniquely keyed by full `hash`, holding the message, author name and email, ISO `date`, a JSON `files_changed` list, aggregate insertion/deletion counts, an `is_merge` flag, `refs`, and a `diff_summary`. `git_commit_files` is the per-file breakdown, with a composite primary key of `(commit_id, file_path)` and an index on `file_path` so [`file_history`](tools/file-history.md) can look up a path cheaply. Commit embeddings live in `vec_git_commits`, and `fts_git_commits` is an FTS5 table over both `message` and `diff_summary` (`src/db/index.ts:376-386`).
+
+Inserts use `INSERT OR IGNORE` on `git_commits` keyed by hash so re-indexing is safe; only when a row was actually inserted does the batch write its vector and per-file rows (`src/db/git-history.ts:21-69`). This is what lets the indexer index only new commits since `getLastIndexedCommit` (`src/db/git-history.ts:71-78`). Because `vec_git_commits` and `fts_git_commits` are virtual tables outside the FK cascade, the purge and clear paths delete from all three tables explicitly inside one transaction and then `'rebuild'` the FTS index (`src/db/git-history.ts:308-340`). This backs [`mimirs history`](cli/history.md) and the [`search_commits`](tools/search-commits.md) tool.
+
+## Metadata: annotations and the query log
+
+Two small tables round out the schema. `annotations` (`src/db/index.ts:399-419`) stores maintainer notes pinned to a `path` and optional `symbol_name`, with `note` text, `author`, and created/updated timestamps. It has the full trio of siblings — `fts_annotations` for keyword search and `vec_annotations` for semantic search — but the sync is done manually inside `upsertAnnotation` rather than by triggers, because an upsert may update an existing note (deleting the old FTS and vector rows first) or insert a new one (`src/db/annotations.ts:4-50`). This backs [`annotate`](tools/annotate.md) and [`get_annotations`](tools/get-annotations.md).
+
+`query_log` (`src/db/index.ts:340-348`) is a flat, append-only audit table: one row per search with the `query`, `result_count`, `top_score`, `top_path`, `duration_ms`, and `created_at`. It is the only table written purely as a side effect of reads — `db.logQuery` is called at the end of search (`src/search/hybrid.ts:388`, `src/search/hybrid.ts:546`). The aggregation functions read it over a time window: `getAnalytics` computes totals, averages, zero-result queries, low-score queries (`top_score < 0.3`), and per-day counts (`src/db/analytics.ts:10-67`), while `getAnalyticsTrend` compares the current window against the prior one (`src/db/analytics.ts:69-116`). This is what powers [`search_analytics`](tools/search-analytics.md), whose whole purpose is to surface documentation gaps from real query history.
+
+## Schema bootstrap, migrations, and recovery
+
+`initSchema` is the single owner of the schema. Every `CREATE TABLE`, `CREATE VIRTUAL TABLE`, `CREATE INDEX`, and `CREATE TRIGGER` uses `IF NOT EXISTS`, so the constructor runs it unconditionally on every open and it is idempotent for an up-to-date database. After the creates, it runs a series of additive migrations that bring older databases forward by checking `PRAGMA table_info` and `ALTER TABLE ADD COLUMN` for any missing column — the entity columns on `chunks`, the `parent_id` column, and the import/export graph flag columns (`src/db/index.ts:527-591`). The `parent_id` index is created in the migration rather than the main schema block, because that is the earliest point the column is guaranteed to exist on an old database.
+
+Two of the post-create steps are recovery passes, not plain migrations. `dedupeChunks` collapses duplicate chunk rows that two concurrent mimirs processes could have written for the same file, then clears the affected files' `hash` so the next indexing pass re-emits them cleanly (`src/db/index.ts:474-525`). `backfillMissingSymbolRefs` finds files that have resolved imports but zero `symbol_refs` — databases built before the symbol-reference feature shipped — and clears their hash for the same reason (`src/db/index.ts:440-459`). Both lean on the same invariant: clearing `files.hash` is the safe, universal "re-index me" signal, because the indexer re-emits a file whenever its stored hash does not match the file on disk.
+
+The seam for schema changes is therefore narrow and clear. A new table or column goes into `initSchema`; if it must land on existing databases, add a `PRAGMA table_info` guard in the matching `migrate*` method. A new feature table that follows the embeddable pattern needs four pieces in lockstep — the base table, a `vec_*` sibling at `FLOAT[${getEmbeddingDim()}]`, an `fts_*` external-content sibling, and either sync triggers or manual mirror maintenance — or the vector and keyword views will silently drift out of sync with the base rows.
+
+## How indexing and reading touch the store
+
+The write side is driven by indexing: [`index_files`](tools/index-files.md) and [`mimirs init`](cli/init.md) populate `files`, `chunks`, the vector/FTS mirrors, and the graph tables. The read side is the long-running server started by [`mimirs serve`](cli/serve.md), which opens one `RagDB` and routes every tool call through the wrapper methods on the `RagDB` class. That class is the only public surface over the database: each store module (`files`, `search`, `graph`, `conversation`, `checkpoints`, `annotations`, `analytics`, `git-history`) exports plain functions that take a `Database`, and `RagDB` holds the connection and delegates to them (`src/db/index.ts:593-897`). Adding a query means adding a function in the relevant store module and a one-line delegating method on `RagDB`; nothing else opens the database directly.
 
 ## Key source files
 
-- `src/db/index.ts` — `RagDB` and `initSchema`: the complete schema, all `vec0`/FTS5 virtual tables, the sync triggers, and the migrations. The single place to edit the data model.
-- `src/db/types.ts` — the TypeScript row shapes (`StoredChunk`, `AnnotationRow`, `CheckpointRow`, `GitCommitRow`, etc.) that mirror the table columns.
-- `src/db/files.ts` — `upsertFileStart`/`insertChunkBatch`/`removeFile`: where chunk embeddings are written and where the manual vector-then-base delete cascade is enforced.
-- `src/db/annotations.ts` — `upsertAnnotation`: the annotation write path showing FTS and vector tables kept in sync on insert and update.
-- `src/db/analytics.ts` — `logQuery`/`getAnalytics`: the writer and readers for the `query_log` analytics table.
+- `src/db/index.ts` — the `RagDB` class, the full `initSchema` schema, the embedding-dim guard, and all migrations/recovery passes.
+- `src/config/index.ts` — `config.json` loading, the `RagConfig` schema and defaults, and the synchronous embedding-config reader the DB constructor depends on.
+- `src/db/files.ts` — file/chunk upsert and pruning, the source of the `chunks`-delete-cascades-to-mirrors behavior.
+- `src/db/graph.ts` — symbol-reference write and two-pass resolution against imports and exports.
+- `src/db/conversation.ts` — session/turn/chunk inserts for the conversation index.
+- `src/db/checkpoints.ts` — checkpoint write and vector search over `vec_checkpoints`.
+- `src/db/git-history.ts` — commit batch insert, incremental hashing, and the purge/clear paths across the three git tables.
+- `src/db/analytics.ts` — `query_log` writer and the windowed aggregation/trend queries.
+- `src/embeddings/embed.ts` — the default model and dimension and the `getEmbeddingDim` source of truth for vector-column widths.

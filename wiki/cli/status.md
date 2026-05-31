@@ -1,145 +1,124 @@
 # CLI: status
 
-`mimirs status` gives a quick, offline answer to "is this project indexed, and
-how much?" It opens the project's local database, reads three numbers — how many
-files and chunks are stored and when the most recent file was indexed — and
-prints them. It does not contact a running server and does not change anything.
+`mimirs status [dir]` is a fast, read-only health check for a project's search index. It answers three questions without re-indexing anything: how many files are tracked, how many searchable chunks exist, and when the index was last updated. Reach for it when you want to confirm that a directory has actually been indexed, gauge how stale the index is before trusting a search, or sanity-check that an indexing run produced the file and chunk counts you expected.
 
-Reach for it when you want to confirm an index exists and is not empty, for
-example right after running [index](index.md) or when debugging why
-[search](search.md) returns nothing. It reads straight from the database on
-disk, so it works whether or not the MCP server is running.
+The command does almost no work of its own. It opens the project database, runs three small counting queries, prints the numbers, and closes the connection. There is no embedding, no scanning of the file system, and no writing — running `status` twice in a row produces identical output and leaves the index untouched.
 
-The whole command is `statusCommand` in `src/cli/commands/status.ts:5`. The
-numbers come from `getStatus` in `src/db/files.ts:363`.
+## How it runs
 
-## What the command does
-
-`statusCommand` resolves the target directory, opens the database, calls
-`getStatus`, prints a four-line summary, and closes the database
-(`src/cli/commands/status.ts:5-13`).
+The CLI entry point reads the process arguments and dispatches on the first word. When that word is `status`, it calls the status handler with the full argument list `src/cli/index.ts:124-125`. The handler resolves the target directory, opens the index, reads the stats, prints them, and closes `src/cli/commands/status.ts:5-14`.
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant User
-    participant Cmd as statusCommand
-    participant DB as RagDB (.mimirs)
-    participant Q as getStatus
+    participant CLI as cli/index.ts (dispatch)
+    participant Handler as statusCommand
+    participant DB as RagDB
+    participant Files as getStatus (db/files.ts)
+    participant SQLite as index.db
 
-    User->>Cmd: mimirs status [dir]
-    Cmd->>DB: new RagDB(dir)
-    Cmd->>Q: db.getStatus()
-    Q->>DB: COUNT(*) files, COUNT(*) chunks, MAX(indexed_at)
-    Q-->>Cmd: { totalFiles, totalChunks, lastIndexed }
-    Cmd->>User: print Files / Chunks / Last indexed
-    Cmd->>DB: db.close()
+    User->>CLI: mimirs status [dir]
+    CLI->>Handler: statusCommand(args)
+    Handler->>Handler: resolve dir (arg or ".")
+    Handler->>DB: new RagDB(dir)
+    DB->>SQLite: open .mimirs/index.db (create if missing)
+    Handler->>Files: db.getStatus()
+    Files->>SQLite: COUNT(*) files, COUNT(*) chunks,<br>latest indexed_at
+    Files-->>Handler: { totalFiles, totalChunks, lastIndexed }
+    Handler->>User: print Files / Chunks / Last indexed
+    Handler->>DB: db.close()
 ```
 
-1. The user runs the command, optionally naming a directory. The first
-   positional argument is the directory; if it is missing or starts with `--`,
-   the current directory is used. The path is resolved to absolute
-   (`src/cli/commands/status.ts:6`).
-2. The command opens the project database with `new RagDB(dir)`
-   (`src/cli/commands/status.ts:7`).
-3. It calls `db.getStatus()`, which runs three SQL queries: a `COUNT(*)` over
-   the `files` table, a `COUNT(*)` over the `chunks` table, and a query for the
-   most recent `indexed_at` value (`src/cli/commands/status.ts:8`,
-   `src/db/files.ts:363-380`).
-4. It prints a header naming the directory, then the file count, chunk count,
-   and last-indexed timestamp (`src/cli/commands/status.ts:9-12`).
-5. It closes the database (`src/cli/commands/status.ts:13`).
+1. The user runs `mimirs status` with an optional directory. The shell hands the arguments to the CLI, which slices off the program name and treats the remaining words as `args`, dispatching on `args[0]` `src/cli/index.ts:25-26`.
+2. The `status` branch of the dispatcher awaits `statusCommand(args)`, passing the whole argument array so the handler can read the optional directory itself `src/cli/index.ts:124-125`.
+3. The handler resolves the target directory. It uses `args[1]` only when that argument exists and does not start with `--`; otherwise it falls back to the current directory `"."`. The chosen value is run through `resolve(...)` so the printed path and the database location are absolute `src/cli/commands/status.ts:6`.
+4. The handler constructs a `RagDB` for that directory. The constructor locates the index folder (`.mimirs` under the project, or an override), ensures it exists, opens `index.db`, and creates the schema if it is not already present `src/db/index.ts:94-140`.
+5. The handler calls `db.getStatus()`, which delegates to the `getStatus` helper in the files module `src/db/index.ts:646-648`.
+6. `getStatus` issues three SQL queries against `index.db`: a `COUNT(*)` on `files`, a `COUNT(*)` on `chunks`, and a single-row lookup of the most recent `indexed_at` timestamp `src/db/files.ts:354-372`.
+7. The numbers come back as `{ totalFiles, totalChunks, lastIndexed }`. The handler prints a header with the resolved directory, then one line each for files, chunks, and the last-indexed time, substituting the literal `never` when no file has ever been indexed `src/cli/commands/status.ts:9-12`.
+8. The handler closes the database connection so the process can exit cleanly `src/cli/commands/status.ts:13`.
 
 ## Inputs
 
 | name | type | required | description |
-|------|------|----------|-------------|
-| directory | positional arg | no | Project directory to inspect. Taken from `args[1]` only when present and not a flag; otherwise defaults to `.` and is resolved to an absolute path (`src/cli/commands/status.ts:6`). |
+| --- | --- | --- | --- |
+| `dir` (positional) | string | no | Project directory to inspect, read from `args[1]`. Accepted only if present and not starting with `--`; otherwise the current working directory is used. Resolved to an absolute path before opening the index `src/cli/commands/status.ts:6`. |
 
-The data it reports comes entirely from the `.mimirs` database for that
-directory; there are no other inputs and no flags.
+There are no flags for this command. Any leading `--` argument in the slot where a directory would go is ignored, and the resolver falls back to `"."`.
 
 ## Outputs
 
 | output | where it lands / shape / description |
-|--------|--------------------------------------|
-| Header | `Index status for <dir>:` printed to stdout (`src/cli/commands/status.ts:9`). |
-| `Files` | `status.totalFiles` — the row count of the `files` table (`src/cli/commands/status.ts:10`, `src/db/files.ts:364-367`). |
-| `Chunks` | `status.totalChunks` — the row count of the `chunks` table (`src/cli/commands/status.ts:11`, `src/db/files.ts:368-370`). |
-| `Last indexed` | `status.lastIndexed`, or the literal `never` when it is null — the newest `indexed_at` timestamp across all files (`src/cli/commands/status.ts:12`, `src/db/files.ts:371-379`). |
+| --- | --- |
+| Status header | Stdout line `Index status for <absolute dir>:` echoing the resolved directory `src/cli/commands/status.ts:9`. |
+| `Files` | Stdout line with the total number of tracked files — the row count of the `files` table `src/cli/commands/status.ts:10`. |
+| `Chunks` | Stdout line with the total number of searchable chunks — the row count of the `chunks` table `src/cli/commands/status.ts:11`. |
+| `Last indexed` | Stdout line with the newest `indexed_at` timestamp (ISO 8601 string), or the word `never` when the `files` table is empty `src/cli/commands/status.ts:12`. |
 
-This command is read-only: it writes nothing to disk and changes no stored
-state.
+All four lines go to stdout through the CLI logger, which is a thin wrapper over `console.log` with no prefix `src/utils/log.ts:49-53`. The command does not change its process exit code on its own; it returns normally after closing the database.
 
-## When to use status vs the MCP tools
+## Where the numbers come from
 
-All three surfaces report on the index, but they differ in scope and in whether
-a server must be running.
+`getStatus` reads three pieces of state straight from `index.db` `src/db/files.ts:354-372`:
 
-| | `mimirs status` (CLI) | `index_status` (MCP tool) | `server_info` (MCP tool) |
-|--|------------------------|----------------------------|---------------------------|
-| How it runs | standalone CLI, reads the DB directly | a tool call to a running server | a tool call to a running server |
-| Server required | no | yes | yes |
-| Reports | files, chunks, last-indexed for one directory | index counts and indexing progress as seen by the server | which projects/databases the server has connected |
+- `totalFiles` is `SELECT COUNT(*) FROM files`. Each row in `files` is one indexed file, with a unique `path`, a content `hash`, and an `indexed_at` timestamp `src/db/index.ts:172-177`.
+- `totalChunks` is `SELECT COUNT(*) FROM chunks`. Each chunk is a semantic unit (a function, class, or section) belonging to a file via `file_id`, and is what search actually ranks `src/db/index.ts:179-189`.
+- `lastIndexed` is the single newest `indexed_at`, found by `ORDER BY indexed_at DESC LIMIT 1`. The value is an ISO 8601 string written with `new Date().toISOString()` whenever a file is inserted or re-indexed `src/db/files.ts:51-61`. Because indexing updates a file's `indexed_at` in place on every run, this reflects the most recent indexing activity, not the first.
 
-Prefer `mimirs status` for a fast, offline sanity check from the shell. Use
-[index_status](../tools/index-status.md) or [server_info](../tools/server-info.md)
-when an agent needs the live view from inside a running server session.
+The same `getStatus` method backs other surfaces, so the numbers here match what those report. The MCP `index_status` tool and the post-index summary both call `db.getStatus()` and read the same `totalFiles` / `totalChunks` fields `src/tools/index-tools.ts:56-66`, and the session-context summary reuses it as well `src/cli/commands/session-context.ts:38`. See [index_status](../tools/index-status.md) for the agent-facing equivalent of this command.
 
 ## Branches and failure cases
 
-- **Default directory.** With no positional argument, or an argument that starts
-  with `--`, the target is the current directory
-  (`src/cli/commands/status.ts:6`).
-- **Never indexed.** When the `files` table has no rows, the most-recent
-  `indexed_at` query returns nothing, `lastIndexed` is null, and the command
-  prints `Last indexed: never`; `Files` and `Chunks` show `0`
-  (`src/cli/commands/status.ts:12`, `src/db/files.ts:371-379`).
-- **Fresh, empty database.** Opening a directory that has never been indexed
-  still creates/opens the database via `new RagDB(dir)` and reports zero counts
-  rather than erroring (`src/cli/commands/status.ts:7-12`).
+- **No directory argument**: when `args[1]` is missing, the handler resolves `"."` — the current working directory `src/cli/commands/status.ts:6`.
+- **A flag where the directory would be**: if `args[1]` starts with `--`, it is not treated as a directory; the resolver falls back to `"."`. `status` defines no flags, so this only matters if someone passes a stray flag.
+- **Empty or fresh index**: a brand-new `RagDB` creates the schema, so the `files` and `chunks` tables exist but are empty. `COUNT(*)` returns `0` for both, and the `indexed_at` lookup returns no row, so `lastIndexed` is `null` and the output prints `never` `src/db/files.ts:364-370`, `src/cli/commands/status.ts:12`.
+- **Directory never indexed**: pointing `status` at a directory with no prior index still creates an empty `.mimirs/index.db` as a side effect of opening it, then reports zero files, zero chunks, and `never`. Running `status` is therefore not entirely free of file-system effects — it may create the index folder and an empty database `src/db/index.ts:108-139`.
+- **Unwritable index location**: if the `.mimirs` directory (or the configured `RAG_DB_DIR`) cannot be created because the path is read-only or permission-denied, the `RagDB` constructor throws a descriptive error pointing at the offending path and suggesting a writable `RAG_DB_DIR` `src/db/index.ts:110-122`. The error propagates out of the handler to the CLI's top-level error handling.
+- **Embedding-dimension mismatch**: if an existing index was built with a different embedding dimension than the currently configured model, the constructor fails loudly before `getStatus` ever runs, telling you to restore the previous embedding config or rebuild the index `src/db/index.ts:149-168`.
+
+## State changes
+
+`status` is fundamentally a read. The only state it can change is incidental to opening the index: if the target directory has no `.mimirs/index.db` yet, the `RagDB` constructor creates the directory, opens a new SQLite database, and runs `initSchema` to create the empty tables `src/db/index.ts:108-139`. After that, every `status` invocation is purely a read — the three queries in `getStatus` only `SELECT`, never write `src/db/files.ts:354-372`.
+
+| state | before | after | why it matters |
+| --- | --- | --- | --- |
+| `.mimirs/index.db` | absent for a never-indexed directory | present but empty (schema only) | A first `status` on a fresh directory leaves behind an empty index. The reported counts are all zero and `Last indexed` is `never`, but the file now exists on disk `src/db/index.ts:134-139`. |
+| `files` / `chunks` rows | unchanged | unchanged | The counting queries do not mutate the index, so `status` is safe to run repeatedly and concurrently with searches `src/db/files.ts:354-372`. |
 
 ## Example
 
-```bash
-# Status for the current project.
-mimirs status
-
-# Status for a specific directory.
-mimirs status ./packages/api
-```
-
-Illustrative output:
+Inspect the current directory:
 
 ```
-Index status for /Users/example/my-app:
-  Files:        124
-  Chunks:       1893
-  Last indexed: 2026-05-28T11:42:07.512Z
+$ mimirs status
+Index status for /Users/example/projects/my-app:
+  Files:        128
+  Chunks:       1342
+  Last indexed: 2026-05-31T14:02:11.084Z
 ```
 
-For a directory that has never been indexed:
+Inspect a specific project directory:
 
 ```
-Index status for /Users/example/empty:
+$ mimirs status ~/repos/other-app
+Index status for /Users/example/repos/other-app:
   Files:        0
   Chunks:       0
   Last indexed: never
 ```
 
+The second example shows a directory that has not been indexed: zero files, zero chunks, and `never` for the timestamp.
+
 ## Key source files
 
-- `src/cli/commands/status.ts` — the command: directory resolution, the
-  `getStatus` call, and the printed summary.
-- `src/db/files.ts` — `getStatus`, the three queries that produce the file
-  count, chunk count, and last-indexed timestamp.
-- `src/db/index.ts` — `RagDB`, which exposes `getStatus` on the opened database.
+- `src/cli/index.ts` — CLI entry point; slices process args, dispatches `status` to the handler `src/cli/index.ts:124-125`.
+- `src/cli/commands/status.ts` — the handler; resolves the directory, opens the DB, reads stats, prints four lines, closes the DB.
+- `src/db/index.ts` — the `RagDB` class; constructor opens/creates `index.db` and `getStatus` delegates to the files module.
+- `src/db/files.ts` — `getStatus` runs the three counting queries that produce `totalFiles`, `totalChunks`, and `lastIndexed`.
+- `src/utils/log.ts` — `cli.log`, the prefix-free stdout wrapper used for all four output lines.
 
-## Related pages
+## Related commands
 
-- [index](index.md) — builds or refreshes the index whose totals this command
-  reports.
-- [index_status](../tools/index-status.md) — the server-side equivalent for an
-  agent.
-- [server_info](../tools/server-info.md) — reports which projects a running
-  server has connected.
+- [index_status](../tools/index-status.md) — the MCP tool that exposes the same index stats to agents, backed by the same `getStatus` method.
+- [index](index.md) — the CLI dispatcher and command list this handler is wired into.

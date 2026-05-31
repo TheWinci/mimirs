@@ -1,188 +1,155 @@
 # CLI: index
 
-`mimirs index` builds or refreshes the local search index for a project. It
-walks the directory, parses and chunks every matching file, embeds the chunks,
-and stores the results in the project's `.mimirs` database so that the `search`
-and `read` commands and the MCP tools have something to query.
+`mimirs index [dir] [--patterns ...] [-v]` scans a project directory, embeds every matching file into the local index, and prints a one-line summary of how many files were indexed, skipped, and pruned. It is the command you run to build or refresh the searchable index that powers `search`, `read`, `map`, and the MCP server. Running it again after editing code re-indexes only what changed: files whose content hash matches the stored hash are skipped, and files deleted from disk are pruned out of the index.
 
-Run it whenever the code on disk has drifted from the index — for example after
-pulling new commits, or after editing files while the live file watcher in the
-server was not running. The index is incremental: unchanged files are skipped,
-only changed files are re-embedded, and files that no longer exist are pruned.
+The command is a thin CLI wrapper. The real work lives in `indexDirectory`, the same indexing engine the MCP `index_files` tool and the file watcher call (see [index_files](../tools/index-files.md)). This page follows the CLI path from argument parsing through the database writes.
 
-The command entry point is `indexCommand` in
-`src/cli/commands/index-cmd.ts:8`. The actual indexing work happens in
-`indexDirectory` (`src/indexing/indexer.ts:695`).
+## How it runs
 
-## What the command does
-
-`indexCommand` is a thin driver. It resolves the target directory, opens the
-database, loads and applies config, optionally narrows the file set with
-`--patterns`, then calls `indexDirectory` and prints a one-line summary
-(`src/cli/commands/index-cmd.ts:8-47`).
+The CLI entrypoint parses `process.argv`, matches the first word `index`, and calls `indexCommand(args, getFlag)` `src/cli/index.ts:115-116`. Everything after that is in the handler `src/cli/commands/index-cmd.ts:8-49`.
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant User
-    participant Cmd as indexCommand
-    participant DB as RagDB (.mimirs)
-    participant Indexer as indexDirectory
-    participant Lock as index lock
-
-    User->>Cmd: mimirs index [dir] [--patterns ...] [--verbose]
-    Cmd->>DB: new RagDB(dir)
-    Cmd->>Cmd: loadConfig + applyEmbeddingConfig
-    opt --patterns given
-        Cmd->>Cmd: config.include = patterns
-    end
-    Cmd->>Indexer: indexDirectory(dir, db, config, onProgress)
-    Indexer->>Lock: tryAcquireIndexLock(dir)
-    alt lock held by another process
-        Indexer-->>Cmd: { locked: true, indexed: 0 }
-    else lock acquired
-        Indexer->>Indexer: collect files, embed, processFile each
-        Indexer->>DB: insert/update/delete chunks, prune deleted
-        Indexer-->>Cmd: { indexed, skipped, pruned, errors }
-    end
-    Cmd->>User: "Done: N indexed, N skipped, N pruned (Ts)"
-    opt errors
-        Cmd->>User: "Errors: ..."
-    end
-    Cmd->>DB: db.close()
+    actor User
+    participant CLI as index-cmd.ts
+    participant DB as RagDB
+    participant Cfg as loadConfig
+    participant Idx as indexDirectory
+    participant Store as RagDB tables
+    User->>CLI: mimirs index [dir] [--patterns] [-v]
+    CLI->>CLI: resolve dir, read --verbose/-v
+    CLI->>DB: new RagDB(dir)
+    CLI->>Cfg: loadConfig(dir)
+    Cfg-->>CLI: config (include/exclude/embedding)
+    CLI->>CLI: if --patterns, override config.include
+    CLI->>Idx: indexDirectory(dir, db, config, progress)
+    Idx->>Idx: acquire index lock + scan files
+    Idx->>Store: upsert file & chunk rows per file
+    Idx->>Store: prune files no longer on disk
+    Idx->>Store: resolve imports + symbol refs
+    Idx-->>CLI: { indexed, skipped, pruned, errors }
+    CLI->>User: "Done: N indexed, M skipped, P pruned (Ts)"
+    CLI->>DB: db.close()
 ```
 
-1. The user runs the command, optionally naming a directory and passing
-   `--patterns` and/or `--verbose`/`-v` (`src/cli/commands/index-cmd.ts:9-10`).
-2. The command opens the project database with `new RagDB(dir)`
-   (`src/cli/commands/index-cmd.ts:11`).
-3. It loads config and applies the embedding settings so the indexer uses the
-   right model and dimensions (`src/cli/commands/index-cmd.ts:12-13`).
-4. If `--patterns` was given, it replaces `config.include` with the
-   comma-separated list so only matching files are indexed this run
-   (`src/cli/commands/index-cmd.ts:15-18`).
-5. `indexDirectory` first tries to acquire a process-level index lock for the
-   directory (`src/indexing/indexer.ts:722`). If another mimirs process owns it,
-   the run is skipped and returns zero counts (`src/indexing/indexer.ts:723-730`).
-6. With the lock held, it collects matching files, eagerly loads the embedding
-   model, then processes each file: re-indexed files count as `indexed`,
-   unchanged ones as `skipped` (`src/indexing/indexer.ts:734-770`).
-7. Unless pruning is disabled, files that are in the index but not in the
-   current matched set are deleted (`src/indexing/indexer.ts:774-782`).
-8. If anything was re-indexed, import paths and symbol references are re-resolved
-   so cross-file edges stay correct (`src/indexing/indexer.ts:785-793`).
-9. The command prints the indexed / skipped / pruned counts with elapsed
-   seconds, prints any per-file errors, and closes the database
-   (`src/cli/commands/index-cmd.ts:40-47`).
+1. The user runs the command. `dir` is the first positional argument; if it is missing or looks like a flag (starts with `--`), the handler defaults to `.` and resolves it to an absolute path `src/cli/commands/index-cmd.ts:9`.
+2. Verbose mode is on if the args contain `--verbose` or `-v` `src/cli/commands/index-cmd.ts:10`. This only changes how progress is printed, not what gets indexed.
+3. A `RagDB` is opened for the directory. Its constructor creates the `.mimirs/` directory, opens `index.db`, applies the project's embedding model/dimension from disk, loads the sqlite-vec extension, and creates the schema if it does not exist `src/db/index.ts`. The comment at `src/cli/commands/index-cmd.ts:12-13` notes that this is why the handler does not call `applyEmbeddingConfig` separately.
+4. `loadConfig(dir)` reads `.mimirs/config.json`. If the file is absent it writes the defaults there first and returns them, so a first run always has a config on disk to edit `src/config/index.ts:136-140`.
+5. If `--patterns` was passed, its comma-separated value replaces `config.include` entirely (each pattern trimmed) `src/cli/commands/index-cmd.ts:16-19`. This is an override, not an addition.
+6. The handler prints `Indexing <dir>...`, records a start time, and builds a progress callback `src/cli/commands/index-cmd.ts:21-37`.
+7. `indexDirectory(dir, db, config, progress)` does the scanning, embedding, and writing `src/cli/commands/index-cmd.ts:39`.
+8. Within that call the engine acquires a per-directory lock, scans the tree, and processes each matched file.
+9. Each file's rows are upserted into the database (details under State changes).
+10. Files that are in the index but no longer on disk are pruned.
+11. Import paths and symbol references are resolved across all files once indexing finishes.
+12. `indexDirectory` returns an `IndexResult` with `indexed`, `skipped`, `pruned`, and `errors` counts `src/indexing/indexer.ts:46-53`.
+13. The handler prints the summary line with elapsed seconds, prints any errors, and closes the database `src/cli/commands/index-cmd.ts:41-48`.
 
 ## Inputs
 
 | name | type | required | description |
-|------|------|----------|-------------|
-| directory | positional arg | no | Project directory to index. Taken from `args[1]` only when present and not a flag; otherwise defaults to `.` and is resolved to an absolute path (`src/cli/commands/index-cmd.ts:9`). |
-| `--patterns` | flag with value | no | Comma-separated glob list. When present it overwrites `config.include`, restricting this run to matching files (`src/cli/commands/index-cmd.ts:15-18`). |
-| `--verbose` / `-v` | boolean flag | no | Emit per-file output instead of a single updating progress line (`src/cli/commands/index-cmd.ts:10`,`:25`). |
-| config | `.mimirs/config.json` | yes (auto-created) | Loaded by `loadConfig`; supplies the default include/exclude patterns, embedding model, batch size, and thread count (`src/cli/commands/index-cmd.ts:12`). |
+| --- | --- | --- | --- |
+| `dir` | positional path | no | Directory to index. Defaults to the current directory. Ignored if it begins with `--` so flags are not mistaken for the path `src/cli/commands/index-cmd.ts:9`. |
+| `--patterns` | comma-separated glob string | no | Overrides the config's `include` list with exactly these patterns, e.g. `--patterns "**/*.ts,**/*.md"`. Each entry is trimmed `src/cli/commands/index-cmd.ts:16-19`. |
+| `-v` / `--verbose` | boolean flag | no | Prints per-file progress (`Indexing ...`, `Indexed: ...`) instead of a single updating progress line `src/cli/commands/index-cmd.ts:10`. |
+| `.mimirs/config.json` | file on disk | no | Supplies `include`, `exclude`, embedding model/dim, chunk size, and indexing options. Created with defaults on first run `src/config/index.ts:132-160`. |
+
+The default `include` list covers source languages (TypeScript, Python, Go, Rust, Java, C/C++, and more), Markdown and text, build files like `Makefile` and `Dockerfile`, shell scripts, and structured config such as YAML, TOML, and SQL `src/config/index.ts:40-86`. Passing `--patterns` discards all of that for the run and uses only what you supply.
 
 ## Outputs
 
 | output | where it lands / shape / description |
-|--------|--------------------------------------|
-| Summary line | `Done: N indexed, N skipped, N pruned (Ts)` printed to stdout, built from the `IndexResult` counts (`src/cli/commands/index-cmd.ts:41-43`). |
-| Error report | When `result.errors` is non-empty, a newline-joined list of per-file errors printed to stderr via `cli.error` (`src/cli/commands/index-cmd.ts:44-46`). |
-| Updated database | Refreshed `files`, `chunks`, `symbols`, and dependency rows in the project's `.mimirs` database, plus re-resolved import and symbol-reference edges (`src/indexing/indexer.ts:752-793`). |
-| Progress output | Terminal progress, either per-file (verbose) or a single updating line (quiet) (`src/cli/commands/index-cmd.ts:23-36`). |
+| --- | --- |
+| File and chunk rows | Written to `index.db`: a `files` row per indexed file plus `chunks` rows for its semantic pieces, each with an embedding mirrored into `vec_chunks` and full-text content mirrored into `fts_chunks` via triggers `src/db/index.ts`. |
+| Graph + symbol data | `file_imports`, `file_exports`, and `symbol_refs` rows derived per file, then cross-resolved after the file loop `src/indexing/indexer.ts:505-515`, `src/indexing/indexer.ts:784-793`. |
+| Summary line | `Done: <indexed> indexed, <skipped> skipped, <pruned> pruned (<elapsed>s)` printed to stdout `src/cli/commands/index-cmd.ts:42-44`. |
+| Error report | If any file failed, an `Errors: ...` block listing each message `src/cli/commands/index-cmd.ts:45-47`. |
+| Progress output | Live progress to the terminal — a single updating line by default, or per-file lines under `-v`. |
+
+A sample run looks like:
+
+```
+$ mimirs index . -v
+Indexing /Users/example/project...
+Indexing src/example.ts
+Indexed: src/example.ts (12 chunks)
+Skipped (unchanged): src/util.ts
+...
+Done: 84 indexed, 31 skipped, 2 pruned (6.3s)
+```
+
+## Verbose vs quiet progress
+
+The handler builds the progress callback differently depending on the verbose flag `src/cli/commands/index-cmd.ts:26-37`.
+
+| mode | callback | what the user sees |
+| --- | --- | --- |
+| `-v` / `--verbose` | `cliProgress` directly | Every message from the engine. `file:start`/`file:done` bookkeeping is suppressed, but `Indexing <path>`, `Indexed: <path> (N chunks)`, and `Skipped (...)` lines all print `src/cli/progress.ts:24-35`. |
+| default (quiet) | a wrapper that lazily creates `createQuietProgress` | A single overwriting line `Indexing: 12/84 files (14%) — src/example.ts`, plus the persistent `Found`, `Pruned`, and `Resolved` summary lines `src/cli/progress.ts:42-101`. Per-file Indexed/Skipped noise is hidden. |
+
+In quiet mode the wrapper waits for the engine's `Found <N> files to index` message, parses the count out of it, and only then constructs the quiet progress renderer sized to that total `src/cli/commands/index-cmd.ts:27-30`. Until that message arrives — during the initial directory scan and model load — messages fall through to `cliProgress` so early status is still visible. The quiet renderer tracks the current file from `file:start`, advances a counter on `file:done`, and shows per-file embedding progress parsed from `Embedded X/Y chunks` messages `src/cli/progress.ts:56-88`.
+
+Both modes use a shared transient-line mechanism: transient messages overwrite the current terminal line, and a persistent message first clears any transient line before printing on its own line `src/cli/progress.ts:8-22`.
 
 ## State changes
 
-### Index tables refreshed and pruned
+### Index rows for each matched file: absent or stale → current
 
-- Before: the database holds the previous index snapshot — rows from the last
-  indexing run, possibly stale relative to the files on disk.
-- After: changed files have fresh chunks and symbols, unchanged files are left
-  alone, and files that disappeared (or fell outside the matched set) are
-  removed.
-- Why it matters: search quality depends on the index matching the working
-  tree. Stale chunks return wrong line ranges; missing files mean missing
-  results.
-- How: each file is run through `processFile`, which re-indexes or skips it
-  based on its content hash; the returned status drives the `indexed`/`skipped`
-  counters (`src/indexing/indexer.ts:752-763`). Removed files are deleted by
-  `db.pruneDeleted` against the set of matched paths
-  (`src/indexing/indexer.ts:777-778`). After any re-index, `resolveImports` and
-  `db.resolveAllSymbolRefs` rebuild cross-file edges
-  (`src/indexing/indexer.ts:786-792`).
+When `indexDirectory` processes a file, `processFile` reads it once, hashes the content, and looks up the stored row `src/indexing/indexer.ts:406-411`. If a row exists with the same hash, the file is skipped and nothing is written `src/indexing/indexer.ts:409-411`. Otherwise the file is (re)indexed:
+
+- For a full re-index, `upsertFileStart` deletes the file's existing chunks and updates (or inserts) the `files` row, keeping the same `files.id` so foreign keys from other files' resolved imports stay intact `src/db/files.ts:40-66`. Deleting chunks fires the `chunks_vec_ad` and FTS triggers, so the matching `vec_chunks` and `fts_chunks` entries are dropped automatically `src/db/index.ts`.
+- New chunks are embedded in batches and inserted via `insertChunkBatch`, which also writes each embedding into `vec_chunks` in the same transaction `src/db/files.ts:79-105`.
+- Graph metadata (`file_imports`, `file_exports`) and per-chunk symbol references (`symbol_refs`) are written for the file `src/indexing/indexer.ts:505-515`.
+
+When incremental chunking is enabled and the file already has hashed chunks, `processFileIncremental` re-embeds only the chunks whose content hash changed and updates positions for the rest, falling back to a full re-index if more than half the chunks changed `src/indexing/indexer.ts:549-608`. Either way the observable result is the same: the index reflects the current file content. The state change is triggered by `indexDirectory(dir, db, config, progress)` `src/cli/commands/index-cmd.ts:39` and counted as `indexed` or `skipped` in the result `src/indexing/indexer.ts:759-763`.
+
+### Deleted files: present in index → pruned
+
+After the file loop, unless pruning is explicitly disabled, `indexDirectory` collects the set of files it just matched and calls `db.pruneDeleted(existingPaths)` `src/indexing/indexer.ts:774-781`. `pruneDeleted` deletes every `files` row whose path is not in that set, removing its chunks (and, via the trigger, its vectors) and clearing its graph rows `src/db/files.ts:267-290`. The returned count becomes `result.pruned`. This is why a full CLI index keeps the index honest: rename or delete a file and the next run drops it. Pruning is scoped to the matched set, so a narrowed `--patterns` run would only ever compare against the files those patterns match — see the failure note below.
+
+### Cross-file resolution: per-file refs → resolved edges
+
+Once at least one file was indexed, the engine resolves import paths across all files and then resolves symbol references against that import scope `src/indexing/indexer.ts:784-793`. Symbol resolution must follow import resolution because cross-file reference edges depend on `file_imports.resolved_file_id`. This is what makes `find_usages`, `depends_on`, and `depended_on_by` return cross-file results after indexing.
 
 ## Branches and failure cases
 
-- **Default directory.** With no positional argument (or a leading-`--`
-  argument), the target is the current directory (`src/cli/commands/index-cmd.ts:9`).
-- **`--patterns` narrows the run.** The patterns replace `config.include`, so
-  only matching files are collected (`src/cli/commands/index-cmd.ts:15-18`).
-  Note that pruning runs against the matched set: when a full project is already
-  indexed and you re-index with a narrow `--patterns`, files outside the pattern
-  are pruned from the index because they are not in the current matched set
-  (`src/indexing/indexer.ts:777-778`). Use `--patterns` to add or refresh a
-  subset only when the index is already scoped the same way.
-- **Verbose vs quiet progress.** With `--verbose`, progress is the per-file
-  `cliProgress` callback (`src/cli/commands/index-cmd.ts:25`,
-  `src/cli/progress.ts:24`). Without it, the command waits for the indexer's
-  "Found N files to index" message, then switches to a single updating progress
-  line via `createQuietProgress` (`src/cli/commands/index-cmd.ts:26-36`,
-  `src/cli/progress.ts:42`).
-- **Index lock held.** If another mimirs process (a second IDE window, or the
-  server) owns the directory's index lock, `indexDirectory` returns immediately
-  with `locked: true` and zero indexed/skipped/pruned counts; the command then
-  prints `Done: 0 indexed, 0 skipped, 0 pruned` (`src/indexing/indexer.ts:722-730`).
-- **Unsafe directory.** Indexing a system-level directory (home, root, etc.) is
-  rejected: `checkIndexDir` throws before any work begins
-  (`src/indexing/indexer.ts:708-711`).
-- **Per-file errors.** A file that throws during processing is caught, recorded
-  in `result.errors`, and indexing continues with the next file
-  (`src/indexing/indexer.ts:764-768`). The command surfaces these afterward
-  (`src/cli/commands/index-cmd.ts:44-46`).
-- **No changes.** If every matched file is unchanged, all of them count as
-  `skipped`, nothing is pruned, and the summary reads `0 indexed`.
-- **Incremental vs full re-index per file.** For a changed file, if more than
-  half its chunks are new, `processFile` falls back to a full re-index;
-  otherwise it does an incremental update that keeps unchanged chunks and only
-  embeds new ones (`src/indexing/indexer.ts:571-575`).
+- **Default directory.** No `dir` argument, or a first argument starting with `--`, falls back to the current directory `src/cli/commands/index-cmd.ts:9`.
+- **`--patterns` override.** When present, `config.include` is replaced wholesale; the default include list is not used for that run `src/cli/commands/index-cmd.ts:16-19`. Combined with pruning, a too-narrow `--patterns` run only matches a subset of files, so the prune step still compares the index against just that subset — files outside the patterns are not deleted here because `pruneDeleted` is over the matched set, but a follow-up full run is the way to reconcile the whole tree.
+- **Unsafe directory.** `indexDirectory` calls `checkIndexDir` and throws if the target is a system-level directory like `$HOME` or `/`, before any indexing happens `src/indexing/indexer.ts:707-711`.
+- **Another process holds the lock.** Indexing funnels through a per-directory file lock. If another live mimirs process owns it, `indexDirectory` returns immediately with `locked: true` and indexes nothing; the handler still prints its summary (all zeros) `src/indexing/indexer.ts:722-730`. The lock is reentrant within one process and reclaims stale locks whose PID is gone `src/utils/index-lock.ts:28-60`.
+- **Empty directory.** When no files match, the embedding model is not even loaded (that step is gated on `matchedFiles.length > 0`) and the result is all zeros `src/indexing/indexer.ts:740-743`.
+- **Per-file skips.** A file is skipped — counted in `skipped`, not `indexed` — when it is larger than 50 MB, when its content hash is unchanged, when its average line length exceeds 1000 characters (minified/obfuscated detection), when its extension is unsupported, or when it is empty `src/indexing/indexer.ts:394-461`.
+- **Per-file errors.** An exception while processing one file is caught, pushed onto `result.errors`, and reported through progress; the loop continues with the next file `src/indexing/indexer.ts:764-768`. At the end the handler prints the collected errors `src/cli/commands/index-cmd.ts:45-47`.
+- **Large project warning.** If more than 200,000 files match, the engine warns that the directory may be too broad but does not abort `src/indexing/indexer.ts:242-248`.
+- **Abort signal.** `indexDirectory` accepts an optional `AbortSignal` and bails out at the start, between files, and before pruning. The CLI does not pass one, so this path is exercised by callers like the file watcher rather than by `mimirs index` `src/indexing/indexer.ts:705,746,772`.
 
 ## Example
 
-```bash
-# Re-index the current project.
+```
+# Index the current directory with default patterns, quiet progress
 mimirs index
 
-# Index a specific directory.
-mimirs index ./packages/api
+# Index a specific project, showing per-file output
+mimirs index /path/to/project --verbose
 
-# Refresh only TypeScript sources under src/, with per-file output.
-mimirs index --patterns "src/**/*.ts" --verbose
-```
-
-Typical output:
-
-```
-Indexing /Users/example/my-app...
-Found 128 files to index
-Indexing: 128/128 files (100%)
-
-Done: 6 indexed, 122 skipped, 1 pruned (3.4s)
+# Index only TypeScript and Markdown, overriding the include list
+mimirs index . --patterns "**/*.ts,**/*.md"
 ```
 
 ## Key source files
 
-- `src/cli/commands/index-cmd.ts` — command entry point; flag parsing, config
-  loading, progress wiring, and the summary line.
-- `src/indexing/indexer.ts` — `indexDirectory`, the lock, file collection,
-  per-file processing, pruning, and import/symbol resolution.
-- `src/db/index.ts` — `RagDB`, the store that holds files, chunks, symbols, and
-  dependency rows, and performs the prune and resolution operations.
-- `src/cli/progress.ts` — verbose and quiet terminal progress rendering.
+- `src/cli/index.ts` — top-level CLI dispatcher; routes the `index` command to the handler `src/cli/index.ts:115-116`.
+- `src/cli/commands/index-cmd.ts` — the `index` command handler: parses args, loads config, applies `--patterns`, runs the engine, prints the summary.
+- `src/indexing/indexer.ts` — `indexDirectory` and `processFile`: scanning, locking, embedding, writing, pruning, and cross-file resolution.
+- `src/cli/progress.ts` — `cliProgress` and `createQuietProgress`: verbose vs quiet terminal output.
+- `src/config/index.ts` — `loadConfig` and the default include/exclude patterns.
+- `src/db/index.ts`, `src/db/files.ts` — the `RagDB` store: schema, `upsertFileStart`, `insertChunkBatch`, and `pruneDeleted`.
 
-## Related pages
+## Related
 
-- [init](init.md) — first-time setup, which can run the initial index.
-- [index_files](../tools/index-files.md) — the MCP tool that triggers the same
-  `indexDirectory` work from an agent.
+- [index_files](../tools/index-files.md) — the MCP tool that calls the same `indexDirectory` engine from inside the server.
+- [init](init.md) — creates `.mimirs/config.json` and performs the first index.
+- [status](status.md) — reports how many files and chunks the index currently holds.
+- [server start](../server/start.md) — the long-running server that indexes on startup and via the watcher.

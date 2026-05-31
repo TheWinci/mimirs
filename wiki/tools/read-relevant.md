@@ -1,145 +1,158 @@
 # Tool: read_relevant
 
-The `read_relevant` MCP tool returns the actual code, not just file paths. You give it a natural-language query, and it returns the most relevant semantic chunks — individual functions, classes, or markdown sections — each with its exact line range and full body. It is the tool to reach for when you want to read code by meaning instead of grepping for a string, and it lets you jump straight to an edit location like `src/db.ts:42-67`.
+`read_relevant` answers the question "show me the actual code relevant to this topic," not "tell me which files are relevant." It runs a hybrid (vector + keyword) search over the indexed code at the *chunk* level — individual functions, classes, or markdown sections — and returns the full text of the best-ranked chunks. Each result is tagged with its score, file path, and exact `:startLine-endLine` range so a caller can jump straight to the code, and any persistent note attached to that file or symbol is inlined as a `[NOTE]` block above the chunk.
 
-The handler is registered in `src/tools/search.ts:101-216`. The ranking work happens in the `searchChunks` function in `src/search/hybrid.ts:470-554`.
+This is the tool to reach for when you want the content itself, not a map. The sibling [search](search.md) tool returns ranked *file paths* with short snippets and deduplicates by file; `read_relevant` returns the bodies of chunks and does **not** deduplicate by file, so two functions from the same file can both appear. The CLI command [`mimirs read`](../cli/read.md) is the terminal twin of this tool — both call the same chunk-search engine, so their ranking and content match.
 
-## How it differs from `search`
-
-Both tools run the same hybrid vector + keyword scoring, but they return different granularities:
-
-| | [search](search.md) | `read_relevant` |
-| --- | --- | --- |
-| Returns | file paths + short snippet preview | full chunk bodies with line ranges |
-| Granularity | one entry per file (deduped) | one entry per chunk; two chunks from the same file can both appear |
-| Body | first snippet, 400 chars | the entire chunk content |
-| Threshold | fixed at `0` | caller-tunable, default `0.3` |
-| Annotations | none | inline `[NOTE]` blocks |
-
-`search` deduplicates to one result per file; `read_relevant` does not, so sibling functions in the same file each get their own slot `src/search/hybrid.ts:466-469`.
+The tool is registered in `src/tools/search.ts:101` as the second tool inside `registerSearchTools`. The bulk of the work happens in `searchChunks` in `src/search/hybrid.ts:470`, which the tool calls and then formats.
 
 ## Inputs
 
 | name | type | required | description |
 | --- | --- | --- | --- |
-| `query` | string (1–2000 chars) | yes | The search text. Natural language or a symbol name. |
-| `top` | integer (1–1000) | no | Max chunks to return. Defaults to 8. |
-| `threshold` | number (0–1) | no | Minimum relevance score to include. Defaults to 0.3. |
-| `extensions` | string[] | no | Restrict to these file extensions, e.g. `[".ts"]`. Leading dot optional. |
-| `dirs` | string[] | no | Restrict to these directories; relative paths resolve against the project root. |
-| `excludeDirs` | string[] | no | Drop chunks under these directories. |
-| `directory` | string | no | Which project to search. Defaults to `RAG_PROJECT_DIR` or the cwd. |
+| `query` | string (1–2000 chars) | yes | Natural-language search query. Embedded into a vector and also used for keyword (BM25) matching. |
+| `top` | int (1–1000) | no | Maximum chunks to return. Defaults to `8` when omitted (`src/tools/search.ts:146`). |
+| `threshold` | number (0–1) | no | Minimum relevance score for a chunk to be kept. Defaults to `0.3` (`src/tools/search.ts:147`). |
+| `extensions` | string[] | no | Restrict to these file extensions, e.g. `[".ts", ".tsx"]`. The leading dot is optional. |
+| `dirs` | string[] | no | Restrict to these directories. Relative paths are resolved against the project root before matching. |
+| `excludeDirs` | string[] | no | Exclude these directories. Also resolved against the project root. |
+| `directory` | string | no | Project directory to search. Falls back to `RAG_PROJECT_DIR`, then the current working directory (`src/tools/index.ts:26`). |
 
-The three scoping arrays become a single path filter via `buildFilter`, which resolves relative dir paths to absolute and returns `undefined` when none are set `src/tools/search.ts:13-29`, `140`.
+The three scope fields (`extensions`, `dirs`, `excludeDirs`) are folded into a single `PathFilter` by `buildFilter` (`src/tools/search.ts:13`). That helper resolves `dirs` and `excludeDirs` to absolute paths so they line up with the absolute paths stored in the index, and returns `undefined` when none of the three fields are populated — in that case the search runs unfiltered.
 
 ## Outputs
 
 | output | where it lands / shape / description |
 | --- | --- |
-| Ranked chunks | A single MCP text block. A header with chunk count, unique-file count, total indexed files, and elapsed ms; then each chunk as a `[score] path:start-end • entityName` header followed by its full body, joined by `---` separators. A footer suggests `find_usages` on the top chunk's entity. |
-| Inline annotations | Any saved notes for a chunk's file appear as `[NOTE]` lines right under that chunk's header. |
-| Empty-result message | When nothing clears the threshold, a text block suggesting `index_files`. |
-| Analytics row | A row in the `query_log` table recording the query, result count, top score, top path, and duration. |
+| Chunk listing | A single text block in the MCP tool response. A header line, then each chunk rendered as `[score] path:start-end • entityName`, any `[NOTE]` lines, and the chunk body, joined by `---` separators, followed by a `find_usages` tip. |
+| `query_log` row | One row inserted into the `query_log` table of the project's SQLite index for every call, recording the query, result count, top score, top path, and duration. Feeds analytics. |
 
-The body is assembled in `src/tools/search.ts:184-205`. Each chunk header is `[score.toFixed(2)] path:startLine-endLine` plus the entity name when present `src/tools/search.ts:186-188`. The line range is omitted only when `startLine`/`endLine` are null `src/tools/search.ts:186`.
-
-## How a query becomes ranked chunks
+## How a call flows
 
 ```mermaid
 sequenceDiagram
-  autonumber
-  participant Caller
-  participant Handler as read_relevant handler<br>(src/tools/search.ts)
-  participant Svc as searchChunks()<br>(src/search/hybrid.ts)
-  participant DB as RagDB
-  Caller->>Handler: query, top, threshold, filters
-  Handler->>Handler: resolveProject + buildFilter
-  Handler->>Svc: searchChunks(query, db, top, threshold, weight, filter)
-  Svc->>DB: embed + vector + BM25 chunk search
-  Svc->>Svc: merge, threshold filter, path/filename/graph boosts
-  Svc->>Svc: groupByParent + doc expansion
-  Svc->>DB: logQuery(...)
-  Svc-->>Handler: ranked ChunkResult[]
-  Handler->>DB: getAnnotations(relPath) per unique file
-  Handler->>Handler: build [NOTE] blocks + chunk bodies
-  Handler-->>Caller: header + chunks + find_usages tip
+    autonumber
+    participant Caller as Caller (agent / IDE)
+    participant Tool as read_relevant handler<br>(src/tools/search.ts)
+    participant Hybrid as searchChunks<br>(src/search/hybrid.ts)
+    participant DB as RagDB (SQLite)
+    Caller->>Tool: query, top?, threshold?, scope filters
+    Tool->>Tool: resolveProject() → projectDir, db, config
+    Tool->>Tool: buildFilter() → PathFilter | undefined
+    Tool->>Hybrid: searchChunks(query, db, top, threshold, ...)
+    Hybrid->>DB: embed(query) → vector
+    Hybrid->>DB: vectorSearchChunks + textSearchChunks (topK*4)
+    Hybrid->>Hybrid: merge, threshold, path/filename/graph rescoring
+    Hybrid->>DB: getChunkById (parent grouping, if triggered)
+    Hybrid->>DB: logQuery() → query_log row
+    Hybrid-->>Tool: ranked ChunkResult[]
+    Tool->>DB: getAnnotations(relPath) per unique file
+    Tool-->>Caller: formatted chunks + [NOTE] blocks + tip
 ```
 
-1. The handler resolves the project and builds the path filter `src/tools/search.ts:139-140`.
-2. It times the call and invokes `searchChunks` with `top ?? 8`, `threshold ?? 0.3`, `config.hybridWeight`, and the configured generated patterns `src/tools/search.ts:142-151`.
-3. `searchChunks` embeds the query, then runs a vector chunk search and a BM25 chunk search, each fetching `topK * 4` candidates `src/search/hybrid.ts:480-489`. A failing full-text query is caught and the search falls back to vector-only `src/search/hybrid.ts:485-489`.
-4. `mergeHybridScores` blends the two with the hybrid weight, then results below the threshold are filtered out and the per-path multipliers are applied (test demotion, source boost, filename affinity, boilerplate/generated demotion, dependency-graph boost) `src/search/hybrid.ts:492-535`.
-5. `groupByParent` consolidates siblings: when two or more sub-chunks share the same parent chunk, they are replaced by the single parent chunk (highest score kept), so sibling methods do not eat multiple slots `src/search/hybrid.ts:399-464`, `538`.
-6. `expandForDocs` lets markdown chunks expand the result set instead of displacing code chunks `src/search/hybrid.ts:541`.
-7. The query is logged for analytics `src/search/hybrid.ts:544-551`.
-8. Back in the handler, the unique file paths are collected and annotations are batch-fetched once per file to avoid N+1 queries `src/tools/search.ts:167-176`.
-9. For each chunk, the handler builds the header, attaches any matching `[NOTE]` blocks, and appends the chunk body `src/tools/search.ts:184-205`.
-10. The footer suggests `find_usages` on the top chunk's entity name, falling back to a placeholder when no entity is present `src/tools/search.ts:207-210`.
+1. The caller invokes the tool with a query and optional `top`, `threshold`, and scope filters.
+2. `resolveProject` resolves the target directory to an absolute path, verifies it exists, loads `.mimirs/config.json`, and hands back the project directory, the `RagDB` handle, and the config (`src/tools/index.ts:22`).
+3. `buildFilter` turns the scope arguments into a `PathFilter`, resolving `dirs`/`excludeDirs` to absolute paths, or returns `undefined` when no scope was given (`src/tools/search.ts:13`).
+4. The handler calls `searchChunks`, passing `top ?? 8`, `threshold ?? 0.3`, the configured `hybridWeight`, the `generated` patterns, the filter, and `parentGroupingMinCount` (`src/tools/search.ts:143`).
+5. `searchChunks` embeds the query into a vector via `embed(query)` (`src/search/hybrid.ts:481`).
+6. It runs two candidate fetches, each over-fetching `topK * 4` rows: a vector search (`db.searchChunks`) and a BM25 keyword search (`db.textSearchChunks`). The text search is wrapped in a `try/catch` that logs and falls back to vector-only if the FTS query throws (`src/search/hybrid.ts:483`).
+7. The two result sets are merged by `mergeHybridScores`, scores below `threshold` are dropped, and each surviving chunk is rescored by path type, filename affinity, and dependency fan-in (`src/search/hybrid.ts:493`).
+8. If two or more chunks share the same parent chunk, `groupByParent` fetches the parent via `getChunkById` and replaces the siblings with the parent (`src/search/hybrid.ts:539`).
+9. Before returning, `searchChunks` writes a `query_log` row recording the query, result count, top score, top path, and elapsed milliseconds (`src/search/hybrid.ts:546`).
+10. Back in the handler, annotations are batch-fetched once per unique file path, and each chunk is rendered with its score, path, line range, entity name, matching `[NOTE]` blocks, and body. A `find_usages` tip closes the response (`src/tools/search.ts:185`).
 
-## Exact line ranges and chunk metadata
+## Chunk search and ranking
 
-Each returned chunk carries `startLine`, `endLine`, `entityName`, `chunkType`, and `parentId` from the `ChunkResult` shape `src/search/hybrid.ts:45-55`. The handler renders the range as `:start-end` so you can open the file at the precise location `src/tools/search.ts:186`. When parent grouping promotes a parent chunk, the promoted result carries the parent's own line range and a `chunkIndex` of `-1` `src/search/hybrid.ts:441-451`.
+`searchChunks` is the engine. It returns a `ChunkResult[]`, where each chunk carries its file `path`, a `score`, the full `content` (the stored chunk snippet), the `entityName` (the function or class name), the `chunkType`, the `startLine`/`endLine`, and the `parentId` (`src/search/hybrid.ts:45`). Unlike the file-level `search`, it does **no** per-file deduplication, which is what lets multiple chunks from the same file surface together — the behavior the tool description promises.
 
-## Inline annotations
+Scoring is hybrid. The vector search returns chunks by embedding distance, converted to a similarity score of `1 / (1 + distance)` (`src/db/search.ts:178`); the keyword search returns chunks by FTS5 rank, scored `1 / (1 + |rank|)` (`src/db/search.ts:227`). `mergeHybridScores` blends them per chunk key (`path:chunkIndex`) as `hybridWeight * vectorScore + (1 - hybridWeight) * textScore`, with `hybridWeight` defaulting to `0.7` — that is, 70% vector, 30% keyword (`src/search/hybrid.ts:87`). The default is set in config (`src/config/index.ts:23`).
 
-Annotations are persistent notes attached to a file (and optionally a symbol). `read_relevant` surfaces them inline so a caller reading code sees relevant caveats without a separate lookup. The handler converts each chunk's absolute path to a project-relative path and fetches that file's annotations via `getAnnotations(relPath)` `src/tools/search.ts:171-176`. `getAnnotations` runs `SELECT * FROM annotations WHERE path = ? ORDER BY updated_at DESC` `src/db/annotations.ts:101-135`.
+After merging, each chunk that clears the `threshold` is multiplied by a series of adjustments inline in `searchChunks` (`src/search/hybrid.ts:495`):
 
-For a given chunk, only annotations whose `symbolName` is null (file-level) or matches the chunk's `entityName` are shown — a note pinned to a different function in the same file is not attached here `src/tools/search.ts:193-195`. Each shown note renders as `[NOTE]` or `[NOTE (symbolName)]` followed by the note text, placed directly above the chunk body `src/tools/search.ts:196-201`. To manage these notes directly, see [annotate](annotate.md) and [get_annotations](get-annotations.md).
+- Path type: test files are demoted to `0.85`, recognized source directories (`src`, `lib`, `app`, `pkg`, `packages`, `internal`, `cmd`) are boosted to `1.1`.
+- Boilerplate filenames (such as `types.ts`, `index.d.ts`) are demoted to `0.8`; files matching the configured `generated` glob patterns are demoted by `0.75`.
+- Filename and path affinity: each query word found in the filename stem adds `+0.1`, and each query word found in a directory segment adds `+0.05`.
+- Dependency-graph boost: a small additive `0.05 * log2(importerCount + 1)` rewards widely-imported files, so heavily-depended-on code ranks higher.
+
+The rescored chunks are sorted high-to-low, then passed through parent grouping and doc expansion (below) before being returned.
+
+### Exact line ranges in the output
+
+Every chunk row carries `startLine` and `endLine` straight from the `chunks` table — they are selected by both `vectorSearchChunks` and `textSearchChunks` and mapped onto the result (`src/db/search.ts:183`). The handler turns them into the suffix `:${startLine}-${endLine}` only when both are present, otherwise the range is omitted (`src/tools/search.ts:187`). This is what lets a caller open the file at the precise location, e.g. `src/db.ts:42-67`. When parent grouping promotes a parent chunk, the line range follows the parent's stored range, so a promoted result still points at a real, navigable span.
+
+### Inline [NOTE] annotation blocks
+
+`read_relevant` is the surface where persistent notes left by [annotate](annotate.md) become visible. After ranking, the handler collects the unique project-relative paths of the results and fetches annotations once per path with `ragDb.getAnnotations(relPath)`, building a `Map` keyed by relative path so it never issues one query per chunk (`src/tools/search.ts:171`). For each chunk it then filters that file's notes to the ones that apply: a note with a null `symbolName` is a file-level note and always applies, while a note with a `symbolName` applies only when it equals the chunk's `entityName` (`src/tools/search.ts:194`). Each surviving note is rendered as `[NOTE] <text>` for file-level notes or `[NOTE (symbolName)] <text>` for symbol-scoped notes, printed directly above the chunk body (`src/tools/search.ts:197`). Notes are stored relative to the project root, which is why the handler converts each absolute result path back to a relative path before the lookup.
+
+### Parent grouping
+
+When several sibling chunks from the same enclosing block (for example multiple methods of one class) all rank, they would otherwise consume several result slots. `groupByParent` prevents that: it groups chunks by `parentId`, and when a group has at least `parentGroupingMinCount` members (default `2`, from `src/config/index.ts:31`), it fetches the parent chunk with `getChunkById` and emits the parent in place of the children, keeping the best score of the group (`src/search/hybrid.ts:404`). It avoids duplicating a parent already present, and if the parent row is missing it keeps the children as-is. Groups below the count threshold keep their children individually.
+
+### Doc expansion
+
+Markdown files (`.md`, `.mdx`) are useful context but should not push code out of the top results. `expandForDocs` looks at the initial top-`K` slice; if it contains some docs *and* some code, it widens the returned set by the number of docs so the code keeps its slots. If the slice is all docs or all code, it returns exactly `topK` (`src/search/hybrid.ts:287`). Because of this, a call can return slightly more than `top` chunks.
 
 ## State changes
 
-### Analytics row in `query_log`
+### query_log row written per call
 
-| before | after |
+| | state |
 | --- | --- |
-| No row for this query | One new `query_log` row: query text, chunk count, top score, top path, duration in ms, ISO timestamp |
+| before | no row for this call |
+| after | one new row in `query_log` |
 
-`searchChunks` writes this row near its end via `db.logQuery(...)` `src/search/hybrid.ts:544-551`, the same `INSERT INTO query_log` used by file-level search `src/db/analytics.ts:3-8`. The row is written even when zero chunks clear the threshold; in that case the count is 0 and top score/path are null. This feeds [search_analytics](search-analytics.md).
+Every chunk search records its own analytics row. Just before returning, `searchChunks` calls `db.logQuery(query, results.length, results[0]?.score ?? null, results[0]?.path ?? null, durationMs)` (`src/search/hybrid.ts:546`). That facade method inserts into the `query_log` table — query text, result count, top score, top path, and duration in milliseconds, plus a timestamp (`src/db/analytics.ts:3`). When the result set is empty, top score and top path are stored as `null`, and `result_count` is `0`. This is the same table powering [search_analytics](search-analytics.md): zero-result and low-score rows are exactly how documentation and indexing gaps are surfaced later. The write happens unconditionally on every call, including the empty-result case, because it lives inside `searchChunks` rather than the formatting code.
 
 ## Branches and failure cases
 
-- **No chunk clears the threshold** — returns the "No relevant chunks found... Try calling index_files first." text, with " matching the given scope" appended when a filter was active `src/tools/search.ts:155-165`.
-- **`top` / `threshold` omitted** — default to 8 and 0.3 respectively `src/tools/search.ts:146-147`.
-- **Full-text query throws** — caught; the search continues with vector-only chunk results `src/search/hybrid.ts:485-489`.
-- **Parent chunk missing in DB** — `groupByParent` keeps the children individually rather than dropping them `src/search/hybrid.ts:453-456`.
-- **Fewer than two siblings from a parent** — children are kept as-is, no promotion `src/search/hybrid.ts:457-460`.
-- **Chunk has no entity name** — the `• entity` suffix and the file-level note filter still work; the footer falls back to a `<symbol>` placeholder `src/tools/search.ts:187`, `208-209`.
-- **File has no annotations** — the note block is empty and only the chunk body is shown `src/tools/search.ts:196-201`.
-
-A known limitation: `searchChunks` calls `groupByParent(results, db)` without forwarding the configurable `parentGroupingMinCount`, so the grouping always uses the hard-coded minimum of 2 regardless of project config `src/search/hybrid.ts:404`, `538`.
+- **No results.** When `searchChunks` returns an empty array, the handler returns a plain message instead of a listing: `No relevant chunks found … across N indexed files. Has the directory been indexed? Try calling index_files first.` If a scope filter was active, the phrase ` matching the given scope` is inserted (`src/tools/search.ts:156`). The `query_log` row is still written by `searchChunks` before it returns, so empty queries are captured for analytics.
+- **Threshold filtering.** Chunks scoring below `threshold` are dropped before any rescoring (`src/search/hybrid.ts:494`). A high threshold can therefore produce zero results even when the index is populated; the default `0.3` is fairly permissive.
+- **Keyword-search failure.** If the FTS5 query throws (for example on special characters that confuse the tokenizer), the `try/catch` logs a debug message and continues with vector-only results rather than failing the whole call (`src/search/hybrid.ts:486`).
+- **Scope filter present vs absent.** With no scope fields, `buildFilter` returns `undefined` and the search is unfiltered. With a filter, the SQL over-fetches more candidate rows (`topK * FILTER_OVERFETCH`) before applying the path constraints, so filtering does not starve the result set (`src/db/search.ts:148`).
+- **Missing or non-existent directory.** `resolveProject` throws `Directory does not exist: <path>` if the resolved `directory` is not present on disk (`src/tools/index.ts:30`).
+- **Unindexed or read-only index.** If the project has never been indexed there are no chunks to match, producing the empty-result message above. If the `.mimirs` directory cannot be created or written (e.g. a read-only filesystem), constructing the `RagDB` throws a descriptive error pointing at `RAG_DB_DIR` (`src/db/index.ts`).
+- **Annotations present vs absent.** Files with no notes simply render no `[NOTE]` block. A symbol-scoped note on a different symbol than the chunk's `entityName` is silently skipped (`src/tools/search.ts:194`).
+- **More chunks than `top`.** Doc expansion can return slightly more than the requested `top` when documentation chunks would otherwise displace code (`src/search/hybrid.ts:542`).
+- **Follow-up tip.** The footer suggests `find_usages("<entity>")` using the top result's `entityName` when one exists, falling back to a generic `<symbol>` placeholder when the top chunk has no entity name (`src/tools/search.ts:208`).
 
 ## Example
+
+Example arguments:
 
 ```json
 {
   "query": "how are hybrid scores merged",
-  "top": 6,
-  "threshold": 0.35,
+  "top": 5,
+  "threshold": 0.3,
   "extensions": [".ts"],
   "dirs": ["src/search"]
 }
 ```
 
-Illustrative output shape:
+Illustrative shape of the returned text block (values synthetic):
 
 ```
-── 6 chunks from 3 files (searched 186 files in 51ms) ──
+── 5 chunks from 2 files (searched 174 files in 18ms) ──
 
-[0.81] src/search/hybrid.ts:65-91  •  mergeHybridScores
-export function mergeHybridScores<T...>(...) { ... }
+[0.74] src/search/hybrid.ts:64-91  •  mergeHybridScores
+export function mergeHybridScores(...)
+...
 
 ---
 
-[0.74] src/search/hybrid.ts:313-397  •  search
-[NOTE (search)] remember to keep threshold at 0 for file-level search
-export async function search(query, db, ...) { ... }
+[0.61] src/search/hybrid.ts:470-555  •  searchChunks
+[NOTE (searchChunks)] FTS failures fall back to vector-only — do not assume keyword hits are always present.
+export async function searchChunks(...)
+...
 
 ── Tip: call find_usages("mergeHybridScores") to see all call sites before modifying. ──
 ```
 
 ## Key source files
 
-- `src/tools/search.ts` — registers `read_relevant`, formats chunk bodies, attaches annotations.
-- `src/search/hybrid.ts` — `searchChunks`: hybrid merge, threshold filter, boosts, parent grouping, doc expansion, analytics logging.
-- `src/db/annotations.ts` — `getAnnotations` reads the notes attached to each file.
-- `src/db/analytics.ts` — `logQuery` writes the `query_log` row.
+- `src/tools/search.ts` — registers the `read_relevant` MCP tool, builds the path filter, calls the chunk search, fetches annotations, and formats the response (handler at `src/tools/search.ts:101`).
+- `src/search/hybrid.ts` — `searchChunks` engine: embedding, hybrid merge, rescoring, parent grouping, doc expansion, and the `query_log` write.
+- `src/db/search.ts` — `vectorSearchChunks` and `textSearchChunks`, which produce the raw scored chunks including line ranges and `parentId`.
+- `src/db/annotations.ts` — `getAnnotations`, the per-file note lookup that supplies the `[NOTE]` blocks.
+- `src/db/analytics.ts` — `logQuery`, which inserts the `query_log` analytics row.
+- `src/config/index.ts` — defaults for `hybridWeight` (0.7) and `parentGroupingMinCount` (2).

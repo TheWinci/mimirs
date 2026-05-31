@@ -1,155 +1,159 @@
 # CLI: serve
 
-`mimirs serve` starts the long-running MCP server that exposes mimirs as tools
-to an AI agent. It speaks the Model Context Protocol over standard input and
-output, so an editor (Claude Code, Cursor, Windsurf, Junie, etc.) launches it as
-a child process and talks to it through the pipes. This is the command the
-`mcpServers.mimirs` registration written by [init](init.md) points at.
+`mimirs serve` is the command an editor or agent runs to start the long-running MCP server that answers tool calls (search, read_relevant, project_map, and the rest) over stdio. In practice you rarely type it yourself — an IDE's MCP client launches the `mimirs` binary with `serve` as its first argument and then talks to the process over its standard input and output. This page covers the thin CLI layer that sits in front of that server: how the subcommand is dispatched, why the server code is loaded the way it is, what gets written to disk when loading fails, and how control is handed off to the actual server boot.
 
-You rarely run it by hand — the editor starts it automatically. You would run it
-manually mostly to reproduce a startup problem in a terminal where you can see
-the diagnostics.
+The `serve` handler itself is deliberately small. Its real job is to load and start the server while making sure that a failure to even *load* the server's native dependencies produces a visible, debuggable error instead of a silent crash. The full server lifecycle — transport handshake, indexing, watchers, shutdown — lives in [Server: MCP stdio start](../server/start.md).
 
-The command is intentionally tiny. `serveCommand` in
-`src/cli/commands/serve.ts:4` is only a bootstrap: it loads the real server
-module and hands off to `startServer` (`src/server/index.ts:88`). The full
-server lifecycle — tool registration, transport, background indexing, and
-shutdown — is documented on the [server start](../server/start.md) page.
+## What runs, end to end
 
-## What the command does
+The published binary `mimirs` points at `src/main.ts` (`package.json` `bin`), which immediately calls `main()` in `src/cli/index.ts:86`. `main` reads `process.argv`, and if the first argument is missing or `--help`/`-h` it prints usage and exits `0` (`src/cli/index.ts:87-90`). Otherwise it runs the dispatcher inside a `try/catch` and forwards to `dispatch()` (`src/cli/index.ts:92-103`).
 
-`serveCommand` figures out the project directory, dynamically imports the
-server module, and calls `startServer`. The dynamic import is the load-bearing
-detail: it lets the command write useful diagnostics if the server module fails
-to load (`src/cli/commands/serve.ts:4-52`).
+`dispatch()` is a `switch` on the command word. Almost every subcommand is statically imported at the top of the file, but `serve` is the exception: its case body does an `await import("./commands/serve")` to load the handler on demand, then calls `serveCommand()` (`src/cli/index.ts:107-111`). The handler then loads the server module — again dynamically — writes diagnostics if that load throws, and finally calls `startServer()` to run the server (`src/cli/commands/serve.ts:4-53`).
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Editor as Editor / shell
-    participant Cmd as serveCommand
-    participant Mod as server module
-    participant Start as startServer
-    participant FS as .mimirs/
-
-    Editor->>Cmd: mimirs serve (RAG_PROJECT_DIR set)
-    Cmd->>Editor: stderr "Starting MCP server (stdio) for <dir>"
-    Cmd->>Mod: await import("../../server")
-    alt module load fails
-        Cmd->>Editor: stderr "FATAL: server module failed to load"
-        Cmd->>FS: write server-error.log and status (error)
-        Cmd-->>Editor: rethrow (process exits)
-    else module loaded
-        Cmd->>Start: await startServer()
-        Start->>Start: register tools, connect stdio transport, background index
-        Cmd->>Editor: stderr "Server ready — listening on stdin/stdout"
+    participant IDE as IDE / MCP client
+    participant Main as src/main.ts
+    participant Dispatch as dispatch() (cli/index.ts)
+    participant Serve as serveCommand() (commands/serve.ts)
+    participant Server as server module (src/server)
+    IDE->>Main: spawn `mimirs serve` (RAG_PROJECT_DIR set)
+    Main->>Dispatch: main() -> dispatch()
+    Dispatch->>Serve: await import("./commands/serve"); serveCommand()
+    Serve->>Serve: dir = RAG_PROJECT_DIR || cwd()
+    Serve->>IDE: stderr "Starting MCP server (stdio) for <dir>"
+    Serve->>Server: await import("../../server")
+    alt module load fails (native deps, top-level await)
+        Server-->>Serve: throws at module load
+        Serve->>Serve: write .mimirs/server-error.log + status
+        Serve->>IDE: stderr "FATAL: server module failed to load"
+        Serve-->>Main: rethrow err
+        Main->>IDE: server-error.log (crash) + exit 1
+    else module loads
+        Server-->>Serve: { startServer }
+        Serve->>Server: await startServer()
+        Server-->>IDE: connect stdio transport, serve tools
+        Serve->>IDE: stderr "Server ready — listening on stdin/stdout"
     end
 ```
 
-1. The editor or shell runs `mimirs serve`. The command picks the project
-   directory from `RAG_PROJECT_DIR`, falling back to the current working
-   directory (`src/cli/commands/serve.ts:5`).
-2. It writes a startup line to stderr so the launching process has a visible
-   sign of life (`src/cli/commands/serve.ts:6`).
-3. It dynamically imports the server module rather than importing it at the top
-   of the file (`src/cli/commands/serve.ts:14`). The server module uses
-   top-level `await` and native dependencies (`bun:sqlite`, `sqlite-vec`); a
-   static import would crash the whole CLI at module-load time, before any
-   handler could record what happened (`src/cli/commands/serve.ts:8-11`).
-4. If the import throws, the command prints a fatal line to stderr and writes
-   two diagnostic files under `.mimirs/`, then rethrows
-   (`src/cli/commands/serve.ts:15-48`).
-5. On success it awaits `startServer`, which registers the tools, connects the
-   stdio transport, opens the database, and kicks off background indexing
-   (`src/cli/commands/serve.ts:51`, `src/server/index.ts:88`).
-6. Once `startServer` resolves, the command writes "Server ready" to stderr and
-   stays alive, serving tool calls until shutdown
-   (`src/cli/commands/serve.ts:52`).
+1. The MCP client spawns the `mimirs` binary with `serve` as the first arg, typically with the environment variable `RAG_PROJECT_DIR` pointing at the project root. `src/main.ts` runs `main()`.
+2. `main()` validates the command word, then calls `dispatch()` inside a `try/catch` that only intercepts bad-flag errors (`src/cli/index.ts:92-102`).
+3. The `serve` case dynamically imports the handler module and calls `serveCommand()` (`src/cli/index.ts:107-110`). This is a normal lazy import for code, not the failure-isolation import — that one is inside the handler.
+4. `serveCommand()` resolves the target directory from `RAG_PROJECT_DIR`, falling back to `process.cwd()` (`src/cli/commands/serve.ts:5`).
+5. It writes a one-line `Starting MCP server (stdio) for <dir>` notice to stderr so the client's log shows the server was at least invoked (`src/cli/commands/serve.ts:6`).
+6. It dynamically imports the server module. This is the load that is isolated behind `try/catch` because the server pulls in native modules and top-level `await` (`src/cli/commands/serve.ts:12-14`).
+7. If that import throws, the handler writes `.mimirs/server-error.log` and `.mimirs/status`, prints a `FATAL` line to stderr, and rethrows (`src/cli/commands/serve.ts:15-48`).
+8. On success it has a `startServer` function and awaits it; `startServer` connects the stdio transport and begins serving tool calls (`src/cli/commands/serve.ts:51`, `src/server/index.ts:88`).
+9. After `startServer()` returns, the handler writes a final `Server ready — listening on stdin/stdout` line to stderr (`src/cli/commands/serve.ts:52`).
+
+## Why the server module is imported dynamically
+
+This is the single most important design choice in the handler, and the reason it exists as a separate file at all. The server module (`src/server/index.ts`) has a top-level `await import("../../package.json")` to read the version (`src/server/index.ts:18`) and transitively pulls in native dependencies — `bun:sqlite` and `sqlite-vec` — through `RagDB` and the indexing code.
+
+If the server were imported with a static `import` at the top of `src/cli/index.ts`, those native modules would be resolved while the CLI's own module graph was loading, *before* any `try/catch` or error handler had a chance to run. A failure there — a missing native library, an incompatible build, a top-level await that rejects — would crash the entire `mimirs` process during module evaluation. That would take down every other subcommand too, including `doctor`, which is the very tool a user would reach for to diagnose the problem. The comment block at `src/cli/index.ts:16-18` records exactly this reasoning, and the matching comment at `src/cli/commands/serve.ts:8-11` explains why the import is deferred into a `try`.
+
+By moving the server import inside `serveCommand()` and wrapping it in `try/catch`, the failure is caught at runtime, turned into written diagnostics, and rethrown cleanly. The CLI process stays in control long enough to leave a trail. There are two layers of laziness here: `dispatch()` lazily imports the handler module (`src/cli/index.ts:108`), and the handler lazily imports the server module (`src/cli/commands/serve.ts:14`). The second layer is the one that matters for fault isolation; the type annotation `typeof import("../../server").startServer` keeps `startServer` typed without forcing an eager load (`src/cli/commands/serve.ts:12`).
+
+## Diagnostics written on load failure
+
+When the server import throws, the catch block does best-effort error reporting in three forms (`src/cli/commands/serve.ts:15-48`):
+
+- A stderr line `[mimirs] FATAL: server module failed to load: <message>`. stderr may not be visible in some MCP clients, so it is not relied on alone (`src/cli/commands/serve.ts:18`).
+- A file `.mimirs/server-error.log` under the target directory, containing a timestamp, the error message, the stack trace, and the hint `To diagnose: bunx mimirs doctor` (`src/cli/commands/serve.ts:24-35`).
+- A file `.mimirs/status` whose first line is `error`, followed by `phase: module load failed`, a failure timestamp, and the error message (`src/cli/commands/serve.ts:36-44`).
+
+The `.mimirs` directory is created with `mkdirSync(..., { recursive: true })` first so the writes do not fail on a fresh project (`src/cli/commands/serve.ts:22-23`). All of this disk I/O is wrapped in its own inner `try/catch` whose catch body is empty — if even writing the diagnostics fails (read-only filesystem, permissions), the handler does not throw from the reporting code; it silently moves on and still rethrows the original error (`src/cli/commands/serve.ts:45-48`).
+
+The rethrown error then bubbles up through `dispatch()` and `main()` (it is not a `CliFlagError`, so the catch in `main` re-throws it, `src/cli/index.ts:97-101`) to the top-level handler in `src/main.ts:5-34`. That handler writes its *own* `.mimirs/server-error.log` describing a crash, prints `[mimirs] FATAL: <msg>`, and calls `process.exit(1)`. So a load failure produces a non-zero exit and a server-error.log; the `status` file written by the handler is what tools like `status` and `doctor` read to report the failed phase.
 
 ## Inputs
 
 | name | type | required | description |
-|------|------|----------|-------------|
-| `RAG_PROJECT_DIR` | environment variable | no | Absolute path of the project to serve. When unset, the command uses the current working directory (`src/cli/commands/serve.ts:5`). The MCP registrations written by `init` set this explicitly (`src/cli/setup.ts:228-234`). |
-| stdin / stdout | process streams | yes (in practice) | The MCP transport. The agent sends JSON-RPC requests on stdin and reads responses on stdout; the server treats stdin closing as a shutdown signal (`src/server/index.ts:154-157`). |
+| --- | --- | --- | --- |
+| `RAG_PROJECT_DIR` | environment variable | no | The project directory the server should operate on. `serveCommand()` reads it and falls back to `process.cwd()` when unset (`src/cli/commands/serve.ts:5`). The same variable is read again independently inside `startServer()` to locate the index (`src/server/index.ts:91`). MCP clients set this when they spawn the server so it targets the open project rather than wherever the process happened to start. |
+
+The `serve` command takes no positional arguments or flags — `dispatch()` matches the bare word `serve` and calls `serveCommand()` with no arguments (`src/cli/index.ts:107-110`). Anything after `serve` on the command line is ignored by this handler.
 
 ## Outputs
 
 | output | where it lands / shape / description |
-|--------|--------------------------------------|
-| Running MCP server | A live process speaking MCP over stdio, with all mimirs tools registered, started by `startServer` (`src/cli/commands/serve.ts:51`, `src/server/index.ts:88`). |
-| stderr status lines | Human-readable "Starting MCP server …" and "Server ready …" messages on stderr (`src/cli/commands/serve.ts:6`,`:52`). |
-| `.mimirs/server-error.log` | A timestamped error report written only when the server module fails to load, including the error message, stack, and a pointer to `bunx mimirs doctor` (`src/cli/commands/serve.ts:24-35`). |
-| `.mimirs/status` (error) | On module-load failure, a status file recording `error`, `phase: module load failed`, the failure timestamp, and the message (`src/cli/commands/serve.ts:36-44`). During normal operation the running server keeps this file updated with its own phases (`src/server/index.ts:100-110`). |
+| --- | --- |
+| stdio MCP server process | On success, control passes to `startServer()`, which connects a `StdioServerTransport` and serves tool calls over the process's stdin/stdout until shutdown (`src/cli/commands/serve.ts:51`, `src/server/index.ts:203-206`). The handler does not return while the server runs. |
+| stderr progress lines | Three human-readable lines for the client log: the `Starting MCP server (stdio) for <dir>` notice at launch, a `FATAL` line on load failure, and `Server ready — listening on stdin/stdout` after `startServer()` returns (`src/cli/commands/serve.ts:6,18,52`). |
+| `.mimirs/server-error.log` | Written only on module-load failure: timestamp, error message, stack, and a `bunx mimirs doctor` hint (`src/cli/commands/serve.ts:24-35`). A second, crash-level copy is written by `src/main.ts:16-27` if the error reaches the top level. |
+| `.mimirs/status` | Written only on module-load failure: first line `error`, then `phase: module load failed`, a timestamp, and the message (`src/cli/commands/serve.ts:36-44`). Successful startup status lines are written later by `startServer()` itself, not by this handler. |
 
 ## State changes
 
-This command itself only writes diagnostic files, and only on the module-load
-failure path. The substantive state changes — status-file phases, the index
-lock, background indexing, and shutdown status — all happen inside
-`startServer`; see the [server start](../server/start.md) page.
+| change | before | after | why it matters |
+| --- | --- | --- | --- |
+| `.mimirs/server-error.log` on load failure | absent or stale from a prior run | overwritten with the current failure's timestamp, message, and stack | This is the durable record a developer or `doctor` reads when the server will not start, because stderr is often invisible to MCP clients (`src/cli/commands/serve.ts:24-35`). |
+| `.mimirs/status` on load failure | may hold `done`, `interrupted`, or a previous `error` | replaced with an `error` / `phase: module load failed` block | Status readers (`status`, `doctor`) report the precise phase the server died in, distinguishing a load failure from a later runtime crash (`src/cli/commands/serve.ts:36-44`). |
 
-- **On module-load failure**, `.mimirs/server-error.log` and `.mimirs/status`
-  go from absent (or stale) to an error report, so the editor and `doctor` can
-  explain why the server never came up (`src/cli/commands/serve.ts:21-44`). The
-  writes are wrapped in their own try/catch and are best-effort
-  (`src/cli/commands/serve.ts:45-47`).
+Both writes are best-effort and silently skipped if the filesystem rejects them (`src/cli/commands/serve.ts:45-47`). On the success path this handler changes no state of its own; all further state changes (the `starting`/`done` status sequence, lock files, the index) belong to `startServer()` and are described in [Server: MCP stdio start](../server/start.md).
 
 ## Branches and failure cases
 
-- **`RAG_PROJECT_DIR` unset.** The directory defaults to the current working
-  directory (`src/cli/commands/serve.ts:5`).
-- **Server module fails to load.** The dynamic import is wrapped in try/catch.
-  On failure the command writes the diagnostic files and rethrows so the process
-  exits with the error rather than hanging (`src/cli/commands/serve.ts:13-49`).
-  This is why the import is dynamic: a top-level import of native modules that
-  fail to load would take down the CLI — including `mimirs doctor` — before any
-  diagnostics could be written (`src/cli/commands/serve.ts:8-11`).
-- **Diagnostic writes fail.** Writing `server-error.log` / `status` is itself
-  wrapped in try/catch; a failure there is swallowed so the original error is
-  still rethrown (`src/cli/commands/serve.ts:45-47`).
-- **Normal startup then shutdown.** After `startServer` resolves, the process
-  keeps running. It shuts down when stdin closes (the editor window is closed)
-  or on `SIGINT`/`SIGTERM`/`SIGHUP`, writing an "interrupted" status on the way
-  out (`src/server/index.ts:154-163`). These handlers live in `startServer`.
-- **Query-only mode.** If another mimirs process already holds the project's
-  index lock, the new server still serves tool calls but skips indexing and
-  watching (`src/server/index.ts:269-277`). This branch is part of the server
-  lifecycle, not this bootstrap.
+| branch | what happens |
+| --- | --- |
+| Dispatch reaches the `serve` case | The handler module is dynamically imported and `serveCommand()` is awaited (`src/cli/index.ts:107-110`). |
+| `RAG_PROJECT_DIR` set vs unset | Set: that directory is the target. Unset: falls back to `process.cwd()` (`src/cli/commands/serve.ts:5`). |
+| Server module imports cleanly | `startServer` is destructured from the import and awaited; the server runs (`src/cli/commands/serve.ts:14,51`). |
+| Server module throws at load | Caught; stderr `FATAL`, `.mimirs/server-error.log`, and `.mimirs/status` are written, then the error is rethrown (`src/cli/commands/serve.ts:15-48`). |
+| Diagnostics write also fails | Inner `try/catch` swallows the write error; the original load error is still rethrown (`src/cli/commands/serve.ts:45-48`). |
+| `startServer()` itself throws | Not caught here — it propagates out of `serveCommand()` to `dispatch()` and `main()`, then to the top-level handler in `src/main.ts:5-34`, which writes a crash log and exits `1`. |
+| Rethrown error reaches `main()` | Because it is not a `CliFlagError`, `main`'s catch re-throws it rather than printing a flag message and exiting cleanly (`src/cli/index.ts:97-101`). |
+| Normal completion | After `startServer()` returns, the `Server ready` line is written; the process stays alive serving over stdio until a shutdown signal or stdin EOF (`src/cli/commands/serve.ts:52`, `src/server/index.ts:154-163`). |
+
+The `serve` case does not pass through the numeric flag parsing in `src/cli/flags.ts`, so the `CliFlagError` path in `main`'s catch (`src/cli/index.ts:97-99`) never applies to it — that branch exists for data commands that take `--top`, `--days`, and similar numeric flags.
 
 ## Example
 
+A client launches the server roughly like this (the exact spawn is up to the IDE's MCP config):
+
 ```bash
-# Started by an editor via the MCP registration; equivalent manual run:
-RAG_PROJECT_DIR=/Users/example/my-app mimirs serve
+RAG_PROJECT_DIR=/path/to/project mimirs serve
 ```
 
-Expected stderr on a healthy start:
+Stderr on a healthy start (paths are illustrative):
 
 ```
-[mimirs] Starting MCP server (stdio) for /Users/example/my-app
+[mimirs] Starting MCP server (stdio) for /path/to/project
 [mimirs] Server ready — listening on stdin/stdout
 ```
 
-If the server module cannot load, stderr shows a fatal line and `.mimirs/`
-gains a `server-error.log`:
+On a load failure, stderr shows the FATAL line and `.mimirs/server-error.log` is written:
 
 ```
-[mimirs] FATAL: server module failed to load: <reason>
+[mimirs] Starting MCP server (stdio) for /path/to/project
+[mimirs] FATAL: server module failed to load: <native dep error>
 ```
+
+```
+mimirs server module failed to load at <iso-timestamp>
+
+Error: <native dep error>
+
+<stack trace>
+
+To diagnose: bunx mimirs doctor
+```
+
+When that happens, the recovery path is the [doctor](doctor.md) command, which inspects `.mimirs/server-error.log` and `.mimirs/status` to explain why startup failed.
 
 ## Key source files
 
-- `src/cli/commands/serve.ts` — the bootstrap: directory resolution, dynamic
-  import, module-load diagnostics, and the `startServer` handoff.
-- `src/server/index.ts` — `startServer`, which registers tools, connects the
-  stdio transport, opens the database, runs background indexing, and handles
-  shutdown.
-- `src/tools/index.ts` — `registerAllTools`, which wires every mimirs MCP tool
-  onto the server (`src/server/index.ts:189`).
+| file | role |
+| --- | --- |
+| `src/main.ts` | Binary entrypoint; calls `main()` and owns the top-level crash handler that writes a server-error.log and exits `1`. |
+| `src/cli/index.ts` | CLI dispatcher; the `serve` case lazily imports and runs `serveCommand()` (`src/cli/index.ts:107-111`). |
+| `src/cli/commands/serve.ts` | The `serve` handler — dynamically imports the server module, writes diagnostics on load failure, and delegates to `startServer()`. |
+| `src/server/index.ts` | Defines `startServer()`, the full server lifecycle this command hands off to. |
 
 ## Related pages
 
-- [server start](../server/start.md) — the full server lifecycle this command
-  hands off to.
-- [init](init.md) — writes the MCP registration that launches this command.
+- [Server: MCP stdio start](../server/start.md) — what `startServer()` does once `serve` hands off: transport handshake, background indexing, watchers, and shutdown.
+- [doctor](doctor.md) — the diagnostic command referenced in the failure logs.
+- [CLI index](index.md) — the dispatcher and the full list of subcommands.

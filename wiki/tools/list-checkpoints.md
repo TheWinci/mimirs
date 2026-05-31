@@ -1,113 +1,113 @@
 # Tool: list_checkpoints
 
-`list_checkpoints` reads back the checkpoints saved by [create_checkpoint](create-checkpoint.md), most recent first. It is how a session orients itself in project history without searching: "what decisions, milestones, blockers, and direction changes have happened, newest first?". By default it spans every session, so you see the whole project's trail, not just the current conversation.
+`list_checkpoints` is an MCP tool that prints the checkpoints saved for a project, newest first. Checkpoints are short, durable notes an agent leaves at the end of a task ("what was done and why") so a later session can pick up context without re-deriving it. This tool is how you read that log back: it answers "what has happened in this project before?" without running a semantic search. When you want a chronological catch-up, use this; when you want to find checkpoints about a specific topic, use the semantic [search_checkpoints](search-checkpoints.md) tool instead.
 
-Use it when you want a chronological overview. When you instead want to find checkpoints by meaning rather than recency, use [search_checkpoints](search-checkpoints.md).
+The tool is registered alongside its siblings in `registerCheckpointTools`, and the listing query itself lives in the database layer in `src/db/checkpoints.ts:51`.
 
-The handler is registered in `src/tools/checkpoint-tools.ts:80-118`.
+## What it does
 
-## How it works
+The handler takes four optional inputs, resolves which project database to talk to, runs a single SQL query against the `conversation_checkpoints` table, and formats the rows into a plain-text block. There is no embedding step and no ranking — it is a straight ordered read, which is why it is fast and deterministic compared to `search_checkpoints`.
+
+By default it reads across every session. Each agent run gets its own session id when a checkpoint is created, so a project accumulates checkpoints from many sessions over time. Listing without a `sessionId` filter gives you the full cross-session history, newest first, capped at the limit.
 
 ```mermaid
 sequenceDiagram
-  autonumber
-  participant Caller
-  participant Tool as list_checkpoints handler
-  participant DB as listCheckpoints
-  participant SQLite as conversation_checkpoints
-
-  Caller->>Tool: sessionId?, type?, limit?, directory?
-  Tool->>Tool: resolveProject(directory) -> RagDB
-  Tool->>DB: listCheckpoints(sessionId, type, limit)
-  DB->>SQLite: SELECT with optional session/type filters,<br>ORDER BY timestamp DESC LIMIT n
-  SQLite-->>DB: rows
-  DB-->>Tool: checkpoints (newest first)
-  alt no rows
-    Tool-->>Caller: "No checkpoints found."
-  else rows present
-    Tool->>Tool: format id, type, title, tags,<br>timestamp, turn, summary, files
-    Tool-->>Caller: joined listing
-  end
+    autonumber
+    participant Agent as Agent / caller
+    participant Tool as list_checkpoints handler
+    participant Resolve as resolveProject
+    participant DB as RagDB.listCheckpoints
+    participant SQLite as conversation_checkpoints table
+    Agent->>Tool: sessionId?, type?, limit=20, directory?
+    Tool->>Resolve: resolveProject(directory, getDB)
+    Resolve-->>Tool: { projectDir, db }
+    Tool->>DB: listCheckpoints(sessionId, type, limit)
+    DB->>SQLite: SELECT ... WHERE 1=1 [+filters]<br>ORDER BY timestamp DESC LIMIT ?
+    SQLite-->>DB: matching rows
+    DB-->>Tool: CheckpointRow[]
+    alt no rows
+        Tool-->>Agent: "No checkpoints found."
+    else rows found
+        Tool-->>Agent: formatted text block, one entry per checkpoint
+    end
 ```
 
-1. The caller invokes the tool with all-optional `sessionId`, `type`, `limit`, and `directory` (`src/tools/checkpoint-tools.ts:83-94`).
-2. `resolveProject` resolves the optional `directory` into the `RagDB` handle, falling back to `RAG_PROJECT_DIR` or the current working directory (`src/tools/checkpoint-tools.ts:96`).
-3. `listCheckpoints` runs a single `SELECT` against `conversation_checkpoints`, adding a `session_id = ?` clause only when `sessionId` is set and a `type = ?` clause only when `type` is set, then ordering by `timestamp DESC` with the limit applied (`src/tools/checkpoint-tools.ts:98`, `src/db/checkpoints.ts:50-69`).
-4. Each row is mapped into a checkpoint object, with `files_involved` and `tags` parsed from their stored JSON strings (`src/db/checkpoints.ts:77-87`).
-5. When the result set is empty, the handler returns the literal text `No checkpoints found.` (`src/tools/checkpoint-tools.ts:100-104`).
-6. Otherwise each checkpoint is rendered into a multi-line block and the blocks are joined with blank-line separators (`src/tools/checkpoint-tools.ts:106-114`).
-
-## Cross-session by default
-
-The key behavior: when no `sessionId` is given, the `session_id` filter clause is simply not added, so the query returns checkpoints from every session, newest first (`src/db/checkpoints.ts:59-62`). This is what makes the tool a project-wide history view rather than a per-conversation one. Passing `sessionId` narrows it to a single session.
-
-## Filters
-
-All three filters are optional and combine with AND semantics in the query (`src/db/checkpoints.ts:56-69`).
-
-| filter | effect | default |
-|--------|--------|---------|
-| `sessionId` | Restrict to one session's checkpoints. Omitted means all sessions. | unset (all sessions) |
-| `type` | Restrict to one of `decision`, `milestone`, `blocker`, `direction_change`, `handoff`. | unset (all types) |
-| `limit` | Cap the number of rows returned, applied as `LIMIT` after ordering. | `20` |
+1. The caller invokes the tool with any combination of `sessionId`, `type`, `limit`, and `directory`; all are optional, and `limit` defaults to `20` if omitted (`src/tools/checkpoint-tools.ts:89`).
+2. The handler calls `resolveProject`, which turns the optional `directory` into an absolute path, verifies it exists, loads that project's config, and returns the matching `RagDB` handle (`src/tools/index.ts:22-37`). If the directory does not exist, this throws before any query runs.
+3. With the resolved database, the handler calls `ragDb.listCheckpoints(sessionId, type, limit)` (`src/tools/checkpoint-tools.ts:98`), which is a thin wrapper that forwards to the store function (`src/db/index.ts:811-813`).
+4. The store builds one SQL statement starting from `SELECT * FROM conversation_checkpoints WHERE 1=1` and appends an `AND session_id = ?` clause and/or an `AND type = ?` clause only when those filters are supplied (`src/db/checkpoints.ts:57-67`).
+5. It always appends `ORDER BY timestamp DESC LIMIT ?`, so rows come back most-recent-first and are bounded by the limit (`src/db/checkpoints.ts:69-70`). The `timestamp` here is the ISO string recorded when the checkpoint was created, not the row id.
+6. Each raw row is mapped into a `CheckpointRow`, with `files_involved` and `tags` parsed back from their stored JSON strings into arrays (`src/db/checkpoints.ts:78-88`).
+7. If the result is empty, the handler returns the literal text `No checkpoints found.` (`src/tools/checkpoint-tools.ts:100-104`).
+8. Otherwise it renders each checkpoint into a multi-line entry — id, type, title, optional tags, timestamp and turn index, summary, and optional file list — joined by blank lines, and returns that as a single text block (`src/tools/checkpoint-tools.ts:106-116`).
 
 ## Inputs
 
 | name | type | required | description |
-|------|------|----------|-------------|
-| `sessionId` | string | no | Limit results to a specific session id. When omitted, checkpoints from all sessions are returned (`src/tools/checkpoint-tools.ts:84`). |
-| `type` | enum | no | Filter by checkpoint type: `decision`, `milestone`, `blocker`, `direction_change`, or `handoff` (`src/tools/checkpoint-tools.ts:85-88`). |
-| `limit` | integer ≥ 1 | no | Maximum number of checkpoints to return. Defaults to 20 (`src/tools/checkpoint-tools.ts:89`). |
-| `directory` | string | no | Project directory to operate on. Defaults to `RAG_PROJECT_DIR` or the current working directory (`src/tools/checkpoint-tools.ts:90-93`). |
+| --- | --- | --- | --- |
+| `sessionId` | string | no | Limit results to one session id. Omit it to list across all sessions (the default), which is the cross-session history view. |
+| `type` | enum | no | Filter by checkpoint type. Allowed values are `decision`, `milestone`, `blocker`, `direction_change`, and `handoff` (`src/tools/checkpoint-tools.ts:85-88`). |
+| `limit` | integer | no | Maximum number of rows to return. Must be at least `1`; defaults to `20` when not provided (`src/tools/checkpoint-tools.ts:89`). |
+| `directory` | string | no | Project directory whose database is read. Falls back to the `RAG_PROJECT_DIR` environment variable, then the current working directory (`src/tools/index.ts:26`). |
 
 ## Outputs
 
 | output | where it lands / shape / description |
-|--------|--------------------------------------|
-| Formatted checkpoint listing | A single text block. Each checkpoint renders as `#<id> [<type>] <title><tags>` on the first line, `<timestamp> (turn <turnIndex>)` indented on the second, the summary indented on the third, and an indented `Files: ...` line when `filesInvolved` is non-empty. `<tags>` shows as ` [tag1, tag2]` only when tags are present. Blocks are joined by blank lines (`src/tools/checkpoint-tools.ts:106-114`). |
-| Empty-state text | When no rows match, the block is exactly `No checkpoints found.` (`src/tools/checkpoint-tools.ts:100-104`). |
+| --- | --- |
+| Checkpoint listing | A single MCP text content item. When matches exist it is one formatted entry per checkpoint, newest first, separated by blank lines. Each entry shows `#<id> [<type>] <title>` plus tags in brackets when present, then a line with the ISO `timestamp` and `(turn <turnIndex>)`, then the `summary`, then a `Files:` line when `filesInvolved` is non-empty (`src/tools/checkpoint-tools.ts:106-116`). When nothing matches, the text is `No checkpoints found.` |
 
-The listing is ordered purely by recency; unlike [search_checkpoints](search-checkpoints.md) it does not compute or print a relevance score.
+This tool only reads. It runs a `SELECT`, so it does not create, update, or delete any rows and changes no stored state.
 
 ## Branches and failure cases
 
-- **No filters.** Returns the newest checkpoints across all sessions, up to the limit (`src/db/checkpoints.ts:56-68`).
-- **Session filter.** Adds `AND session_id = ?` and returns only that session's checkpoints (`src/db/checkpoints.ts:59-62`).
-- **Type filter.** Adds `AND type = ?` and returns only checkpoints of that type (`src/db/checkpoints.ts:63-66`).
-- **Both filters.** They stack — only checkpoints matching both the session and the type are returned.
-- **Limit default.** When `limit` is omitted, the schema default of 20 is used (`src/tools/checkpoint-tools.ts:89`).
-- **Empty result.** Any filter combination that yields zero rows returns `No checkpoints found.` rather than an empty body (`src/tools/checkpoint-tools.ts:100-104`).
-- **Tags / files rendering.** The ` [tags]` segment and the `Files:` line each appear only when their array is non-empty; an empty array renders nothing for that part (`src/tools/checkpoint-tools.ts:108-112`).
-- **Read-only.** This tool only queries; it never writes. Directory errors surface from `resolveProject` / `RagDB`.
+- **No filters**: with neither `sessionId` nor `type`, the query is `WHERE 1=1 ORDER BY timestamp DESC LIMIT ?`, returning the newest checkpoints across all sessions (`src/db/checkpoints.ts:57-70`).
+- **Session filter only**: supplying `sessionId` adds `AND session_id = ?`, scoping the list to one conversation's checkpoints (`src/db/checkpoints.ts:60-63`).
+- **Type filter only**: supplying `type` adds `AND type = ?`, useful for, say, listing only `blocker` or `decision` checkpoints (`src/db/checkpoints.ts:64-67`).
+- **Both filters**: both clauses are appended and combined with `AND`, so a checkpoint must match the session and the type to appear.
+- **Empty result**: if the query returns no rows — empty project, over-narrow filters, or a `sessionId` with no saved checkpoints — the handler short-circuits to the `No checkpoints found.` message rather than emitting an empty block (`src/tools/checkpoint-tools.ts:100-104`).
+- **Per-entry conditional formatting**: tags and the `Files:` line are only rendered when those arrays are non-empty, so a minimal checkpoint with no files or tags still prints cleanly (`src/tools/checkpoint-tools.ts:108-112`).
+- **Missing or bad directory**: `resolveProject` resolves the path to absolute and throws `Directory does not exist: <path>` if it is missing, so an invalid `directory` fails before the query (`src/tools/index.ts:30-32`).
+- **Limit floor**: the schema rejects a `limit` below `1`; there is no explicit upper bound in the schema, so a large limit is passed straight into the SQL `LIMIT`.
 
 ## Example
 
-List the 10 most recent decisions across all sessions:
+Example arguments to list the five most recent blocker checkpoints in the current project:
 
 ```json
-{ "type": "decision", "limit": 10 }
+{
+  "type": "blocker",
+  "limit": 5
+}
 ```
 
-Illustrative output:
+A representative response body (values synthetic):
 
+```text
+#42 [decision] Chose JSON columns over join tables [schema, db]
+  2026-05-31T14:24:00.000Z (turn 7)
+  Stored files_involved and tags as JSON text to avoid extra tables. Simpler reads, no migrations.
+  Files: src/db/checkpoints.ts, src/db/index.ts
+
+#41 [milestone] Checkpoint tooling wired into MCP server
+  2026-05-30T09:10:00.000Z (turn 3)
+  Registered create/list/search checkpoint tools and exposed them over the MCP transport.
 ```
-#12 [decision] Chose SQLite vec0 for embeddings [storage, embeddings]
-  2026-05-20T14:03:11.000Z (turn 8)
-  Picked sqlite-vec over a separate vector DB to keep the index a single file.
-  Files: src/example.ts, src/db/index.ts
 
-#9 [decision] Switched chunker to bun-chunk
-  2026-05-18T09:12:44.000Z (turn 3)
-  Replaced the hand-rolled splitter; better symbol boundaries.
-```
+## How it relates to the other checkpoint flows
 
-## Related tools
+The three checkpoint tools share one store and one table, and differ only in direction and ranking. The CLI exposes the same read through `mimirs checkpoint list`, which calls the identical `listCheckpoints` store function with no session filter.
 
-- [create_checkpoint](create-checkpoint.md) — writes the rows this tool reads.
-- [search_checkpoints](search-checkpoints.md) — find checkpoints by meaning instead of by recency.
+| Flow | What it does | Ordering |
+| --- | --- | --- |
+| [create_checkpoint](create-checkpoint.md) | Writes a new checkpoint and its embedding | n/a (write) |
+| `list_checkpoints` | Reads checkpoints by recency, optional session/type filters | `timestamp` descending |
+| [search_checkpoints](search-checkpoints.md) | Semantic match over title + summary embeddings | embedding distance |
+| [mimirs checkpoint list](../cli/checkpoint.md) | CLI surface for the same listing query | `timestamp` descending |
 
 ## Key source files
 
-- `src/tools/checkpoint-tools.ts` — registers `list_checkpoints`, applies filters, and formats the listing.
-- `src/db/checkpoints.ts` — `listCheckpoints`, the filtered `ORDER BY timestamp DESC LIMIT` query and row mapping.
-- `src/db/index.ts` — the `RagDB` class exposing `listCheckpoints` over the `conversation_checkpoints` table.
+- `src/tools/checkpoint-tools.ts` — registers `list_checkpoints` (and its siblings), validates inputs, runs the query, and formats the text response.
+- `src/db/checkpoints.ts` — `listCheckpoints` builds the filtered, ordered SQL query and maps rows into `CheckpointRow` objects.
+- `src/db/index.ts` — defines the `conversation_checkpoints` table and indexes (`src/db/index.ts:320-333`) and exposes `listCheckpoints` as a method on `RagDB` (`src/db/index.ts:811-813`).
+- `src/db/types.ts` — the `CheckpointRow` shape returned to the handler (`src/db/types.ts:71-81`).
+- `src/tools/index.ts` — `resolveProject` selects the project directory and database for the call.

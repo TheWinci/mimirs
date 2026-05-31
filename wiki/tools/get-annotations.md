@@ -1,137 +1,144 @@
 # Tool: get_annotations
 
-`get_annotations` reads back the persistent notes that [annotate](annotate.md) has stored. You use it to pull up the caveats attached to a file before you edit it, or to search across all notes by meaning when you remember a warning but not where it lives. It is the explicit read counterpart to the automatic `[NOTE]` lines that [read_relevant](read-relevant.md) prints — useful when you want the full set of notes for a file, including ones whose symbol does not match any chunk currently being viewed.
+`get_annotations` reads back the persistent notes that agents and people pin to files and symbols while working in a project. Those notes are short caveats — a known bug, a race condition, a fragile spot that should not be touched yet, a non-obvious constraint, or a workaround that needs context — written through the [annotate](annotate.md) tool so the warning survives across sessions. `get_annotations` is the read side: you call it to surface those caveats on demand, either by asking for every note on one file or by searching the whole note collection by meaning.
 
-The handler is registered in `src/tools/annotation-tools.ts:41-88`. It chooses one of three retrieval modes based on which arguments are present, then formats the rows into a plain-text listing.
+It solves a simple but real problem. Notes left behind are only useful if you can find them again. Inside `read_relevant` they already show up automatically as inline `[NOTE]` blocks next to the code they warn about, but that only covers chunks that happen to rank for your query. `get_annotations` gives direct access: list a file's notes before editing it, or run a semantic search like "concurrency hazards" across every annotation to collect related caveats that live in different files.
+
+The tool is registered alongside its siblings in `registerAnnotationTools`, which wires `annotate`, `get_annotations`, and `delete_annotation` onto the MCP server (`src/tools/annotation-tools.ts:7`). The handler itself spans `src/tools/annotation-tools.ts:58-87`.
 
 ## How it works
 
+The handler takes three optional arguments — `path`, `query`, and `directory` — and chooses one of three retrieval paths based on which of `path` and `query` were supplied. There is no required argument; calling it with nothing is valid and returns every note in the project.
+
 ```mermaid
 sequenceDiagram
-  autonumber
-  participant Caller
-  participant Tool as get_annotations handler
-  participant Embed as embed()
-  participant DB as RagDB
-  participant SQLite as annotations / vec_annotations
+    autonumber
+    participant Caller as Caller (agent)
+    participant Tool as get_annotations handler
+    participant Project as resolveProject
+    participant Embed as embed()
+    participant DB as RagDB (SQLite)
 
-  Caller->>Tool: path?, query?, directory?
-  Tool->>Tool: resolveProject(directory) -> RagDB
-  alt query provided
-    Tool->>Embed: embed(query)
-    Embed-->>Tool: embedding
-    Tool->>DB: searchAnnotations(embedding, 10)
-    DB->>SQLite: vector search over vec_annotations
-    SQLite-->>DB: rows ordered by distance
-    Tool->>Tool: if path, keep only rows where r.path === path
-  else path only
-    Tool->>DB: getAnnotations(path)
-    DB->>SQLite: SELECT WHERE path = ?
-  else neither
-    Tool->>DB: getAnnotations()
-    DB->>SQLite: SELECT all, newest first
-  end
-  alt no rows
-    Tool-->>Caller: "No annotations found."
-  else rows present
-    Tool->>Tool: format each row as id / target / author / note / timestamp
-    Tool-->>Caller: joined listing
-  end
+    Caller->>Tool: { path?, query?, directory? }
+    Tool->>Project: resolveProject(directory, getDB)
+    Project-->>Tool: { db }
+    alt query present
+        Tool->>Embed: embed(query)
+        Embed-->>Tool: Float32Array (384-dim)
+        Tool->>DB: searchAnnotations(embedding, 10)
+        DB-->>Tool: rows ranked by vector distance
+        Note over Tool: if path also given,<br>keep only rows whose path === path
+    else path only
+        Tool->>DB: getAnnotations(path)
+        DB-->>Tool: rows for that path, newest first
+    else neither
+        Tool->>DB: getAnnotations()
+        DB-->>Tool: every note, newest first
+    end
+    alt no rows
+        Tool-->>Caller: "No annotations found."
+    else rows found
+        Tool-->>Caller: formatted text block, one entry per note
+    end
 ```
 
-1. The caller invokes the tool with any combination of optional `path`, `query`, and `directory`. None are required (`src/tools/annotation-tools.ts:44-57`).
-2. `resolveProject` resolves the optional `directory` into the project's `RagDB` handle, falling back to `RAG_PROJECT_DIR` or the current working directory (`src/tools/annotation-tools.ts:59`).
-3. If `query` is set, the query string is embedded.
-4. `searchAnnotations` runs a vector search over `vec_annotations`, joined back to the `annotations` table, returning up to 10 rows ordered by ascending distance and tagged with a `score` of `1 / (1 + distance)` (`src/db/annotations.ts:137-172`).
-5. In that query-plus-path case, the results are then filtered in memory to keep only rows whose `path` equals the supplied path — so the path narrows an already-ranked semantic search (`src/tools/annotation-tools.ts:64-65`).
-6. If only `path` is set (no query), `getAnnotations(path)` returns every note for that file, ordered by `updated_at` descending (`src/tools/annotation-tools.ts:67`, `src/db/annotations.ts:101-135`).
-7. If neither is set, `getAnnotations()` returns all notes across the whole project, again newest-updated first (`src/tools/annotation-tools.ts:69`).
-8. When the result set is empty, the handler returns the literal text `No annotations found.` (`src/tools/annotation-tools.ts:72-76`).
-9. Otherwise each row is rendered into a multi-line block and the blocks are joined with blank-line separators (`src/tools/annotation-tools.ts:78-86`).
+1. The caller invokes the tool with any combination of `path`, `query`, and `directory`. All three are optional (`src/tools/annotation-tools.ts:44-57`).
+2. The handler first resolves which project to read from. `resolveProject` turns the optional `directory` into an absolute path (falling back to the `RAG_PROJECT_DIR` environment variable, then the current working directory), verifies it exists, loads that project's config, applies its embedding settings, and returns the `RagDB` handle for that project (`src/tools/index.ts:22-37`). If the directory does not exist, this throws before any query runs.
+3. If a `query` was supplied, the handler embeds it. `embed` loads the sentence-embedding model (the default is `Xenova/all-MiniLM-L6-v2`, a 384-dimension model) and returns a single normalized `Float32Array` for the query text (`src/embeddings/embed.ts:78-86`).
+4. The embedding is passed to `searchAnnotations` with a fixed limit of 10. This runs a vector-similarity search over the stored note embeddings and returns the closest matches, ordered by distance (`src/tools/annotation-tools.ts:63-64`).
+5. When both `query` and `path` are given, the ranked search results are filtered in memory down to rows whose `path` exactly equals the supplied `path`, so you get a relevance-ranked view scoped to one file (`src/tools/annotation-tools.ts:65`).
+6. If there is no `query` but a `path` was given, the handler skips embedding entirely and asks the database for every note on that exact path (`src/tools/annotation-tools.ts:67`).
+7. If neither argument was given, it fetches every note in the project (`src/tools/annotation-tools.ts:69`).
+8. If the chosen path produced no rows, the handler returns the plain string `"No annotations found."` (`src/tools/annotation-tools.ts:72-76`).
+9. Otherwise it formats each note into a human-readable block and returns the joined text (`src/tools/annotation-tools.ts:78-86`).
 
-## Three retrieval modes
+### Path-only retrieval
 
-The handler picks exactly one path based on which arguments are present (`src/tools/annotation-tools.ts:61-70`).
+When you pass only `path`, the handler calls `ragDb.getAnnotations(path)` (`src/tools/annotation-tools.ts:67`). That maps to the database function `getAnnotations`, which builds a `SELECT * FROM annotations WHERE 1=1` query and appends `AND path = ?` because a path was supplied, then orders the rows by `updated_at DESC` so the most recently edited note appears first (`src/db/annotations.ts:101-135`). The `symbol_name` column is not filtered here — both file-level notes (where `symbol_name` is `NULL`) and symbol-level notes on that file come back together. The path match is exact string equality against the stored `path`, so the value you pass must be the same project-relative path the note was written with; there is no normalization step in this handler.
 
-| Arguments given | Function called | What you get back |
-|-----------------|-----------------|-------------------|
-| `query` (with or without `path`) | `searchAnnotations(embedding, 10)`, then an in-memory `path` filter when `path` is also set | Up to 10 notes ranked by semantic similarity to the query; when `path` is also supplied, only those whose path matches survive |
-| `path` only | `getAnnotations(path)` | Every note for that file, newest-updated first |
-| neither | `getAnnotations()` | Every note in the project, newest-updated first |
+### Semantic query across annotations
 
-Note the ordering of the checks: `query` is tested first, so supplying both `path` and `query` runs the semantic search and then filters by path — it does not run a path-scoped query. The score-based ranking comes from the search branch; the path-only and project-wide branches are ordered purely by `updated_at` (`src/db/annotations.ts:118`).
+When you pass `query` (with or without `path`), the handler embeds the query text and calls `ragDb.searchAnnotations(embedding, 10)` (`src/tools/annotation-tools.ts:63-64`). That runs a nearest-neighbour search against `vec_annotations`, a `vec0` virtual table that stores one embedding per note. The SQL selects the 10 nearest rows by `embedding MATCH ?` ordered by `distance`, then joins back to the `annotations` table to recover each note's full row (`src/db/annotations.ts:137-173`). This is why semantic search finds notes by meaning rather than exact wording: a query about "data races" can surface a note that says "this counter is not thread-safe" even though the words differ.
+
+Each note's embedding was computed at write time, not at read time. The `annotate` tool embeds the note text — prefixed with the symbol name when one is given (`${symbol}: ${note}`) — and stores that vector, so symbol-level notes carry their symbol into the searchable text (`src/tools/annotation-tools.ts:30-32`). `searchAnnotations` returns each row with an extra `score` field computed as `1 / (1 + distance)`, but this handler does not display the score — it only uses the ordering and reformats the rows (`src/db/annotations.ts:171`).
+
+### path + query combination
+
+Supplying both narrows a semantic search to a single file. The search still runs across all notes and returns the global top 10 by relevance; the handler then filters that list in memory, keeping only rows whose `path` equals the supplied `path` (`src/tools/annotation-tools.ts:65`). Because the filter is applied after the database already limited the result to 10, a file with many notes can lose relevant ones that ranked outside the global top 10 — the limit is enforced before the path filter, not after. For an exhaustive list of one file's notes, prefer path-only retrieval, which has no top-K cap.
 
 ## Inputs
 
 | name | type | required | description |
-|------|------|----------|-------------|
-| `path` | string | no | File path to retrieve annotations for. Alone, it returns all notes for that file. Combined with `query`, it filters the ranked search results down to that path (`src/tools/annotation-tools.ts:45-48`). |
-| `query` | string | no | Semantic search query. Embedded and matched against all stored note vectors; finds notes by meaning regardless of which file they are on (`src/tools/annotation-tools.ts:49-52`). |
-| `directory` | string | no | Project directory to operate on. Defaults to the `RAG_PROJECT_DIR` env var or the current working directory (`src/tools/annotation-tools.ts:53-56`). |
+| --- | --- | --- | --- |
+| `path` | string | no | Project-relative file path to retrieve notes for. Used alone for a full list of that file's notes, or with `query` to scope a semantic search to that file. Matched by exact string equality against stored paths. |
+| `query` | string | no | Natural-language search text. When present, the handler embeds it and ranks notes by vector similarity across the whole project (top 10). |
+| `directory` | string | no | Which project to read from. Defaults to the `RAG_PROJECT_DIR` environment variable, then the current working directory. Resolved to an absolute path and checked for existence by `resolveProject` (`src/tools/index.ts:26-32`). |
 
 ## Outputs
 
 | output | where it lands / shape / description |
-|--------|--------------------------------------|
-| Formatted annotation listing | A single text block returned to the caller. Each note renders as `#<id>  <target><author>` on the first line, the note text indented on the second, and `(<updatedAt>)` indented on the third. `<target>` is the path, or `path  •  symbol` when the note is symbol-scoped; `<author>` shows as ` [author]` only when an author is present. Blocks are joined by blank lines (`src/tools/annotation-tools.ts:78-86`). |
-| Empty-state text | When no rows match, the block is exactly `No annotations found.` (`src/tools/annotation-tools.ts:72-76`). |
+| --- | --- |
+| matching annotations | A single MCP text content block. Each note is rendered as `#<id>  <path>` (or `#<id>  <path>  •  <symbolName>` for symbol notes), an optional ` [<author>]` suffix, then the note text and the `updatedAt` timestamp on their own indented lines, with a blank line between notes (`src/tools/annotation-tools.ts:78-86`). |
+| empty-result message | When no note matches, the same text block instead contains the literal string `"No annotations found."` (`src/tools/annotation-tools.ts:72-76`). |
 
-The score from the semantic-search branch is computed but is not printed in this tool's output — the formatting reads only `id`, `path`, `symbolName`, `author`, `note`, and `updatedAt` (`src/tools/annotation-tools.ts:78-83`).
+The shape of each row comes from `AnnotationRow`: `id`, `path`, `symbolName`, `note`, `author`, `createdAt`, and `updatedAt` (`src/db/types.ts:47-55`). The handler does not emit `createdAt` or the raw similarity score — only `id`, target (`path` plus optional `symbolName`), `author`, `note`, and `updatedAt` reach the caller.
 
 ## Branches and failure cases
 
-- **Query branch.** Present `query` always takes priority over `path`, embeds the query, and pulls the top 10 by vector distance (`src/tools/annotation-tools.ts:62-64`).
-- **Query + path branch.** After the search, rows are filtered to the exact path. If none of the top 10 are on that path, the result is empty even though notes for that path may exist further down the ranking (`src/tools/annotation-tools.ts:65`).
-- **Path-only branch.** Returns all notes for the path, no relevance ranking, newest first (`src/tools/annotation-tools.ts:66-67`).
-- **No-argument branch.** Returns every note in the project, newest first — useful for an audit but potentially large (`src/tools/annotation-tools.ts:68-69`).
-- **Empty result.** Any branch that yields zero rows returns `No annotations found.` rather than an empty body (`src/tools/annotation-tools.ts:72-76`).
-- **Read-only.** This tool never writes; it only queries. Directory resolution errors surface from `resolveProject` / `RagDB`, not from this handler.
+- **No arguments** — both `path` and `query` are absent, so the handler calls `getAnnotations()` with no filter and returns every note in the project, newest first (`src/tools/annotation-tools.ts:69`).
+- **Path only** — semantic search is skipped entirely; no embedding model is loaded. The database returns every note on that exact path (`src/tools/annotation-tools.ts:66-67`).
+- **Query only** — the query is embedded and the global top 10 nearest notes are returned, ranked by similarity (`src/tools/annotation-tools.ts:62-65`).
+- **Path and query together** — the top-10 semantic results are filtered in memory to the given path; notes on that file that ranked outside the top 10 are not recovered (`src/tools/annotation-tools.ts:65`).
+- **Empty result** — any path that yields zero rows returns the string `"No annotations found."` rather than an empty block or an error (`src/tools/annotation-tools.ts:72-76`).
+- **Missing or invalid directory** — `resolveProject` throws `Directory does not exist` when the resolved path is absent on disk, so the tool surfaces an error instead of querying (`src/tools/index.ts:30-32`).
+- **Path mismatch** — because the path filter is exact string equality, a value that differs from the stored path (for example an absolute path when the note was stored relative, or differing separators) silently matches nothing and falls into the empty-result branch. This handler does not normalize the path before querying.
 
-## When to use this vs the inline notes in read_relevant
+## State changes
 
-[read_relevant](read-relevant.md) already surfaces notes automatically: for each returned chunk it fetches that file's annotations and prints the relevant ones as `[NOTE]` lines, where "relevant" means file-level notes plus any symbol-scoped note whose symbol matches the chunk's entity (`src/tools/search.ts:170-203`). That is the right surface while you are reading code.
-
-Reach for `get_annotations` when you want notes outside that flow:
-
-- You want **every** note on a file, including symbol-scoped notes for symbols that did not appear in your last `read_relevant` result.
-- You remember a caveat but not its file, and want to find it by **meaning** via `query`.
-- You are about to [delete an annotation](delete-annotation.md) and need its `id`, which the inline `[NOTE]` lines do not show.
+`get_annotations` is read-only. It runs `SELECT` queries against the `annotations` and `vec_annotations` tables and never inserts, updates, or deletes a row. The notes it returns are created and modified by [annotate](annotate.md) and removed by [delete_annotation](delete-annotation.md); this tool only reads what those two have written. The only side effect on the query-only path is lazily loading the embedding model into memory the first time it is needed, which is a process-level cache, not stored state (`src/embeddings/embed.ts:44-76`).
 
 ## Example
 
-Search all notes by meaning:
+Retrieve every note attached to one file:
 
 ```json
-{ "query": "race condition in the indexing watcher" }
+{ "path": "src/db/index.ts" }
 ```
 
-Get every note for one file:
+Search all notes by meaning, regardless of file:
 
 ```json
-{ "path": "src/example.ts" }
+{ "query": "thread safety and concurrency hazards" }
 ```
 
-Illustrative output for the path-only call:
+Scope a semantic search to a single file:
 
-```
-#7  src/example.ts  •  parseConfig [agent]
-  Returns undefined on malformed YAML instead of throwing — callers must null-check.
-  (2026-05-20T14:03:11.000Z)
-
-#4  src/example.ts [human]
-  Whole module is slated for rewrite; avoid large refactors here.
-  (2026-05-18T09:12:44.000Z)
+```json
+{ "path": "src/embeddings/embed.ts", "query": "model cache corruption" }
 ```
 
-## Related tools
+A non-empty response renders as text shaped like this (values are illustrative):
 
-- [annotate](annotate.md) — creates and updates the notes this tool reads.
-- [delete_annotation](delete-annotation.md) — removes a note by the `id` shown in this listing.
-- [read_relevant](read-relevant.md) — surfaces matching notes inline as `[NOTE]` lines while reading code.
+```
+#7  src/db/index.ts  •  RagDB [agent]
+  Constructor throws on EROFS/EACCES — set RAG_DB_DIR to a writable dir.
+  (2026-05-30T11:04:18.221Z)
+
+#3  src/db/index.ts [human]
+  WAL mode plus busy_timeout=5000; concurrent writers will retry, not fail.
+  (2026-05-28T09:12:50.880Z)
+```
 
 ## Key source files
 
-- `src/tools/annotation-tools.ts` — registers `get_annotations`, selects the retrieval mode, and formats the listing.
-- `src/db/annotations.ts` — `getAnnotations` (path / all) and `searchAnnotations` (vector search) implementations.
-- `src/db/index.ts` — the `RagDB` class exposing both query methods over the `annotations` and `vec_annotations` tables.
-- `src/tools/search.ts` — the inline `[NOTE]` rendering in `read_relevant` that this tool complements (`src/tools/search.ts:170-203`).
+- `src/tools/annotation-tools.ts` — registers the tool and contains the handler that chooses the retrieval path, runs the query, and formats the output.
+- `src/db/annotations.ts` — the database functions `getAnnotations` (path/symbol filter) and `searchAnnotations` (vector search) that back the two retrieval paths.
+- `src/db/types.ts` — defines `AnnotationRow`, the row shape returned to the handler.
+- `src/embeddings/embed.ts` — turns the `query` string into the embedding used for semantic search.
+- `src/tools/index.ts` — `resolveProject`, which resolves the target project directory and database handle before any query runs.
+
+## Related tools
+
+- [annotate](annotate.md) — writes the notes this tool reads, including the symbol-prefixed embedding text that semantic search relies on.
+- [delete_annotation](delete-annotation.md) — removes a note by its `id`; the workflow is to find the `id` here first, then delete.
+- [annotations CLI](../cli/annotations.md) — the command-line equivalent for listing the same persistent notes outside an MCP session.

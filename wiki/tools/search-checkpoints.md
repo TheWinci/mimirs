@@ -1,115 +1,126 @@
 # Tool: search_checkpoints
 
-`search_checkpoints` finds saved checkpoints by meaning rather than by recency. Each checkpoint written by [create_checkpoint](create-checkpoint.md) was embedded from its title and summary; this tool embeds your query the same way and returns the closest matches, ranked by similarity. Use it when you remember roughly what a past decision or blocker was about but not when it happened — for example "why did we pick this storage layer?" — where the chronological listing from [list_checkpoints](list-checkpoints.md) would not help you find it.
+`search_checkpoints` finds past checkpoints by meaning rather than by exact words. A checkpoint is a short note an earlier session saved with `create_checkpoint` — a decision, a milestone, a blocker, a mid-task direction change, or a handoff — describing what was done and why. Over many sessions these pile up, and listing them newest-first (`list_checkpoints`) stops being useful once there are dozens. This tool lets an agent ask a question in plain language ("why did we drop the worker pool?", "did we ever decide on the auth approach?") and get back the most semantically similar checkpoints, ranked by closeness.
 
-The handler is registered in `src/tools/checkpoint-tools.ts:120-158`.
+The tool is registered on the MCP server inside `registerCheckpointTools`, alongside `create_checkpoint` and `list_checkpoints`, in `src/tools/checkpoint-tools.ts:120`. The actual vector query lives one layer down in the database module at `src/db/checkpoints.ts:91`.
 
 ## How it works
 
+When a checkpoint is created, the title and summary are concatenated and embedded into a single vector, which is stored in a dedicated vector table (`src/tools/checkpoint-tools.ts:46`). Searching reverses that: the incoming query string is embedded with the same model, and that query vector is compared against every stored checkpoint vector to find the nearest ones.
+
+The embedding step is shared with the rest of mimirs. `embed` loads (or reuses) a singleton transformer pipeline — by default `Xenova/all-MiniLM-L6-v2` producing 384-dimensional vectors — and returns a mean-pooled, L2-normalized `Float32Array` for the text (`src/embeddings/embed.ts:78`). Because the model is a singleton, the first search in a process can be slow while the model loads; later searches reuse the loaded pipeline.
+
+The nearest-neighbor lookup uses a `vec0` virtual table named `vec_checkpoints`, created with the project database (`src/db/index.ts:335`). The query joins the vector hits back to the `conversation_checkpoints` base table so each match carries its full title, summary, type, files, and tags (`src/db/checkpoints.ts:114-118`).
+
 ```mermaid
 sequenceDiagram
-  autonumber
-  participant Caller
-  participant Tool as search_checkpoints handler
-  participant Embed as embed()
-  participant DB as searchCheckpoints
-  participant SQLite as vec_checkpoints + conversation_checkpoints
+    autonumber
+    participant Agent as MCP client (agent)
+    participant Tool as search_checkpoints
+    participant Embed as embed()
+    participant DB as RagDB.searchCheckpoints
+    participant Vec as vec_checkpoints + conversation_checkpoints
 
-  Caller->>Tool: query, type?, limit?, directory?
-  Tool->>Tool: resolveProject(directory) -> RagDB
-  Tool->>Embed: embed(query)
-  Embed-->>Tool: query embedding
-  Tool->>DB: searchCheckpoints(embedding, limit, type)
-  DB->>SQLite: vector search top (limit * 2),<br>JOIN checkpoint rows
-  SQLite-->>DB: candidate rows ordered by distance
-  DB->>DB: skip rows whose type != filter,<br>stop at limit, compute score
-  DB-->>Tool: matches with score
-  alt no matches
-    Tool-->>Caller: "No matching checkpoints found."
-  else matches present
-    Tool->>Tool: format score, id, type, title, summary, files
-    Tool-->>Caller: joined listing
-  end
+    Agent->>Tool: { query, type?, limit?, directory? }
+    Tool->>Tool: resolveProject(directory) -> projectDir, db
+    Tool->>Embed: embed(query)
+    Embed-->>Tool: 384-dim Float32Array
+    Tool->>DB: searchCheckpoints(queryEmb, limit, type)
+    DB->>Vec: nearest limit*2 by distance, JOIN base rows
+    Vec-->>DB: candidate rows + distance
+    DB->>DB: drop rows where type mismatches, score = 1/(1+distance), cut to limit
+    DB-->>Tool: ranked checkpoints with score
+    alt no matches
+        Tool-->>Agent: "No matching checkpoints found."
+    else matches
+        Tool-->>Agent: formatted list, highest score first
+    end
 ```
 
-1. The caller invokes the tool with a required `query` plus optional `type`, `limit`, and `directory` (`src/tools/checkpoint-tools.ts:123-134`).
-2. `resolveProject` resolves the optional `directory` into the `RagDB` handle, falling back to `RAG_PROJECT_DIR` or the current working directory (`src/tools/checkpoint-tools.ts:136`).
-3. The query string is embedded with the same embedder used when checkpoints were stored, so the vectors are comparable (`src/tools/checkpoint-tools.ts:138`).
-4. `searchCheckpoints` runs a vector search over `vec_checkpoints` joined back to `conversation_checkpoints`, requesting `limit * 2` candidates ordered by ascending distance (`src/tools/checkpoint-tools.ts:139`, `src/db/checkpoints.ts:96-119`).
-5. The candidate rows are walked in order. Any row whose `type` does not match the filter is skipped, and the loop stops once it has collected `limit` matches (`src/db/checkpoints.ts:123-141`).
-6. Each kept row gets a `score` of `1 / (1 + distance)`, so a smaller distance yields a higher score closer to 1 (`src/db/checkpoints.ts:136`).
-7. When nothing matches, the handler returns the literal text `No matching checkpoints found.` (`src/tools/checkpoint-tools.ts:141-145`).
-8. Otherwise each match is rendered into a multi-line block and the blocks are joined with blank-line separators (`src/tools/checkpoint-tools.ts:147-155`).
-
-## Why it over-fetches before filtering
-
-The type filter is applied in application code, not in the SQL vector query. To avoid returning too few rows when many of the nearest matches are the wrong type, the database fetches `limit * 2` candidates by distance first, then skips non-matching types and stops at `limit` (`src/db/checkpoints.ts:119`, `src/db/checkpoints.ts:123-141`). A consequence worth knowing: if more than half of the top `limit * 2` neighbors are filtered out by type, the result can come back shorter than `limit` even when more matching checkpoints exist further down the full ranking.
-
-## list_checkpoints vs search_checkpoints
-
-| | [list_checkpoints](list-checkpoints.md) | search_checkpoints |
-|---|---|---|
-| ordering | `timestamp DESC` (recency) | similarity to the query (`score`) |
-| requires a query | no | yes |
-| score in output | no | yes, printed as the first field |
-| session filter | yes (`sessionId`) | no |
-| type filter | yes | yes |
-| default limit | 20 | 5 |
+1. The agent calls the tool with a `query` and optional `type`, `limit`, and `directory`. Zod validates the arguments before the handler runs, so a missing or empty `query` is rejected before any work happens (`src/tools/checkpoint-tools.ts:123-134`).
+2. `resolveProject` turns the optional `directory` into an absolute path, verifies it exists, loads the project config, applies its embedding settings, and returns the project's `RagDB` handle (`src/tools/index.ts:22-37`). This is what lets the same server serve checkpoints for multiple projects.
+3. The handler embeds the query string into a vector with `embed` (`src/tools/checkpoint-tools.ts:138`).
+4. The vector is passed to `ragDb.searchCheckpoints`, which forwards to the database helper with the `limit` as `topK` and the optional `type` (`src/db/index.ts:814`).
+5. The helper runs a `MATCH` query against `vec_checkpoints` ordered by distance, joined to the base checkpoint rows. It deliberately over-fetches — it asks for `topK * 2` candidates (`src/db/checkpoints.ts:117-120`).
+6. It walks the candidates, skips any whose `type` does not match the requested filter, converts each distance into a `score` of `1 / (1 + distance)`, and stops once it has collected `topK` results (`src/db/checkpoints.ts:124-141`).
+7. If nothing came back, the handler returns the fixed string `"No matching checkpoints found."` (`src/tools/checkpoint-tools.ts:141-145`).
+8. Otherwise it formats each match as a text block — score, id, type, title, summary, and an optional `Files:` line — joined by blank lines, with the highest score first (`src/tools/checkpoint-tools.ts:147-156`).
 
 ## Inputs
 
 | name | type | required | description |
-|------|------|----------|-------------|
-| `query` | string (1–2000) | yes | What to search for. Embedded and matched against stored checkpoint title+summary vectors (`src/tools/checkpoint-tools.ts:124`). |
-| `type` | enum | no | Restrict matches to `decision`, `milestone`, `blocker`, `direction_change`, or `handoff`. Applied as a post-search filter (`src/tools/checkpoint-tools.ts:125-128`). |
-| `limit` | integer ≥ 1 | no | Maximum number of matches to return. Defaults to 5 (`src/tools/checkpoint-tools.ts:129`). |
-| `directory` | string | no | Project directory to operate on. Defaults to `RAG_PROJECT_DIR` or the current working directory (`src/tools/checkpoint-tools.ts:130-133`). |
+| --- | --- | --- | --- |
+| `query` | string (1–2000 chars) | yes | Natural-language text to match against checkpoint titles and summaries. It is embedded and used as the search vector. |
+| `type` | enum: `decision`, `milestone`, `blocker`, `direction_change`, `handoff` | no | Restrict results to one checkpoint kind. Applied as a post-filter on the vector candidates, not in SQL. |
+| `limit` | integer ≥ 1 | no | Maximum number of results. Defaults to `5` (`src/tools/checkpoint-tools.ts:129`). Passed through as `topK`. |
+| `directory` | string | no | Project directory to search. Falls back to the `RAG_PROJECT_DIR` env var, then the current working directory (`src/tools/index.ts:26`). |
 
 ## Outputs
 
 | output | where it lands / shape / description |
-|--------|--------------------------------------|
-| Ranked checkpoint matches | A single text block. Each match renders as `<score>  #<id> [<type>] <title>` on the first line, the summary indented on the second, and an indented `Files: ...` line when `filesInvolved` is non-empty. The score is formatted to four decimal places. Blocks are joined by blank lines (`src/tools/checkpoint-tools.ts:147-155`). |
-| Empty-state text | When no rows match, the block is exactly `No matching checkpoints found.` (`src/tools/checkpoint-tools.ts:141-145`). |
+| --- | --- |
+| Ranked checkpoints | A single MCP text block. Each checkpoint is rendered as `<score>  #<id> [<type>] <title>` then an indented summary line, with an optional `Files: ...` line when the checkpoint recorded involved files (`src/tools/checkpoint-tools.ts:147-156`). The score is `distance`-derived and printed to four decimals. Blocks are separated by a blank line. |
+| Empty-result message | When no candidate survives the search and type filter, the literal text `No matching checkpoints found.` is returned instead of a list (`src/tools/checkpoint-tools.ts:142-144`). |
 
-Unlike [list_checkpoints](list-checkpoints.md), this tool's output does not print the timestamp or turn index — it leads with the relevance score (`src/tools/checkpoint-tools.ts:152`).
+The tool only reads. It performs no inserts or updates, so it changes no stored state — unlike `create_checkpoint`, which writes a new row and a new vector.
+
+## Ranking and the score field
+
+Vector search returns a `distance` (smaller means closer). The helper turns that into a similarity-like `score` with `score = 1 / (1 + row.distance)`, so a perfect match (distance 0) scores `1.0` and worse matches trend toward `0` (`src/db/checkpoints.ts:137`). Results are already ordered by ascending distance from the SQL `ORDER BY distance`, so the printed list runs from most to least relevant. The score is informational; there is no minimum-score cutoff, so even weak matches appear if fewer than `limit` strong ones exist.
 
 ## Branches and failure cases
 
-- **Type filter.** When `type` is set, candidate rows of other types are skipped during the walk; when unset, all candidate types are eligible (`src/db/checkpoints.ts:124`).
-- **Over-fetch then trim.** The search asks for `limit * 2` neighbors and breaks once `limit` matches are collected, so a strict type filter can yield fewer than `limit` results even if more exist deeper in the ranking (`src/db/checkpoints.ts:119`, `src/db/checkpoints.ts:139`).
-- **Limit default.** When `limit` is omitted, the schema default of 5 applies (`src/tools/checkpoint-tools.ts:129`).
-- **Empty result.** No matches (including the case where every candidate is filtered out by type) returns `No matching checkpoints found.` (`src/tools/checkpoint-tools.ts:141-145`).
-- **Files rendering.** The `Files:` line appears only when `filesInvolved` is non-empty (`src/tools/checkpoint-tools.ts:149-151`).
-- **Read-only.** This tool only queries; it never writes. Directory or embedding errors surface from `resolveProject` / `embed` / `RagDB`.
+| Situation | Behavior |
+| --- | --- |
+| Empty / over-long `query` | Rejected by Zod validation (`min(1).max(2000)`) before the handler runs (`src/tools/checkpoint-tools.ts:124`). |
+| `type` omitted | No filtering; all candidate kinds are eligible (`src/db/checkpoints.ts:125`). |
+| `type` provided | Candidates whose `type` differs are skipped in the result loop. Because filtering happens after the vector lookup, see the over-fetch note below (`src/db/checkpoints.ts:124-125`). |
+| `limit` omitted | Defaults to `5` results (`src/tools/checkpoint-tools.ts:129`). |
+| No checkpoints stored / none match | The vector query yields no surviving rows and the handler returns `"No matching checkpoints found."` (`src/tools/checkpoint-tools.ts:141-145`). |
+| Checkpoint has no involved files | The `Files:` line is omitted from that block; only score, id, type, title, and summary are shown (`src/tools/checkpoint-tools.ts:149-152`). |
+| `directory` does not exist | `resolveProject` throws `Directory does not exist: <path>` before any search (`src/tools/index.ts:30-32`). |
+| Model load failure | Surfaces from `embed`/`getEmbedder`. A corrupted cached model is deleted and the load is retried once; other load errors propagate (`src/embeddings/embed.ts:61-72`). |
+
+### The over-fetch and post-filter
+
+The most surprising part of the search is that the type filter is not pushed into SQL. The vector query fetches `topK * 2` nearest candidates regardless of type, and the type check happens afterward in a loop that stops once it has `topK` matches (`src/db/checkpoints.ts:117-141`). The doubled fetch is a cushion so that filtering by type still tends to return enough results. It is only a cushion, though: if a type is rare and its checkpoints are not among the `topK * 2` nearest overall, the result can come back shorter than `limit` — or empty — even when matching checkpoints of that type exist further down the distance ranking. Callers that need exhaustive type-scoped history are better served by `list_checkpoints` with its `type` filter, which queries the base table directly.
 
 ## Example
 
-Find decisions related to storage:
+Example arguments:
 
 ```json
-{ "query": "why we picked the embedding storage layer", "type": "decision", "limit": 3 }
+{
+  "query": "why did we switch the embedding model",
+  "type": "decision",
+  "limit": 3,
+  "directory": "/Users/me/repos/myproject"
+}
 ```
 
-Illustrative output:
+Illustrative response text (values synthetic):
 
 ```
-0.8123  #12 [decision] Chose SQLite vec0 for embeddings
-  Picked sqlite-vec over a separate vector DB to keep the index a single file.
-  Files: src/example.ts, src/db/index.ts
+0.8421  #42 [decision] Switched embedding model to all-MiniLM-L6-v2
+  Chose the smaller MiniLM model for faster local indexing; quality loss was acceptable for code search.
+  Files: src/embeddings/embed.ts, src/config.ts
 
-0.6440  #9 [decision] Switched chunker to bun-chunk
-  Replaced the hand-rolled splitter; better symbol boundaries.
+0.6113  #29 [decision] Locked embedding dimension at 384
+  Standardized the vector table width so swapping models later requires a reindex, recorded here so nobody assumes it is dynamic.
 ```
-
-## Related tools
-
-- [create_checkpoint](create-checkpoint.md) — writes and embeds the checkpoints this tool searches.
-- [list_checkpoints](list-checkpoints.md) — the recency-ordered counterpart when you want chronological history instead of relevance.
 
 ## Key source files
 
-- `src/tools/checkpoint-tools.ts` — registers `search_checkpoints`, embeds the query, and formats the ranked listing.
-- `src/embeddings/embed.ts` — `embed`, which turns the query into a comparable vector.
-- `src/db/checkpoints.ts` — `searchCheckpoints`, the over-fetch vector search, type filtering, and score computation.
-- `src/db/index.ts` — the `RagDB` class exposing `searchCheckpoints` over the `vec_checkpoints` and `conversation_checkpoints` tables.
+| File | Role |
+| --- | --- |
+| `src/tools/checkpoint-tools.ts` | Registers `search_checkpoints`, validates arguments, embeds the query, formats the result text. |
+| `src/db/checkpoints.ts` | `searchCheckpoints` runs the `vec_checkpoints` MATCH query, applies the type post-filter, and computes the score. |
+| `src/embeddings/embed.ts` | `embed` turns the query string into the normalized vector used for the lookup. |
+| `src/tools/index.ts` | `resolveProject` resolves the directory and hands back the project's `RagDB`. |
+| `src/db/index.ts` | Defines the `conversation_checkpoints` table and the `vec_checkpoints` virtual table, and exposes `searchCheckpoints` on `RagDB`. |
+
+## Related tools
+
+- [create_checkpoint](create-checkpoint.md) — writes the checkpoint rows and embeddings that this tool searches.
+- [list_checkpoints](list-checkpoints.md) — newest-first listing with an exact `type` filter, queried straight from the base table.
+- [checkpoint CLI](../cli/checkpoint.md) — the command-line surface over the same checkpoint store.

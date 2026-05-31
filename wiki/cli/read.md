@@ -1,183 +1,153 @@
 # CLI: read
 
-`mimirs read` answers "show me the code that is relevant to this topic." Unlike
-[search](search.md), which lists matching *files*, `read` returns the actual
-*content* of the best-matching chunks — individual functions, classes, and
-documentation sections — ranked by relevance. It is the command-line
-counterpart of the `read_relevant` MCP tool.
+`mimirs read <query>` answers the question "show me the actual code that is relevant to this topic" from the terminal. Where `mimirs search` returns a ranked list of *files* with short previews, `read` returns the *content* of the most relevant semantic chunks — individual functions, classes, or markdown sections — printed in full to stdout, each tagged with its score, file path, and the name of the symbol it belongs to. It is the command-line twin of the `read_relevant` MCP tool: both call the same chunk-search engine, so the ranking and content you see on the terminal match what an agent receives.
 
-Use it when you want to read the relevant code directly in the terminal rather
-than open files one by one. When you only need to know which files are
-involved, use [search](search.md) instead.
+Use it when you want to read code by meaning instead of by file name — for example to dump the body of the function that handles a feature without first having to find which file it lives in.
 
-The command entry point is `readCommand` in
-`src/cli/commands/search-cmd.ts:61`. The chunk search runs in
-`searchChunks` (`src/search/hybrid.ts:470`).
+The command is wired into the CLI dispatcher under the `read` case, which forwards the raw arguments and a flag-lookup helper to the handler `src/cli/index.ts:121-122`. The handler itself lives next to the `search` handler in the same module `src/cli/commands/search-cmd.ts:61-88`.
 
-## What the command does
-
-`readCommand` validates the query, opens the database, runs the chunk-level
-hybrid search, and prints each matching chunk's score, path, optional entity
-name, and full content (`src/cli/commands/search-cmd.ts:61-88`).
+## What it does, step by step
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant User
-    participant Cmd as readCommand
-    participant DB as RagDB (.mimirs)
-    participant SearchChunks as searchChunks()
-    participant Embed as embedder
-
-    User->>Cmd: mimirs read "query" [--top N] [--threshold T] [--dir D] [filters]
-    alt no query
-        Cmd->>User: usage error, exit 1
-    end
-    Cmd->>DB: new RagDB(dir)
-    Cmd->>Cmd: loadConfig + applyEmbeddingConfig
-    Cmd->>SearchChunks: searchChunks(query, db, top, threshold, hybridWeight, generated, filter)
-    SearchChunks->>Embed: embed(query)
-    SearchChunks->>DB: vector + BM25 chunk search
-    SearchChunks->>SearchChunks: merge scores, drop below threshold
-    SearchChunks-->>Cmd: ChunkResult[]
-    alt empty
-        Cmd->>User: "No relevant chunks found. Has the directory been indexed?"
-    else has results
-        Cmd->>User: per chunk: [score] path • entity, then content, then ---
-    end
-    Cmd->>DB: db.close()
+    participant Dispatch as dispatch()<br>(cli/index.ts)
+    participant Handler as readCommand()<br>(search-cmd.ts)
+    participant Engine as searchChunks()<br>(search/hybrid.ts)
+    participant Embed as embed()
+    participant DB as RagDB (sqlite)
+    User->>Dispatch: mimirs read "query" --top 5
+    Dispatch->>Handler: readCommand(args, getFlag)
+    Handler->>Handler: validate query, parse --top / --threshold / filters
+    Handler->>Engine: searchChunks(query, db, top, threshold, ...)
+    Engine->>Embed: embed(query)
+    Embed-->>Engine: query vector
+    Engine->>DB: vector search + FTS over chunks
+    DB-->>Engine: candidate chunks
+    Engine->>Engine: hybrid merge, threshold, boosts, parent grouping, doc expansion
+    Engine->>DB: logQuery(...) → query_log row
+    Engine-->>Handler: ranked ChunkResult[]
+    Handler->>User: print [score] path • entity + full content per chunk
 ```
 
-1. The user runs the command with a query and optional flags; the query is the
-   first positional argument (`src/cli/commands/search-cmd.ts:62`).
-2. If the query is missing, the command prints a usage line and exits with
-   status 1 (`src/cli/commands/search-cmd.ts:63-66`).
-3. It resolves the target directory (`--dir` or the current directory), opens
-   the database, and loads/applies config (`src/cli/commands/search-cmd.ts:68-71`).
-4. It reads `--top` (default `8`) and `--threshold` (default `0.3`), and builds
-   an optional path filter from `--ext`/`--in`/`--exclude`
-   (`src/cli/commands/search-cmd.ts:72-74`).
-5. It calls `searchChunks`, which embeds the query, runs a vector and a BM25
-   chunk search, merges scores, drops chunks below the threshold, and applies
-   path-based score adjustments (`src/cli/commands/search-cmd.ts:76`,
-   `src/search/hybrid.ts:470-498`).
-6. If nothing matched, it prints "No relevant chunks found. Has the directory
-   been indexed?" (`src/cli/commands/search-cmd.ts:78-79`).
-7. Otherwise, for each chunk it prints a header line `[score] path • entity`,
-   then the chunk content, then a `---` separator
-   (`src/cli/commands/search-cmd.ts:81-86`).
-8. It closes the database (`src/cli/commands/search-cmd.ts:88`).
+1. The user runs `mimirs read <query>` with optional flags. The dispatcher matches the `read` command and calls `readCommand` `src/cli/index.ts:121-122`.
+2. `readCommand` reads the query from `args[1]`. If it is missing, the command prints a usage line and exits with code 1 `src/cli/commands/search-cmd.ts:62-66`.
+3. The handler resolves the target directory (`--dir`, default `.`), opens the index database, loads the project config, and parses the numeric flags and path filters `src/cli/commands/search-cmd.ts:68-73`.
+4. It calls `searchChunks` with the parsed query, the database handle, `top`, `threshold`, the configured hybrid weight, the configured generated-file globs, the path filter, and the parent-grouping count `src/cli/commands/search-cmd.ts:75`.
+5. `searchChunks` embeds the query text into a vector via `embed` `src/search/hybrid.ts:481`.
+6. It runs a vector (nearest-neighbour) search and a BM25 full-text search over the chunk index, each over-fetching `topK * 4` candidates `src/search/hybrid.ts:483-487`.
+7. It merges the two result sets with hybrid scoring, drops anything below the threshold, applies path and filename boosts, demotes generated/boilerplate files, adds a dependency-graph boost, sorts, then consolidates sibling chunks into their parent and expands for docs `src/search/hybrid.ts:493-542`.
+8. Before returning, it writes one row into the `query_log` table for analytics `src/search/hybrid.ts:544-552`.
+9. Back in the handler, the ranked chunks are printed: a header line `[score] path • entity` followed by the full chunk content and a `---` separator `src/cli/commands/search-cmd.ts:80-85`. If nothing cleared the threshold, it prints a hint that the directory may not be indexed `src/cli/commands/search-cmd.ts:77-78`. Either way the database is closed `src/cli/commands/search-cmd.ts:87`.
 
 ## Inputs
 
-| name | type | required | description |
-|------|------|----------|-------------|
-| query | positional arg | yes | The natural-language query (`args[1]`). Missing it triggers a usage error and exit 1 (`src/cli/commands/search-cmd.ts:62-66`). |
-| `--top` | flag with value | no | Maximum number of chunks to return. Defaults to `8`, parsed with `parseInt` (`src/cli/commands/search-cmd.ts:72`). |
-| `--threshold` | flag with value | no | Minimum relevance score (0–1) a chunk must meet to be returned. Defaults to `0.3`, parsed with `parseFloat` (`src/cli/commands/search-cmd.ts:73`). |
-| `--dir` | flag with value | no | Project directory to search. Resolved against the current directory; defaults to `.` (`src/cli/commands/search-cmd.ts:68`). |
-| `--ext` / `--extensions` | flag with value | no | Comma-separated extensions to restrict results to (`src/cli/commands/search-cmd.ts:21`). |
-| `--in` / `--dirs` | flag with value | no | Comma-separated directories to restrict results to (`src/cli/commands/search-cmd.ts:22`). |
-| `--exclude` / `--exclude-dirs` | flag with value | no | Comma-separated directories to exclude (`src/cli/commands/search-cmd.ts:23`). |
+| Name | Type | Required | Description |
+| --- | --- | --- | --- |
+| `<query>` | positional string | yes | The natural-language or symbol query. Read from `args[1]`; if absent the command prints usage and exits 1 `src/cli/commands/search-cmd.ts:62-66`. |
+| `--top N` | integer | no | Number of chunks to return. Parsed with a strict integer parser, minimum 1; **defaults to 8** (not the config `searchTopK`) `src/cli/commands/search-cmd.ts:71`. |
+| `--threshold T` | float 0–1 | no | Minimum hybrid score a chunk must reach to be kept. Defaults to `0.3` `src/cli/commands/search-cmd.ts:72`. |
+| `--dir D` | path | no | Project directory whose index to query. Resolved to an absolute path; defaults to the current directory `src/cli/commands/search-cmd.ts:68`. |
+| `--ext` / `--extensions` | comma list | no | Restrict to these file extensions, e.g. `.ts,.tsx` `src/cli/commands/search-cmd.ts:22`. |
+| `--in` / `--dirs` | comma list | no | Restrict to these directories (resolved relative to the project root) `src/cli/commands/search-cmd.ts:23,28`. |
+| `--exclude` / `--exclude-dirs` | comma list | no | Exclude these directories `src/cli/commands/search-cmd.ts:24,29`. |
 
-The filter flags are merged into a single path filter only when at least one is
-present (`src/cli/commands/search-cmd.ts:17-30`).
+`--ext`, `--in`, and `--exclude` are collected by `buildCliFilter`. Each accepts a comma-separated value, split and trimmed by `parseListFlag`; empty segments are dropped. When none of the three flags is present, no filter object is built at all and the search runs unscoped `src/cli/commands/search-cmd.ts:18-31`.
+
+The hybrid weight (vector vs. keyword balance), the list of generated-file globs, and the parent-grouping count are not flags — they come from the loaded project config (`config.hybridWeight`, `config.generated`, `config.parentGroupingMinCount`) and default to `0.7`, empty, and `2` respectively `src/config/index.ts:23,113,120`.
 
 ## Outputs
 
-| output | where it lands / shape / description |
-|--------|--------------------------------------|
-| Chunk results | Printed to stdout, one block per `ChunkResult` (`src/search/hybrid.ts:45-55`). |
-| Header line | `[score] path • entity` — `r.score.toFixed(2)` and `r.path`, with `  •  entityName` appended only when the chunk has an entity name (`src/cli/commands/search-cmd.ts:82-83`). |
-| Chunk content | The full chunk text printed verbatim on the following lines (`src/cli/commands/search-cmd.ts:84`). |
-| Separator | A `---` line between chunks (`src/cli/commands/search-cmd.ts:85`). |
-| Empty-result message | "No relevant chunks found. Has the directory been indexed?" when zero chunks meet the threshold (`src/cli/commands/search-cmd.ts:79`). |
+| Output | Where it lands / shape / description |
+| --- | --- |
+| Ranked chunk content | stdout. For each result: a header line `[<score, 2dp>] <path>` with `  •  <entityName>` appended when the chunk has a symbol name, then the full chunk content, then a line containing `---` `src/cli/commands/search-cmd.ts:80-85`. |
+| Empty-state message | stdout. When zero chunks clear the threshold: `No relevant chunks found. Has the directory been indexed?` `src/cli/commands/search-cmd.ts:77-78`. |
+| `query_log` row | One row inserted into the SQLite `query_log` table, side-effect of every chunk search `src/search/hybrid.ts:546-552`. |
 
-`ChunkResult` carries `startLine`, `endLine`, `chunkType`, and `parentId`
-alongside the printed fields (`src/search/hybrid.ts:45-55`), but this command
-prints only the score, path, entity name, and content — it does not render line
-ranges, and it does not attach any inline annotation blocks. Those are produced
-by the `read_relevant` MCP tool, not by this command
-(`src/cli/commands/search-cmd.ts:81-86`).
+Each chunk in the ranked list comes from the `ChunkResult` shape — `path`, `score`, `content`, `chunkIndex`, `entityName`, `chunkType`, `startLine`, `endLine`, `parentId` `src/search/hybrid.ts:45-55`. The terminal output only prints the score, path, entity name, and content; the line-range fields are carried internally and surfaced by the `read_relevant` tool rather than this command.
 
-This command reads the index and prints results; it does not write or change
-any stored state.
+## How the chunk search ranks results
 
-## search vs read
+`searchChunks` is the heart of the command, and it is the same routine the `read_relevant` MCP tool runs `src/tools/search.ts:143`. Understanding it explains every number you see on screen.
 
-Both commands live in `src/cli/commands/search-cmd.ts` and share the same
-flag and filter parsing, but they differ in result granularity and defaults.
+- **Two retrievers, one score.** The query is embedded once, then run through a vector nearest-neighbour search (`db.searchChunks`) and a BM25 keyword search (`db.textSearchChunks`), each fetching four times `topK` to give the re-ranker room `src/search/hybrid.ts:481-487`. The keyword search is wrapped in a try/catch: if the full-text query fails (for example on special characters), it logs a debug line and continues vector-only rather than erroring out `src/search/hybrid.ts:486-490`.
+- **Hybrid merge.** `mergeHybridScores` keys results by `path:chunkIndex`, then computes `hybridWeight * vectorScore + (1 - hybridWeight) * textScore`. With the default weight of `0.7`, that is 70% vector similarity and 30% keyword match `src/search/hybrid.ts:65-91`.
+- **Threshold filter.** Merged chunks below the `--threshold` score are dropped immediately `src/search/hybrid.ts:494`.
+- **Path and name adjustments.** Surviving chunks are multiplied by heuristics: test files are demoted to `0.85`, source files (`src`, `lib`, `app`, …) boosted to `1.1`, boilerplate basenames demoted to `0.8`, generated files demoted by `0.75`, and chunks whose file name or path segments share words with the query are boosted further `src/search/hybrid.ts:497-524`.
+- **Dependency-graph boost.** A chunk in a file that many others import gets a small logarithmic bonus, so widely-used code surfaces higher `src/search/hybrid.ts:527-532`.
+- **Parent grouping.** When `parentGroupingMinCount` or more sibling chunks share the same parent, they are replaced by the single parent chunk (keeping the best score) so a class does not flood the list with its individual methods `src/search/hybrid.ts:404-463,539`. This is why a result may have `chunkIndex` `-1` and represent a whole parent rather than one method `src/search/hybrid.ts:445`.
+- **Doc expansion.** If markdown results are displacing code within the top `topK`, the list is extended slightly so docs are treated as bonus results instead of crowding out code `src/search/hybrid.ts:287-298`.
 
-| | `mimirs read` | `mimirs search` |
-|--|---------------|-----------------|
-| Underlying function | `searchChunks` (`src/search/hybrid.ts:470`) | `search` (`src/search/hybrid.ts:313`) |
-| Result granularity | individual chunks (functions, classes, sections) | one entry per file, deduplicated by path |
-| Default `--top` | `8` (`src/cli/commands/search-cmd.ts:72`) | `config.searchTopK` (`src/cli/commands/search-cmd.ts:43`) |
-| `--threshold` | `0.3` default, settable (`src/cli/commands/search-cmd.ts:73`) | always `0` |
-| Output per item | score + path + entity name + full content | score + path + truncated snippet |
+## State changes
 
-Use `read` to get the *content* of matching chunks; use `search` to locate the
-*files* a topic lives in.
+### `query_log` row written per search
+
+| Before | After |
+| --- | --- |
+| No row for this invocation | One new `query_log` row recording the query text, result count, top score, top path, and duration |
+
+Every call to `searchChunks` ends by calling `db.logQuery(...)` with the query string, the number of results, the top result's score and path (or `null` when empty), and the elapsed milliseconds measured from a `performance.now()` timer started at the top of the function `src/search/hybrid.ts:545-552`. `db.logQuery` delegates to the analytics layer, which runs a single `INSERT INTO query_log (...)` with the current ISO timestamp `src/db/index.ts:880-884`, `src/db/analytics.ts:3-8`. The table is created at database open time `src/db/index.ts:340-348`.
+
+This matters because it is the data source for `mimirs analytics`: zero-result and low-score rows are exactly how the project finds documentation and indexing gaps. The write happens unconditionally — even an empty result set logs a row with `result_count = 0` and `null` score, which is what makes "queries that found nothing" reportable later. See [analytics](analytics.md).
 
 ## Branches and failure cases
 
-- **Missing query.** Prints the usage string and exits with code 1
-  (`src/cli/commands/search-cmd.ts:63-66`).
-- **No matches above threshold.** Prints the "No relevant chunks found" hint and
-  closes (`src/cli/commands/search-cmd.ts:78-79`). Raising `--threshold` makes
-  this more likely; lowering it returns more, lower-confidence chunks.
-- **Entity name absent.** When a chunk has no entity name (for example a plain
-  text block), the `  •  entity` suffix is omitted from the header line
-  (`src/cli/commands/search-cmd.ts:82`).
-- **No filter flags.** When none of `--ext`/`--in`/`--exclude` is present,
-  `buildCliFilter` returns `undefined` and the search runs unscoped
-  (`src/cli/commands/search-cmd.ts:24`).
-- **FTS failure falls back.** Inside `searchChunks`, if the BM25 chunk query
-  throws, it is caught and the search proceeds vector-only
-  (`src/search/hybrid.ts:485-489`).
+| Branch | Behavior |
+| --- | --- |
+| Missing query | Prints `Usage: mimirs read <query> ...` to stderr and exits with code 1 `src/cli/commands/search-cmd.ts:62-66`. |
+| Bad numeric flag | `--top` / `--threshold` parsing throws `CliFlagError` (e.g. `--top abc`, or `--threshold 2` exceeding the 0–1 range). The dispatcher catches it, prints the message, and exits 1 — it does not crash `src/cli/flags.ts:40-71`, `src/cli/index.ts:94-102`. |
+| No filters supplied | `buildCliFilter` returns `undefined` and the search runs across the whole index `src/cli/commands/search-cmd.ts:25`. |
+| Empty filter values | `parseListFlag` trims and drops empty segments, so `--ext " "` contributes nothing `src/cli/commands/search-cmd.ts:11-13`. |
+| Zero results / unindexed dir | Prints `No relevant chunks found. Has the directory been indexed?`; still logs a `query_log` row and closes the DB `src/cli/commands/search-cmd.ts:77-78,87`. |
+| Full-text search failure | Falls back to vector-only results after a debug log; the command still returns whatever the vector search found `src/search/hybrid.ts:486-490`. |
+| Chunk with no entity name | The `  •  <entity>` suffix is omitted; only `[score] path` is printed `src/cli/commands/search-cmd.ts:81-82`. |
 
 ## Example
 
 ```bash
-# Read the chunks most relevant to "how scores are merged".
-mimirs read "how scores are merged"
+# Dump the most relevant chunks about query logging, top 5, into the current index
+mimirs read "where is the search query logged for analytics" --top 5
 
-# Top 5 chunks at a stricter threshold, TypeScript only.
-mimirs read "embedding model loading" --top 5 --threshold 0.45 --ext .ts
-
-# Read from a different project directory.
-mimirs read "config defaults" --dir ../other-project
+# Scope to TypeScript source only, raise the relevance bar
+mimirs read "hybrid score merge" --ext .ts --in src --threshold 0.5
 ```
 
-Illustrative output:
+Illustrative output shape (values synthetic):
 
 ```
-[0.81] src/search/hybrid.ts  •  mergeHybridScores
-export function mergeHybridScores(vectorResults, textResults, hybridWeight) {
-  // ...merge and normalize vector + BM25 scores...
+[0.81] src/search/hybrid.ts  •  searchChunks
+export async function searchChunks(query, db, topK = 8, ...) {
+  ...
 }
 
 ---
 
-[0.74] src/db/search.ts  •  textSearchChunks
-textSearchChunks(query, limit, filter) {
-  // ...BM25 FTS query over chunks...
+[0.74] src/db/analytics.ts  •  logQuery
+export function logQuery(db, query, resultCount, ...) {
+  ...
 }
 
 ---
 ```
+
+## How it differs from `search`
+
+| | `mimirs read` | `mimirs search` |
+| --- | --- | --- |
+| Engine | `searchChunks` (chunk-level) `src/cli/commands/search-cmd.ts:75` | `search` (file-level) `src/cli/commands/search-cmd.ts:46` |
+| Output | Full chunk content + entity name | File paths + 120-char snippet preview `src/cli/commands/search-cmd.ts:51-55` |
+| File dedup | None — multiple chunks per file allowed `src/search/hybrid.ts:467-468` | Deduplicated to best chunk per file `src/search/hybrid.ts:338-359` |
+| Default `--top` | 8 `src/cli/commands/search-cmd.ts:71` | `config.searchTopK` (10) `src/cli/commands/search-cmd.ts:43` |
+| Default threshold | 0.3 `src/cli/commands/search-cmd.ts:72` | 0 (no floor) `src/cli/commands/search-cmd.ts:46` |
+
+Both handlers live in the same file and share the filter-building and flag-parsing helpers. The practical rule: reach for [search](search.md) to find *where* something is, and `read` to get the code itself. See also the [read_relevant](../tools/read-relevant.md) tool, which exposes the same chunk search to MCP clients.
 
 ## Key source files
 
-- `src/cli/commands/search-cmd.ts` — `readCommand` entry point and the shared
-  flag/filter parsing (`parseListFlag`, `buildCliFilter`).
-- `src/search/hybrid.ts` — `searchChunks`, the chunk-level hybrid query, and the
-  `ChunkResult` shape.
-- `src/db/index.ts` — `RagDB`, providing the chunk-level vector and text search
-  primitives.
-
-## Related pages
-
-- [search](search.md) — file-level sibling command from the same source file.
-- [read_relevant](../tools/read-relevant.md) — the MCP tool that exposes
-  chunk-level results (with line ranges and inline notes) to an agent.
+- `src/cli/index.ts` — CLI dispatcher; routes the `read` command to `readCommand` and catches flag errors `src/cli/index.ts:121-122`.
+- `src/cli/commands/search-cmd.ts` — `readCommand` handler plus shared filter/flag helpers.
+- `src/search/hybrid.ts` — `searchChunks` retrieval and ranking engine, and the per-search `query_log` write.
+- `src/cli/flags.ts` — strict numeric flag parsing (`intFlag`, `floatFlag`, `CliFlagError`).
+- `src/db/analytics.ts` — `logQuery` insert into `query_log`.
+- `src/db/index.ts` — `RagDB` wrappers (`searchChunks`, `logQuery`) and the `query_log` schema.

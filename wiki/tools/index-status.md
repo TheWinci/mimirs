@@ -1,101 +1,104 @@
 # Tool: index_status
 
-`index_status` answers one question: how much of a project is currently in the search index, and when was it last refreshed. It is a read-only health check. You call it to confirm that indexing actually ran, to see whether a project has any indexed content before searching, or to compare counts before and after an [index_files](../tools/index-files.md) run.
+`index_status` is a read-only MCP tool that reports the current state of the mimirs RAG index for a project: how many files it holds, how many searchable chunks those files produced, and when the most recent file was indexed. It answers the question "is the index actually populated, and is it fresh?" without changing anything.
 
-The whole tool is a thin wrapper around a single database read. The handler is registered in `registerIndexTools` and returns three numbers as plain text; see `src/tools/index-tools.ts:94-116`.
+Agents and users reach for it when search is returning nothing useful, after a fresh checkout, or after running [index_files](./index-files.md) to confirm the work landed. Because it only counts rows and reads one timestamp, it is cheap and safe to call at any time, including before the project has ever been indexed.
 
-## How it works
+## What it does
+
+The tool takes an optional `directory`, resolves it to a concrete project and an open database handle, asks the database for three numbers, and formats them into a short text block. There is no embedding, no file scanning, and no write — the entire cost is three small SQL queries against the project's `index.db`.
+
+The handler lives in `src/tools/index-tools.ts:94-116`. It is registered alongside `index_files` and `remove_file` by `registerIndexTools`, which the server wires up at startup through `registerAllTools` (`src/tools/index.ts:39-56`).
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Caller
-    participant Handler as index_status handler
-    participant Project as resolveProject
-    participant DB as RagDB.getStatus
+    participant Caller as Agent / CLI
+    participant Tool as index_status handler
+    participant Resolve as resolveProject
+    participant DB as RagDB (.mimirs/index.db)
+    participant Files as getStatus (SQL)
 
-    Caller->>Handler: directory?
-    Handler->>Project: resolveProject(directory)
-    Project-->>Handler: { db } for the project
-    Handler->>DB: getStatus()
-    DB->>DB: COUNT files, COUNT chunks, latest indexed_at
-    DB-->>Handler: { totalFiles, totalChunks, lastIndexed }
-    Handler-->>Caller: "Index status:" text block
+    Caller->>Tool: index_status({ directory? })
+    Tool->>Resolve: resolveProject(directory, getDB)
+    Resolve->>Resolve: directory ?? RAG_PROJECT_DIR ?? cwd
+    Resolve->>Resolve: resolve() + existsSync() guard
+    Resolve->>DB: getDB(resolved) — open or reuse handle
+    DB-->>Resolve: RagDB
+    Resolve-->>Tool: { db }
+    Tool->>DB: ragDb.getStatus()
+    DB->>Files: getStatus(this.db)
+    Files->>Files: COUNT(*) files, COUNT(*) chunks, MAX(indexed_at)
+    Files-->>Tool: { totalFiles, totalChunks, lastIndexed }
+    Tool-->>Caller: "Index status:" text block
 ```
 
-1. The caller may pass an optional `directory`. The handler calls `resolveProject` to resolve it to an absolute path (falling back to `RAG_PROJECT_DIR` then the current working directory), verify it exists, load config, and open the project's database (`src/tools/index-tools.ts:103-104`, `src/tools/index.ts:22-37`).
-2. The handler asks the database object for its current status via `getStatus` (`src/tools/index-tools.ts:105`). `RagDB.getStatus` simply delegates to the file-store helper (`src/db/index.ts:593-594`).
-3. `getStatus` runs three quick queries: a `COUNT(*)` over the `files` table, a `COUNT(*)` over the `chunks` table, and a single-row lookup of the most recent `indexed_at` timestamp ordered descending (`src/db/files.ts:363-381`).
-4. The handler formats the three values into a text block and returns it as MCP text content. When no files have ever been indexed, `lastIndexed` is null and the output prints `never` (`src/tools/index-tools.ts:107-114`).
+1. The caller invokes `index_status` with an optional `directory` argument; the schema declares only that one optional string (`src/tools/index-tools.ts:97-102`).
+2. The handler hands `directory` and the server's `getDB` factory to `resolveProject` (`src/tools/index-tools.ts:104`).
+3. `resolveProject` picks the target directory: the explicit argument if given, else the `RAG_PROJECT_DIR` environment variable, else the current working directory (`src/tools/index.ts:26`).
+4. It calls `resolve()` to make the path absolute and rejects a path that does not exist on disk, throwing `Directory does not exist: <path>` (`src/tools/index.ts:29-32`).
+5. `getDB(resolved)` returns a database connection. On the server this is a cached handle: the first call for a directory constructs a `RagDB` and stores it; later calls reuse it (`src/server/index.ts:34-51`).
+6. The handler asks the connection for status via `ragDb.getStatus()` (`src/tools/index-tools.ts:105`), which is a thin pass-through to the file operations module (`src/db/index.ts:646-648`).
+7. `getStatus` runs three independent queries against the SQLite database — a row count of `files`, a row count of `chunks`, and the single most recent `indexed_at` value (`src/db/files.ts:354-372`).
+8. The handler formats the three values into a single text block and returns it as the tool result (`src/tools/index-tools.ts:107-114`).
+
+## The status query
+
+`getStatus` is the only data source for this tool. It runs three small, separate statements rather than one joined query (`src/db/files.ts:354-372`):
+
+- `SELECT COUNT(*) FROM files` — the number of indexed file records. Each row in `files` is one source file mimirs has chunked and embedded.
+- `SELECT COUNT(*) FROM chunks` — the number of semantic chunks. A single file usually produces several chunks (one per function, class, or markdown section), so this number is normally larger than the file count.
+- `SELECT indexed_at FROM files ORDER BY indexed_at DESC LIMIT 1` — the newest indexing timestamp across all files.
+
+The result shape is fixed: `{ totalFiles, totalChunks, lastIndexed }`, where `lastIndexed` is the raw ISO-8601 string stored in the row, or `null` when the `files` table is empty (`src/db/files.ts:367-371`).
+
+The timestamp is not a single global "last full index" marker. Every file row carries its own `indexed_at`, written when that file is first inserted or re-indexed (`src/db/files.ts:51-52`, with the schema requiring the column at `src/db/index.ts:172-177`). `getStatus` simply surfaces the maximum of those per-file timestamps, so "last indexed" really means "the most recently touched file." A partial refresh that only re-indexed a handful of files still moves this value forward.
 
 ## Inputs
 
 | name | type | required | description |
 | --- | --- | --- | --- |
-| `directory` | string | no | Project directory whose index to report on. Defaults to the `RAG_PROJECT_DIR` environment variable, then the current working directory. Resolved to an absolute path; if it does not exist, `resolveProject` throws before any read (`src/tools/index-tools.ts:98-101`, `src/tools/index.ts:26-32`). |
+| `directory` | string | no | Project directory whose index to inspect. When omitted, falls back to the `RAG_PROJECT_DIR` environment variable, then to the process working directory (`src/tools/index.ts:26`). The path is resolved to absolute and must exist on disk (`src/tools/index.ts:29-32`). |
 
 ## Outputs
 
 | output | where it lands / shape / description |
 | --- | --- |
-| Index status text | Returned as MCP text content. The block reads `Index status:` followed by `Files:` (row count of the `files` table), `Chunks:` (row count of the `chunks` table), and `Last indexed:` (the newest `indexed_at` value, or `never` when the index is empty) (`src/tools/index-tools.ts:111`). |
+| Index status text | A single MCP text content block. The body is `Index status:` followed by three indented lines — `Files: <n>`, `Chunks: <n>`, and `Last indexed: <iso-timestamp>`. When no file has ever been indexed, the timestamp line reads `Last indexed: never` (`src/tools/index-tools.ts:107-114`). |
 
-The three displayed numbers come straight from the database: `status.totalFiles`, `status.totalChunks`, and `status.lastIndexed` (`src/db/files.ts:376-380`).
-
-## State changes
-
-None. `index_status` only reads. It runs counting queries and a single ordered lookup, and writes nothing to the database, no status file, and no logs as part of the response (`src/tools/index-tools.ts:103-114`, `src/db/files.ts:363-381`). This is the key distinction from [index_files](../tools/index-files.md), which rewrites rows and updates the index.
+The `never` fallback comes from the `status.lastIndexed || "never"` expression: because `lastIndexed` is `null` on an empty index, the `||` substitutes the literal string `never` (`src/tools/index-tools.ts:111`).
 
 ## Branches and failure cases
 
-| Condition | Behavior |
-| --- | --- |
-| Empty index (never indexed) | `getStatus` finds no `files` row, so `lastIndexed` is null and the output prints `Last indexed: never`; file and chunk counts read `0` (`src/db/files.ts:379`, `src/tools/index-tools.ts:111`). |
-| Populated index | Counts and the latest timestamp are reported as-is. |
-| `directory` does not exist | `resolveProject` throws `Directory does not exist` before any query runs (`src/tools/index.ts:30-32`). |
-| `directory` omitted | Falls back to `RAG_PROJECT_DIR`, then the current working directory (`src/tools/index.ts:26`). |
+This tool has very little branching because it neither writes nor scans the file system. The cases that do exist:
 
-There are no other branches: the handler has no flags, no pagination, and no locking. It cannot fail partway through because it performs only reads.
+- **Empty index.** When `files` has no rows, both counts are `0` and `lastIndexed` is `null`. The output shows `Files: 0`, `Chunks: 0`, and `Last indexed: never` (`src/db/files.ts:367-371`, `src/tools/index-tools.ts:111`).
+- **Missing directory.** If the resolved path does not exist, `resolveProject` throws `Directory does not exist: <resolved>` before any query runs, and the tool call fails rather than returning a status block (`src/tools/index.ts:30-32`).
+- **No `directory` argument.** The handler does not require it; the fallback chain in `resolveProject` always produces a path (`src/tools/index.ts:26`).
+- **Database open failure.** `getDB` constructs a `RagDB` on first use, which creates the `.mimirs` directory and opens `index.db`. If that directory cannot be written — for example a read-only file system — the constructor throws a guidance error pointing at `RAG_DB_DIR`, and that error surfaces from the tool call (`src/db/index.ts:108-123`). A fresh-but-writable directory does not fail: the schema is created on demand, so the tool simply reports an empty index.
 
-## index_status vs server_info
-
-Both tools report the same three index numbers, but they answer different questions. `server_info` is a superset built for diagnosing connection and configuration problems.
-
-| | index_status | server_info |
-| --- | --- | --- |
-| File / chunk counts | yes | yes (calls the same `getStatus`, `src/tools/server-info-tools.ts:28`) |
-| Last-indexed timestamp | yes | yes |
-| Resolved project dir + database location | no | yes |
-| Active config (chunk size, weights, include/exclude counts, threads) | no | yes (`src/tools/server-info-tools.ts:46-57`) |
-| Embedding model | no | yes |
-| Currently connected databases | no | yes (`src/tools/server-info-tools.ts:61-63`) |
-
-Use `index_status` when you only need the counts; reach for `server_info` when you need to know which database and config the server resolved.
+There is no locking or query-only mode here. Those concerns belong to [index_files](./index-files.md), which writes to the index; `index_status` only reads.
 
 ## Example
 
-Report on the current project:
+Request arguments:
 
 ```json
-{}
+{
+  "directory": "/Users/example/repos/my-project"
+}
 ```
 
-Report on a specific project:
-
-```json
-{ "directory": "/Users/example/repos/myproject" }
-```
-
-A populated index returns text shaped like:
+Typical response on a populated index (values are illustrative):
 
 ```
 Index status:
   Files: 312
   Chunks: 4187
-  Last indexed: 2026-05-28T18:42:11.000Z
+  Last indexed: 2026-05-31T18:42:07.901Z
 ```
 
-A project that has never been indexed returns:
+Response on a project that has never been indexed:
 
 ```
 Index status:
@@ -104,13 +107,16 @@ Index status:
   Last indexed: never
 ```
 
-## Key source files
-
-- `src/tools/index-tools.ts` — registers `index_status` and formats the text output.
-- `src/db/index.ts` — `RagDB.getStatus` delegates to the file store.
-- `src/db/files.ts` — `getStatus` runs the count and latest-timestamp queries.
-
 ## Related tools
 
-- [index_files](../tools/index-files.md) is what changes the numbers this tool reports.
-- `server_info` reports the same counts plus config and connection details.
+- [index_files](./index-files.md) — the write side. It indexes or refreshes files and is what advances the `Files`, `Chunks`, and `Last indexed` numbers this tool reports. After indexing, `index_files` itself prints the same `total files` / `total chunks` figures by calling `getStatus` (`src/tools/index-tools.ts:56-60`).
+- [status](../cli/status.md) — the command-line equivalent for humans, reporting the same index state from a terminal.
+- [server_info](./server-info.md) — reports which project databases the running server currently has open, complementing the per-project counts shown here.
+
+## Key source files
+
+- `src/tools/index-tools.ts` — registers `index_status` (and its siblings) and formats the status text (`src/tools/index-tools.ts:94-116`).
+- `src/tools/index.ts` — `resolveProject` resolves the directory, validates it, and supplies the database handle (`src/tools/index.ts:22-37`).
+- `src/db/index.ts` — `RagDB.getStatus` forwards to the file operations module and owns the schema for the `files` and `chunks` tables (`src/db/index.ts:646-648`, `src/db/index.ts:170-188`).
+- `src/db/files.ts` — `getStatus` runs the three counting queries that produce the reported numbers (`src/db/files.ts:354-372`).
+- `src/server/index.ts` — the `getDB` factory that caches one `RagDB` per project directory (`src/server/index.ts:34-51`).

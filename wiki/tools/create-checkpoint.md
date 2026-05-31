@@ -1,134 +1,263 @@
 # Tool: create_checkpoint
 
-`create_checkpoint` saves a short, durable record of what happened in a session and why — a decision made, a milestone reached, a blocker hit, a change of direction, or a handoff. The record is stored in the project's local index, tagged to the current session and turn, and embedded so later sessions can find it by meaning. It is the mechanism by which a future session learns what an earlier one did without re-reading the entire transcript.
+`create_checkpoint` is the MCP tool an agent calls to leave a durable note for
+future sessions: what it decided, what it shipped, what blocked it, or where it
+handed off. A Claude session has no memory of past sessions, so without an
+explicit write nothing carries over. This tool persists a short, typed,
+searchable record into the project's local index so a later session can recall
+it with [list_checkpoints](list-checkpoints.md) or
+[search_checkpoints](search-checkpoints.md).
 
-The recommended pattern is to call it as the final step after completing any user-requested task, before responding — and also when hitting a blocker or changing direction mid-task. That guidance lives in the tool's own description (`src/tools/checkpoint-tools.ts:10`).
+The tool is registered alongside its read-side siblings in
+`registerCheckpointTools`, which wires all three checkpoint tools onto the MCP
+server (`src/tools/checkpoint-tools.ts:7-9`). The handler is small and
+synchronous in shape: resolve the project, figure out which session and turn
+this checkpoint belongs to, embed the title and summary, insert one row, and
+return a confirmation string.
 
-The handler is registered in `src/tools/checkpoint-tools.ts:8-78`.
+## When to use it
 
-## How it works
+The tool description tells the agent to call it as the final step after
+finishing any user-requested task, and also when hitting a blocker or changing
+direction mid-task (`src/tools/checkpoint-tools.ts:10`). The checkpoint `type`
+maps to those situations: a `decision` records a choice and its reasoning, a
+`milestone` records completed work, a `blocker` records something that stopped
+progress, a `direction_change` records a pivot, and a `handoff` records state
+left for the next session.
+
+## What the flow does
 
 ```mermaid
 sequenceDiagram
-  autonumber
-  participant Caller
-  participant Tool as create_checkpoint handler
-  participant Sessions as discoverSessions()
-  participant DB as RagDB
-  participant Embed as embed()
-  participant SQLite as conversation_checkpoints + vec_checkpoints
+    autonumber
+    participant Agent
+    participant Tool as create_checkpoint handler
+    participant Parser as discoverSessions
+    participant DB as RagDB
+    participant Embed as embed()
+    participant SQLite
 
-  Caller->>Tool: type, title, summary, filesInvolved?, tags?, directory?
-  Tool->>Tool: resolveProject(directory) -> projectDir, RagDB
-  Tool->>Sessions: discoverSessions(projectDir)
-  Sessions-->>Tool: sessions sorted newest-first
-  Tool->>Tool: sessionId = sessions[0] or "unknown"
-  Tool->>DB: getTurnCount(sessionId)
-  DB-->>Tool: turnCount
-  Tool->>Tool: turnIndex = max(0, turnCount - 1)
-  Tool->>Embed: embed("title. summary")
-  Embed-->>Tool: embedding
-  Tool->>DB: createCheckpoint(sessionId, turnIndex, now, type, ...)
-  DB->>SQLite: INSERT row + vector
-  DB-->>Tool: checkpoint id
-  Tool->>Tool: if filesInvolved present, add annotate() hint
-  Tool-->>Caller: "Checkpoint #id created: [type] title" (+ hint)
+    Agent->>Tool: type, title, summary,<br>filesInvolved?, tags?, directory?
+    Tool->>Tool: resolveProject(directory)
+    Tool->>Parser: discoverSessions(projectDir)
+    Parser-->>Tool: sessions sorted by mtime desc
+    Tool->>DB: getTurnCount(sessionId)
+    DB-->>Tool: turnCount
+    Note over Tool: turnIndex = max(0, turnCount - 1)
+    Tool->>Embed: embed("title. summary")
+    Embed-->>Tool: 384-dim normalized vector
+    Tool->>DB: createCheckpoint(...)
+    DB->>SQLite: INSERT conversation_checkpoints
+    DB->>SQLite: INSERT vec_checkpoints
+    SQLite-->>DB: new row id
+    DB-->>Tool: id
+    Tool-->>Agent: "Checkpoint #id created" (+ annotate hint)
 ```
 
-1. The caller invokes the tool with a required `type`, `title`, and `summary`, plus optional `filesInvolved`, `tags`, and `directory` (`src/tools/checkpoint-tools.ts:11-33`).
-2. `resolveProject` resolves the optional `directory` into both the project path and the `RagDB` handle, falling back to `RAG_PROJECT_DIR` or the current working directory (`src/tools/checkpoint-tools.ts:35`).
-3. `discoverSessions` scans `~/.claude/projects/<encoded-project-path>/` for `*.jsonl` transcript files and returns them sorted newest-modified first (`src/conversation/parser.ts:292-323`).
-4. The checkpoint is bound to the most recently modified session. If no transcript exists yet, the session id falls back to the literal string `"unknown"` (`src/tools/checkpoint-tools.ts:38-39`).
-5. `getTurnCount` counts the indexed turns for that session in `conversation_turns` (`src/tools/checkpoint-tools.ts:42`, `src/db/conversation.ts:117-124`).
-6. The turn index is set to `max(0, turnCount - 1)`, i.e. the last indexed turn, clamped so it never goes negative when no turns are indexed yet (`src/tools/checkpoint-tools.ts:43`).
-7. The text `` `${title}. ${summary}` `` is embedded so the checkpoint is later findable by semantic search (`src/tools/checkpoint-tools.ts:46-47`).
-8. `createCheckpoint` inserts the row and its vector inside one transaction, stamping the current time via `new Date().toISOString()` (`src/tools/checkpoint-tools.ts:49-59`, `src/db/checkpoints.ts:4-48`).
-9. If `filesInvolved` was non-empty, a hint is appended reminding the caller to attach any caveats with [annotate](annotate.md) (`src/tools/checkpoint-tools.ts:61-66`).
-10. The handler returns a confirmation line `Checkpoint #<id> created: [<type>] <title>`, with the hint joined below it when present (`src/tools/checkpoint-tools.ts:68-76`).
+1. The agent calls the tool with a `type`, `title`, and `summary`, optionally a
+   list of `filesInvolved`, freeform `tags`, and a project `directory`
+   (`src/tools/checkpoint-tools.ts:34`).
+2. `resolveProject` turns the optional `directory` into an absolute path
+   (falling back to `RAG_PROJECT_DIR` or the current working directory), checks
+   it exists, loads the project config, applies its embedding settings, and
+   returns the open `RagDB` for that project (`src/tools/checkpoint-tools.ts:35`,
+   `src/tools/index.ts:21-37`).
+3. The handler discovers the project's conversation transcripts to find which
+   session is current. `discoverSessions` globs the Claude Code transcript
+   directory for the project and returns the sessions sorted by file
+   modification time, most recent first (`src/conversation/parser.ts:302-332`).
+4. The most recently modified transcript is taken as the current session; its id
+   becomes the checkpoint's `session_id`. If no transcripts exist, the id falls
+   back to the literal string `"unknown"` (`src/tools/checkpoint-tools.ts:38-39`).
+5. The turn index is read from the database, not the transcript file:
+   `getTurnCount` counts the indexed `conversation_turns` rows for that session
+   (`src/tools/checkpoint-tools.ts:42`, `src/db/conversation.ts:117-124`).
+6. The turn index is set to `max(0, turnCount - 1)`, i.e. the index of the last
+   indexed turn, or `0` when the session has no indexed turns yet
+   (`src/tools/checkpoint-tools.ts:43`).
+7. The title and summary are joined as `"${title}. ${summary}"` and embedded
+   into one normalized vector by the local embedding model
+   (`src/tools/checkpoint-tools.ts:46-47`, `src/embeddings/embed.ts:78-86`).
+8. `RagDB.createCheckpoint` writes the base row and its vector inside a single
+   transaction and returns the new id (`src/tools/checkpoint-tools.ts:49-59`,
+   `src/db/checkpoints.ts:4-49`).
+9. If `filesInvolved` was non-empty, a hint is appended telling the agent to
+   call `annotate()` for any caveats it noticed in those files
+   (`src/tools/checkpoint-tools.ts:61-66`).
+10. The handler returns a single text block: `Checkpoint #<id> created: [<type>]
+    <title>`, plus the optional hint (`src/tools/checkpoint-tools.ts:68-76`).
 
-## Allowed checkpoint types
+## Resolving the session and turn index
 
-The `type` argument is constrained to one of five values (`src/tools/checkpoint-tools.ts:12-14`). They are free-form labels for the kind of moment being recorded — the code does not branch on them at write time; they exist for later filtering in [list_checkpoints](list-checkpoints.md) and [search_checkpoints](search-checkpoints.md).
+The checkpoint is anchored to a session and a turn so a later reader knows
+roughly where in the conversation it was written. Both values are derived, not
+supplied by the caller.
 
-| type | typical use |
-|------|-------------|
-| `decision` | A choice was made between alternatives, e.g. "chose JWT over session cookies". |
-| `milestone` | A unit of work was completed. |
-| `blocker` | Progress is stuck on something. |
-| `direction_change` | The approach shifted mid-task. |
-| `handoff` | State is being passed to a future session or person. |
+The session id comes from the file system, not the database. `discoverSessions`
+builds the transcript directory path with `getTranscriptsDir`, which encodes the
+absolute project path by replacing `/` with `-` and looking under
+`~/.claude/projects/<encoded-path>/` (`src/conversation/parser.ts:293-296`). It
+globs every `*.jsonl` file there, stats each one, and sorts the results by
+`mtime` descending so the freshest transcript is first
+(`src/conversation/parser.ts:302-332`). The handler takes `sessions[0]`, which
+is the session whose transcript was written to most recently — in practice, the
+live session (`src/tools/checkpoint-tools.ts:38-39`).
+
+The turn index comes from the database. `getTurnCount` runs `SELECT COUNT(*)`
+over `conversation_turns` for that session id (`src/db/conversation.ts:117-124`).
+This counts turns that have already been *indexed*, which is a different thing
+from the turns that exist in the live transcript. If the current conversation
+has not been indexed since the latest turns were written, the count lags and the
+stored `turnIndex` points at an earlier turn. The index is only an approximate
+anchor; nothing in the create or read path requires it to be exact.
+
+## Embedding the title and summary
+
+The checkpoint is made semantically searchable up front by embedding it at
+write time. The handler concatenates the title and summary into a single string
+and passes it to `embed`, which loads the configured local feature-extraction
+model and returns one mean-pooled, L2-normalized vector
+(`src/tools/checkpoint-tools.ts:46-47`, `src/embeddings/embed.ts:78-86`). With
+the default model (`Xenova/all-MiniLM-L6-v2`) that vector is 384 dimensions
+(`src/embeddings/embed.ts:16-17`); a project configured for a different model
+produces a vector of that model's dimension instead. Because the embedding
+happens here, [search_checkpoints](search-checkpoints.md) only has to embed the
+query at read time and compare against vectors that already exist.
+
+## Inserting the checkpoint row
+
+`RagDB.createCheckpoint` delegates to the store function in
+`src/db/checkpoints.ts`, which performs both writes inside one transaction so the
+row and its vector always land together (`src/db/checkpoints.ts:4-49`). It first
+inserts into `conversation_checkpoints` with the session id, turn index, ISO
+timestamp, type, title, summary, and the `filesInvolved` and `tags` arrays
+serialized to JSON text (`src/db/checkpoints.ts:21-35`). It then reads
+`last_insert_rowid()` to capture the new id (`src/db/checkpoints.ts:37-39`) and
+inserts the embedding into the `vec_checkpoints` virtual table keyed by that id,
+passing the `Float32Array` as a raw byte buffer (`src/db/checkpoints.ts:41-44`).
+
+The split between the two tables is deliberate: the base table holds the
+human-readable columns and the `vec0` virtual table holds the vector, mirroring
+how code chunks are stored as `chunks` plus `vec_chunks`. Both tables are created
+once in the schema, where `conversation_checkpoints` is defined with an
+`AUTOINCREMENT` primary key and `vec_checkpoints` is a `vec0` table sized to the
+configured embedding dimension (`src/db/index.ts`). The transaction wrapper means
+a failure midway — for example a dimension mismatch on the vector insert — rolls
+back the base-table row too, so you never get a checkpoint with no vector.
 
 ## Inputs
 
-| name | type | required | description |
-|------|------|----------|-------------|
-| `type` | enum | yes | One of `decision`, `milestone`, `blocker`, `direction_change`, `handoff` (`src/tools/checkpoint-tools.ts:12-14`). |
-| `title` | string (1–200) | yes | Short label for the checkpoint (`src/tools/checkpoint-tools.ts:15`). |
-| `summary` | string (1–2000) | yes | A 2–3 sentence description of what happened and why. Embedded together with the title for search (`src/tools/checkpoint-tools.ts:16-20`). |
-| `filesInvolved` | string[] | no | Files relevant to this checkpoint. Stored on the row and, when non-empty, triggers the annotate hint in the response. Defaults to an empty array (`src/tools/checkpoint-tools.ts:21-24`, `src/tools/checkpoint-tools.ts:55`). |
-| `tags` | string[] | no | Free-form tags for later filtering. Defaults to an empty array (`src/tools/checkpoint-tools.ts:25-28`, `src/tools/checkpoint-tools.ts:56`). |
-| `directory` | string | no | Project directory to operate on. Defaults to `RAG_PROJECT_DIR` or the current working directory (`src/tools/checkpoint-tools.ts:29-32`). |
+| Name | Type | Required | Description |
+| --- | --- | --- | --- |
+| `type` | enum: `decision`, `milestone`, `blocker`, `direction_change`, `handoff` | yes | The kind of checkpoint, stored verbatim in the `type` column and echoed in the confirmation (`src/tools/checkpoint-tools.ts:12-14`). |
+| `title` | string, 1–200 chars | yes | Short label, e.g. `Chose JWT over session cookies`. Stored and used as the first part of the embedded text (`src/tools/checkpoint-tools.ts:15`). |
+| `summary` | string, 1–2000 chars | yes | Two-to-three sentence description of what happened and why. Stored and embedded after the title (`src/tools/checkpoint-tools.ts:16-20`). |
+| `filesInvolved` | string[] | no | Files relevant to this checkpoint. Stored as JSON; when non-empty it also triggers the annotate hint (`src/tools/checkpoint-tools.ts:21-24`, `:62-66`). |
+| `tags` | string[] | no | Freeform tags for later filtering. Stored as JSON text (`src/tools/checkpoint-tools.ts:25-28`). |
+| `directory` | string | no | Project directory; defaults to `RAG_PROJECT_DIR` or the current working directory (`src/tools/checkpoint-tools.ts:29-32`). |
+
+The tool does not accept a `sessionId` or `turnIndex` from the caller — both are
+derived inside the handler as described above.
 
 ## Outputs
 
-| output | where it lands / shape / description |
-|--------|--------------------------------------|
-| Confirmation text | A single text block: `Checkpoint #<id> created: [<type>] <title>`. When `filesInvolved` was non-empty, a second paragraph appends an annotate reminder (`src/tools/checkpoint-tools.ts:68-76`). |
-| `conversation_checkpoints` row | Inserted with `session_id`, `turn_index`, `timestamp`, `type`, `title`, `summary`, and JSON-encoded `files_involved` and `tags` (`src/db/checkpoints.ts:19-34`). |
-| Vector entry | A row in `vec_checkpoints` holding the embedding, used by [search_checkpoints](search-checkpoints.md) (`src/db/checkpoints.ts:40-43`). |
+| Output | Where it lands / shape / description |
+| --- | --- |
+| New checkpoint row | One row in `conversation_checkpoints` plus one matching vector in `vec_checkpoints`, written in a single transaction (`src/db/checkpoints.ts:21-44`). |
+| Confirmation text | A single MCP text block: `Checkpoint #<id> created: [<type>] <title>`, where `<id>` is the new row id (`src/tools/checkpoint-tools.ts:68-76`). |
+| Annotate hint (conditional) | When `filesInvolved` is non-empty, an extra paragraph is appended suggesting the agent call `annotate()` for caveats in those files (`src/tools/checkpoint-tools.ts:61-66`). |
 
 ## State changes
 
-**`conversation_checkpoints` row**
+| Item | Before | After | Why it matters |
+| --- | --- | --- | --- |
+| Checkpoint record | No row for this note | One new `conversation_checkpoints` row and one `vec_checkpoints` entry sharing the same id | This is the only persistent effect. It is what makes the checkpoint visible to `list_checkpoints` and findable by `search_checkpoints` in later sessions. |
 
-- Before: no row for this checkpoint.
-- After: a new row carrying the session id, the computed turn index, an ISO timestamp, the type, title, summary, files, and tags, plus a matching vector entry.
-
-This matters because the checkpoint is the only durable signal a future session has about what an earlier one decided or got stuck on. The row is what [list_checkpoints](list-checkpoints.md) returns, and the embedded vector is what [search_checkpoints](search-checkpoints.md) ranks against. Both the base row and the vector are written in a single transaction so a checkpoint is never half-persisted (`src/db/checkpoints.ts:18-47`).
-
-Note that `createCheckpoint` always inserts a fresh row — there is no upsert or dedup. Calling it twice with the same title produces two checkpoints.
+The change is performed by `RagDB.createCheckpoint`, which wraps both inserts in
+a transaction (`src/tools/checkpoint-tools.ts:49-59`, `src/db/checkpoints.ts:18-47`).
+Before the call there is no record of the note anywhere; after a successful call
+there is exactly one base row and exactly one vector, and the handler holds the
+returned id. Nothing else in the database is touched — no session row, no turn
+row, and no annotation are created or updated by this tool.
 
 ## Branches and failure cases
 
-- **No transcript yet.** When `discoverSessions` finds no `*.jsonl` files, the session id stored is `"unknown"` rather than failing (`src/tools/checkpoint-tools.ts:38-39`).
-- **Turn index clamping.** When the session has zero indexed turns, `turnCount - 1` would be `-1`; the `Math.max(0, ...)` clamp keeps the stored `turnIndex` at `0` (`src/tools/checkpoint-tools.ts:43`).
-- **Files-involved hint.** The annotate reminder paragraph is added only when `filesInvolved` is present and non-empty; otherwise the response is the single confirmation line (`src/tools/checkpoint-tools.ts:61-66`).
-- **Optional arrays default to empty.** Omitting `filesInvolved` or `tags` stores `[]` for that column, not null (`src/tools/checkpoint-tools.ts:55-56`).
-- **Invalid type.** A `type` outside the five-value enum fails schema validation before the handler runs (`src/tools/checkpoint-tools.ts:12-14`).
-- **Always writes.** There is no empty-result or query-only branch; every successful call inserts a row and returns a confirmation. Directory or DB errors surface from `resolveProject` / `RagDB`.
+- **Project resolution fails.** If the resolved `directory` does not exist on
+  disk, `resolveProject` throws `Directory does not exist: <path>` before any
+  write happens (`src/tools/index.ts:30-32`). An embedding-dimension mismatch
+  between the project config and the existing index is caught when the `RagDB`
+  is opened, also before any checkpoint write (`src/db/index.ts`).
+- **No transcripts found.** When `discoverSessions` finds no `*.jsonl` files —
+  the transcript directory does not exist or is empty — it returns an empty
+  array, and the handler stores the session id as the literal `"unknown"`
+  (`src/tools/checkpoint-tools.ts:38-39`, `src/conversation/parser.ts:325-327`).
+  The checkpoint is still written; it just is not tied to a real session id.
+- **Session not yet indexed.** If the current session has no indexed turns,
+  `getTurnCount` returns `0` and the turn index clamps to `0` via
+  `Math.max(0, turnCount - 1)` (`src/tools/checkpoint-tools.ts:42-43`). The
+  checkpoint is written normally with `turnIndex = 0`.
+- **filesInvolved omitted or empty.** The annotate hint is only appended when
+  `filesInvolved` exists and has at least one entry; otherwise the confirmation
+  is just the single `Checkpoint #<id> created` line
+  (`src/tools/checkpoint-tools.ts:61-66`).
+- **Optional arrays defaulted.** When `filesInvolved` or `tags` are not
+  supplied, the handler passes empty arrays to the store function, which
+  serializes them as `"[]"` (`src/tools/checkpoint-tools.ts:56-57`,
+  `src/db/checkpoints.ts:32-33`).
+- **Input validation.** The argument schema enforces the `type` enum, the title
+  length (1–200) and summary length (1–2000); out-of-range or invalid values are
+  rejected by the MCP layer before the handler runs
+  (`src/tools/checkpoint-tools.ts:12-20`).
+- **Vector insert failure.** If inserting into `vec_checkpoints` throws, the
+  surrounding transaction rolls back the base-table insert as well, so a partial
+  checkpoint is never persisted (`src/db/checkpoints.ts:18-47`).
 
 ## Example
 
-Arguments for a decision checkpoint:
+Example arguments for a decision checkpoint with two involved files:
 
 ```json
 {
   "type": "decision",
-  "title": "Chose SQLite vec0 for embeddings",
-  "summary": "Picked sqlite-vec over a separate vector DB to keep the index a single file. Tradeoff: no horizontal scaling, but the project is single-user local.",
-  "filesInvolved": ["src/example.ts", "src/db/index.ts"],
-  "tags": ["storage", "embeddings"]
+  "title": "Store checkpoint vectors in a separate vec0 table",
+  "summary": "Kept conversation_checkpoints holding the readable columns and put the embedding in vec_checkpoints, mirroring chunks/vec_chunks. Both writes share one transaction so they can't drift.",
+  "filesInvolved": ["src/db/checkpoints.ts", "src/tools/checkpoint-tools.ts"],
+  "tags": ["schema", "checkpoints"]
 }
 ```
 
-Returned text (with the files hint, since `filesInvolved` is non-empty):
+A possible confirmation, with a synthetic id:
 
 ```
-Checkpoint #12 created: [decision] Chose SQLite vec0 for embeddings
+Checkpoint #42 created: [decision] Store checkpoint vectors in a separate vec0 table
 
 If you noticed any caveats, known issues, or "don't touch" conditions in the files above, call annotate() now to attach them.
 ```
 
+Because `filesInvolved` here is non-empty, the annotate hint is included; with no
+files it would be just the first line.
+
 ## Related tools
 
-- [list_checkpoints](list-checkpoints.md) — read checkpoints back, most recent first, optionally filtered by session or type.
-- [search_checkpoints](search-checkpoints.md) — find checkpoints by meaning using the embedded title and summary.
-- [annotate](annotate.md) — the tool the files hint points you toward for attaching caveats to involved files.
+- [list_checkpoints](list-checkpoints.md) and
+  [search_checkpoints](search-checkpoints.md) read back what this tool writes;
+  all three are registered together in `registerCheckpointTools`
+  (`src/tools/checkpoint-tools.ts:7-159`).
+- The [checkpoint CLI command](../cli/checkpoint.md) performs the same insert
+  from the terminal instead of over MCP.
+- [annotate](annotate.md) is the tool the post-write hint points the agent
+  toward when files were involved.
 
 ## Key source files
 
-- `src/tools/checkpoint-tools.ts` — registers `create_checkpoint`, binds session and turn, builds the embed text, and formats the response.
-- `src/conversation/parser.ts` — `discoverSessions`, which locates the current session's transcript on disk.
-- `src/db/conversation.ts` — `getTurnCount`, used to compute the turn index.
-- `src/db/checkpoints.ts` — `createCheckpoint`, the transactional insert into `conversation_checkpoints` and `vec_checkpoints`.
-- `src/db/index.ts` — the `RagDB` class exposing these methods and defining the checkpoint tables.
+- `src/tools/checkpoint-tools.ts` — registers `create_checkpoint` and its
+  handler; the orchestration described on this page.
+- `src/db/checkpoints.ts` — the `createCheckpoint` store function and the
+  two-table transactional insert.
+- `src/db/index.ts` — the `RagDB` wrapper method and the schema for
+  `conversation_checkpoints` and `vec_checkpoints`.
+- `src/conversation/parser.ts` — `discoverSessions` and `getTranscriptsDir`,
+  which resolve the current session id.
+- `src/db/conversation.ts` — `getTurnCount`, which supplies the turn index.
+- `src/embeddings/embed.ts` — `embed`, which turns the title and summary into a
+  vector.
