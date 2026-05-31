@@ -59,14 +59,13 @@ This project has a local RAG index (mimirs). Use these MCP tools:
 - **`depends_on`**: List all files that a given file imports — its dependencies.
 - **`depended_on_by`**: List all files that import a given file — reverse
   dependencies. Use before modifying a shared module to see who depends on it.
-- **`impact_analysis`**: Before refactoring, renaming, or changing a function
-  signature, run this on the symbol or file to see direct callers, importers,
-  transitive dependents, annotations, git co-change, and test coverage — with
-  a 0–100 risk score explaining *why* the change is risky.
-- **`diff_context`**: PR-review helper. For the working tree (or
-  `staged: true`), reports each changed file's touched symbols, callers of
-  those symbols, linked tests, annotations, and related checkpoints. Use
-  before self-reviewing your diff or reviewing a teammate's branch.
+- **Assessing blast radius / reviewing a diff**: there is no single
+  `impact_analysis` or `diff_context` tool — compose the ones above. Before a
+  risky change (refactor, rename, signature change) combine `find_usages` (call
+  sites), `depended_on_by` (importers), and `get_annotations` (known caveats) on
+  the symbol or file. For diff or PR review, pair `git_context` (what changed)
+  with `find_usages` on the changed symbols and `search_checkpoints` for prior
+  decisions.
 - **`write_relevant`**: Before adding new code or docs, find the best insertion
   point — returns the most semantically appropriate file and anchor.
 - **`wiki`**: Run the wiki rebuild workflow. Start with

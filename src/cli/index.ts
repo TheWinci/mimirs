@@ -46,7 +46,7 @@ Usage:
   mimirs eval <file> [--dir D]      Run A/B eval (with/without RAG)
                   [--top N] [--out F]
   mimirs map [dir] [--focus F]      Generate project dependency graph
-                [--zoom file|directory]     (Mermaid format)
+                [--zoom file|directory]     (structured text)
   mimirs conversation search <query> Search conversation history
                 [--dir D] [--top N]
   mimirs conversation sessions      List indexed sessions
