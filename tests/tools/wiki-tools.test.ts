@@ -408,7 +408,8 @@ describe("wiki rebuild tool", () => {
     expect(page).toContain("Treat discovery, page packets, and `mustCover` items as a map");
     expect(page).toContain("Do not paste discovery summaries");
     expect(page).toContain("Source-first self-check");
-    expect(page).toContain("Mermaid sequence diagram");
+    expect(page).toContain("Include a Mermaid diagram");
+    expect(page).toContain("flowchart");
     expect(page).toContain("Explain what this one flow does");
     expect(page).toContain("Use citations sparingly");
     expect(page).toContain("Treat `mustCover` as the list of required topics for this page");

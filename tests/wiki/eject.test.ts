@@ -30,6 +30,7 @@ const FILES = [
   "page-overview.md",
   "page-screen.md",
   "changelog.md",
+  "update.md",
 ];
 
 describe("wiki(eject)", () => {

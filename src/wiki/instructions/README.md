@@ -19,6 +19,7 @@ project wiki. Editing them customizes how *this project's* wiki is written.
 - `page-screen.md` — the prompt for a single frontend UI screen page.
 - `page-overview.md` — the prompt for a bird's-eye overview page.
 - `changelog.md` — the prompt for writing one `wiki/CHANGELOG.md` entry (the `changelog` step).
+- `update.md` — the prompt for an incremental update: decide which pages a code/instruction change made stale and regenerate only those (the `update` step).
 
 ## Tokens
 

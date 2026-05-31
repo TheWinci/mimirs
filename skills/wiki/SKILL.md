@@ -50,6 +50,20 @@ flows.
 11. After all page writers finish, call `wiki(validate-pages)` and fix any broken relative `.md` links it reports.
 12. Before committing the updated pages, call `wiki(changelog)` and follow the returned prompt: it diffs the pending `wiki/` changes and has you prepend one entry to `wiki/CHANGELOG.md` — a curated summary of the behavior changes for an incremental update, or a single line for a full regeneration. Then commit the pages and the changelog together.
 
+## Updating an existing wiki
+
+When the wiki already exists and the code or instructions have changed, prefer an
+incremental update over a full rebuild:
+
+1. Call `index_files()` if the index is stale.
+2. Call `wiki(update)`. It diffs the source and instruction changes since the wiki
+   was last generated (never the `wiki/` output) and returns the changed files plus
+   the page index.
+3. Follow the returned prompt: decide which pages each change made stale, then call
+   `wiki(write:page:<slug>)` for only those pages and rewrite them. Leave untouched
+   pages alone. If the signal says too much changed, do the full rebuild instead.
+4. Call `wiki(validate-pages)`, then `wiki(changelog)`, then commit.
+
 ## Discovery Shape
 
 Each flow may include `stateChanges` for project items whose state changes

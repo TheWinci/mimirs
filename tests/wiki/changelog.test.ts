@@ -14,7 +14,6 @@ afterEach(async () => {
   }
 });
 
-// changelog reads git + the wiki dir from ctx.projectDir; a stub db is enough.
 function changelog(projectDir: string): Promise<string> {
   const ctx: WikiContext = { db: undefined as unknown as RagDB, projectDir, version: "test" };
   return runWikiRebuild(ctx, "changelog");
@@ -25,52 +24,62 @@ function git(cwd: string, ...args: string[]) {
   if (proc.exitCode !== 0) throw new Error(`git ${args.join(" ")} failed`);
 }
 
-// Commit N flow pages so the working tree has a clean wiki baseline to diff.
+const PAGE = (i: number) => `# Command ${i}\n\nLine A\nLine B\nLine C\nLine D\nLine E\nLine F\n`;
+
+// Commit N multi-line flow pages so the working tree has a clean wiki baseline.
 function seedWikiRepo(dir: string, pageCount: number) {
   git(dir, "init", "-q");
   git(dir, "config", "user.email", "t@t.t");
   git(dir, "config", "user.name", "t");
   mkdirSync(join(dir, "wiki", "cli"), { recursive: true });
   for (let i = 0; i < pageCount; i++) {
-    writeFileSync(join(dir, "wiki", "cli", `cmd${i}.md`), `# Command ${i}\n\nOriginal behavior.\n`);
+    writeFileSync(join(dir, "wiki", "cli", `cmd${i}.md`), PAGE(i));
   }
   git(dir, "add", "-A");
   git(dir, "commit", "-qm", "seed wiki");
 }
 
-describe("wiki(changelog)", () => {
-  test("degrades gracefully with no git and no wiki — reports nothing pending", async () => {
+describe("wiki(changelog) — effect-based, per-page churn", () => {
+  test("nothing pending with no git/wiki", async () => {
     tempDir = await createTempDir();
     const out = await changelog(tempDir);
     expect(out).toContain("wiki/CHANGELOG.md");
     expect(out).toContain("## Changelog signal");
-    expect(out).toContain("Update type: none");
+    expect(out).toContain("Pending wiki changes: 0");
     expect(out).not.toContain("{{");
   });
 
-  test("incremental: one changed page of many → diff included for summarizing", async () => {
+  test("surgical edit (a few lines) → summarized, diff included", async () => {
     tempDir = await createTempDir();
-    seedWikiRepo(tempDir, 5);
-    // Change a single page (1 of 5 = 20% < 60% threshold → incremental).
-    writeFileSync(join(tempDir, "wiki", "cli", "cmd0.md"), "# Command 0\n\nNow validates its input first.\n");
+    seedWikiRepo(tempDir, 3);
+    // Change one line of one page: ~12% churn, well under the 30% threshold.
+    writeFileSync(join(tempDir, "wiki", "cli", "cmd0.md"), PAGE(0).replace("Line C", "Line C now validates input"));
 
     const out = await changelog(tempDir);
-    expect(out).toContain("Update type: incremental (1 page changed)");
-    expect(out).toContain("- cli/cmd0 (modified)");
-    expect(out).toContain("### Wiki diff");
-    expect(out).toContain("Now validates its input first."); // the actual diff content
+    expect(out).toContain("Surgical edits (summarize from the diffs below): cli/cmd0");
+    expect(out).toContain("Refreshed wholesale (list only, do not summarize): none");
+    expect(out).toContain("### Surgical page diffs");
+    expect(out).toContain("Line C now validates input"); // the actual diff content
   });
 
-  test("full regeneration: most pages changed → one-liner, no diff dump", async () => {
+  test("wholesale rewrite (most lines) → listed as refreshed, no diff dump", async () => {
     tempDir = await createTempDir();
-    seedWikiRepo(tempDir, 5);
-    // Change 4 of 5 (80% >= 60% threshold → full regen).
-    for (let i = 0; i < 4; i++) {
-      writeFileSync(join(tempDir, "wiki", "cli", `cmd${i}.md`), `# Command ${i}\n\nRewritten ${i}.\n`);
-    }
+    seedWikiRepo(tempDir, 3);
+    // Replace the whole page: ~100% churn, over the threshold.
+    writeFileSync(join(tempDir, "wiki", "cli", "cmd0.md"), "# Command 0\n\nCompletely different prose.\nMore new prose.\n");
 
     const out = await changelog(tempDir);
-    expect(out).toContain("Update type: full regeneration (4 of 5 pages changed)");
-    expect(out).not.toContain("### Wiki diff"); // no diff for a full regen
+    expect(out).toContain("Refreshed wholesale (list only, do not summarize): cli/cmd0");
+    expect(out).toContain("Surgical edits (summarize from the diffs below): none");
+    expect(out).not.toContain("### Surgical page diffs"); // no diff when nothing surgical
+  });
+
+  test("a brand-new page is reported under New pages", async () => {
+    tempDir = await createTempDir();
+    seedWikiRepo(tempDir, 2);
+    writeFileSync(join(tempDir, "wiki", "cli", "fresh.md"), PAGE(9));
+
+    const out = await changelog(tempDir);
+    expect(out).toContain("New pages: cli/fresh");
   });
 });

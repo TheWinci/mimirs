@@ -189,25 +189,29 @@ async function gitOutput(projectDir: string, args: string[]): Promise<string | n
   }
 }
 
-// At or above this fraction of pages changing, an update is treated as a full
-// regeneration: the diff is mostly LLM rewording, so it gets a one-line entry
-// instead of a summarized diff.
-const FULL_REGEN_PAGE_FRACTION = 0.6;
+// A modified wiki page whose changed-line ratio is at or above this is treated
+// as a wholesale rewrite (reword / restructure / diagram swap), not a behavior
+// change: it is listed as "refreshed" rather than fed to the changelog
+// summarizer. Below it, the page is a surgical edit worth summarizing.
+const WIKI_WHOLESALE_RATIO = 0.3;
 
 function slugFromWikiPath(path: string): string {
   return normalizePath(path).replace(/^wiki\//, "").replace(/\.md$/, "");
 }
 
 // The pending wiki page changes vs HEAD — run before committing an update.
-// Diffing the working tree needs no remembered baseline commit (it is exactly
-// "this update's changes"), which sidesteps the dropped/rewritten-history
-// problem entirely. JSON state files and the changelog itself are excluded; the
-// diff is gathered only for an incremental update (a full regen gets a one-liner).
+// Diffing the working tree needs no remembered baseline commit. Each modified
+// page is classified by churn: a surgical edit (a few lines → a real behavior
+// change) is summarizable; a wholesale rewrite is only listed. Only surgical
+// diffs are gathered, so a 50-page regen never produces a giant changelog input.
+// JSON state files and the changelog itself are excluded.
 async function pendingWikiChanges(projectDir: string): Promise<{
-  pages: { slug: string; state: "modified" | "added" | "deleted" }[];
+  surgical: { slug: string; churn: number }[];
+  refreshed: string[];
+  added: string[];
+  removed: string[];
   total: number;
-  fullRegen: boolean;
-  diff: string;
+  surgicalDiff: string;
 }> {
   const status = (await gitOutput(projectDir, ["status", "--porcelain", "--", "wiki"])) ?? "";
   const pages: { path: string; slug: string; state: "modified" | "added" | "deleted" }[] = [];
@@ -223,24 +227,48 @@ async function pendingWikiChanges(projectDir: string): Promise<{
 
   const dir = wikiDir(projectDir);
   const total = existsSync(dir) ? (await collectMarkdownFiles(dir)).filter((p) => !p.endsWith("CHANGELOG.md")).length : 0;
-  const fullRegen = total > 0 && pages.length / total >= FULL_REGEN_PAGE_FRACTION;
+  const added = pages.filter((p) => p.state === "added").map((p) => p.slug).sort();
+  const removed = pages.filter((p) => p.state === "deleted").map((p) => p.slug).sort();
+  const modified = pages.filter((p) => p.state === "modified");
 
-  let diff = "";
-  if (!fullRegen && pages.length) {
-    const parts: string[] = [];
-    const modified = pages.filter((p) => p.state !== "added").map((p) => p.path);
-    if (modified.length) {
-      const out = await gitOutput(projectDir, ["diff", "HEAD", "--", ...modified]);
-      if (out?.trim()) parts.push(out.trim());
+  // One numstat call gives added/deleted lines per modified page; combine with
+  // the current line count to get a churn ratio in [0,1].
+  const churn = new Map<string, number>();
+  if (modified.length) {
+    const numstat = (await gitOutput(projectDir, ["diff", "--numstat", "HEAD", "--", ...modified.map((p) => p.path)])) ?? "";
+    for (const line of numstat.split("\n").filter(Boolean)) {
+      const parts = line.split("\t");
+      const addCount = parts[0] === "-" ? 0 : parseInt(parts[0], 10) || 0; // "-" == binary
+      const delCount = parts[1] === "-" ? 0 : parseInt(parts[1], 10) || 0;
+      const path = parts.slice(2).join("\t");
+      const newLines = (await readFile(join(projectDir, path), "utf-8").catch(() => "")).split("\n").length;
+      const oldLines = Math.max(0, newLines - addCount + delCount);
+      const denom = oldLines + newLines;
+      churn.set(normalizePath(path), denom > 0 ? (addCount + delCount) / denom : 1);
     }
-    for (const added of pages.filter((p) => p.state === "added")) {
-      const content = await readFile(join(projectDir, added.path), "utf-8").catch(() => "");
-      if (content) parts.push(`### New page: ${added.slug}\n\n${content}`);
-    }
-    diff = parts.join("\n\n");
   }
 
-  return { pages: pages.map(({ slug, state }) => ({ slug, state })), total, fullRegen, diff };
+  const surgical: { slug: string; churn: number }[] = [];
+  const surgicalPaths: string[] = [];
+  const refreshed: string[] = [];
+  for (const p of modified) {
+    const ratio = churn.get(normalizePath(p.path)) ?? 1;
+    if (ratio >= WIKI_WHOLESALE_RATIO) {
+      refreshed.push(p.slug);
+    } else {
+      surgical.push({ slug: p.slug, churn: ratio });
+      surgicalPaths.push(p.path);
+    }
+  }
+  surgical.sort((a, b) => a.slug.localeCompare(b.slug));
+  refreshed.sort();
+
+  let surgicalDiff = "";
+  if (surgicalPaths.length) {
+    surgicalDiff = ((await gitOutput(projectDir, ["diff", "HEAD", "--", ...surgicalPaths])) ?? "").trim();
+  }
+
+  return { surgical, refreshed, added, removed, total, surgicalDiff };
 }
 
 function computePageRank(paths: string[], edges: { fromPath: string; toPath: string }[]): Map<string, number> {
@@ -797,6 +825,108 @@ function readSelector(prefetch: WikiPrefetch, command: WikiRebuildCommand): unkn
   throw new Error(`Unknown prefetch selector '${selector}'.`);
 }
 
+// --- iterative update: detect what changed since the wiki was last generated ---
+
+// Past these, a targeted update is not worth attempting — recommend a regen.
+const CAUSE_DIFF_MAX_BYTES = 64 * 1024;
+const CAUSE_FILES_MAX = 25;
+const LOCKFILE_NAMES = new Set(["package-lock.json", "bun.lockb", "yarn.lock", "pnpm-lock.yaml"]);
+
+function isNoiseFile(path: string): boolean {
+  const base = path.split("/").pop() ?? path;
+  return LOCKFILE_NAMES.has(base) || base.endsWith(".lock");
+}
+
+async function gitSucceeds(projectDir: string, args: string[]): Promise<boolean> {
+  try {
+    const proc = Bun.spawn(["git", ...args], { cwd: projectDir, stdout: "ignore", stderr: "ignore" });
+    return (await proc.exited) === 0;
+  } catch {
+    return false;
+  }
+}
+
+// The commit the wiki was last generated from. Never trusts the stamped hash
+// blindly: it survives rebases, squashes, and dropped commits.
+async function resolveBaseline(projectDir: string): Promise<{ commit: string | null; source: string; warning?: string }> {
+  let stamped: string | null = null;
+  const changelogPath = join(wikiDir(projectDir), "CHANGELOG.md");
+  if (existsSync(changelogPath)) {
+    const match = (await readFile(changelogPath, "utf-8")).match(/^##\s*\[([0-9a-fA-F]{7,40})\]/m);
+    if (match) stamped = match[1];
+  }
+
+  if (stamped && (await gitSucceeds(projectDir, ["cat-file", "-e", `${stamped}^{commit}`]))) {
+    if (await gitSucceeds(projectDir, ["merge-base", "--is-ancestor", stamped, "HEAD"])) {
+      return { commit: stamped, source: `changelog stamp ${stamped}` };
+    }
+    const mergeBase = (await gitOutput(projectDir, ["merge-base", stamped, "HEAD"]))?.trim();
+    if (mergeBase) return { commit: mergeBase, source: `merge-base with diverged stamp ${stamped}` };
+  }
+
+  // The last commit that wrote the wiki is reachable by definition.
+  const lastWiki = (await gitOutput(projectDir, ["log", "-1", "--format=%H", "--", "wiki"]))?.trim();
+  if (lastWiki) {
+    const why = stamped ? `stamp ${stamped} unreachable; ` : "";
+    return { commit: lastWiki, source: `${why}last wiki/ commit ${lastWiki.slice(0, 7)}` };
+  }
+
+  return {
+    commit: null,
+    source: "none",
+    warning: "Could not anchor a baseline (no usable changelog stamp, no wiki/ history). Regenerate the wiki instead of a targeted update.",
+  };
+}
+
+async function wikiPageIndex(projectDir: string): Promise<{ slug: string; title: string }[]> {
+  try {
+    const discovery = await readDiscovery(projectDir);
+    return (discovery.pages ?? [])
+      .filter((page): page is DiscoveryPage & { slug: string } => Boolean(page.slug))
+      .map((page) => ({ slug: page.slug, title: page.title ?? page.slug }));
+  } catch {
+    return [];
+  }
+}
+
+// The "cause" of a wiki update: source + instruction changes since the baseline,
+// excluding the wiki/ output itself, binaries, and lockfiles — no directory
+// assumptions, so it works for any project layout. The LLM maps these to pages.
+async function buildCausePacket(projectDir: string): Promise<{
+  baseline: string | null;
+  baselineSource: string;
+  files: string[];
+  diff: string;
+  tooLarge: boolean;
+  pageIndex: { slug: string; title: string }[];
+  warning?: string;
+}> {
+  const { commit: baseline, source: baselineSource, warning } = await resolveBaseline(projectDir);
+  const pageIndex = await wikiPageIndex(projectDir);
+
+  if (!baseline) {
+    return { baseline, baselineSource, files: [], diff: "", tooLarge: false, pageIndex, warning };
+  }
+
+  // numstat over baseline → working tree; drop binaries ("-\t-"), lockfiles, and
+  // anything under wiki/ (the output we regenerate).
+  const numstat = (await gitOutput(projectDir, ["diff", "--numstat", baseline])) ?? "";
+  const files: string[] = [];
+  for (const line of numstat.split("\n").filter(Boolean)) {
+    const parts = line.split("\t");
+    const isBinary = parts[0] === "-" && parts[1] === "-";
+    const path = parts.slice(2).join("\t");
+    if (!path || isBinary || isNoiseFile(path) || normalizePath(path).startsWith("wiki/")) continue;
+    files.push(path);
+  }
+  files.sort();
+
+  const diff = files.length ? ((await gitOutput(projectDir, ["diff", baseline, "--", ...files])) ?? "").trim() : "";
+  const tooLarge = diff.length > CAUSE_DIFF_MAX_BYTES || files.length > CAUSE_FILES_MAX;
+
+  return { baseline, baselineSource, files, diff: tooLarge ? "" : diff, tooLarge, pageIndex, warning };
+}
+
 export async function runWikiRebuild(ctx: WikiContext, input: string): Promise<string> {
   const command = parseWikiCommand(input);
 
@@ -899,6 +1029,7 @@ export async function runWikiRebuild(ctx: WikiContext, input: string): Promise<s
       "page-overview",
       "page-screen",
       "changelog",
+      "update",
     ];
     const written: string[] = [];
     const skipped: string[] = [];
@@ -923,36 +1054,68 @@ export async function runWikiRebuild(ctx: WikiContext, input: string): Promise<s
     ].join("\n");
   }
 
-  if (command.mode === "changelog") {
-    const currentFull = await lastCommitHash(ctx.projectDir);
-    const currentCommit = currentFull ? currentFull.slice(0, 7) : "unknown";
-    const date = new Date().toISOString().slice(0, 10);
-    const { pages, total, fullRegen, diff } = await pendingWikiChanges(ctx.projectDir);
+  if (command.mode === "update") {
+    const { baseline, baselineSource, files, diff, tooLarge, pageIndex, warning } = await buildCausePacket(ctx.projectDir);
+    const prompt = await renderInstruction(ctx.projectDir, "update", {});
 
-    const updateType =
-      pages.length === 0
-        ? "none (no pending wiki changes)"
-        : fullRegen
-          ? `full regeneration (${pages.length} of ${total} pages changed)`
-          : `incremental (${pages.length} page${pages.length === 1 ? "" : "s"} changed)`;
+    if (!baseline) {
+      return [prompt, "", "## Update signal", "", `- ${warning ?? "No baseline found; regenerate the wiki."}`].join("\n");
+    }
+    if (!files.length) {
+      return [
+        prompt,
+        "",
+        "## Update signal",
+        "",
+        `- Baseline: ${baselineSource}`,
+        "- No source or instruction changes since the last wiki version — nothing to update.",
+      ].join("\n");
+    }
 
-    const prompt = await renderInstruction(ctx.projectDir, "changelog", { currentCommit, date });
     const signal = [
-      "## Changelog signal",
+      "## Update signal",
       "",
-      `- Stamp: [${currentCommit}] - ${date}`,
-      `- Update type: ${updateType}`,
+      `- Baseline: ${baselineSource}`,
+      `- Changed files since baseline (${files.length}):`,
+      ...files.map((file) => `  - ${file}`),
+      ...(tooLarge
+        ? ["", "**Too much changed for a targeted update — run the full wiki rebuild instead of regenerating individual pages.**"]
+        : []),
       "",
-      "### Changed pages",
+      "### Wiki pages (slug — title)",
       "",
-      pages.length ? pages.map((p) => `- ${p.slug} (${p.state})`).join("\n") : "(none)",
-      ...(fullRegen || !pages.length
-        ? []
-        : ["", "### Wiki diff (summarize the behavior changes it reveals — ignore rewording)", "", diff || "(empty)"]),
+      pageIndex.length ? pageIndex.map((page) => `- ${page.slug} — ${page.title}`).join("\n") : "(no discovery page index found)",
+      ...(tooLarge ? [] : ["", "### Cause diff", "", diff || "(empty)"]),
     ].join("\n");
 
     return [prompt, "", signal].join("\n");
   }
 
-  throw new Error(`Unknown wiki command '${input}'. Try \`shape\`, \`prefetch\`, \`validate-discovery\`, \`discovery\`, \`write\`, \`changelog\`, \`eject\`, or \`validate-pages\`.`);
+  if (command.mode === "changelog") {
+    const currentFull = await lastCommitHash(ctx.projectDir);
+    const currentCommit = currentFull ? currentFull.slice(0, 7) : "unknown";
+    const date = new Date().toISOString().slice(0, 10);
+    const { surgical, refreshed, added, removed, surgicalDiff } = await pendingWikiChanges(ctx.projectDir);
+    const totalChanged = surgical.length + refreshed.length + added.length + removed.length;
+
+    const list = (slugs: string[]) => (slugs.length ? slugs.join(", ") : "none");
+    const prompt = await renderInstruction(ctx.projectDir, "changelog", { currentCommit, date });
+    const signal = [
+      "## Changelog signal",
+      "",
+      `- Stamp: [${currentCommit}] - ${date}`,
+      `- Pending wiki changes: ${totalChanged}`,
+      `- Surgical edits (summarize from the diffs below): ${list(surgical.map((s) => s.slug))}`,
+      `- Refreshed wholesale (list only, do not summarize): ${list(refreshed)}`,
+      `- New pages: ${list(added)}`,
+      `- Removed pages: ${list(removed)}`,
+      ...(surgical.length
+        ? ["", "### Surgical page diffs", "", surgicalDiff || "(empty)"]
+        : []),
+    ].join("\n");
+
+    return [prompt, "", signal].join("\n");
+  }
+
+  throw new Error(`Unknown wiki command '${input}'. Try \`shape\`, \`prefetch\`, \`validate-discovery\`, \`discovery\`, \`write\`, \`update\`, \`changelog\`, \`eject\`, or \`validate-pages\`.`);
 }
