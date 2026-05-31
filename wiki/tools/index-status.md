@@ -117,6 +117,6 @@ Index status:
 
 - `src/tools/index-tools.ts` — registers `index_status` (and its siblings) and formats the status text (`src/tools/index-tools.ts:94-116`).
 - `src/tools/index.ts` — `resolveProject` resolves the directory, validates it, and supplies the database handle (`src/tools/index.ts:22-37`).
-- `src/db/index.ts` — `RagDB.getStatus` forwards to the file operations module and owns the schema for the `files` and `chunks` tables (`src/db/index.ts:646-648`, `src/db/index.ts:170-188`).
+- `src/db/index.ts` — `RagDB.getStatus` forwards to the file operations module and owns the schema for the `files` and `chunks` tables (`src/db/index.ts:646-648`, `src/db/index.ts:170-189`).
 - `src/db/files.ts` — `getStatus` runs the three counting queries that produce the reported numbers (`src/db/files.ts:354-372`).
 - `src/server/index.ts` — the `getDB` factory that caches one `RagDB` per project directory (`src/server/index.ts:34-51`).

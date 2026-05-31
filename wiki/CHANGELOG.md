@@ -4,6 +4,21 @@ Notable changes to the generated wiki, newest first, by wiki version. The format
 follows [Keep a Changelog](https://keepachangelog.com/); each version is stamped
 with the source commit the wiki was generated from.
 
+## [b37b514] - 2026-05-31
+
+### Added
+- The wiki tool page now documents the `changelog` command and corrects the
+  ejected-instruction list to nine files; the page predated both (tools/wiki).
+
+### Changed
+- Flow-page diagrams now match the shape of each flow instead of always using a
+  sequence diagram: flowcharts for branching dispatch and pipelines — the wiki
+  command router, the search rerank pipeline, and the server-start decision tree
+  — while linear request/response flows keep a sequence diagram (server/start,
+  tools/search, tools/wiki).
+
+_Pages updated: server/start, tools/index-status, tools/search, tools/wiki_
+
 ## [e5d2055] - 2026-05-31
 
 ### Added
