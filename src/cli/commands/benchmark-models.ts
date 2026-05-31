@@ -2,6 +2,7 @@ import { resolve, join } from "path";
 import { mkdirSync, rmSync, existsSync } from "fs";
 import { RagDB } from "../../db";
 import { loadConfig, applyEmbeddingConfig } from "../../config";
+import { intFlag } from "../flags";
 import { indexDirectory } from "../../indexing/indexer";
 import { loadBenchmarkQueries, runBenchmark, type BenchmarkSummary } from "../../search/benchmark";
 import { configureEmbedder, resetEmbedder, DEFAULT_MODEL_ID, DEFAULT_EMBEDDING_DIM } from "../../embeddings/embed";
@@ -42,7 +43,7 @@ export async function benchmarkModelsCommand(args: string[], getFlag: (flag: str
 
   const dir = resolve(getFlag("--dir") || ".");
   const config = await loadConfig(dir);
-  const top = parseInt(getFlag("--top") || String(config.benchmarkTopK), 10);
+  const top = intFlag(getFlag("--top"), "--top", config.benchmarkTopK, { min: 1 });
   const modelsArg = getFlag("--models");
 
   if (!modelsArg) {
@@ -70,7 +71,10 @@ export async function benchmarkModelsCommand(args: string[], getFlag: (flag: str
 
     // Create a temp config pointing at this temp dir
     const tmpRagDir = tmpDir;
-    const db = new RagDB(dir, tmpRagDir);
+    // This command drives the embedder across multiple models itself
+    // (configureEmbedder above), so opt out of the constructor's config-based
+    // embedding setup which would reset the dim to the project default.
+    const db = new RagDB(dir, tmpRagDir, { autoEmbeddingConfig: false });
 
     try {
       // Index

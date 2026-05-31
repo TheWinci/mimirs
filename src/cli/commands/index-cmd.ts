@@ -1,6 +1,6 @@
 import { resolve } from "path";
 import { RagDB } from "../../db";
-import { loadConfig, applyEmbeddingConfig } from "../../config";
+import { loadConfig } from "../../config";
 import { indexDirectory } from "../../indexing/indexer";
 import { cliProgress, createQuietProgress } from "../progress";
 import { cli } from "../../utils/log";
@@ -9,8 +9,9 @@ export async function indexCommand(args: string[], getFlag: (flag: string) => st
   const dir = resolve(args[1] && !args[1].startsWith("--") ? args[1] : ".");
   const verbose = args.includes("--verbose") || args.includes("-v");
   const db = new RagDB(dir);
+  // RagDB's constructor applies the project's embedding config before creating
+  // its schema, so no separate applyEmbeddingConfig call is needed here.
   const config = await loadConfig(dir);
-  applyEmbeddingConfig(config);
 
   const patternsStr = getFlag("--patterns");
   if (patternsStr) {

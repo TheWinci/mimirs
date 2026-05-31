@@ -3,6 +3,7 @@ import { RagDB } from "../../db";
 import { loadConfig } from "../../config";
 import { loadBenchmarkQueries, runBenchmark, formatBenchmarkReport } from "../../search/benchmark";
 import { cli } from "../../utils/log";
+import { intFlag } from "../flags";
 
 export async function benchmarkCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const file = args[1];
@@ -14,7 +15,7 @@ export async function benchmarkCommand(args: string[], getFlag: (flag: string) =
   const dir = resolve(getFlag("--dir") || ".");
   const db = new RagDB(dir);
   const config = await loadConfig(dir);
-  const top = parseInt(getFlag("--top") || String(config.benchmarkTopK), 10);
+  const top = intFlag(getFlag("--top"), "--top", config.benchmarkTopK, { min: 1 });
 
   const queries = await loadBenchmarkQueries(resolve(file));
   cli.log(`Running ${queries.length} benchmark queries against ${dir}...\n`);

@@ -1,6 +1,6 @@
 import { readFile, writeFile, mkdir } from "fs/promises";
 import { join } from "path";
-import { existsSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { z } from "zod";
 import { log } from "../utils/log";
 import { configureEmbedder, DEFAULT_MODEL_ID, DEFAULT_EMBEDDING_DIM } from "../embeddings/embed";
@@ -166,5 +166,38 @@ export async function loadConfig(projectDir: string): Promise<RagConfig> {
 export function applyEmbeddingConfig(config: RagConfig): void {
   const model = config.embeddingModel ?? DEFAULT_MODEL_ID;
   const dim = config.embeddingDim ?? DEFAULT_EMBEDDING_DIM;
+  configureEmbedder(model, dim);
+}
+
+/**
+ * Synchronously apply the embedding model/dim from a project's config.json.
+ *
+ * Called inside the `RagDB` constructor so the vec tables are always created at
+ * the configured dimension — the constructor must run before `initSchema`, and
+ * it is synchronous, so it cannot await `loadConfig`. Reads only the embedding
+ * fields (best-effort) and never writes the file; the async `loadConfig` owns
+ * writing defaults and validation warnings. Missing/invalid config falls back
+ * to the default model + dim.
+ */
+export function applyEmbeddingConfigFromDisk(projectDir: string): void {
+  const configPath = join(projectDir, ".mimirs", "config.json");
+  let model = DEFAULT_MODEL_ID;
+  let dim = DEFAULT_EMBEDDING_DIM;
+
+  if (existsSync(configPath)) {
+    try {
+      const parsed = JSON.parse(readFileSync(configPath, "utf-8")) as {
+        embeddingModel?: unknown;
+        embeddingDim?: unknown;
+      };
+      if (typeof parsed.embeddingModel === "string") model = parsed.embeddingModel;
+      if (Number.isInteger(parsed.embeddingDim) && (parsed.embeddingDim as number) > 0) {
+        dim = parsed.embeddingDim as number;
+      }
+    } catch {
+      // Malformed JSON — fall back to defaults; loadConfig() surfaces the warning.
+    }
+  }
+
   configureEmbedder(model, dim);
 }

@@ -20,6 +20,7 @@ import { demoCommand } from "./commands/demo";
 import { doctorCommand } from "./commands/doctor";
 import { cleanupCommand } from "./commands/cleanup";
 import { cli } from "../utils/log";
+import { CliFlagError } from "./flags";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -88,6 +89,20 @@ export async function main() {
     process.exit(0);
   }
 
+  try {
+    await dispatch();
+  } catch (err) {
+    // Bad numeric flags surface as a clear message + non-zero exit, not a crash
+    // log meant for server failures.
+    if (err instanceof CliFlagError) {
+      cli.error(err.message);
+      process.exit(1);
+    }
+    throw err;
+  }
+}
+
+async function dispatch() {
   switch (command) {
     case "serve": {
       const { serveCommand } = await import("./commands/serve");

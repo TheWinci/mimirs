@@ -1,10 +1,11 @@
 import { resolve } from "path";
 import { RagDB } from "../../db";
 import { cli } from "../../utils/log";
+import { intFlag } from "../flags";
 
 export async function analyticsCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const dir = resolve(args[1] && !args[1].startsWith("--") ? args[1] : ".");
-  const days = parseInt(getFlag("--days") || "30", 10);
+  const days = intFlag(getFlag("--days"), "--days", 30, { min: 1 });
   const db = new RagDB(dir);
   const analytics = db.getAnalytics(days);
 

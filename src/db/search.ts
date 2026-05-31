@@ -2,6 +2,7 @@ import { Database } from "bun:sqlite";
 import { dirname, basename } from "path";
 import { type SearchResult, type ChunkSearchResult, type SymbolResult, type UsageResult, type PathFilter } from "./types";
 import { escapeRegex, sanitizeFTS } from "../search/usages";
+import { log } from "../utils/log";
 
 /**
  * Build parametrized SQL fragments for a PathFilter. Caller concatenates
@@ -506,7 +507,13 @@ export function findUsages(db: Database, symbolName: string, exact: boolean, top
          LIMIT ?`
       )
       .all(ftsQuery, top * 5);
-  } catch {
+  } catch (err) {
+    // A malformed/corrupt FTS query shouldn't be silent — the symbol_refs
+    // results above still stand, but log why the fallback was skipped.
+    log.debug(
+      `findUsages FTS fallback failed for "${symbolName}": ${err instanceof Error ? err.message : err}`,
+      "search",
+    );
     return results;
   }
 

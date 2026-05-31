@@ -1,8 +1,9 @@
 import { resolve } from "path";
 import { RagDB, type PathFilter } from "../../db";
-import { loadConfig, applyEmbeddingConfig } from "../../config";
+import { loadConfig } from "../../config";
 import { search, searchChunks } from "../../search/hybrid";
 import { cli } from "../../utils/log";
+import { intFlag, floatFlag } from "../flags";
 
 function parseListFlag(getFlag: (flag: string) => string | undefined, ...names: string[]): string[] | undefined {
   for (const name of names) {
@@ -39,8 +40,7 @@ export async function searchCommand(args: string[], getFlag: (flag: string) => s
   const dir = resolve(getFlag("--dir") || ".");
   const db = new RagDB(dir);
   const config = await loadConfig(dir);
-  applyEmbeddingConfig(config);
-  const top = parseInt(getFlag("--top") || String(config.searchTopK), 10);
+  const top = intFlag(getFlag("--top"), "--top", config.searchTopK, { min: 1 });
   const filter = buildCliFilter(dir, getFlag);
 
   const results = await search(query, db, top, 0, config.hybridWeight, config.generated, filter);
@@ -68,12 +68,11 @@ export async function readCommand(args: string[], getFlag: (flag: string) => str
   const dir = resolve(getFlag("--dir") || ".");
   const db = new RagDB(dir);
   const config = await loadConfig(dir);
-  applyEmbeddingConfig(config);
-  const top = parseInt(getFlag("--top") || "8", 10);
-  const threshold = parseFloat(getFlag("--threshold") || "0.3");
+  const top = intFlag(getFlag("--top"), "--top", 8, { min: 1 });
+  const threshold = floatFlag(getFlag("--threshold"), "--threshold", 0.3, { min: 0, max: 1 });
   const filter = buildCliFilter(dir, getFlag);
 
-  const results = await searchChunks(query, db, top, threshold, config.hybridWeight, config.generated, filter);
+  const results = await searchChunks(query, db, top, threshold, config.hybridWeight, config.generated, filter, config.parentGroupingMinCount);
 
   if (results.length === 0) {
     cli.log("No relevant chunks found. Has the directory been indexed?");

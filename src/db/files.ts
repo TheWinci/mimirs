@@ -2,6 +2,7 @@ import { Database } from "bun:sqlite";
 import { type EmbeddedChunk } from "../types";
 import { type StoredFile } from "./types";
 import { normalizePath } from "../utils/path";
+import { clearFileGraph } from "./graph";
 
 export function getFileByPath(db: Database, path: string): StoredFile | null {
   return db
@@ -42,13 +43,9 @@ export function upsertFileStart(db: Database, path: string, hash: string): numbe
   if (existing) {
     // UPDATE instead of DELETE+INSERT to preserve files.id — this keeps
     // file_imports.resolved_file_id FKs pointing at this file intact.
+    // Deleting the chunks fires the chunks_vec_ad trigger, which drops the
+    // matching vec_chunks rows — no manual vec cleanup needed.
     const tx = db.transaction(() => {
-      const oldChunks = db
-        .query<{ id: number }, [number]>("SELECT id FROM chunks WHERE file_id = ?")
-        .all(existing.id);
-      for (const c of oldChunks) {
-        db.run("DELETE FROM vec_chunks WHERE chunk_id = ?", [c.id]);
-      }
       db.run("DELETE FROM chunks WHERE file_id = ?", [existing.id]);
       db.run(
         "UPDATE files SET hash = ?, indexed_at = ? WHERE id = ?",
@@ -256,13 +253,10 @@ export function removeFile(db: Database, path: string): boolean {
   if (!existing) return false;
 
   const tx = db.transaction(() => {
-    const oldChunks = db
-      .query<{ id: number }, [number]>("SELECT id FROM chunks WHERE file_id = ?")
-      .all(existing.id);
-    for (const c of oldChunks) {
-      db.run("DELETE FROM vec_chunks WHERE chunk_id = ?", [c.id]);
-    }
+    // DELETE FROM chunks fires chunks_vec_ad, which clears the file's
+    // vec_chunks rows. clearFileGraph handles the graph tables (no FK cascade).
     db.run("DELETE FROM chunks WHERE file_id = ?", [existing.id]);
+    clearFileGraph(db, existing.id);
     db.run("DELETE FROM files WHERE id = ?", [existing.id]);
   });
 
@@ -284,13 +278,10 @@ export function pruneDeleted(db: Database, existingPaths: Set<string>): number {
 
   const tx = db.transaction(() => {
     for (const file of toRemove) {
-      const oldChunks = db
-        .query<{ id: number }, [number]>("SELECT id FROM chunks WHERE file_id = ?")
-        .all(file.id);
-      for (const c of oldChunks) {
-        db.run("DELETE FROM vec_chunks WHERE chunk_id = ?", [c.id]);
-      }
+      // DELETE FROM chunks fires chunks_vec_ad to clear vec_chunks;
+      // clearFileGraph handles the graph tables (no FK cascade).
       db.run("DELETE FROM chunks WHERE file_id = ?", [file.id]);
+      clearFileGraph(db, file.id);
       db.run("DELETE FROM files WHERE id = ?", [file.id]);
     }
   });
@@ -327,7 +318,7 @@ export function deleteStaleChunks(db: Database, fileId: number, keepHashes: Set<
 
   const tx = db.transaction(() => {
     for (const c of toDelete) {
-      db.run("DELETE FROM vec_chunks WHERE chunk_id = ?", [c.id]);
+      // chunks_vec_ad trigger drops the matching vec_chunks row.
       db.run("DELETE FROM chunks WHERE id = ?", [c.id]);
     }
   });

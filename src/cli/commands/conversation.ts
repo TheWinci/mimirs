@@ -4,6 +4,7 @@ import { loadConfig } from "../../config";
 import { embed } from "../../embeddings/embed";
 import { discoverSessions } from "../../conversation/parser";
 import { indexConversation } from "../../conversation/indexer";
+import { intFlag } from "../flags";
 import { cli } from "../../utils/log";
 
 export async function conversationCommand(args: string[], getFlag: (flag: string) => string | undefined) {
@@ -19,7 +20,7 @@ export async function conversationCommand(args: string[], getFlag: (flag: string
     }
 
     const config = await loadConfig(dir);
-    const top = parseInt(getFlag("--top") || String(config.searchTopK), 10);
+    const top = intFlag(getFlag("--top"), "--top", config.searchTopK, { min: 1 });
 
     // Ensure conversations are indexed
     const sessions = discoverSessions(dir);

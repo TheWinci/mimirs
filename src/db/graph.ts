@@ -758,6 +758,42 @@ export function upsertFileGraph(
   tx();
 }
 
+/**
+ * Delete every graph row tied to a file that is being removed from the index.
+ *
+ * Foreign keys aren't enforced (PRAGMA foreign_keys defaults OFF in
+ * bun:sqlite), so deleting the `files` row never cascades to file_imports /
+ * file_exports / symbol_refs, and the `ON DELETE SET NULL` on the resolved_*
+ * pointers in OTHER files never fires. Without this, `removeFile` /
+ * `pruneDeleted` leave behind: the file's own orphaned imports/exports/refs,
+ * stale `file_imports.resolved_file_id` in files that imported it, and stale
+ * `symbol_refs.resolved_export_id` in files that referenced its exports —
+ * which corrupts depends_on / depended_on_by / find_usages results.
+ *
+ * Reindexing a file does this per-table in upsertFileGraph/upsertSymbolRefs;
+ * this is the equivalent for outright removal. Caller is expected to wrap this
+ * in its own transaction alongside the chunk/file deletes.
+ */
+export function clearFileGraph(db: Database, fileId: number) {
+  // Null cross-file pointers AT this file before deleting the rows they target.
+  db.run(
+    `UPDATE symbol_refs
+       SET resolved_export_id = NULL
+       WHERE resolved_export_id IN (
+         SELECT id FROM file_exports WHERE file_id = ?
+       )`,
+    [fileId],
+  );
+  db.run(
+    "UPDATE file_imports SET resolved_file_id = NULL WHERE resolved_file_id = ?",
+    [fileId],
+  );
+  // Delete this file's own graph rows.
+  db.run("DELETE FROM symbol_refs WHERE file_id = ?", [fileId]);
+  db.run("DELETE FROM file_exports WHERE file_id = ?", [fileId]);
+  db.run("DELETE FROM file_imports WHERE file_id = ?", [fileId]);
+}
+
 export function resolveImport(db: Database, importId: number, resolvedFileId: number) {
   db.run(
     "UPDATE file_imports SET resolved_file_id = ? WHERE id = ?",

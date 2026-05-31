@@ -31,7 +31,7 @@ export function registerServerInfoTools(
         "## Server",
         `  version:     ${(await import("../../package.json")).version}`,
         `  project_dir: ${projectDir}`,
-        `  db_dir:      ${process.env.RAG_DB_DIR || `${projectDir}/.rag`}`,
+        `  db_dir:      ${process.env.RAG_DB_DIR || `${projectDir}/.mimirs`}`,
         `  log_level:   ${process.env.LOG_LEVEL || "warn"}`,
         "",
         "## Index",

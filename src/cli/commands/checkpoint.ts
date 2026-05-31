@@ -3,6 +3,7 @@ import { RagDB } from "../../db";
 import { embed } from "../../embeddings/embed";
 import { discoverSessions } from "../../conversation/parser";
 import { cli } from "../../utils/log";
+import { intFlag } from "../flags";
 
 export async function checkpointCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const subCommand = args[1];
@@ -36,7 +37,7 @@ export async function checkpointCommand(args: string[], getFlag: (flag: string) 
     cli.log(`Checkpoint #${id} created: [${type}] ${title}`);
   } else if (subCommand === "list") {
     const type = getFlag("--type");
-    const top = parseInt(getFlag("--top") || "20", 10);
+    const top = intFlag(getFlag("--top"), "--top", 20, { min: 1 });
     const checkpoints = db.listCheckpoints(undefined, type, top);
 
     if (checkpoints.length === 0) {
@@ -61,7 +62,7 @@ export async function checkpointCommand(args: string[], getFlag: (flag: string) 
     }
 
     const type = getFlag("--type");
-    const top = parseInt(getFlag("--top") || "5", 10);
+    const top = intFlag(getFlag("--top"), "--top", 5, { min: 1 });
     const queryEmb = await embed(query);
     const results = db.searchCheckpoints(queryEmb, top, type);
 

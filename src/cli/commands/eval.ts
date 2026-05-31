@@ -3,6 +3,7 @@ import { RagDB } from "../../db";
 import { loadConfig } from "../../config";
 import { loadEvalTasks, runEval, formatEvalReport, saveEvalTraces } from "../../search/eval";
 import { cli } from "../../utils/log";
+import { intFlag } from "../flags";
 
 export async function evalCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const file = args[1];
@@ -15,7 +16,7 @@ export async function evalCommand(args: string[], getFlag: (flag: string) => str
   const outPath = getFlag("--out");
   const db = new RagDB(dir);
   const config = await loadConfig(dir);
-  const top = parseInt(getFlag("--top") || String(config.benchmarkTopK), 10);
+  const top = intFlag(getFlag("--top"), "--top", config.benchmarkTopK, { min: 1 });
 
   const tasks = await loadEvalTasks(resolve(file));
   cli.log(`Running A/B eval with ${tasks.length} tasks against ${dir}...\n`);

@@ -16,8 +16,12 @@ fi
 
 # Only re-index if the file exists (not a deletion)
 if [ -f "$FILE_PATH" ]; then
-  # Fire and forget — don't block the agent
-  bunx mimirs index "$(dirname "$FILE_PATH")" --file "$FILE_PATH" 2>/dev/null &
+  # Fire and forget — don't block the agent. This is a fallback for running
+  # without the MCP server; when the server is up its file watcher is the real
+  # reindex path and this lock-aware incremental pass is a no-op.
+  # `index` re-indexes the directory incrementally (unchanged files are skipped
+  # by hash); there is no single-file CLI mode, so pass only the directory.
+  bunx mimirs index "$(dirname "$FILE_PATH")" 2>/dev/null &
 fi
 
 exit 0

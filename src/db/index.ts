@@ -1,6 +1,7 @@
 import { Database } from "bun:sqlite";
 import * as sqliteVec from "sqlite-vec";
 import { getEmbeddingDim } from "../embeddings/embed";
+import { applyEmbeddingConfigFromDisk } from "../config";
 import { join, resolve } from "path";
 import { mkdirSync, existsSync } from "fs";
 import { platform } from "os";
@@ -88,8 +89,13 @@ function loadCustomSQLite() {
 
 export class RagDB {
   private db: Database;
+  private ragDir: string;
 
-  constructor(projectDir: string, customRagDir?: string) {
+  constructor(
+    projectDir: string,
+    customRagDir?: string,
+    opts?: { autoEmbeddingConfig?: boolean },
+  ) {
     loadCustomSQLite();
 
     const ragDir = customRagDir
@@ -97,6 +103,7 @@ export class RagDB {
       : process.env.RAG_DB_DIR
         ? resolve(process.env.RAG_DB_DIR)
         : join(projectDir, ".mimirs");
+    this.ragDir = ragDir;
 
     try {
       mkdirSync(ragDir, { recursive: true });
@@ -115,11 +122,49 @@ export class RagDB {
       throw err;
     }
 
+    // Apply the project's embedding model/dim BEFORE initSchema so the vec
+    // tables are created at the configured dimension, not the default 384.
+    // This makes a correctly-sized index correct-by-construction regardless of
+    // call-site ordering. benchmark-models opts out — it drives the embedder
+    // itself across multiple models against throwaway indexes.
+    if (opts?.autoEmbeddingConfig !== false) {
+      applyEmbeddingConfigFromDisk(projectDir);
+    }
+
     this.db = new Database(join(ragDir, "index.db"));
     this.db.exec("PRAGMA journal_mode=WAL");
     this.db.exec("PRAGMA busy_timeout = 5000");
     sqliteVec.load(this.db);
+    this.assertEmbeddingDimCompatible();
     this.initSchema();
+  }
+
+  /**
+   * Guard against a config/index embedding-dim mismatch. If this DB already has
+   * a `vec_chunks` table built at a different dimension than the currently
+   * configured model produces, fail loudly here instead of much later with a
+   * cryptic vec0 insert error. The stored index wins — the fix is to rebuild or
+   * restore the previous embedding config, never to silently re-create tables.
+   */
+  private assertEmbeddingDimCompatible(): void {
+    const row = this.db
+      .query<{ sql: string | null }, []>(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'vec_chunks'",
+      )
+      .get();
+    if (!row?.sql) return; // fresh DB — vec_chunks will be created at the right dim
+    const match = row.sql.match(/FLOAT\s*\[\s*(\d+)\s*\]/i);
+    if (!match) return;
+    const existingDim = parseInt(match[1], 10);
+    const configuredDim = getEmbeddingDim();
+    if (existingDim !== configuredDim) {
+      throw new Error(
+        `mimirs: embedding dimension mismatch — the index at "${this.ragDir}" was ` +
+        `built with ${existingDim}-dim vectors, but the configured embedding model ` +
+        `produces ${configuredDim}-dim vectors. Restore the previous embeddingModel/` +
+        `embeddingDim in .mimirs/config.json, or delete the index to rebuild it.`,
+      );
+    }
   }
 
   private initSchema() {
@@ -163,6 +208,15 @@ export class RagDB {
       CREATE TRIGGER IF NOT EXISTS chunks_au AFTER UPDATE ON chunks BEGIN
         INSERT INTO fts_chunks(fts_chunks, rowid, snippet) VALUES ('delete', old.id, old.snippet);
         INSERT INTO fts_chunks(rowid, snippet) VALUES (new.id, new.snippet);
+      END;
+
+      -- vec_chunks is a vec0 virtual table, so it can't be an FK child and a
+      -- cascade can never reach it. Mirror the fts triggers: whenever a chunk
+      -- row is deleted (directly or via any deletion path), drop its vector.
+      -- Keeps vec_chunks in sync from one place instead of every caller
+      -- remembering a manual delete.
+      CREATE TRIGGER IF NOT EXISTS chunks_vec_ad AFTER DELETE ON chunks BEGIN
+        DELETE FROM vec_chunks WHERE chunk_id = old.id;
       END;
 
       CREATE TABLE IF NOT EXISTS file_imports (
@@ -272,8 +326,7 @@ export class RagDB {
         title TEXT NOT NULL,
         summary TEXT NOT NULL,
         files_involved TEXT,
-        tags TEXT,
-        embedding BLOB
+        tags TEXT
       );
 
       CREATE INDEX IF NOT EXISTS idx_checkpoints_session ON conversation_checkpoints(session_id);

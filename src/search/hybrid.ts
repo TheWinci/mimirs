@@ -475,6 +475,7 @@ export async function searchChunks(
   hybridWeight: number = DEFAULT_HYBRID_WEIGHT,
   generatedPatterns: string[] = [],
   filter?: PathFilter,
+  parentGroupingMinCount: number = 2,
 ): Promise<ChunkResult[]> {
   const start = performance.now();
   const queryEmbedding = await embed(query);
@@ -534,8 +535,8 @@ export async function searchChunks(
     })
     .sort((a, b) => b.score - a.score);
 
-  // Parent grouping: if ≥2 sub-chunks from the same parent appear, consolidate
-  results = groupByParent(results, db);
+  // Parent grouping: if ≥minCount sub-chunks from the same parent appear, consolidate
+  results = groupByParent(results, db, parentGroupingMinCount);
 
   // Doc expansion
   results = expandForDocs(results, topK);

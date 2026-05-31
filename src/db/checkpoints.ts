@@ -16,10 +16,12 @@ export function createCheckpoint(
   let checkpointId = 0;
 
   const tx = db.transaction(() => {
+    // The embedding lives only in the vec_checkpoints virtual table below;
+    // the base table has no embedding column (matching the chunks/vec_chunks split).
     db.run(
       `INSERT INTO conversation_checkpoints
-       (session_id, turn_index, timestamp, type, title, summary, files_involved, tags, embedding)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (session_id, turn_index, timestamp, type, title, summary, files_involved, tags)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         sessionId,
         turnIndex,
@@ -29,7 +31,6 @@ export function createCheckpoint(
         summary,
         JSON.stringify(filesInvolved),
         JSON.stringify(tags),
-        null,
       ]
     );
 

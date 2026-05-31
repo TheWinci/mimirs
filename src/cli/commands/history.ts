@@ -1,10 +1,11 @@
 import { resolve } from "path";
 import { RagDB } from "../../db";
-import { loadConfig, applyEmbeddingConfig } from "../../config";
+import { loadConfig } from "../../config";
 import { indexGitHistory } from "../../git/indexer";
 import { embed } from "../../embeddings/embed";
 import { cliProgress, createQuietProgress } from "../progress";
 import { cli } from "../../utils/log";
+import { intFlag } from "../flags";
 
 export async function historyCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const subcommand = args[1];
@@ -38,8 +39,8 @@ async function historyIndexCommand(args: string[], getFlag: (flag: string) => st
   const verbose = args.includes("--verbose") || args.includes("-v");
   const since = getFlag("--since");
   const db = new RagDB(dir);
+  // Embedding config is applied by RagDB's constructor.
   const config = await loadConfig(dir);
-  applyEmbeddingConfig(config);
 
   const startTime = Date.now();
 
@@ -70,7 +71,7 @@ async function historySearchCommand(args: string[], getFlag: (flag: string) => s
   }
 
   const dir = resolve(getFlag("--dir") || ".");
-  const top = parseInt(getFlag("--top") || "10", 10);
+  const top = intFlag(getFlag("--top"), "--top", 10, { min: 1 });
   const author = getFlag("--author");
   const since = getFlag("--since");
   const db = new RagDB(dir);

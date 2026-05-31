@@ -148,6 +148,7 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
         config.hybridWeight,
         config.generated,
         filter,
+        config.parentGroupingMinCount,
       );
       const durationMs = Math.round(performance.now() - start);
       const { totalFiles } = ragDb.getStatus();
@@ -306,6 +307,8 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
         threshold ?? 0.3,
         config.hybridWeight,
         config.generated,
+        undefined,
+        config.parentGroupingMinCount,
       );
 
       if (chunks.length === 0) {
