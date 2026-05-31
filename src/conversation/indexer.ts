@@ -1,4 +1,6 @@
-import { watch, statSync } from "fs";
+import { watch, statSync, existsSync } from "fs";
+import { join, basename } from "path";
+import { Glob } from "bun";
 import { readJSONL, parseTurns, buildTurnText, type ParsedTurn } from "./parser";
 import { chunkText } from "../indexing/chunker";
 import { embedBatch } from "../embeddings/embed";
@@ -85,63 +87,147 @@ async function indexTurn(turn: ParsedTurn, db: RagDB): Promise<boolean> {
 }
 
 /**
- * Start tailing a JSONL file for live conversation indexing.
- * Watches for file changes and indexes new turns as they appear.
+ * Index one transcript file from the offset persisted in its session row.
+ *
+ * Reading the offset from the DB on every call (rather than trusting an
+ * in-memory cursor) makes repeated/overlapping calls safe: a pass that finds no
+ * new bytes returns 0 and re-reads the same offset next time, so it can never
+ * desync `turn_count` from stale local state. Returns the number of new turns.
  */
-export function startConversationTail(
-  jsonlPath: string,
-  sessionId: string,
+async function indexSessionFromStoredOffset(
   db: RagDB,
-  onEvent?: (msg: string) => void
-): Watcher {
-  let currentOffset = 0;
-  let currentTurnIndex = 0;
-  let pending: NodeJS.Timeout | null = null;
-
-  // Load existing state
+  jsonlPath: string,
+  onEvent?: (msg: string) => void,
+): Promise<number> {
+  if (!existsSync(jsonlPath)) return 0;
+  const sessionId = basename(jsonlPath).replace(/\.jsonl$/, "");
   const session = db.getSession(sessionId);
-  if (session) {
-    currentOffset = session.readOffset;
-    currentTurnIndex = session.turnCount;
+  const result = await indexConversation(
+    jsonlPath,
+    sessionId,
+    db,
+    session?.readOffset ?? 0,
+    session?.turnCount ?? 0,
+    onEvent,
+  );
+  if (result.turnsIndexed > 0) {
+    onEvent?.(`Conversation ${sessionId.slice(0, 8)}: ${result.turnsIndexed} new turns indexed`);
+  }
+  return result.turnsIndexed;
+}
+
+/**
+ * Index every transcript in a project's conversations folder from its stored
+ * offset. Idempotent — already-indexed files read from their saved offset, find
+ * no new bytes, and do nothing. Returns the total new turns indexed.
+ */
+export async function indexAllSessions(
+  transcriptsDir: string,
+  db: RagDB,
+  onEvent?: (msg: string) => void,
+): Promise<number> {
+  const files: string[] = [];
+  try {
+    for (const file of new Glob("*.jsonl").scanSync(transcriptsDir)) {
+      files.push(join(transcriptsDir, file));
+    }
+  } catch {
+    return 0; // folder doesn't exist yet
   }
 
-  async function processNewData() {
+  let total = 0;
+  for (const jsonlPath of files) {
     try {
-      const result = await indexConversation(
-        jsonlPath,
-        sessionId,
-        db,
-        currentOffset,
-        currentTurnIndex,
-        onEvent
-      );
-
-      if (result.turnsIndexed > 0) {
-        currentOffset = result.newOffset;
-        currentTurnIndex += result.turnsIndexed;
-        onEvent?.(`Conversation: ${result.turnsIndexed} new turns indexed (total: ${currentTurnIndex})`);
-      }
+      total += await indexSessionFromStoredOffset(db, jsonlPath, onEvent);
     } catch (err) {
-      onEvent?.(`Conversation index error: ${(err as Error).message}`);
+      onEvent?.(`Conversation index error (${basename(jsonlPath)}): ${(err as Error).message}`);
+    }
+  }
+  return total;
+}
+
+/**
+ * Watch a project's conversations folder and index every transcript live.
+ *
+ * Replaces the old single-file tail: on startup it backfills all existing
+ * sessions, then watches the folder so live sessions — and any session that
+ * starts later — get indexed as they grow. This is what lets one agent's
+ * findings become searchable to another in near real time.
+ *
+ * A single serial queue drains both the initial backfill and live file-change
+ * events, so two `indexConversation` runs never overlap (overlapping runs on
+ * one file could corrupt `turn_count`). The folder is flat, so a non-recursive
+ * `fs.watch` is enough and stays portable across platforms.
+ */
+export function startConversationFolderWatch(
+  transcriptsDir: string,
+  db: RagDB,
+  onEvent?: (msg: string) => void,
+): Watcher {
+  const pending = new Map<string, NodeJS.Timeout>();
+  const queue = new Set<string>();
+  let processing = false;
+
+  async function drain() {
+    if (processing) return;
+    processing = true;
+    try {
+      while (queue.size > 0) {
+        const batch = [...queue];
+        queue.clear();
+        for (const jsonlPath of batch) {
+          try {
+            await indexSessionFromStoredOffset(db, jsonlPath, onEvent);
+          } catch (err) {
+            onEvent?.(`Conversation index error (${basename(jsonlPath)}): ${(err as Error).message}`);
+          }
+        }
+      }
+    } finally {
+      processing = false;
     }
   }
 
-  const watcher = watch(jsonlPath, () => {
-    if (pending) clearTimeout(pending);
-    pending = setTimeout(() => {
-      pending = null;
-      processNewData();
-    }, TAIL_DEBOUNCE_MS);
-  });
+  // Initial backfill: enqueue every existing transcript through the same queue
+  // the watcher uses, so the backfill and any early live event stay serialized.
+  try {
+    for (const file of new Glob("*.jsonl").scanSync(transcriptsDir)) {
+      queue.add(join(transcriptsDir, file));
+    }
+  } catch {
+    // folder doesn't exist yet — the watch below will pick it up once created
+  }
+  drain();
 
-  // Do initial index
-  processNewData();
+  let fsWatcher: ReturnType<typeof watch> | null = null;
+  try {
+    fsWatcher = watch(transcriptsDir, (_event, filename) => {
+      if (!filename) return;
+      const name = filename.toString();
+      if (!name.endsWith(".jsonl")) return;
+      const jsonlPath = join(transcriptsDir, name);
 
-  onEvent?.(`Tailing conversation: ${jsonlPath}`);
+      const existing = pending.get(jsonlPath);
+      if (existing) clearTimeout(existing);
+      pending.set(
+        jsonlPath,
+        setTimeout(() => {
+          pending.delete(jsonlPath);
+          queue.add(jsonlPath);
+          drain();
+        }, TAIL_DEBOUNCE_MS),
+      );
+    });
+  } catch (err) {
+    onEvent?.(`Could not watch conversations folder ${transcriptsDir}: ${(err as Error).message}`);
+  }
+
+  onEvent?.(`Watching conversations: ${transcriptsDir}`);
   return {
     close() {
-      if (pending) { clearTimeout(pending); pending = null; }
-      watcher.close();
+      for (const timer of pending.values()) clearTimeout(timer);
+      pending.clear();
+      fsWatcher?.close();
     },
   };
 }

@@ -7,8 +7,8 @@ import { RagDB } from "../db";
 import { loadConfig } from "../config";
 import { indexDirectory } from "../indexing/indexer";
 import { startWatcher, type Watcher } from "../indexing/watcher";
-import { discoverSessions } from "../conversation/parser";
-import { indexConversation, startConversationTail } from "../conversation/indexer";
+import { getTranscriptsDir } from "../conversation/parser";
+import { startConversationFolderWatch } from "../conversation/indexer";
 import { ensureGitignore } from "../cli/setup";
 import { registerAllTools } from "../tools";
 import { log } from "../utils/log";
@@ -348,40 +348,18 @@ export async function startServer() {
       writeStatus(`error\nversion: ${version}\nfailed: ${new Date().toISOString()}\n${err instanceof Error ? err.message : err}`);
       log.warn(`Startup indexing failed: ${err instanceof Error ? err.message : err}`, "indexer");
     });
-    } // end if (indexLock)
-  }
-
-  // Start conversation tailing — find and tail the current session's JSONL
-  const sessions = discoverSessions(startupDir);
-  if (sessions.length > 0) {
-    // Tail the most recent session (likely the current one)
-    const currentSession = sessions[0];
-    log.debug(`Indexing conversation: ${currentSession.sessionId.slice(0, 8)}...`, "conversation");
-
-    convWatcher = startConversationTail(
-      currentSession.jsonlPath,
-      currentSession.sessionId,
+    // Watch the whole conversations folder and index every transcript from its
+    // stored offset — the live session plus any other session that changes or
+    // starts later. Backfills all existing sessions on startup, then keeps them
+    // current, so one agent's findings become searchable to another in near
+    // real time. Idempotent (insertTurn dedups; offsets advance by bytes read)
+    // and gated by the index lock so only one server instance writes.
+    convWatcher = startConversationFolderWatch(
+      getTranscriptsDir(startupDir),
       startupDb,
-      (msg) => log.debug(msg, "conversation")
+      (msg) => log.debug(msg, "conversation"),
     );
-
-    // Also index any older sessions that haven't been indexed yet
-    for (const session of sessions.slice(1)) {
-      const existing = startupDb.getSession(session.sessionId);
-      if (!existing || existing.mtime < session.mtime) {
-        indexConversation(
-          session.jsonlPath,
-          session.sessionId,
-          startupDb
-        ).then((result) => {
-          if (result.turnsIndexed > 0) {
-            log.debug(`Indexed past session ${session.sessionId.slice(0, 8)}...: ${result.turnsIndexed} turns`, "conversation");
-          }
-        }).catch((err) => {
-          log.warn(`Failed to index session ${session.sessionId.slice(0, 8)}: ${err instanceof Error ? err.message : err}`, "conversation");
-        });
-      }
-    }
+    } // end if (indexLock)
   }
 
 }

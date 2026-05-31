@@ -286,12 +286,21 @@ export interface SessionInfo {
 }
 
 /**
+ * Resolve the directory holding a project's conversation transcripts.
+ * Claude Code stores them in ~/.claude/projects/<encoded-path>/, where the
+ * encoded path is the absolute project dir with `/` replaced by `-`.
+ */
+export function getTranscriptsDir(projectDir: string): string {
+  const encoded = projectDir.replace(/\//g, "-");
+  return `${process.env.HOME}/.claude/projects/${encoded}`;
+}
+
+/**
  * Find all conversation JSONL files for a given project directory.
  * Claude Code stores transcripts in ~/.claude/projects/<encoded-path>/.
  */
 export function discoverSessions(projectDir: string): SessionInfo[] {
-  const encoded = projectDir.replace(/\//g, "-");
-  const claudeProjectDir = `${process.env.HOME}/.claude/projects/${encoded}`;
+  const claudeProjectDir = getTranscriptsDir(projectDir);
 
   const sessions: SessionInfo[] = [];
   const glob = new Glob("*.jsonl");
