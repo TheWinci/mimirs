@@ -195,6 +195,16 @@ async function gitOutput(projectDir: string, args: string[]): Promise<string | n
 // summarizer. Below it, the page is a surgical edit worth summarizing.
 const WIKI_WHOLESALE_RATIO = 0.3;
 
+// Backstops so a full (or near-full) regeneration never floods the changelog with
+// per-page diffs. When at least this fraction of all pages changed, treat it as a
+// full regen: list every changed page as refreshed and gather no diffs.
+const WIKI_FULL_REGEN_FRACTION = 0.6;
+
+// And regardless of page fraction, if the combined surgical diff would exceed this
+// many bytes it is too large to summarize, so those pages collapse to a refreshed
+// listing too. (The 50-page regen that motivated this produced ~640 KB of diff.)
+const WIKI_CHANGELOG_DIFF_MAX_BYTES = 32 * 1024;
+
 function slugFromWikiPath(path: string): string {
   return normalizePath(path).replace(/^wiki\//, "").replace(/\.md$/, "");
 }
@@ -202,15 +212,17 @@ function slugFromWikiPath(path: string): string {
 // The pending wiki page changes vs HEAD — run before committing an update.
 // Diffing the working tree needs no remembered baseline commit. Each modified
 // page is classified by churn: a surgical edit (a few lines → a real behavior
-// change) is summarizable; a wholesale rewrite is only listed. Only surgical
-// diffs are gathered, so a 50-page regen never produces a giant changelog input.
-// JSON state files and the changelog itself are excluded.
+// change) is summarizable; a wholesale rewrite is only listed. Two backstops keep
+// a full regen from flooding the changelog: when most pages changed, or when the
+// combined surgical diff is too large, every changed page collapses to a refreshed
+// listing with no diff. JSON state files and the changelog itself are excluded.
 async function pendingWikiChanges(projectDir: string): Promise<{
   surgical: { slug: string; churn: number }[];
   refreshed: string[];
   added: string[];
   removed: string[];
   total: number;
+  fullRegen: boolean;
   surgicalDiff: string;
 }> {
   const status = (await gitOutput(projectDir, ["status", "--porcelain", "--", "wiki"])) ?? "";
@@ -260,15 +272,29 @@ async function pendingWikiChanges(projectDir: string): Promise<{
       surgicalPaths.push(p.path);
     }
   }
-  surgical.sort((a, b) => a.slug.localeCompare(b.slug));
-  refreshed.sort();
+
+  // Full-regen backstop: when most pages changed, per-page diffs are dominated by
+  // rewording and gathering 30+ of them blows the changelog input past its size
+  // limit. Decide before spending a git diff on the surgical pages.
+  const changedCount = surgical.length + refreshed.length + added.length + removed.length;
+  const fullRegen = total > 0 && changedCount / total >= WIKI_FULL_REGEN_FRACTION;
 
   let surgicalDiff = "";
-  if (surgicalPaths.length) {
+  if (!fullRegen && surgicalPaths.length) {
     surgicalDiff = ((await gitOutput(projectDir, ["diff", "HEAD", "--", ...surgicalPaths])) ?? "").trim();
   }
 
-  return { surgical, refreshed, added, removed, total, surgicalDiff };
+  // Collapse surgical → refreshed for a full regen, or when the combined diff is too
+  // large to summarize; either way every changed page is reported as refreshed, no diff.
+  if (fullRegen || surgicalDiff.length > WIKI_CHANGELOG_DIFF_MAX_BYTES) {
+    for (const s of surgical) refreshed.push(s.slug);
+    surgical.length = 0;
+    surgicalDiff = "";
+  }
+  surgical.sort((a, b) => a.slug.localeCompare(b.slug));
+  refreshed.sort();
+
+  return { surgical, refreshed, added, removed, total, fullRegen, surgicalDiff };
 }
 
 function computePageRank(paths: string[], edges: { fromPath: string; toPath: string }[]): Map<string, number> {
@@ -1095,7 +1121,7 @@ export async function runWikiRebuild(ctx: WikiContext, input: string): Promise<s
     const currentFull = await lastCommitHash(ctx.projectDir);
     const currentCommit = currentFull ? currentFull.slice(0, 7) : "unknown";
     const date = new Date().toISOString().slice(0, 10);
-    const { surgical, refreshed, added, removed, surgicalDiff } = await pendingWikiChanges(ctx.projectDir);
+    const { surgical, refreshed, added, removed, total, fullRegen, surgicalDiff } = await pendingWikiChanges(ctx.projectDir);
     const totalChanged = surgical.length + refreshed.length + added.length + removed.length;
 
     const list = (slugs: string[]) => (slugs.length ? slugs.join(", ") : "none");
@@ -1105,6 +1131,7 @@ export async function runWikiRebuild(ctx: WikiContext, input: string): Promise<s
       "",
       `- Stamp: [${currentCommit}] - ${date}`,
       `- Pending wiki changes: ${totalChanged}`,
+      ...(fullRegen ? [`- Full regeneration: ${totalChanged} of ${total} pages rewritten`] : []),
       `- Surgical edits (summarize from the diffs below): ${list(surgical.map((s) => s.slug))}`,
       `- Refreshed wholesale (list only, do not summarize): ${list(refreshed)}`,
       `- New pages: ${list(added)}`,

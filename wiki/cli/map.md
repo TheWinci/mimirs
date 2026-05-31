@@ -14,9 +14,9 @@ database `src/cli/commands/map.ts:6-20`.
 
 ## What it produces
 
-Despite older help text describing a "Mermaid format", the renderer emits a
-structured, indented text report, not Mermaid. The header line states the level
-and a count, for example `## Project Map (file-level, 142 files)`, followed by
+Despite older help text describing a structured-text "graph", the renderer emits
+an indented text report, not Mermaid. The header line states the level and a
+count, for example `## Project Map (file-level, 142 files)`, followed by
 per-node blocks listing each file's exports, what it depends on, and what
 depends on it `src/graph/resolver.ts:266-309`. See
 [Branches and failure cases](#branches-and-failure-cases) for the stale help
@@ -139,9 +139,12 @@ from the focus file and, per hop, pulls every import edge where the focus side
 appears as either importer or importee, then folds the newly seen files into
 the next frontier until two hops are done `src/db/graph.ts:880-908`. After the
 walk it loads nodes and edges only for the visited file ids, batching queries to
-stay under SQLite's parameter limit `src/db/graph.ts:910-980`. The resulting
-neighborhood is then rendered with the same file-level or directory-level
-formatter as a full graph.
+stay under SQLite's parameter limit `src/db/graph.ts:910-981`. A prior version
+batched both edge endpoints with the same slice and silently dropped edges whose
+ends fell in different batches; the current code batches by `file_id` alone and
+filters the other end in JS against the visited set
+`src/db/graph.ts:944-978`. The resulting neighborhood is then rendered with the
+same file-level or directory-level formatter as a full graph.
 
 ## Branches and failure cases
 
@@ -149,7 +152,7 @@ formatter as a full graph.
 | --- | --- |
 | No `[dir]` arg | Defaults to the current working directory `src/cli/commands/map.ts:7`. |
 | `--focus` set, file found | Renders the two-hop neighborhood of that file `src/graph/resolver.ts:197-198`. |
-| `--focus` set, file not in index | The lookup returns nothing, the graph is set to empty, and the command prints `No files indexed or no dependencies found.` `src/graph/resolver.ts:199-211`. |
+| `--focus` set, file not in index | The lookup returns nothing, the graph is set to empty, and the command prints `No files indexed or no dependencies found.` `src/graph/resolver.ts:199-210`. |
 | No `--focus` | Loads and renders the whole stored graph `src/graph/resolver.ts:202-203`. |
 | Empty index / no resolved edges | Same empty message as above; the graph has zero nodes so the renderer returns the message before any formatting `src/graph/resolver.ts:206-211`. |
 | `--zoom directory` | Renders the directory-level report `src/graph/resolver.ts:220-221`. |
@@ -205,11 +208,12 @@ Illustrative file-level output (paths and counts are synthetic):
 
 ## Open questions
 
-The built-in usage text still advertises `mimirs map` as producing a graph in
-"(Mermaid format)" `src/cli/index.ts:48-49`, but `generateProjectMap` replaced
-Mermaid with the structured text format described above
-`src/graph/resolver.ts:176-179`. The help string is stale; the command emits
-indented text.
+The built-in usage text advertises `mimirs map` as generating a "project
+dependency graph (structured text)" `src/cli/index.ts:48-49`. That phrasing is
+current, but the doc comment on `generateProjectMap` still records that the
+format replaced an older Mermaid output `src/graph/resolver.ts:176-179` — worth
+knowing if you grep for "Mermaid" expecting this command to emit it. It does
+not; it emits indented text.
 
 ## Related
 

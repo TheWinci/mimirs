@@ -82,4 +82,49 @@ describe("wiki(changelog) — effect-based, per-page churn", () => {
     const out = await changelog(tempDir);
     expect(out).toContain("New pages: cli/fresh");
   });
+
+  test("full regeneration (most pages changed) → terse entry, no per-page diffs", async () => {
+    tempDir = await createTempDir();
+    seedWikiRepo(tempDir, 5);
+    // Edit 4 of 5 pages (80% ≥ 60% full-regen threshold). Each change is tiny (would
+    // be "surgical" on its own), but together they are a regen — no diffs gathered.
+    for (let i = 0; i < 4; i++) {
+      writeFileSync(join(tempDir, "wiki", "cli", `cmd${i}.md`), PAGE(i).replace("Line C", `Line C edit ${i}`));
+    }
+    const out = await changelog(tempDir);
+    expect(out).toContain("Full regeneration: 4 of 5 pages rewritten");
+    expect(out).toContain("Surgical edits (summarize from the diffs below): none");
+    expect(out).toContain("Refreshed wholesale (list only, do not summarize): cli/cmd0, cli/cmd1, cli/cmd2, cli/cmd3");
+    expect(out).not.toContain("### Surgical page diffs");
+  });
+
+  // A single low-churn page whose diff is huge in absolute size: under the 30% churn
+  // bar (so "surgical") and only 1 of 3 pages (so not a full regen), yet its diff alone
+  // exceeds the 32 KB changelog cap → it collapses to a refreshed listing.
+  const bigLines = (variant: string) =>
+    Array.from({ length: 2000 }, (_, i) => `line ${i} ${variant} ${"x".repeat(30)}`).join("\n") + "\n";
+
+  test("oversized surgical diff → collapses to refreshed (byte cap)", async () => {
+    tempDir = await createTempDir();
+    git(tempDir, "init", "-q");
+    git(tempDir, "config", "user.email", "t@t.t");
+    git(tempDir, "config", "user.name", "t");
+    mkdirSync(join(tempDir, "wiki", "cli"), { recursive: true });
+    writeFileSync(join(tempDir, "wiki", "cli", "big.md"), bigLines("orig"));
+    writeFileSync(join(tempDir, "wiki", "cli", "small1.md"), PAGE(1));
+    writeFileSync(join(tempDir, "wiki", "cli", "small2.md"), PAGE(2));
+    git(tempDir, "add", "-A");
+    git(tempDir, "commit", "-qm", "seed");
+    // Edit 500 of 2000 lines on the big page only: 25% churn (surgical), 1/3 pages
+    // (not a full regen), but the diff is ~50 KB > the 32 KB cap.
+    const edited = bigLines("orig").split("\n");
+    for (let i = 0; i < 500; i++) edited[i] = `line ${i} EDITED ${"x".repeat(30)}`;
+    writeFileSync(join(tempDir, "wiki", "cli", "big.md"), edited.join("\n"));
+
+    const out = await changelog(tempDir);
+    expect(out).toContain("Refreshed wholesale (list only, do not summarize): cli/big");
+    expect(out).toContain("Surgical edits (summarize from the diffs below): none");
+    expect(out).not.toContain("- Full regeneration:"); // signal bullet absent (1/3 pages, not a regen)
+    expect(out).not.toContain("### Surgical page diffs");
+  });
 });

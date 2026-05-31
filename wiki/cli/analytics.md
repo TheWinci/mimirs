@@ -11,9 +11,8 @@ the same length.
 It is a read-only command. It opens the index database, runs a handful of
 aggregate queries, prints the report to stdout, and closes the database. It
 never writes to the log itself. The rows it reads are produced as a side effect
-of running searches — see [cli/search](search.md) and
-[cli/read](read.md), which both call into the same hybrid search path that
-records each query.
+of running searches — see [search](search.md) and [read](read.md), which both
+call into the same hybrid search path that records each query.
 
 The most common reason to run it is to find documentation or indexing gaps: a
 query that consistently returns zero results, or returns only low-relevance
@@ -46,9 +45,9 @@ The table is created on database open if it does not already exist —
 | `duration_ms` | INTEGER | Search latency in milliseconds |
 | `created_at` | TEXT | ISO timestamp the row was written |
 
-The `analytics` command only reads `query`, `result_count`, `top_score`, and
-`created_at`. The `top_path` and `duration_ms` columns are stored but not shown
-in this report.
+The `analytics` command only surfaces `query`, `result_count`, `top_score`, and
+`created_at`. The `top_path` and `duration_ms` columns are stored but never
+shown in this report.
 
 ## What the command does
 
@@ -68,8 +67,8 @@ sequenceDiagram
     Handler->>Handler: resolve dir, parse --days (default 30)
     Handler->>DB: new RagDB(dir) (opens index.db)
     Handler->>DB: getAnalytics(days)
-    DB->>Log: 6 aggregate SELECTs since now - days
-    Log-->>DB: totals, averages, top/zero/low lists
+    DB->>Log: 7 aggregate SELECTs since now - days
+    Log-->>DB: totals, averages, top/zero/low lists, per-day counts
     DB-->>Handler: analytics object
     Handler->>Handler: compute zero-result rate, print summary + lists
     Handler->>DB: getAnalyticsTrend(days)
@@ -91,15 +90,16 @@ sequenceDiagram
    and rejects non-integer or sub-1 values — `src/cli/commands/analytics.ts:8`.
 4. It opens the index database for that directory by constructing a `RagDB`,
    which opens `index.db` and ensures the schema (including `query_log`) exists
-   — `src/db/index.ts:134`, `src/cli/commands/analytics.ts:9`.
-5. It calls `getAnalytics(days)`, which runs six aggregate SQL queries over rows
-   newer than `now - days` and returns a single object — `src/db/analytics.ts:10`.
+   — `src/db/index.ts:94`, `src/cli/commands/analytics.ts:9`.
+5. It calls `getAnalytics(days)`, which runs seven aggregate SQL queries over
+   rows newer than `now - days` and returns a single object —
+   `src/db/analytics.ts:10`.
 6. The handler computes the zero-result rate from the returned zero-result list
    and prints the summary block, then prints the three optional lists when they
    are non-empty — `src/cli/commands/analytics.ts:12-42`.
 7. It calls `getAnalyticsTrend(days)` to compare the current window against the
-   immediately preceding window of the same length — `src/cli/commands/analytics.ts:45`,
-   `src/db/analytics.ts:69`.
+   immediately preceding window of the same length —
+   `src/cli/commands/analytics.ts:45`, `src/db/analytics.ts:69`.
 8. If either window saw any queries, it prints the trend block with signed
    deltas — `src/cli/commands/analytics.ts:46-57`.
 9. It closes the database and returns. All output has already gone to stdout
@@ -116,22 +116,30 @@ stored as an ISO 8601 string and the cutoff is also an ISO string, the
 comparison is a lexicographic string compare that happens to be chronologically
 correct for this format.
 
-The six reads behind the summary are — `src/db/analytics.ts:21-56`:
+`getAnalytics` runs seven reads over that window — `src/db/analytics.ts:21-56`.
+Six of them feed the report; the seventh is computed and returned but never
+printed by this command:
 
-| Reported field | Source query |
-| --- | --- |
-| `totalQueries` | `COUNT(*)` of all logged queries in the window |
-| `avgResultCount` | `AVG(result_count)`, coalesced to `0` when there are no rows |
-| `avgTopScore` | `AVG(top_score)` over rows where `top_score` is not null (stays `null` if none) |
-| `zeroResultQueries` | Top 10 queries grouped by text where `result_count = 0`, by frequency |
-| `lowScoreQueries` | Top 10 lowest-scoring queries where `top_score < 0.3` |
-| `topSearchedTerms` | Top 10 queries grouped by text, by frequency |
+| Returned field | Source query | Shown? |
+| --- | --- | --- |
+| `totalQueries` | `COUNT(*)` of all logged queries in the window | yes |
+| `avgResultCount` | `AVG(result_count)`, coalesced to `0` when there are no rows | yes |
+| `avgTopScore` | `AVG(top_score)` over rows where `top_score` is not null (stays `null` if none) | yes |
+| `zeroResultQueries` | Top 10 queries grouped by text where `result_count = 0`, by frequency | yes |
+| `lowScoreQueries` | Up to 10 lowest-scoring queries where `top_score < 0.3` | yes |
+| `topSearchedTerms` | Top 10 queries grouped by text, by frequency | yes |
+| `queriesPerDay` | Per-day counts (`substr(created_at,1,10)` grouped by date) | no |
+
+The `queriesPerDay` series is part of the returned object — `src/db/analytics.ts:52-56`
+— but the `analytics` handler never reads it, so it is invisible at the CLI. The
+[search_analytics](../tools/search-analytics.md) MCP tool, which calls the same
+`getAnalytics`, is where that per-day breakdown can surface.
 
 ## The printed report
 
 The handler always prints a five-line summary, then up to three optional list
 sections, then an optional trend block. Output goes through the CLI logger,
-which writes plain lines to stdout with no `[mimirs]` prefix —
+which writes plain lines to stdout via `console.log` with no `[mimirs]` prefix —
 `src/utils/log.ts:49-53`.
 
 The summary header reflects the window (`Search analytics (last 30 days):`) and
@@ -156,7 +164,7 @@ non-empty:
 - **Zero-result queries** — frequent searches that returned nothing, labeled as
   topics worth indexing — `src/cli/commands/analytics.ts:30-35`.
 - **Low-relevance queries** — searches whose best match scored below `0.3`,
-  shown with that score — `src/cli/commands/analytics.ts:37-42`.
+  shown with that score to two decimals — `src/cli/commands/analytics.ts:37-42`.
 
 ## Trend comparison vs the prior period
 
@@ -165,17 +173,18 @@ window to the window immediately before it. `getAnalyticsTrend(days)` computes
 two start timestamps — `now - days` for the current window and `now - 2 * days`
 for the previous window — and counts queries in each — `src/db/analytics.ts:74-104`.
 
-It uses a helper that runs three counts per window (total queries, average top
-score, and a zero-result count it converts into a rate) bounded by a `since` and
-an `until` timestamp — `src/db/analytics.ts:78-100`. The current window runs
-from `now - days` up to a sentinel far-future timestamp
+It uses a local `getCounts` helper that runs three counts per window (total
+queries, average top score, and a zero-result count it converts into a rate)
+bounded by a `since` and an `until` timestamp — `src/db/analytics.ts:78-100`.
+The current window runs from `now - days` up to a sentinel far-future timestamp
 (`9999-12-31T23:59:59.999Z`), and the previous window runs from `now - 2*days`
 up to `now - days`, so the two windows are adjacent and non-overlapping —
 `src/db/analytics.ts:102-104`.
 
 The returned `delta` is current minus previous for each metric. The query delta
 is an integer; the average-top-score delta is `null` when either window had no
-scored query; the zero-result-rate delta is a fraction — `src/db/analytics.ts:106-113`.
+scored query; the zero-result-rate delta is a fraction —
+`src/db/analytics.ts:106-113`.
 
 The handler prints the trend block only when at least one of the two windows
 actually saw queries — otherwise there is nothing useful to compare and the
@@ -188,11 +197,11 @@ queries), and otherwise shows the current average with a signed two-decimal
 change — `src/cli/commands/analytics.ts:53-55`.
 
 Note the default arguments differ between the two functions: `getAnalytics`
-defaults to `30` days and `getAnalyticsTrend` defaults to `7`, but this command
-passes the same parsed `days` value into both, so the trend window always
-matches the summary window the user asked for — `src/db/analytics.ts:10`,
-`src/db/analytics.ts:69`, `src/cli/commands/analytics.ts:10`,
-`src/cli/commands/analytics.ts:45`.
+defaults to `30` days and `getAnalyticsTrend` defaults to `7` —
+`src/db/analytics.ts:10`, `src/db/analytics.ts:69`. The command never relies on
+those defaults: it passes the same parsed `days` value into both, so the trend
+window always matches the summary window the user asked for —
+`src/cli/commands/analytics.ts:10`, `src/cli/commands/analytics.ts:45`.
 
 ## Inputs
 

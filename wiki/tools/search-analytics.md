@@ -2,7 +2,7 @@
 
 `search_analytics` is a read-only MCP tool that summarizes how search has been used on a project over a recent window of time. It answers questions like: how many searches ran, how good the results were on average, which terms get searched most, and — most usefully — which queries returned nothing or returned only weak matches. Those last two lists are the point of the tool: they expose gaps in the index or in the documentation, so an agent or maintainer knows what topics to write about or re-index next.
 
-Every search the project runs is logged. `search_analytics` reads back that log, aggregates it over a look-back window, and renders a plain-text report. It writes nothing — it is purely a reporting view over the `query_log` table.
+Every search the project runs is logged. `search_analytics` reads that log back, aggregates it over a look-back window, and renders a plain-text report. It writes nothing — it is purely a reporting view over the `query_log` table.
 
 ## Where the data comes from
 
@@ -11,13 +11,13 @@ The report only has anything to show because the two main search flows record ea
 - `search` (full-file ranking) logs its query at `src/search/hybrid.ts:388`.
 - `read_relevant` (chunk ranking) logs its query at `src/search/hybrid.ts:546`.
 
-Each call records the query string, how many results came back, the top result's score (or `null` when there were no results), the top result's path, and how long the search took in milliseconds (`src/db/analytics.ts:3-8`). Those columns land in the `query_log` table, whose schema is `id`, `query`, `result_count`, `top_score`, `top_path`, `duration_ms`, and an ISO-8601 `created_at` timestamp (`src/db/index.ts:340-348`). The `created_at` string is what the look-back window filters on, and `result_count = 0` plus `top_score < 0.3` are the two conditions that feed the zero-result and low-relevance lists.
+Both call sites record the same five values: the query string, how many results came back (`results.length`), the top result's score (`results[0]?.score ?? null`, which is `null` when there were no results), the top result's path, and how long the search took in milliseconds (`src/search/hybrid.ts:388-394`). The writer inserts those into a row alongside an ISO-8601 `created_at` timestamp (`src/db/analytics.ts:3-8`). The columns land in the `query_log` table, whose schema is `id`, `query`, `result_count`, `top_score`, `top_path`, `duration_ms`, and `created_at` (`src/db/index.ts:340-348`). The `created_at` string is what the look-back window filters on, and `result_count = 0` plus `top_score < 0.3` are the two conditions that feed the zero-result and low-relevance lists.
 
 ## What the tool does
 
-When the tool is invoked it resolves the project directory, opens that project's database, and asks for an analytics summary over the requested number of days. The summary is returned as a single structured object; the tool then turns that object into a human-readable block of text and returns it as the tool's text content (`src/tools/analytics-tools.ts:23-58`).
+When the tool is invoked it resolves the project directory, opens that project's database, and asks for an analytics summary over the requested number of days. The summary comes back as a single structured object; the tool then turns that object into a human-readable block of text and returns it as the tool's text content (`src/tools/analytics-tools.ts:23-58`).
 
-The actual aggregation happens in the database layer. The tool calls the `getAnalytics` wrapper method on the project's database object, which delegates to the analytics query function (`src/db/index.ts:886-888`). That function computes a start timestamp `days` ago and runs a handful of SQL queries against `query_log`, all scoped to rows at or after that timestamp (`src/db/analytics.ts:19-56`):
+The actual aggregation happens in the database layer. The tool calls the `getAnalytics` wrapper method on the project's database object, which delegates to the standalone analytics query function with the live SQLite connection (`src/db/index.ts:886-888`). That function computes a start timestamp `days` ago and runs a handful of SQL queries against `query_log`, all scoped to rows at or after that timestamp (`src/db/analytics.ts:19-56`):
 
 - **Total queries** — a `COUNT(*)` of rows in the window.
 - **Average result count** — `AVG(result_count)`, defaulting to `0` when there are no rows.
@@ -26,7 +26,7 @@ The actual aggregation happens in the database layer. The tool calls the `getAna
 - **Zero-result queries** — the ten most frequent queries whose `result_count` was `0`, grouped by query and ordered by count.
 - **Low-relevance queries** — up to ten queries whose best result scored below `0.3`, ordered by the worst score first.
 
-The query function also computes a per-day breakdown (`queriesPerDay`), but `search_analytics` does not render it — that field is consumed elsewhere (the `analytics` CLI command uses it for a sparkline). The tool only formats the totals and the three lists.
+The query function also computes a per-day breakdown (`queriesPerDay`), but `search_analytics` does not render it — that field is consumed elsewhere (the [`analytics` CLI command](../cli/analytics.md) uses it for a trend view). The tool only formats the totals and the three lists.
 
 ```mermaid
 sequenceDiagram
@@ -34,17 +34,17 @@ sequenceDiagram
     participant Agent as MCP client
     participant Tool as search_analytics
     participant DB as RagDB
-    participant Analytics as getAnalytics (query)
+    participant Query as getAnalytics (query)
     participant Log as query_log table
 
     Agent->>Tool: call with { directory?, days? }
     Tool->>DB: resolveProject(directory) -> open db
     Tool->>DB: getAnalytics(days)
-    DB->>Analytics: getAnalytics(db, days)
-    Analytics->>Analytics: compute since = now - days
-    Analytics->>Log: COUNT, AVG, top terms,<br>zero-result, low-score (all >= since)
-    Log-->>Analytics: aggregated rows
-    Analytics-->>DB: summary object
+    DB->>Query: getAnalytics(db, days)
+    Query->>Query: since = now - days * 86400000
+    Query->>Log: COUNT, AVG, top terms,<br>zero-result, low-score (all >= since)
+    Log-->>Query: aggregated rows
+    Query-->>DB: summary object
     DB-->>Tool: summary object
     Tool->>Tool: build report lines
     Tool-->>Agent: text content
@@ -79,11 +79,13 @@ sequenceDiagram
 The header line names the window (`Search analytics (last N days):`) and is followed by four aligned summary rows (`src/tools/analytics-tools.ts:27-33`):
 
 - **Total queries** — printed as-is.
-- **Avg results** — fixed to one decimal place.
-- **Avg top score** — fixed to two decimals, or the literal `n/a` when no scored query exists in the window.
-- **Zero-result rate** — computed in the tool, not the database: it sums the counts of the zero-result query groups and divides by total queries, shown as a whole-number percent. When there were no queries at all it prints `0%` to avoid dividing by zero (`src/tools/analytics-tools.ts:32`).
+- **Avg results** — fixed to one decimal place via `toFixed(1)`.
+- **Avg top score** — fixed to two decimals, or the literal `n/a` when no scored query exists in the window (`analytics.avgTopScore?.toFixed(2) ?? "n/a"`).
+- **Zero-result rate** — computed in the tool, not the database. It sums the counts of the zero-result query groups and divides by total queries, shown as a whole-number percent. When there were no queries at all it prints `0%` to avoid dividing by zero (`src/tools/analytics-tools.ts:32`).
 
 Then up to three labelled lists follow, each rendered only if it has at least one entry. Top searches and zero-result queries show the query and a count with a `×` suffix; low-relevance queries show the query and its top score to two decimals (`src/tools/analytics-tools.ts:35-54`).
+
+One subtlety in the zero-result rate: it is derived from `zeroResultQueries`, which is capped at the ten most frequent zero-result groups by SQL. If more than ten distinct queries returned nothing, the summed count understates the true number of zero-result rows, so the displayed rate is a lower bound rather than an exact percentage (`src/db/analytics.ts:33-37`, `src/tools/analytics-tools.ts:32`).
 
 ## Branches and failure cases
 
@@ -91,19 +93,19 @@ Then up to three labelled lists follow, each rendered only if it has at least on
 - **Empty window (no queries logged).** When nothing has been searched in the window, total queries is `0`, average results is `0.0`, and average top score is `n/a`. The zero-result-rate guard prints `0%` instead of dividing by zero. All three lists are empty, so none of their sections are emitted — the report is just the header and four summary rows (`src/tools/analytics-tools.ts:29-33`).
 - **Some queries but no scored ones.** Average top score stays `null` and renders as `n/a` because the average ignores rows with a null `top_score` (`src/db/analytics.ts:29-31`).
 - **Empty list sections are skipped.** Each of "Top searches", "Zero-result queries", and "Low-relevance queries" is gated on its array being non-empty, so a healthy project with no zero-result or low-score queries simply omits those sections (`src/tools/analytics-tools.ts:35-54`).
-- **`days` out of range.** The schema rejects non-integers, values below `1`, and values above `365` before the tool body runs; the caller gets a validation error rather than a report (`src/tools/analytics-tools.ts:14-21`).
+- **`days` out of range.** The Zod schema rejects non-integers, values below `1`, and values above `365` before the tool body runs; the caller gets a validation error rather than a report (`src/tools/analytics-tools.ts:14-21`).
 - **List caps.** Each of the three lists is capped at ten entries by `LIMIT 10` in SQL, so the report never grows unbounded regardless of how many distinct queries were logged (`src/db/analytics.ts:35-50`).
 
 ## How it differs from the analytics CLI command
 
-The same aggregation backs the `analytics` CLI command, but the two presentations differ:
+The same aggregation backs the [`analytics` CLI command](../cli/analytics.md), but the two presentations differ:
 
-| | `search_analytics` (this tool) | [`analytics` CLI](../cli/analytics.md) |
+| | `search_analytics` (this tool) | `analytics` CLI |
 | --- | --- | --- |
 | Caller | MCP client / agent | Terminal user |
 | Window source | `days` argument (default 30) | `--days` flag |
 | Output | Text content in a tool response | Printed to stdout |
-| Per-day trend | Not rendered | Rendered (uses `queriesPerDay`) |
+| Per-day trend | Not rendered | Rendered (uses `queriesPerDay` and `getAnalyticsTrend`) |
 
 Both ultimately call the same `getAnalytics` query function, so the numbers agree; only the rendering and the extra trend section differ.
 

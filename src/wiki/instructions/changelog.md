@@ -12,6 +12,8 @@ changelog, not a copy of the project's source changelog. Work only from the
 - **Refreshed wholesale** — pages rewritten end to end (reword, restructure,
   diagram swap). Their content is NOT included; do not try to summarize it.
 - **New pages** / **Removed pages** — pages added or deleted this update.
+- **Full regeneration** — a `Full regeneration:` line means most or all pages were
+  rewritten at once; write the terse one-line entry described below, not per-page detail.
 
 ## Decide what to write
 
@@ -33,12 +35,17 @@ Build the entry from these parts, omitting any that do not apply:
   `Refreshed from current source with no notable behavior change: <slugs>`. Do not
   invent behavior changes for these — you do not have their diffs.
 
-If the only changes are wholesale refreshes (no surgical edits, no new or removed
-pages), write just that one refreshed line — that is the terse full- or
-partial-regeneration entry.
+- **Full regeneration** → when the signal has a `Full regeneration:` line, do not
+  enumerate pages. Write a single `### Changed` bullet: `Regenerated all N pages from
+  current source.` (use the page count from that line), and nothing else.
 
-Close with one italic line naming every changed page:
-`_Pages updated: <comma-separated slugs>_`.
+If the only changes are wholesale refreshes (no surgical edits, no new or removed
+pages) and it is not a full regeneration, write just that one refreshed line — that
+is the terse partial-regeneration entry.
+
+Close with one italic line naming the changed pages:
+`_Pages updated: <comma-separated slugs>_` — or `_Pages updated: all N pages_` for a
+full regeneration.
 
 Keep it tight and factual. No marketing language.
 

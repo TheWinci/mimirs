@@ -18,8 +18,8 @@ sequenceDiagram
 
     User->>CLI: mimirs remove <file> [dir]
     CLI->>Handler: removeCommand(args)
-    Handler->>Handler: require <file>, else exit 1
-    Handler->>Handler: resolve(dir), resolve(file)
+    Handler->>Handler: require args[1], else exit 1
+    Handler->>Handler: resolve(dir), resolve(dir, file)
     Handler->>Store: new RagDB(dir).removeFile(absPath)
     Store->>Files: removeFile(db, absPath)
     Files->>SQLite: getFileByPath(normalized) — exists?
@@ -37,14 +37,14 @@ sequenceDiagram
     Handler->>Store: db.close()
 ```
 
-1. The CLI entrypoint reads the raw process arguments once at module load — `args` is `process.argv.slice(2)` and the first element becomes `command` (`src/cli/index.ts:25-26`). When `command` is `remove`, the dispatcher calls `removeCommand(args)` (`src/cli/index.ts:127-129`).
+1. The CLI entrypoint reads the raw process arguments once at module load — `args` is `process.argv.slice(2)` and the first element becomes `command` (`src/cli/index.ts:25-26`). When `command` is `remove`, the dispatcher awaits `removeCommand(args)` (`src/cli/index.ts:127-129`).
 2. The handler treats `args[1]` as the file to remove. If it is missing, the handler prints a usage line and exits with status `1` (`src/cli/commands/remove.ts:6-10`). This is the only argument it validates.
-3. The handler resolves the project directory and the target file to absolute paths. `args[2]` is treated as the optional directory only when it exists and does not start with `--`; otherwise the directory defaults to `.` (the current working directory). Both the directory and the file are passed through Node's `resolve()` (`src/cli/commands/remove.ts:11`, `src/cli/commands/remove.ts:13`).
-4. The handler opens the index for that directory by constructing a `RagDB` and calls its `removeFile` method with the resolved absolute file path (`src/cli/commands/remove.ts:12-13`). `RagDB.removeFile` is a thin pass-through to the file-operations module (`src/db/index.ts:622-624`).
+3. The handler resolves the project directory and the target file to absolute paths. `args[2]` is treated as the optional directory only when it exists and does not start with `--`; otherwise the directory defaults to `.` (the current working directory). The directory is run through Node's `resolve()`, and the file is resolved *relative to that directory* with `resolve(dir, file)` (`src/cli/commands/remove.ts:11`, `src/cli/commands/remove.ts:15`).
+4. The handler opens the index for that directory by constructing a `RagDB` and calls its `removeFile` method with the resolved absolute file path (`src/cli/commands/remove.ts:12`, `src/cli/commands/remove.ts:15`). `RagDB.removeFile` is a thin pass-through to the file-operations module (`src/db/index.ts:622-624`).
 5. The store-level `removeFile` first looks the file up by path. It normalizes the path to forward slashes and queries the `files` table; if no row matches, it returns `false` immediately and nothing is deleted (`src/db/files.ts:251-253`).
 6. When the row exists, all deletes run inside one transaction. Deleting the file's `chunks` rows fires two SQLite triggers that remove the matching full-text and vector entries; `clearFileGraph` removes the dependency-graph rows; and finally the `files` row itself is deleted (`src/db/files.ts:255-264`).
-7. The handler turns the boolean result into a one-line message: `Removed <file>` when a row was deleted, or `<file> was not in the index` when nothing matched (`src/cli/commands/remove.ts:14`). The original (unresolved) argument string is echoed back, not the absolute path.
-8. The handler closes the database handle before returning (`src/cli/commands/remove.ts:15`). There is no explicit success exit code, so a normal run exits `0`.
+7. The handler turns the boolean result into a one-line message: `Removed <file>` when a row was deleted, or `<file> was not in the index` when nothing matched (`src/cli/commands/remove.ts:16`). The original (unresolved) argument string is echoed back, not the absolute path.
+8. The handler closes the database handle before returning (`src/cli/commands/remove.ts:17`). There is no explicit success exit code, so a normal run exits `0`.
 
 ## Looking the file up by path
 
@@ -52,11 +52,11 @@ The index stores every file under a canonical, forward-slash path. Before decidi
 
 The lookup returns a `StoredFile` (its `id`, `path`, `hash`, and `indexedAt`) or `null` (`src/db/types.ts:13-18`). Only the `id` is used afterward — every cascade delete keys off `file_id`, not the path.
 
-A consequence worth knowing: the path you pass must resolve to the *exact* absolute path that was indexed. The CLI applies `resolve(file)` relative to the process working directory, not relative to the `[dir]` argument, so running `mimirs remove src/foo.ts ../other-project` resolves `src/foo.ts` against your current shell directory while opening the index in `../other-project`. If those disagree, the lookup misses and you get the "not in the index" message even though the file is indexed under its real absolute path.
+A consequence worth knowing: the path you pass must resolve to the *exact* absolute path that was indexed. Because the file is resolved with `resolve(dir, file)`, a relative `<file>` is interpreted relative to `[dir]`, not the shell's working directory. The inline comment spells out why: the index stores absolute paths rooted at `dir`, so resolving against cwd would miss whenever `dir` differs from where you run the command (`src/cli/commands/remove.ts:13-15`). An *absolute* `<file>` is used as-is, since `resolve` ignores the base when the second argument is already absolute. If the resolved path still does not match a stored row, the lookup misses and you get the "not in the index" message even though the file is indexed under some other absolute path.
 
 ## What gets deleted, and how
 
-Foreign keys are declared in the schema (for example `chunks.file_id ... REFERENCES files(id) ON DELETE CASCADE`), but the database never enables `PRAGMA foreign_keys`, so those `ON DELETE CASCADE` clauses never fire (`src/db/index.ts:130-139`, `src/db/index.ts:181`). Deleting the `files` row alone would therefore leave orphaned chunks, vectors, FTS entries, and graph rows behind. `removeFile` compensates by deleting from `chunks` and the graph tables explicitly, in a deliberate order, all wrapped in a single `db.transaction(...)` so a failure mid-way rolls the whole thing back (`src/db/files.ts:255-264`).
+Foreign keys are declared in the schema (for example `chunks.file_id ... REFERENCES files(id) ON DELETE CASCADE`), but the database never enables `PRAGMA foreign_keys`, so those `ON DELETE CASCADE` clauses never fire (`src/db/index.ts:179-189`, `src/db/graph.ts:764`). Deleting the `files` row alone would therefore leave orphaned chunks, vectors, FTS entries, and graph rows behind. `removeFile` compensates by deleting from `chunks` and the graph tables explicitly, in a deliberate order, all wrapped in a single `db.transaction(...)` so a failure mid-way rolls the whole thing back (`src/db/files.ts:255-264`).
 
 Three layers of derived data are removed:
 
@@ -67,9 +67,9 @@ Three layers of derived data are removed:
 | Vector embeddings | `vec_chunks` | The `chunks_vec_ad` AFTER-DELETE trigger deletes the row whose `chunk_id` matches each removed chunk (`src/db/index.ts:218-220`) |
 | Dependency graph | `symbol_refs`, `file_exports`, `file_imports` | `clearFileGraph(db, fileId)` (`src/db/files.ts:259`, `src/db/graph.ts:777-795`) |
 
-The two FTS/vector triggers matter because `fts_chunks` is a contentless FTS5 table and `vec_chunks` is a `vec0` virtual table — neither can be an FK child, so a cascade could never reach them even if foreign keys were on. The triggers fire on *any* delete from `chunks`, which is exactly why `removeFile` only has to delete the chunk rows and the embeddings and search rows follow automatically (`src/db/index.ts:213-220`).
+The two FTS/vector triggers matter because `fts_chunks` is a contentless FTS5 table and `vec_chunks` is a `vec0` virtual table — neither can be an FK child, so a cascade could never reach them even if foreign keys were on. The triggers fire on *any* delete from `chunks`, which is exactly why `removeFile` only has to delete the chunk rows and the search and embedding rows follow automatically (`src/db/index.ts:213-220`).
 
-`clearFileGraph` does more than delete the file's own graph rows. The dependency graph also stores cross-file pointers in *other* files — `symbol_refs.resolved_export_id` pointing at this file's exports, and `file_imports.resolved_file_id` pointing at this file. Because foreign keys are off, the schema's `ON DELETE SET NULL` on those pointers never fires either. So `clearFileGraph` first nulls those inbound pointers in other files, and only then deletes this file's `symbol_refs`, `file_exports`, and `file_imports` rows (`src/db/graph.ts:777-795`). Skipping this would corrupt `depends_on`, `depended_on_by`, and `find_usages` results for files that referenced the removed file.
+`clearFileGraph` does more than delete the file's own graph rows. The dependency graph also stores cross-file pointers in *other* files — `symbol_refs.resolved_export_id` pointing at this file's exports, and `file_imports.resolved_file_id` pointing at this file. Because foreign keys are off, the schema's `ON DELETE SET NULL` on those pointers never fires either. So `clearFileGraph` first nulls those inbound pointers in other files, and only then deletes this file's `symbol_refs`, `file_exports`, and `file_imports` rows (`src/db/graph.ts:777-795`). Skipping this would corrupt [depends_on](../tools/depends-on.md), [depended_on_by](../tools/depended-on-by.md), and [find_usages](../tools/find-usages.md) results for files that referenced the removed file (`src/db/graph.ts:769-771`).
 
 ## State changes
 
@@ -86,24 +86,24 @@ All of these happen inside one transaction, so the file is either fully removed 
 ## Branches and failure cases
 
 - **Missing file argument.** If `args[1]` is absent, the handler prints `Usage: mimirs remove <file> [dir]` and exits with code `1` before opening any database (`src/cli/commands/remove.ts:7-10`).
-- **File not in the index.** `getFileByPath` returns `null`, `removeFile` returns `false` without running the transaction, and the handler prints `<file> was not in the index` (`src/db/files.ts:252-253`, `src/cli/commands/remove.ts:14`). This is not an error: the process still exits `0`.
-- **File present.** The transaction runs and `removeFile` returns `true`, producing `Removed <file>` (`src/db/files.ts:264`, `src/cli/commands/remove.ts:14`).
+- **File not in the index.** `getFileByPath` returns `null`, `removeFile` returns `false` without running the transaction, and the handler prints `<file> was not in the index` (`src/db/files.ts:252-253`, `src/cli/commands/remove.ts:16`). This is not an error: the process still exits `0`.
+- **File present.** The transaction runs and `removeFile` returns `true`, producing `Removed <file>` (`src/db/files.ts:264`, `src/cli/commands/remove.ts:16`).
 - **Optional directory parsing.** A second positional argument is used as the project directory only when it is present and not a flag (`!args[2].startsWith("--")`); otherwise the directory falls back to `.` (`src/cli/commands/remove.ts:11`). The command does not parse any flags of its own.
-- **No flag errors.** Unlike commands that read numeric flags, `remove` does not call the flag parser, so it never throws the flag-error handled in `main` (`src/cli/index.ts:97-100`).
+- **No flag errors.** Unlike commands that read numeric flags, `remove` does not call the flag parser, so it never throws the `CliFlagError` handled in `main` (`src/cli/index.ts:97-100`).
 - **Transaction safety.** All deletes are wrapped in `db.transaction(...)`; if any statement throws, SQLite rolls back and no partial deletion is committed (`src/db/files.ts:255-263`).
 
 ## Inputs
 
 | name | type | required | description |
 | --- | --- | --- | --- |
-| `<file>` | string (path) | yes | The file to remove. Resolved to an absolute path via `resolve()` relative to the current working directory, then normalized to forward slashes for the lookup. Must match the path the file was indexed under (`src/cli/commands/remove.ts:6-13`). |
-| `[dir]` | string (path) | no | The project directory whose index to open. Used only when present and not starting with `--`; otherwise defaults to `.` (`src/cli/commands/remove.ts:11`). |
+| `<file>` | string (path) | yes | The file to remove. Resolved to an absolute path via `resolve(dir, file)` — relative to `[dir]`, not the shell's working directory — then normalized to forward slashes for the lookup. Must match the path the file was indexed under (`src/cli/commands/remove.ts:6`, `src/cli/commands/remove.ts:15`). |
+| `[dir]` | string (path) | no | The project directory whose index to open, and the base used to resolve `<file>`. Used only when present and not starting with `--`; otherwise defaults to `.` (`src/cli/commands/remove.ts:11`). |
 
 ## Outputs
 
 | output | where it lands / shape / description |
 | --- | --- |
-| Result message | A single line printed to stdout: `Removed <file>` on success, `<file> was not in the index` when no row matched (`src/cli/commands/remove.ts:14`). |
+| Result message | A single line printed to stdout: `Removed <file>` on success, `<file> was not in the index` when no row matched (`src/cli/commands/remove.ts:16`). |
 | Deleted file + cascaded rows | The `files` row plus its `chunks`, `vec_chunks`, `fts_chunks`, and graph rows (`symbol_refs` / `file_exports` / `file_imports`) are removed from the on-disk index at `.mimirs/index.db` (`src/db/files.ts:255-264`, `src/db/index.ts:134`). |
 | Exit code | `1` when the file argument is missing; otherwise `0` (`src/cli/commands/remove.ts:9`). |
 
@@ -114,7 +114,8 @@ All of these happen inside one transaction, so the file is either fully removed 
 mimirs remove src/legacy/old-helper.ts
 
 # Remove a file from another project's index
-mimirs remove /abs/path/to/file.ts /abs/path/to/project
+# <file> is resolved relative to the [dir] argument
+mimirs remove src/legacy/old-helper.ts /abs/path/to/project
 ```
 
 Sample output:
@@ -131,7 +132,7 @@ src/legacy/old-helper.ts was not in the index
 
 ## Relationship to the MCP tool
 
-The [`remove_file`](../tools/remove-file.md) MCP tool exposes the same operation to agents. It also calls `RagDB.removeFile` and prints the same success / not-found wording, but it expects the caller to pass an already-absolute `path` and does not run it through `resolve()` itself (`src/tools/index-tools.ts:118-139`). Both paths converge on the single store method, so the deletion behavior described above is identical.
+The [remove_file](../tools/remove-file.md) MCP tool exposes the same operation to agents. It also calls `RagDB.removeFile` and prints near-identical wording, but it expects the caller to pass an already-absolute `path` and does not run it through `resolve()` itself; on success it prints `Removed <path> from index` (with the trailing "from index"), while the not-found branch matches the CLI exactly (`src/tools/index-tools.ts:118-142`). Both paths converge on the single store method, so the deletion behavior described above is identical.
 
 ## Key source files
 

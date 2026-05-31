@@ -4,6 +4,13 @@ Notable changes to the generated wiki, newest first, by wiki version. The format
 follows [Keep a Changelog](https://keepachangelog.com/); each version is stamped
 with the source commit the wiki was generated from.
 
+## [5c7b45b] - 2026-05-31
+
+### Changed
+- Regenerated all 50 pages from current source.
+
+_Pages updated: all 50 pages_
+
 ## [b85ca02] - 2026-05-31
 
 ### Added

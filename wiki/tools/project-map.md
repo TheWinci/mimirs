@@ -10,37 +10,44 @@ no importers (likely entry points or dead code)?".
 
 The tool reads only what indexing already stored — it does not parse source on
 demand. The graph is built earlier, when files are indexed: the indexer
-extracts each file's imports and exports, then resolves each import specifier
-to a concrete indexed file. So `project_map` is fast (a few SQL reads plus
+extracts each file's imports and exports, then resolves each import specifier to
+a concrete indexed file. So `project_map` is fast (a few SQL reads plus
 in-memory formatting) but only as complete as the last index run. The handler
 lives in `src/tools/graph-tools.ts:8`, the formatting in
 `src/graph/resolver.ts:181`, and the graph reads in `src/db/graph.ts`.
 
 ## How a call flows
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Agent
-    participant Tool as project_map handler
-    participant Resolver as generateProjectMap
-    participant DB as RagDB (SQLite)
+The interesting part of this tool is not the call order — it is the branching:
+`focus` chooses whether to load the whole graph or a neighborhood, and the
+`zoom` × `format` pair selects one of four formatters. A flowchart shows those
+forks more clearly than a sequence.
 
-    Agent->>Tool: { directory?, focus?, zoom?, format? }
-    Tool->>Tool: resolveProject(directory) → projectDir + db
-    Tool->>Resolver: generateProjectMap(db, { projectDir, focus, zoom, format })
-    alt focus given
-        Resolver->>DB: getFileByPath(resolve(projectDir, focus))
-        DB-->>Resolver: file record or undefined
-        Resolver->>DB: getSubgraph([file.id], maxHops=2)
-        DB-->>Resolver: nodes + edges near that file
-    else no focus
-        Resolver->>DB: getGraph()
-        DB-->>Resolver: every file + every resolved edge
-    end
-    Resolver->>Resolver: format as text or JSON, by zoom level
-    Resolver-->>Tool: map string
-    Tool-->>Agent: text (+ tip footer) or raw JSON
+```mermaid
+flowchart TD
+    callIn["project_map(directory?, focus?, zoom?, format?)"] --> resolveDir["resolveProject(directory)<br>→ absolute projectDir + db"]
+    resolveDir --> genMap["generateProjectMap(db, options)<br>zoom defaults file, format defaults text"]
+    genMap --> hasFocus{"focus set?"}
+    hasFocus -->|yes| lookup["getFileByPath(resolve(projectDir, focus))"]
+    lookup --> found{"file indexed?"}
+    found -->|yes| subgraph2["getSubgraph([id], maxHops=2)<br>BFS over edges"]
+    found -->|no| emptyGraph["empty graph"]
+    hasFocus -->|no| whole["getGraph()<br>all files + all resolved edges"]
+    subgraph2 --> emptyCheck{"nodes empty?"}
+    whole --> emptyCheck
+    emptyGraph --> emptyCheck
+    emptyCheck -->|yes| emptyOut["'No files indexed...' (text)<br>or empty object (json)"]
+    emptyCheck -->|no| pickFmt{"format / zoom"}
+    pickFmt -->|text + file| fileMap["generateFileMap"]
+    pickFmt -->|text + directory| dirMap["generateDirectoryMap"]
+    pickFmt -->|json + file| fileJson["generateFileMapJson"]
+    pickFmt -->|json + directory| dirJson["generateDirectoryMapJson"]
+    fileMap --> footerDecide{"format json?"}
+    dirMap --> footerDecide
+    fileJson --> footerDecide
+    dirJson --> footerDecide
+    footerDecide -->|no| addFooter["append tip footer, return text"]
+    footerDecide -->|yes| rawReturn["return JSON verbatim"]
 ```
 
 1. The agent calls `project_map` with four optional arguments. None are
@@ -49,22 +56,25 @@ sequenceDiagram
 2. The handler calls `resolveProject(directory, getDB)`, which resolves the
    directory to an absolute path (falling back to `RAG_PROJECT_DIR` or the
    current working directory), confirms it exists, loads config, and opens the
-   matching database `src/tools/index.ts:22`. A non-existent directory throws
+   matching database `src/tools/index.ts:22-37`. A non-existent directory throws
    here before any map work begins.
 3. The handler calls `generateProjectMap` with the resolved project directory
    and the caller's options, defaulting `zoom` to `"file"` and `format` to
-   `"text"` `src/tools/graph-tools.ts:32`.
-4. If `focus` is set, the resolver looks up that file by absolute path. If found,
-   it pulls only the neighborhood around it; if not found, it produces an empty
-   graph rather than erroring `src/graph/resolver.ts:195`.
+   `"text"` `src/tools/graph-tools.ts:32-37`.
+4. If `focus` is set, the resolver looks up that file by its absolute path. If
+   found, it pulls only the neighborhood around it; if not found, it produces an
+   empty graph rather than erroring `src/graph/resolver.ts:195-201`.
 5. `getSubgraph` runs a breadth-first walk over the import edges starting at the
-   focus file, up to `maxHops` (fixed at 2) in both directions — importers and
-   dependencies `src/db/graph.ts:870`.
+   focus file, up to `maxHops` (defaulted to 2 inside the resolver) in both
+   directions — importers and dependencies `src/db/graph.ts:870-908`.
 6. With no `focus`, `getGraph` loads every file, every export, and every
-   resolved edge in three batched SQL queries `src/db/graph.ts:816`.
-7. The resolver picks one of four formatters based on `zoom` and `format`, then
-   builds the output string `src/graph/resolver.ts:213-224`.
-8. The string returns to the handler. For `format: "json"` it is returned
+   resolved edge in three batched SQL queries `src/db/graph.ts:816-867`.
+7. If the resulting graph has no nodes, the resolver short-circuits: text mode
+   returns a one-line "nothing found" string, JSON mode returns an empty object
+   `src/graph/resolver.ts:206-211`.
+8. Otherwise the resolver picks one of four formatters based on `zoom` and
+   `format`, then builds the output string `src/graph/resolver.ts:213-224`.
+9. The string returns to the handler. For `format: "json"` it is returned
    verbatim. For text, the handler appends a one-line tip footer pointing the
    caller at `search`, `depends_on`, and `depended_on_by` for follow-up
    `src/tools/graph-tools.ts:39-49`.
@@ -73,12 +83,21 @@ sequenceDiagram
 
 `project_map` never parses source files itself. The nodes and edges it renders
 are rows in the `files`, `file_exports`, and `file_imports` tables, populated
-during indexing. After a file is chunked and its raw imports stored, the
-indexer calls `resolveImports`, which matches each import specifier (for
-example `../db`) to a concrete indexed file id and writes that id into
-`file_imports.resolved_file_id` `src/indexing/indexer.ts:784-786`. An edge only
-appears in the map once it has been resolved this way — every graph query
+during indexing. After files are indexed and their raw imports stored, the
+indexer calls `resolveImports`, which matches each import specifier (for example
+`../db`) to a concrete indexed file id and writes that id into
+`file_imports.resolved_file_id` via `db.resolveImport`
+`src/graph/resolver.ts:24-61`. The indexer triggers this once per index run,
+right after files are chunked `src/indexing/indexer.ts:784-786`. An edge only
+appears in the map after it has been resolved this way — every graph query
 filters on `resolved_file_id IS NOT NULL` `src/db/graph.ts:856`.
+
+Resolution is two-pass: first `@winci/bun-chunk`'s filesystem resolver (which
+understands tsconfig path aliases plus Python and Rust import styles), then a
+fallback that probes the indexed paths directly, trying `.ts/.tsx/.js/.jsx`
+extensions and `/index.*` files `src/graph/resolver.ts:40-57`. Bare/external
+specifiers (anything not starting with `.` or `/`) are skipped for JS/TS, so
+third-party packages never become edges `src/graph/resolver.ts:36-38`.
 
 Two consequences follow. First, imports of third-party packages (bare
 specifiers like `zod`) are never resolved to a node, so they do not appear as
@@ -111,7 +130,7 @@ two groups: those with no indexed importers and the rest
 files, then a `### Files With No Importers` section (likely entry points or
 unreferenced files) and a `### Files` section. Each file lists up to its first 8
 exports (with a `+N more` suffix beyond that), its `depends_on` list, and its
-`depended_on_by` list `src/graph/resolver.ts:269-291`.
+`depended_on_by` list `src/graph/resolver.ts:269-306`.
 
 ```text
 ## Project Map (file-level, 3 files)
@@ -185,8 +204,9 @@ only reads it.
 
 ## Branches and failure cases
 
-- Non-existent `directory`: `resolveProject` throws `Directory does not exist`
-  before any map is built `src/tools/index.ts:30-32`.
+- Non-existent `directory`: `resolveProject` throws
+  `Directory does not exist: <abs-path>` before any map is built
+  `src/tools/index.ts:30-32`.
 - `focus` names a file that is not indexed: `getFileByPath` returns nothing, the
   resolver substitutes an empty graph, and the next branch reports nothing found
   rather than throwing `src/graph/resolver.ts:196-201`.
@@ -196,15 +216,16 @@ only reads it.
   `{ "level": <zoom>, "nodes": [], "edges": [], "directories": [] }`
   `src/graph/resolver.ts:206-211`.
 - `focus` set and found: only the 2-hop neighborhood is mapped via
-  `getSubgraph`. The hop count is hard-coded to 2 in the resolver's defaults and
-  is not exposed as a tool argument `src/graph/resolver.ts:188`.
+  `getSubgraph`. The hop count is fixed at 2 by the resolver's `maxHops`
+  default and is not exposed as a tool argument `src/graph/resolver.ts:188`.
 - Large focus neighborhoods: `getSubgraph` batches its SQL by 499 ids to stay
-  under SQLite's parameter limit. A prior version reused the same batch for both
+  under SQLite's 999-parameter limit (the BFS query uses two `IN` clauses, so
+  each batch costs twice). A prior version reused the same batch for both
   endpoints of an edge and silently dropped edges that spanned batches; it now
   batches by `file_id` alone and filters the other endpoint in JS against the
   visited set `src/db/graph.ts:944-978`.
 - `format: "json"` skips the tip footer; text output always appends it
-  `src/tools/graph-tools.ts:39-45`.
+  `src/tools/graph-tools.ts:39-49`.
 - Bare/external imports are never edges: only imports whose `resolved_file_id`
   is set appear, so third-party packages and unresolved relative imports are
   absent `src/db/graph.ts:856`.
@@ -229,8 +250,8 @@ Map an entire large project grouped by folder:
 ```
 
 The same engine backs the `mimirs map` CLI command, which calls
-`generateProjectMap` directly with `--focus` and `--zoom` flags but always emits
-text `src/cli/commands/map.ts:12-18`.
+`generateProjectMap` directly with `--focus` and `--zoom` flags. The CLI never
+passes `format`, so it always emits text `src/cli/commands/map.ts:6-19`.
 
 ## Key source files
 

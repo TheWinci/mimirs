@@ -24,7 +24,7 @@ sequenceDiagram
     Tool->>Resolve: resolveProject(directory, getDB)
     Resolve-->>Tool: { db: RagDB }
     Tool->>RagDB: getFileHistory(path, top, since)
-    RagDB->>SQLite: SELECT ... WHERE file_path LIKE '%'||path<br>ORDER BY date DESC LIMIT top
+    RagDB->>SQLite: SELECT gc.* WHERE file_path LIKE '%'||path<br>ORDER BY date DESC LIMIT top
     SQLite-->>RagDB: rows (newest first)
     RagDB-->>Tool: GitCommitRow[]
     alt no rows
@@ -35,9 +35,9 @@ sequenceDiagram
     end
 ```
 
-1. The caller invokes the tool with a file `path` and optional `top`, `since`, and `directory` arguments. The argument shape is validated by the Zod schema declared on the tool; `path` is the only required field `src/tools/git-history-tools.ts:114`.
-2. The handler resolves which project to read. `resolveProject` turns the optional `directory` (falling back to `RAG_PROJECT_DIR` then the current working directory) into an absolute path, verifies it exists, loads that project's config, applies the embedding config, and hands back the `RagDB` for that directory `src/tools/index.ts:22`.
-3. The handler calls `ragDb.getFileHistory(path, top, since)` `src/tools/git-history-tools.ts:126`. This is a thin wrapper that forwards to the standalone query function with the same arguments `src/db/index.ts:859`.
+1. The caller invokes the tool with a file `path` and optional `top`, `since`, and `directory` arguments. The argument shape is validated by the Zod schema declared on the tool; `path` is the only required field `src/tools/git-history-tools.ts:115`.
+2. The handler resolves which project to read. `resolveProject` turns the optional `directory` (falling back to `RAG_PROJECT_DIR`, then the current working directory) into an absolute path, verifies it exists, loads that project's config, applies the embedding config, and hands back the `RagDB` for that directory `src/tools/index.ts:22`.
+3. The handler calls `ragDb.getFileHistory(path, top, since)` `src/tools/git-history-tools.ts:126`. This `RagDB` method is a thin wrapper that forwards to the standalone query function with the same arguments `src/db/index.ts:859`.
 4. The query joins `git_commit_files` to `git_commits` and matches the file with a `LIKE '%' || path` suffix pattern, optionally adds a `date >= since` clause, orders by commit date descending, and limits to `top` rows `src/db/git-history.ts:273`.
 5. SQLite returns the raw rows, already sorted newest-first by the `ORDER BY gc.date DESC` clause.
 6. Each raw row is turned into a `GitCommitRow` by `parseRow`, which decodes the JSON `files_changed` and `refs` columns and coerces the merge flag to a boolean `src/db/git-history.ts:89`.
@@ -47,9 +47,11 @@ sequenceDiagram
 
 ## Suffix path matching
 
-The match is deliberately loose. The SQL binds the path as `` `%${filePath}` `` and compares with `LIKE`, so the stored `file_path` only has to *end with* the value you pass `src/db/git-history.ts:276`. The indexer stores project-relative paths (for example `src/db/git-history.ts`), so passing the full relative path matches exactly, while passing just `git-history.ts` matches every indexed file whose path ends in that string — including `src/tools/git-history-tools.ts` would *not* match, but `src/db/git-history.ts` and any other file literally ending in `git-history.ts` would. A bare basename is convenient but can pull in unrelated files in different directories that share a name (for example `index.ts`), so prefer the most specific suffix you can give.
+The match is deliberately loose. The SQL binds the path as `` `%${filePath}` `` and compares with `LIKE`, so the stored `file_path` only has to *end with* the value you pass `src/db/git-history.ts:277`. The indexer stores project-relative paths (for example `src/db/git-history.ts`), so passing the full relative path matches exactly, while passing just `git-history.ts` matches every indexed file whose path ends in that string. A bare basename is convenient but can pull in unrelated files in different directories that share a name (for example `index.ts`), so prefer the most specific suffix you can give.
 
 Note there is no leading `%`, so the pattern is anchored at the end of the stored path, not a substring match in the middle. A value like `db/git-history.ts` matches `src/db/git-history.ts`; a value like `db/git` does not, because the stored path does not end there.
+
+This is a different matching style from the sibling `search_commits` tool. There, the `path` filter does a plain substring `includes` check against each commit's changed files `src/db/git-history.ts:149`, so `db/git` *would* match in that tool. Only `file_history` uses the end-anchored `LIKE` form.
 
 ## Newest-first ordering and the limit
 
@@ -66,7 +68,7 @@ When `since` is supplied, the query appends `AND gc.date >= ?` before the orderi
 | `path` | string | yes | File path to look up, matched as a suffix against indexed commit file paths. Most specific is safest; a bare filename may match files of the same name in other directories `src/tools/git-history-tools.ts:115`. |
 | `top` | integer ≥ 1 | no (default 20) | Maximum number of commits to return. Applied as the `LIMIT` after newest-first sorting `src/tools/git-history-tools.ts:116`. |
 | `since` | string | no | ISO date (e.g. `2025-01-01`). Keeps only commits with `date >= since`. Omit for the file's full history `src/tools/git-history-tools.ts:118`. |
-| `directory` | string | no | Project directory to read. Falls back to `RAG_PROJECT_DIR` then the current working directory `src/tools/git-history-tools.ts:120`. |
+| `directory` | string | no | Project directory to read. Falls back to `RAG_PROJECT_DIR`, then the current working directory `src/tools/git-history-tools.ts:120`. |
 
 ## Outputs
 
@@ -76,22 +78,22 @@ When `since` is supplied, the query appends `AND gc.date >= ?` before the orderi
 | Per-commit block | Three lines: rank + bold short hash + date + `@author` (with a `[merge]` tag for merge commits); the first line of the commit message; and a `Files:` line listing up to five changed paths (with `+K more` if there are more) and `(+insertions -deletions)` totals `src/tools/git-history-tools.ts:21`. |
 | Empty-result hint | If nothing matched, a single line `No commits found for "<path>". Is git history indexed?` `src/tools/git-history-tools.ts:132`. |
 
-The per-commit block carries no relevance score. That is the visible difference from [search_commits](search-commits.md): `formatCommitRow` omits the score because chronological history has no notion of relevance, whereas `formatCommitResult` (used by `search_commits`) prints a `(0.xx)` score `src/tools/git-history-tools.ts:15`.
+The per-commit block carries no relevance score. That is the visible difference from [search_commits](search-commits.md): `formatCommitRow` omits the score because chronological history has no notion of relevance, whereas `formatCommitResult` (used by `search_commits`) prints a `(0.xx)` score `src/tools/git-history-tools.ts:15`. The date shown in each block is just the date portion of the stored ISO timestamp, taken from before the `T` `src/tools/git-history-tools.ts:23`.
 
 ## Branches and failure cases
 
 - **Empty result.** If the query returns zero rows the handler short-circuits and returns the "No commits found" hint instead of an empty list `src/tools/git-history-tools.ts:128`. This single branch covers two real situations the tool cannot tell apart: the file genuinely has no commits matching the path/`since` filter, and the project has no indexed git history at all. The hint deliberately asks "Is git history indexed?" to nudge the caller toward [index_files](index-files.md) or the CLI `mimirs history index`.
 - **Unindexed history is not pre-checked.** Unlike `search_commits`, this handler does not call `getGitHistoryStatus()` up front to detect an empty index `src/tools/git-history-tools.ts:58`. It runs the query unconditionally and only the empty-result branch reports the problem, so the failure surfaces the same generic hint whether the index is empty or the path simply did not match.
 - **No `since` filter.** When `since` is absent the date clause is skipped and the full history (up to `top`) is eligible `src/db/git-history.ts:279`.
-- **Over-broad path.** A short or bare-filename `path` can match unrelated files because of suffix matching; the results then mix commits from several files, which is a behavior to be aware of rather than an error `src/db/git-history.ts:276`.
-- **Bad directory.** If `directory` resolves to a path that does not exist, `resolveProject` throws `Directory does not exist: <path>` before any query runs `src/tools/index.ts:30`.
+- **Over-broad path.** A short or bare-filename `path` can match unrelated files because of suffix matching; the results then mix commits from several files, which is a behavior to be aware of rather than an error `src/db/git-history.ts:277`.
+- **Bad directory.** If `directory` resolves to a path that does not exist, `resolveProject` throws `Directory does not exist: <path>` before any query runs `src/tools/index.ts:31`.
 - **Limit floor.** The schema rejects `top` values below 1, so a caller cannot request zero or negative results `src/tools/git-history-tools.ts:116`.
 
 ## Where the data comes from
 
 `file_history` is purely a reader; it depends on two tables being populated by the indexer. `git_commits` holds one row per commit with its hash, message, author, date, and aggregate insertion/deletion counts; `git_commit_files` holds one row per (commit, changed file) pair `src/db/index.ts:350`. The join in `getFileHistory` walks `git_commit_files` to find which commits touched a path, then pulls the full commit record from `git_commits`. There is an index on `git_commit_files(file_path)` so the suffix lookup does not scan every row from scratch `src/db/index.ts:374`.
 
-Those rows are written when commit history is indexed — see the [history](../cli/history.md) CLI page for how the indexer walks `git log` and calls `insertCommitBatch` to populate both tables. This tool reads them; it never writes, so it has no state changes of its own.
+Those rows are written when commit history is indexed — see the [history](../cli/history.md) CLI page for how the indexer walks `git log` and calls `insertCommitBatch` to populate both tables `src/db/git-history.ts:21`. This tool reads them; it never writes, so it has no state changes of its own.
 
 ## Example
 
@@ -124,6 +126,6 @@ The short hashes, dates, authors, and counts above are synthetic placeholders; t
 ## Key source files
 
 - `src/tools/git-history-tools.ts` — registers the `file_history` MCP tool, validates arguments, calls the query, and formats the response (`formatCommitRow`, lines 111-142).
-- `src/db/git-history.ts` — `getFileHistory` builds and runs the suffix-matched, date-ordered SQL query and parses rows into `GitCommitRow`.
+- `src/db/git-history.ts` — `getFileHistory` builds and runs the suffix-matched, date-ordered SQL query and parses rows into `GitCommitRow` (lines 267-292).
 - `src/db/index.ts` — defines the `git_commits` / `git_commit_files` schema and exposes `getFileHistory` as a `RagDB` method.
 - `src/tools/index.ts` — `resolveProject` resolves the directory argument to the right `RagDB`.
