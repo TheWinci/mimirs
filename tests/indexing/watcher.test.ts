@@ -25,6 +25,13 @@ afterEach(async () => {
   await cleanupTempDir(tempDir);
 });
 
+// bun 1.3.14's recursive fs.watch drops events fired in the first moments after
+// watch() returns (a startup lag bun 1.3.11 did not have). Let the watcher settle
+// before mutating files so the event isn't lost. This race is test-only: the real
+// server starts the watcher once at boot and files change long after.
+const WATCH_SETTLE_MS = 500;
+const settleWatcher = () => new Promise((r) => setTimeout(r, WATCH_SETTLE_MS));
+
 describe("indexFile", () => {
   test("indexes a new file", async () => {
     await writeFixture(tempDir, "doc.md", "# Setup\n\nInstall with bun install.");
@@ -86,6 +93,7 @@ describe("startWatcher", () => {
     const config = await loadConfig(tempDir);
     const events: string[] = [];
     const watcher = startWatcher(tempDir, db, config, (msg) => events.push(msg));
+    await settleWatcher();
 
     // Write a new file
     await writeFixture(tempDir, "new-doc.md", "# New\n\nBrand new documentation.");
@@ -114,6 +122,7 @@ describe("startWatcher", () => {
 
     const events: string[] = [];
     const watcher = startWatcher(tempDir, db, config, (msg) => events.push(msg));
+    await settleWatcher();
 
     // Delete the file
     await unlink(join(tempDir, "to-delete.md"));
@@ -145,6 +154,7 @@ describe("startWatcher", () => {
 
     const events: string[] = [];
     const watcher = startWatcher(tempDir, db, config, (msg) => events.push(msg));
+    await settleWatcher();
 
     // Mutate file content after watcher is running
     await writeFixture(tempDir, "edit-me.md", "# Version 2\n\nCompletely different content with new info.");
@@ -170,6 +180,7 @@ describe("startWatcher", () => {
     config.exclude = [...config.exclude, "**/*.log"];
     const events: string[] = [];
     const watcher = startWatcher(tempDir, db, config, (msg) => events.push(msg));
+    await settleWatcher();
 
     // Write an excluded file
     await writeFixture(tempDir, "debug.log", "some log output");
