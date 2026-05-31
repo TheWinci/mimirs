@@ -4,6 +4,23 @@ Notable changes to the generated wiki, newest first, by wiki version. The format
 follows [Keep a Changelog](https://keepachangelog.com/); each version is stamped
 with the source commit the wiki was generated from.
 
+## [b85ca02] - 2026-05-31
+
+### Added
+- The wiki tool page now documents the `update` command: an incremental refresh
+  that resolves the commit the wiki was last generated from and returns the
+  source and instruction changes since then, plus the page index, so a caller
+  rewrites only the pages a change made stale instead of regenerating everything
+  (tools/wiki).
+
+### Changed
+- The wiki tool page's `changelog` section now describes effect-based, per-page
+  churn classification — surgical edits summarized from their diffs, wholesale
+  rewrites listed only, and new or removed pages — and corrects the ejected
+  instruction list to ten files, adding `update.md` (tools/wiki).
+
+_Pages updated: tools/wiki_
+
 ## [b37b514] - 2026-05-31
 
 ### Added
