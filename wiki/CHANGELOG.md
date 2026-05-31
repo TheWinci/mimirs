@@ -1,0 +1,46 @@
+# Wiki Changelog
+
+Notable changes to the generated wiki, newest first, by wiki version. The format
+follows [Keep a Changelog](https://keepachangelog.com/); each version is stamped
+with the source commit the wiki was generated from.
+
+## [e5d2055] - 2026-05-31
+
+### Added
+- Wiki generation prose is now editable per project: the discovery, page-writing,
+  and shared-block instructions live in markdown and can be copied into
+  `.mimirs/wiki/` with `wiki(eject)`, where a project file overrides the packaged
+  default (tools/wiki).
+- Conversation indexing now watches the whole project session folder — it
+  backfills every past session and tails the live one and any that start later,
+  so findings are searchable across sessions in near real time. Previously only
+  the single current transcript was tailed (cli/conversation, server/start,
+  runtime-lifecycle).
+
+### Changed
+- The configured embedding dimension is applied before the database schema is
+  created, so a custom model's vector tables are sized correctly; a mismatch now
+  fails with a clear error instead of silently breaking (data-model,
+  tools/index-files).
+- Removing a file no longer leaves orphaned graph rows, and an after-delete
+  trigger keeps the vector table in sync with the chunk table — foreign-key
+  cascades are off, so both are done explicitly (cli/remove, tools/remove-file,
+  data-model).
+- Result grouping honors the `parentGroupingMinCount` setting when promoting a
+  shared parent chunk over its children (cli/read, cli/search, tools/read-relevant,
+  tools/search).
+- `server_info` reports the `.mimirs` data directory; it previously named the old
+  `.rag` directory (tools/server-info).
+- Numeric CLI flags are validated and report a usage error instead of crashing
+  with a range error (cli/benchmark, cli/eval, cli/search).
+
+### Fixed
+- `mimirs remove <file> [dir]` resolves `<file>` against the target directory
+  rather than the current working directory, fixing a false "not in the index"
+  result when the two differ (cli/remove).
+- The `mimirs map` help text no longer claims Mermaid output; the command emits
+  structured text (cli/map).
+- `find_usages` logs full-text-search errors instead of swallowing them
+  (tools/find-usages).
+
+_Pages updated: cli/benchmark, cli/conversation, cli/eval, cli/map, cli/read, cli/remove, cli/search, data-model, runtime-lifecycle, server/start, tools/find-usages, tools/index-files, tools/read-relevant, tools/remove-file, tools/search, tools/server-info, tools/wiki_
