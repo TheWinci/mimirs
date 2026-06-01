@@ -58,6 +58,12 @@ This project has a local RAG index (mimirs). Use these MCP tools:
 - **\`depends_on\`**: List all files that a given file imports — its dependencies.
 - **\`dependents\`**: List all files that import a given file — reverse
   dependencies. Use before modifying a shared module to see who depends on it.
+- **\`impact\`**: Symbol-level blast radius — the transitive callers of a
+  function or method as a pruned call tree, plus the test files to run. More
+  precise than \`dependents\` (file-level). Use before changing a signature.
+- **\`trace\`**: Show how one symbol reaches another — the reachable call
+  sub-graph from \`from\` to \`to\` ("how does X reach Y"). Static resolution, so
+  a dynamic-dispatch hop can break the chain (it says so when it does).
 - **\`write_relevant\`**: Before adding new code or docs, find the best insertion
   point — returns the most semantically appropriate file and anchor.
 - **\`wiki\`**: Run the wiki rebuild workflow. Start with
