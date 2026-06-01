@@ -12,9 +12,9 @@ The same indexed tables back two MCP tools an agent uses at runtime: [search_com
 
 ## How a `history` invocation is routed
 
-The top-level CLI reads `process.argv.slice(2)`, takes the first token as the command name, and dispatches on it. When the command is `history`, it calls `historyCommand(args, getFlag)` with the full argument array and a flag-lookup helper `src/cli/index.ts:151`.
+The top-level CLI reads `process.argv.slice(2)`, takes the first token as the command name, and dispatches on it. When the command is `history`, it calls `historyCommand(args, getFlag)` with the full argument array and a flag-lookup helper `src/cli/index.ts:158`.
 
-`getFlag` is a simple positional lookup: it finds the index of a flag like `--since` in the argument list and returns the *next* token as its value `src/cli/index.ts:81`. It does not understand `--flag=value` form — a flag and its value must be two separate tokens.
+`getFlag` is a simple positional lookup: it finds the index of a flag like `--since` in the argument list and returns the *next* token as its value `src/cli/index.ts:85`. It does not understand `--flag=value` form — a flag and its value must be two separate tokens.
 
 `historyCommand` then reads `args[1]` as the subcommand and switches on it. An unknown subcommand prints usage and exits non-zero; no subcommand at all prints usage and exits cleanly `src/cli/commands/history.ts:23`.
 
@@ -42,7 +42,7 @@ flowchart TD
     statGuard -->|no| statOut["count + last commit hash/date"]
 ```
 
-1. The user runs `mimirs history <sub> ...`. The top-level dispatcher routes `history` to `historyCommand` `src/cli/index.ts:151`.
+1. The user runs `mimirs history <sub> ...`. The top-level dispatcher routes `history` to `historyCommand` `src/cli/index.ts:158`.
 2. `historyCommand` switches on `args[1]`. With no subcommand it prints the usage block and falls through (exit 0); with an unrecognized one it prints usage, logs `Unknown subcommand`, and exits 1 `src/cli/commands/history.ts:30`.
 3. `index` is the only state-changing path: it opens a `RagDB`, loads config, and calls `indexGitHistory`, then prints a one-line summary `src/cli/commands/history.ts:47`.
 4. `search` first guards on the commit count, then embeds the query and runs two searches, fuses them by hash, and prints either result blocks or a "not found" line `src/cli/commands/history.ts:79`.
@@ -145,7 +145,7 @@ Every subcommand closes its `RagDB` before returning.
 - **Binary files in numstat.** `git --numstat` prints `-` for insertions/deletions on binary files; the parser maps `-` to `0` so totals stay numeric `src/git/indexer.ts:102`.
 - **Search before indexing.** Both `search` and `status` short-circuit on `totalCommits === 0` with the "No git history indexed" hint `src/cli/commands/history.ts:79`.
 - **Empty search result.** When the merged result list is empty after fusion and filtering, `search` prints `No commits found matching "<query>"` and returns `src/cli/commands/history.ts:107`.
-- **Bad `--top`.** A non-integer or out-of-range `--top` raises `CliFlagError`, which the top-level dispatcher catches in `main`, prints, and exits 1 — no crash `src/cli/flags.ts:40`, `src/cli/index.ts:97`.
+- **Bad `--top`.** A non-integer or out-of-range `--top` raises `CliFlagError`, which the top-level dispatcher catches in `main`, prints, and exits 1 — no crash `src/cli/flags.ts:40`, `src/cli/index.ts:101`.
 - **Missing query.** `search` with no query (or a flag-shaped first token) prints usage and exits 1 `src/cli/commands/history.ts:68`.
 - **Unknown subcommand.** Prints usage then exits 1; no subcommand prints usage and exits 0 `src/cli/commands/history.ts:23`.
 

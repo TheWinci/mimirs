@@ -13,7 +13,7 @@ demand. The graph is built earlier, when files are indexed: the indexer
 extracts each file's imports and exports, then resolves each import specifier to
 a concrete indexed file. So `project_map` is fast (a few SQL reads plus
 in-memory formatting) but only as complete as the last index run. The handler
-lives in `src/tools/graph-tools.ts:8`, the formatting in
+lives in `src/tools/graph-tools.ts:45`, the formatting in
 `src/graph/resolver.ts:181`, and the graph reads in `src/db/graph.ts`.
 
 ## How a call flows
@@ -60,15 +60,15 @@ flowchart TD
    here before any map work begins.
 3. The handler calls `generateProjectMap` with the resolved project directory
    and the caller's options, defaulting `zoom` to `"file"` and `format` to
-   `"text"` `src/tools/graph-tools.ts:32-37`.
+   `"text"` `src/tools/graph-tools.ts:69-74`.
 4. If `focus` is set, the resolver looks up that file by its absolute path. If
    found, it pulls only the neighborhood around it; if not found, it produces an
    empty graph rather than erroring `src/graph/resolver.ts:195-201`.
 5. `getSubgraph` runs a breadth-first walk over the import edges starting at the
    focus file, up to `maxHops` (defaulted to 2 inside the resolver) in both
-   directions — importers and dependencies `src/db/graph.ts:870-908`.
+   directions — importers and dependencies `src/db/graph.ts:1029-1158`.
 6. With no `focus`, `getGraph` loads every file, every export, and every
-   resolved edge in three batched SQL queries `src/db/graph.ts:816-867`.
+   resolved edge in three SQL queries `src/db/graph.ts:975-1027`.
 7. If the resulting graph has no nodes, the resolver short-circuits: text mode
    returns a one-line "nothing found" string, JSON mode returns an empty object
    `src/graph/resolver.ts:206-211`.
@@ -76,8 +76,8 @@ flowchart TD
    `format`, then builds the output string `src/graph/resolver.ts:213-224`.
 9. The string returns to the handler. For `format: "json"` it is returned
    verbatim. For text, the handler appends a one-line tip footer pointing the
-   caller at `search`, `depends_on`, and `depended_on_by` for follow-up
-   `src/tools/graph-tools.ts:39-49`.
+   caller at `search`, `depends_on`, and `dependents` for follow-up
+   `src/tools/graph-tools.ts:82`.
 
 ## Where the graph data comes from
 
@@ -90,7 +90,7 @@ indexer calls `resolveImports`, which matches each import specifier (for example
 `src/graph/resolver.ts:24-61`. The indexer triggers this once per index run,
 right after files are chunked `src/indexing/indexer.ts:784-786`. An edge only
 appears in the map after it has been resolved this way — every graph query
-filters on `resolved_file_id IS NOT NULL` `src/db/graph.ts:856`.
+filters on `resolved_file_id IS NOT NULL` `src/db/graph.ts:1015`.
 
 Resolution is two-pass: first `@winci/bun-chunk`'s filesystem resolver (which
 understands tsconfig path aliases plus Python and Rust import styles), then a
@@ -130,7 +130,7 @@ two groups: those with no indexed importers and the rest
 files, then a `### Files With No Importers` section (likely entry points or
 unreferenced files) and a `### Files` section. Each file lists up to its first 8
 exports (with a `+N more` suffix beyond that), its `depends_on` list, and its
-`depended_on_by` list `src/graph/resolver.ts:269-306`.
+`dependents` list `src/graph/resolver.ts:269-291`.
 
 ```text
 ## Project Map (file-level, 3 files)
@@ -144,7 +144,7 @@ exports (with a `+N more` suffix beyond that), its `depends_on` list, and its
   src/graph/resolver.ts
     exports: resolveImports (function), generateProjectMap (function), +4 more
     depends_on: src/db/index.ts
-    depended_on_by: src/tools/graph-tools.ts, src/cli/commands/map.ts
+    dependents: src/tools/graph-tools.ts, src/cli/commands/map.ts
 ```
 
 ### Text, directory zoom
@@ -219,16 +219,15 @@ only reads it.
   `getSubgraph`. The hop count is fixed at 2 by the resolver's `maxHops`
   default and is not exposed as a tool argument `src/graph/resolver.ts:188`.
 - Large focus neighborhoods: `getSubgraph` batches its SQL by 499 ids to stay
-  under SQLite's 999-parameter limit (the BFS query uses two `IN` clauses, so
-  each batch costs twice). A prior version reused the same batch for both
-  endpoints of an edge and silently dropped edges that spanned batches; it now
-  batches by `file_id` alone and filters the other endpoint in JS against the
-  visited set `src/db/graph.ts:944-978`.
+  under SQLite's 999-parameter limit. The final edge-collection pass batches by
+  `file_id` alone and filters the other endpoint in JS against the visited set,
+  rather than reusing one batch for both endpoints of an edge (which could drop
+  edges that span batches) `src/db/graph.ts:1107-1158`.
 - `format: "json"` skips the tip footer; text output always appends it
-  `src/tools/graph-tools.ts:39-49`.
+  `src/tools/graph-tools.ts:76-86`.
 - Bare/external imports are never edges: only imports whose `resolved_file_id`
   is set appear, so third-party packages and unresolved relative imports are
-  absent `src/db/graph.ts:856`.
+  absent `src/db/graph.ts:1015`.
 
 ## Example
 
@@ -271,6 +270,6 @@ passes `format`, so it always emits text `src/cli/commands/map.ts:6-19`.
 ## Related tools
 
 - [depends_on](depends-on.md) — list one file's direct dependencies.
-- [depended_on_by](depended-on-by.md) — list one file's importers (reverse
+- [dependents](dependents.md) — list one file's importers (reverse
   dependencies).
 - [mimirs map](../cli/map.md) — the CLI command over the same map engine.

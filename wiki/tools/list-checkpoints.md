@@ -34,7 +34,7 @@ sequenceDiagram
 
 1. The caller invokes the tool with any combination of `sessionId`, `type`, `limit`, and `directory`; all are optional, and `limit` defaults to `20` when omitted (`src/tools/checkpoint-tools.ts:89`).
 2. The handler calls `resolveProject`, which turns the optional `directory` into an absolute path, verifies it exists, loads that project's config, and returns the matching `RagDB` handle (`src/tools/index.ts:22-37`). A missing directory throws here, before any query runs.
-3. With the resolved database, the handler calls `ragDb.listCheckpoints(sessionId, type, limit)` (`src/tools/checkpoint-tools.ts:98`), a thin method that forwards straight to the store function (`src/db/index.ts:811-813`).
+3. With the resolved database, the handler calls `ragDb.listCheckpoints(sessionId, type, limit)` (`src/tools/checkpoint-tools.ts:98`), a thin method that forwards straight to the store function (`src/db/index.ts:820-822`).
 4. The store builds one SQL statement starting from `SELECT * FROM conversation_checkpoints WHERE 1=1`, then appends `AND session_id = ?` and/or `AND type = ?` only when those filters are supplied (`src/db/checkpoints.ts:57-67`).
 5. It always appends `ORDER BY timestamp DESC LIMIT ?`, so rows come back most-recent-first and are capped by the limit (`src/db/checkpoints.ts:69-70`). The `timestamp` is the ISO string recorded when the checkpoint was created, not the row id, so ordering follows wall-clock creation time.
 6. Each raw row is mapped into a `CheckpointRow`, with `files_involved` and `tags` parsed back from their stored JSON strings into arrays (`src/db/checkpoints.ts:78-88`).
@@ -108,6 +108,6 @@ The three checkpoint tools share one store and one table, differing only in dire
 
 - `src/tools/checkpoint-tools.ts` — registers `list_checkpoints` (and its siblings), validates inputs, runs the read, and formats the text response.
 - `src/db/checkpoints.ts` — `listCheckpoints` builds the filtered, ordered SQL query and maps rows into `CheckpointRow` objects.
-- `src/db/index.ts` — defines the `conversation_checkpoints` table and its indexes (`src/db/index.ts:320-333`) and exposes `listCheckpoints` as a method on `RagDB` (`src/db/index.ts:811-813`).
+- `src/db/index.ts` — defines the `conversation_checkpoints` table and its indexes (`src/db/index.ts:320-333`) and exposes `listCheckpoints` as a method on `RagDB` (`src/db/index.ts:820-822`).
 - `src/db/types.ts` — the `CheckpointRow` shape returned to the handler (`src/db/types.ts:71-81`).
 - `src/tools/index.ts` — `resolveProject` selects the project directory and database for the call.

@@ -20,7 +20,7 @@ All three subcommands start from this same step, so they only ever touch the cur
 
 ## Dispatch and branching
 
-`mimirs conversation ...` enters through the shared CLI dispatcher. The top-level command string is matched in a switch, and `conversation` routes to `conversationCommand(args, getFlag)` (`src/cli/index.ts:145`). That handler reads the second positional argument as the subcommand, resolves the working directory from `--dir` (defaulting to `.`), opens the project database, and branches (`src/cli/commands/conversation.ts:10`). Because the value of the command is in which branch runs, the flow is best read as a dispatch tree.
+`mimirs conversation ...` enters through the shared CLI dispatcher. The top-level command string is matched in a switch, and `conversation` routes to `conversationCommand(args, getFlag)` (`src/cli/index.ts:152`). That handler reads the second positional argument as the subcommand, resolves the working directory from `--dir` (defaulting to `.`), opens the project database, and branches (`src/cli/commands/conversation.ts:10`). Because the value of the command is in which branch runs, the flow is best read as a dispatch tree.
 
 ```mermaid
 flowchart TD
@@ -128,7 +128,7 @@ Session bookkeeping happens after the turns. `upsertSession` inserts or updates 
 - **Empty turn text.** A turn whose combined text is blank after trimming is skipped by `indexTurn` and never reaches the database (`src/conversation/indexer.ts:60`).
 - **Already-indexed turn.** Re-running `index` on an unchanged session is a no-op: the unique constraint ignores each existing turn, so `turnsIndexed` stays `0` and no per-session line prints.
 - **Stale-only re-index in `search`.** A session is re-indexed only when it has no row or its `mtime` grew; an unchanged session is skipped entirely on the search path (`src/cli/commands/conversation.ts:29`).
-- **Bad `--top` value.** `--top` is parsed by `intFlag`, which rejects non-integers and values below `1` by throwing `CliFlagError`; the dispatcher catches it, prints the message, and exits `1` (`src/cli/flags.ts:40`, `src/cli/index.ts:97`).
+- **Bad `--top` value.** `--top` is parsed by `intFlag`, which rejects non-integers and values below `1` by throwing `CliFlagError`; the dispatcher catches it, prints the message, and exits `1` (`src/cli/flags.ts:40`, `src/cli/index.ts:101`).
 - **Always closes the DB.** Every branch falls through to `db.close()` at the end of the handler (`src/cli/commands/conversation.ts:103`).
 
 ## Inputs

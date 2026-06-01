@@ -4,7 +4,7 @@
 
 One entry point serves two modes. Pass a `symbol` and you get the matching definitions. Omit `symbol` and the tool lists every exported symbol in the project, which is useful for surveying an unfamiliar codebase or auditing the public surface of a module. Either way, each result carries enrichment metadata — how many child members the symbol has, how many other files reference it, and whether the row is a re-export rather than the original definition — so you can read blast radius at a glance.
 
-The symbol data is precomputed. During indexing, each file's exports are extracted and written to the `file_exports` table, so this tool never parses source at query time — it reads a table that was populated when the file was last indexed (`src/indexing/indexer.ts:506-509`, `src/db/graph.ts:751-756`).
+The symbol data is precomputed. During indexing, each file's exports are extracted and written to the `file_exports` table, so this tool never parses source at query time — it reads a table that was populated when the file was last indexed (`src/indexing/indexer.ts:506-509`, `src/db/graph.ts:901-912`).
 
 ## How a call flows
 
@@ -28,7 +28,7 @@ sequenceDiagram
     else rows found
         Query->>Store: snippets, child counts, sibling exports, resolved imports
         Query-->>Handler: SymbolResult[] with enrichment
-        Handler-->>Caller: formatted text + find_usages / read_relevant tip
+        Handler-->>Caller: formatted text + usages / read_relevant tip
     end
 ```
 
@@ -38,7 +38,7 @@ sequenceDiagram
 4. The query layer first fetches base rows from `file_exports` joined to `files`, applying the name pattern, the optional type filter, an `ORDER BY fe.name`, and the row limit (`src/db/search.ts:254-288`).
 5. If no rows match, the function returns an empty array and the handler replies with a single "No exported symbols ... found." line, naming whichever filter was active (`src/tools/search.ts:252-256`).
 6. Otherwise the query layer batch-loads supporting data — a code snippet per symbol, child-member counts, and the reference fan-in — then composes one `SymbolResult` per base row (`src/db/search.ts:290-406`).
-7. The handler renders each result as a line of `path • name (metadata)` followed by a trimmed snippet, joined by `---` separators, and appends a tip suggesting `find_usages` or `read_relevant` on the top hit (`src/tools/search.ts:259-273`).
+7. The handler renders each result as a line of `path • name (metadata)` followed by a trimmed snippet, joined by `---` separators, and appends a tip suggesting `usages` or `read_relevant` on the top hit (`src/tools/search.ts:259-273`).
 
 ## Two modes: search vs. list-all-exports
 
@@ -102,7 +102,7 @@ Unlike [search](search.md) and [read_relevant](read-relevant.md), this tool has 
 | --- | --- |
 | Symbol definitions | Returned as a single text block in the MCP response. One entry per matched export, in `path • name (metadata)` form, separated by `---`, each followed by a snippet of up to 300 characters (`src/tools/search.ts:259-268`). |
 | Enrichment metadata | Inline in each entry: the symbol type, then `N children`, `N refs, N modules`, and a `re-export` tag, each shown only when its value is present or non-zero (`src/tools/search.ts:262-265`). |
-| Next-step tip | A trailing line suggesting `find_usages("<top symbol>")` to see call sites or `read_relevant("<top symbol>")` for full context, built from the first result's name (`src/tools/search.ts:270-271`). |
+| Next-step tip | A trailing line suggesting `usages("<top symbol>")` to see call sites or `read_relevant("<top symbol>")` for full context, built from the first result's name (`src/tools/search.ts:270-271`). |
 | Empty-result message | When nothing matches, a single line: `No exported symbols matching "<symbol>" found.` or `... of type "<type>" found.` (`src/tools/search.ts:252-256`). |
 
 This tool only reads the index; it does not write to the database or change any stored state.
@@ -138,7 +138,7 @@ export class RagDB {
   private db: Database;
   ...
 
-── Tip: call find_usages("RagDB") to see all call sites, or read_relevant("RagDB") for full context. ──
+── Tip: call usages("RagDB") to see all call sites, or read_relevant("RagDB") for full context. ──
 ```
 
 List every exported interface in the project:
@@ -152,7 +152,7 @@ List every exported interface in the project:
 
 ## Related tools
 
-- [find_usages](find-usages.md) — once you have located a definition, this lists every call site and reference, the natural follow-up suggested in the result tip.
+- [usages](usages.md) — once you have located a definition, this lists every call site and reference, the natural follow-up suggested in the result tip.
 - [read_relevant](read-relevant.md) — fetches full chunk content with line ranges when the trimmed snippet is not enough.
 - [search](search.md) — semantic file search for when you do *not* know the symbol name and need to discover where a concept lives.
 

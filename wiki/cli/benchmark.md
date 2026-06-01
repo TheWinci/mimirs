@@ -18,7 +18,7 @@ mutate any stored state.
 The command is dispatched from the CLI router. When the first argument is
 `benchmark`, the router calls `benchmarkCommand` with the raw argument list and
 a `getFlag` helper that reads `--flag value` pairs out of `args`
-(`src/cli/index.ts:136-137`).
+(`src/cli/index.ts:143-145`).
 
 ```mermaid
 sequenceDiagram
@@ -51,7 +51,7 @@ sequenceDiagram
 
 1. The user runs `mimirs benchmark <file>` with an optional `--dir` and `--top`.
    The router matches the `benchmark` case and invokes the handler
-   `benchmarkCommand` (`src/cli/index.ts:136-137`).
+   `benchmarkCommand` (`src/cli/index.ts:143-145`).
 2. The handler reads the query file path from `args[1]`. If it is absent it
    prints a usage line and exits with code `1`
    (`src/cli/commands/benchmark.ts:9-13`).
@@ -113,7 +113,7 @@ For each query it calls `search(q.query, db, topK, 0, weight, config.generated)`
 matching and deduplicates by file path (`src/search/benchmark.ts:65`). The
 fourth argument is the score threshold, passed as `0`, so no results are
 filtered out by score. The returned `DedupedResult[]` carries one entry per file
-path with its best score and matching snippets (`src/search/hybrid.ts:39-43`),
+path with its best score and matching snippets (`src/search/hybrid.ts:40-44`),
 which is exactly the granularity the benchmark needs because expectations are
 expressed as file paths.
 
@@ -201,7 +201,7 @@ thresholds falls through to a normal exit (code `0`).
 | Recall or MRR below threshold | `1` | Either gate failed (`src/cli/commands/benchmark.ts:29-31`) |
 | Both gates passed | `0` | Normal completion |
 | Malformed query file | non-zero | Uncaught throw from the loader (`src/search/benchmark.ts:33-41`) |
-| Bad `--top` value | `1` | `CliFlagError` caught by the router (`src/cli/flags.ts:40-52`, `src/cli/index.ts:97-100`) |
+| Bad `--top` value | `1` | `CliFlagError` caught by the router (`src/cli/flags.ts:40-53`, `src/cli/index.ts:101-104`) |
 
 ## Inputs
 
@@ -238,7 +238,7 @@ re-indexed, and the query file is read but never modified.
   before opening the database (`src/cli/commands/benchmark.ts:10-13`).
 - **Invalid `--top` value** — a non-integer or sub-`1` value makes `intFlag`
   throw a `CliFlagError`; the router's `try/catch` prints the message and exits
-  `1` rather than crashing (`src/cli/flags.ts:46-52`, `src/cli/index.ts:97-100`).
+  `1` rather than crashing (`src/cli/flags.ts:46-52`, `src/cli/index.ts:101-104`).
 - **Malformed query file** — non-array JSON or an entry missing `query` /
   `expected` throws inside `loadBenchmarkQueries`. This is not caught in the
   handler, so it propagates as a runtime error and non-zero exit
@@ -258,7 +258,7 @@ re-indexed, and the query file is read but never modified.
   (`src/cli/commands/benchmark.ts:29-31`).
 - **FTS unavailable** — inside the hybrid search, if the BM25 text query fails it
   logs at debug level and falls back to vector-only results, so the benchmark
-  still completes (`src/search/hybrid.ts:330-334`).
+  still completes (`src/search/hybrid.ts:324-328`).
 
 ## Example
 

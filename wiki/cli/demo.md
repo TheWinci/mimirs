@@ -6,7 +6,7 @@ The whole flow lives in one handler, `demoCommand`, in `src/cli/commands/demo.ts
 
 ## How it is reached
 
-The CLI entry parses `process.argv` once at module load — `args = process.argv.slice(2)` and `command = args[0]` (`src/cli/index.ts:25`). When the command is `demo`, `dispatch()` hits its `case "demo"` and calls `demoCommand(args)` (`src/cli/index.ts:166`). The entire `args` array is forwarded, so inside the handler `args[0]` is still the literal string `"demo"` and `args[1]` is the optional directory.
+The CLI entry parses `process.argv` once at module load — `args = process.argv.slice(2)` and `command = args[0]` (`src/cli/index.ts:26-27`). When the command is `demo`, `dispatch()` hits its `case "demo"` and calls `demoCommand(args)` (`src/cli/index.ts:173-174`). The entire `args` array is forwarded, so inside the handler `args[0]` is still the literal string `"demo"` and `args[1]` is the optional directory.
 
 The handler resolves the target directory defensively: it uses `args[1]` only when it exists and does not start with `--`, otherwise it falls back to the current directory, then makes the result absolute with `resolve` (`src/cli/commands/demo.ts:37`). So `mimirs demo` and `mimirs demo .` behave identically, and a stray flag passed where a path is expected is ignored rather than mistaken for a directory.
 
@@ -47,7 +47,7 @@ sequenceDiagram
 
 4. **Search demo (files).** Section 2 runs `search(demoQuery, db, 3, 0, config.hybridWeight, config.generated)` and keeps the first three results (`src/cli/commands/demo.ts:67`). `search` returns one entry per file — a `DedupedResult` with `path`, `score`, and `snippets` — collapsed so each file appears once with its best score (`src/search/hybrid.ts:39-43`). For each result the demo prints the score in yellow, the path relative to the target dir, and the first snippet, truncated by `renderBlock` to three lines at 96 columns (`src/cli/commands/demo.ts:69-76`).
 
-5. **Read demo (chunks).** Section 3 runs `searchChunks(demoQuery, db, 2, 0.3, config.hybridWeight, config.generated)` (`src/cli/commands/demo.ts:85`). Unlike `search`, this returns individual semantic chunks with no file deduplication, and each `ChunkResult` carries `startLine`, `endLine`, and an optional `entityName` (`src/search/hybrid.ts:45-55`). The demo renders a `path:start-end` locator plus the entity name when present, then up to 18 lines of the chunk body (`src/cli/commands/demo.ts:87-94`). The `0.3` argument is a relevance floor — merged candidates scoring below it are dropped inside `searchChunks` (`src/search/hybrid.ts:494`).
+5. **Read demo (chunks).** Section 3 runs `searchChunks(demoQuery, db, 2, 0.3, config.hybridWeight, config.generated)` (`src/cli/commands/demo.ts:85`). Unlike `search`, this returns individual semantic chunks with no file deduplication, and each `ChunkResult` carries `startLine`, `endLine`, and an optional `entityName` (`src/search/hybrid.ts:45-55`). The demo renders a `path:start-end` locator plus the entity name when present, then up to 18 lines of the chunk body (`src/cli/commands/demo.ts:87-94`). The `0.3` argument is a relevance floor — merged candidates scoring below it are dropped inside `searchChunks` (`src/search/hybrid.ts:488`).
 
 6. **Symbol listing demo.** Section 4 calls `db.searchSymbols(undefined, false, undefined, 200)` (`src/cli/commands/demo.ts:102`). Passing no query puts `searchSymbols` into listing mode (`isListing = !query`), which returns up to 200 exported symbols with per-symbol metadata instead of matching a name (`src/db/search.ts:245-246`). The demo then filters out re-exports and zero-reference symbols, sorts by `referenceCount` descending, and keeps the top five (`src/cli/commands/demo.ts:103-106`). Each line shows the symbol name, its type, how many importer files reference it, and across how many modules — see the State changes section below.
 
@@ -92,9 +92,9 @@ Ranking metadata is computed but **not** stored. `referenceCount` and `reference
 
 - **No referenceable symbols.** After dropping re-exports and zero-reference symbols, if nothing remains the symbol section prints `No exported symbols indexed yet.` (`src/cli/commands/demo.ts:115-116`). This happens on a freshly indexed project with no resolved cross-file imports, or one whose language has no export extraction.
 
-- **FTS unavailable.** Inside both `search` and `searchChunks`, a failure in the BM25 full-text query is caught and logged at debug level, and the function falls back to vector-only results (`src/search/hybrid.ts:330-334`, `src/search/hybrid.ts:486-490`). The demo never sees the error; it just gets slightly different ranking.
+- **FTS unavailable.** Inside both `search` and `searchChunks`, a failure in the BM25 full-text query is caught and logged at debug level, and the function falls back to vector-only results (`src/search/hybrid.ts:327`, `src/search/hybrid.ts:482-483`). The demo never sees the error; it just gets slightly different ranking.
 
-- **No `process.exit`.** The handler closes the DB and returns; it never forces an exit code, so a thrown error (for example from `loadConfig` on malformed config) propagates up to `main`'s try/catch in `src/cli/index.ts:92-102` rather than being swallowed here.
+- **No `process.exit`.** The handler closes the DB and returns; it never forces an exit code, so a thrown error (for example from `loadConfig` on malformed config) propagates up to `main`'s try/catch in `src/cli/index.ts:96-106` rather than being swallowed here.
 
 ## Example
 

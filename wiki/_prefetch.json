@@ -1,13 +1,13 @@
 {
   "metadata": {
     "projectRoot": "/Users/winci/repos/mimirs",
-    "generatedAt": "2026-05-31T21:36:41.051Z",
-    "lastCommitHash": "5c7b45b00a7c9cf57038a98ad628b7f5279da0fb",
+    "generatedAt": "2026-06-01T09:46:33.221Z",
+    "lastCommitHash": "8b52efc578171f4c1811165342fd6db79e7ca635",
     "mimirsVersion": "unknown",
     "index": {
-      "totalFiles": 213,
-      "totalChunks": 3771,
-      "lastIndexed": "2026-05-31T21:25:10.758Z"
+      "totalFiles": 217,
+      "totalChunks": 3950,
+      "lastIndexed": "2026-06-01T08:45:18.831Z"
     }
   },
   "map": {
@@ -18,7 +18,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -27,7 +27,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -36,7 +36,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -45,7 +45,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -54,7 +54,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -63,7 +63,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -72,7 +72,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -81,7 +81,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -95,7 +95,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 4,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -104,7 +104,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -117,7 +117,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 3,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -131,7 +131,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 4,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -147,7 +147,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 6,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -164,7 +164,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 7,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -179,7 +179,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 5,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -192,7 +192,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 3,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -210,7 +210,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 8,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -219,7 +219,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -236,7 +236,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 7,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -245,7 +245,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -254,7 +254,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -263,7 +263,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -272,7 +272,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -281,7 +281,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -290,7 +290,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -299,7 +299,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -308,7 +308,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -317,7 +317,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -326,7 +326,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -337,7 +337,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 1,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -346,7 +346,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -355,8 +355,30 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
+      },
+      {
+        "path": "src/cli/commands/affected.ts",
+        "imports": [
+          "src/db/index.ts",
+          "src/graph/trace.ts",
+          "src/tools/git-tools.ts",
+          "src/utils/log.ts"
+        ],
+        "importedBy": [
+          "src/cli/index.ts"
+        ],
+        "fanIn": 1,
+        "fanOut": 4,
+        "pageRank": 0.00293663,
+        "exports": [
+          {
+            "name": "affectedCommand",
+            "kind": "function",
+            "line": 19
+          }
+        ]
       },
       {
         "path": "src/cli/commands/analytics.ts",
@@ -370,7 +392,7 @@
         ],
         "fanIn": 1,
         "fanOut": 3,
-        "pageRank": 0.00300556,
+        "pageRank": 0.00293663,
         "exports": [
           {
             "name": "analyticsCommand",
@@ -390,7 +412,7 @@
         ],
         "fanIn": 1,
         "fanOut": 2,
-        "pageRank": 0.00300556,
+        "pageRank": 0.00293663,
         "exports": [
           {
             "name": "annotationsCommand",
@@ -415,7 +437,7 @@
         ],
         "fanIn": 1,
         "fanOut": 7,
-        "pageRank": 0.00300556,
+        "pageRank": 0.00293663,
         "exports": [
           {
             "name": "benchmarkModelsCommand",
@@ -438,7 +460,7 @@
         ],
         "fanIn": 1,
         "fanOut": 5,
-        "pageRank": 0.00300556,
+        "pageRank": 0.00293663,
         "exports": [
           {
             "name": "benchmarkCommand",
@@ -461,7 +483,7 @@
         ],
         "fanIn": 1,
         "fanOut": 5,
-        "pageRank": 0.00300556,
+        "pageRank": 0.00293663,
         "exports": [
           {
             "name": "checkpointCommand",
@@ -481,7 +503,7 @@
         ],
         "fanIn": 1,
         "fanOut": 2,
-        "pageRank": 0.00300556,
+        "pageRank": 0.00293663,
         "exports": [
           {
             "name": "cleanupCommand",
@@ -506,7 +528,7 @@
         ],
         "fanIn": 1,
         "fanOut": 7,
-        "pageRank": 0.00300556,
+        "pageRank": 0.00293663,
         "exports": [
           {
             "name": "conversationCommand",
@@ -530,7 +552,7 @@
         ],
         "fanIn": 1,
         "fanOut": 6,
-        "pageRank": 0.00300556,
+        "pageRank": 0.00293663,
         "exports": [
           {
             "name": "demoCommand",
@@ -549,7 +571,7 @@
         ],
         "fanIn": 1,
         "fanOut": 1,
-        "pageRank": 0.00300556,
+        "pageRank": 0.00293663,
         "exports": [
           {
             "name": "doctorCommand",
@@ -572,7 +594,7 @@
         ],
         "fanIn": 1,
         "fanOut": 5,
-        "pageRank": 0.00300556,
+        "pageRank": 0.00293663,
         "exports": [
           {
             "name": "evalCommand",
@@ -597,7 +619,7 @@
         ],
         "fanIn": 1,
         "fanOut": 7,
-        "pageRank": 0.00300556,
+        "pageRank": 0.00293663,
         "exports": [
           {
             "name": "historyCommand",
@@ -620,7 +642,7 @@
         ],
         "fanIn": 1,
         "fanOut": 5,
-        "pageRank": 0.00300556,
+        "pageRank": 0.00293663,
         "exports": [
           {
             "name": "indexCommand",
@@ -644,7 +666,7 @@
         ],
         "fanIn": 1,
         "fanOut": 6,
-        "pageRank": 0.00300556,
+        "pageRank": 0.00293663,
         "exports": [
           {
             "name": "initCommand",
@@ -665,7 +687,7 @@
         ],
         "fanIn": 1,
         "fanOut": 3,
-        "pageRank": 0.00300556,
+        "pageRank": 0.00293663,
         "exports": [
           {
             "name": "mapCommand",
@@ -685,7 +707,7 @@
         ],
         "fanIn": 1,
         "fanOut": 2,
-        "pageRank": 0.00300556,
+        "pageRank": 0.00293663,
         "exports": [
           {
             "name": "removeCommand",
@@ -708,7 +730,7 @@
         ],
         "fanIn": 1,
         "fanOut": 5,
-        "pageRank": 0.00321494,
+        "pageRank": 0.00313253,
         "exports": [
           {
             "name": "searchCommand",
@@ -728,7 +750,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": [
           {
             "name": "serveCommand",
@@ -748,7 +770,7 @@
         ],
         "fanIn": 1,
         "fanOut": 2,
-        "pageRank": 0.00300556,
+        "pageRank": 0.00293663,
         "exports": [
           {
             "name": "sessionContextCommand",
@@ -768,7 +790,7 @@
         ],
         "fanIn": 1,
         "fanOut": 2,
-        "pageRank": 0.00300556,
+        "pageRank": 0.00293663,
         "exports": [
           {
             "name": "statusCommand",
@@ -794,7 +816,7 @@
         ],
         "fanIn": 10,
         "fanOut": 0,
-        "pageRank": 0.0091071,
+        "pageRank": 0.00890351,
         "exports": [
           {
             "name": "CliFlagError",
@@ -816,6 +838,7 @@
       {
         "path": "src/cli/index.ts",
         "imports": [
+          "src/cli/commands/affected.ts",
           "src/cli/commands/analytics.ts",
           "src/cli/commands/annotations.ts",
           "src/cli/commands/benchmark-models.ts",
@@ -841,13 +864,13 @@
           "src/main.ts"
         ],
         "fanIn": 1,
-        "fanOut": 20,
-        "pageRank": 0.00517293,
+        "fanOut": 21,
+        "pageRank": 0.00507035,
         "exports": [
           {
             "name": "main",
             "kind": "function",
-            "line": 86
+            "line": 90
           }
         ]
       },
@@ -864,7 +887,7 @@
         ],
         "fanIn": 4,
         "fanOut": 1,
-        "pageRank": 0.00543606,
+        "pageRank": 0.00532007,
         "exports": [
           {
             "name": "cliProgress",
@@ -890,72 +913,72 @@
         ],
         "fanIn": 3,
         "fanOut": 1,
-        "pageRank": 0.0053115,
+        "pageRank": 0.00519904,
         "exports": [
           {
             "name": "SetupResult",
             "kind": "interface",
-            "line": 87
+            "line": 93
           },
           {
             "name": "ensureConfig",
             "kind": "function",
-            "line": 92
+            "line": 98
           },
           {
             "name": "ensureGitignore",
             "kind": "function",
-            "line": 100
+            "line": 106
           },
           {
             "name": "KnownIDE",
             "kind": "type",
-            "line": 148
+            "line": 154
           },
           {
             "name": "KNOWN_IDES",
             "kind": "variable",
-            "line": 149
+            "line": 155
           },
           {
             "name": "unknownIdes",
             "kind": "function",
-            "line": 151
+            "line": 157
           },
           {
             "name": "parseIdeFlag",
             "kind": "function",
-            "line": 157
+            "line": 163
           },
           {
             "name": "ensureAgentInstructions",
             "kind": "function",
-            "line": 162
+            "line": 168
           },
           {
             "name": "mcpConfigSnippet",
             "kind": "function",
-            "line": 217
+            "line": 223
           },
           {
             "name": "ensureMcpJson",
             "kind": "function",
-            "line": 258
+            "line": 264
           },
           {
             "name": "detectAgentHints",
             "kind": "function",
-            "line": 297
+            "line": 303
           },
           {
             "name": "confirm",
             "kind": "function",
-            "line": 314
+            "line": 320
           },
           {
             "name": "runSetup",
             "kind": "function",
-            "line": 324
+            "line": 330
           }
         ]
       },
@@ -994,6 +1017,7 @@
           "tests/features/git-history.test.ts",
           "tests/graph/remove-file-graph.test.ts",
           "tests/graph/symbol-refs.test.ts",
+          "tests/graph/trace.test.ts",
           "tests/indexing/exclude-filter.test.ts",
           "tests/indexing/indexer.test.ts",
           "tests/indexing/line-numbers.test.ts",
@@ -1001,9 +1025,9 @@
           "tests/indexing/watcher.test.ts",
           "tests/search/fts-special-chars.test.ts"
         ],
-        "fanIn": 34,
+        "fanIn": 35,
         "fanOut": 2,
-        "pageRank": 0.03007403,
+        "pageRank": 0.02952192,
         "exports": [
           {
             "name": "RagConfig",
@@ -1042,7 +1066,7 @@
         ],
         "fanIn": 4,
         "fanOut": 3,
-        "pageRank": 0.00435337,
+        "pageRank": 0.00426592,
         "exports": [
           {
             "name": "indexConversation",
@@ -1076,7 +1100,7 @@
         ],
         "fanIn": 8,
         "fanOut": 0,
-        "pageRank": 0.01032936,
+        "pageRank": 0.01010681,
         "exports": [
           {
             "name": "JournalEntry",
@@ -1138,7 +1162,7 @@
         ],
         "fanIn": 1,
         "fanOut": 0,
-        "pageRank": 0.00678219,
+        "pageRank": 0.00663408,
         "exports": [
           {
             "name": "logQuery",
@@ -1165,7 +1189,7 @@
         ],
         "fanIn": 1,
         "fanOut": 0,
-        "pageRank": 0.00678219,
+        "pageRank": 0.00663408,
         "exports": [
           {
             "name": "upsertAnnotation",
@@ -1202,7 +1226,7 @@
         ],
         "fanIn": 1,
         "fanOut": 0,
-        "pageRank": 0.00678219,
+        "pageRank": 0.00663408,
         "exports": [
           {
             "name": "createCheckpoint",
@@ -1236,7 +1260,7 @@
         ],
         "fanIn": 1,
         "fanOut": 1,
-        "pageRank": 0.00678219,
+        "pageRank": 0.00663408,
         "exports": [
           {
             "name": "upsertSession",
@@ -1286,7 +1310,7 @@
         ],
         "fanIn": 1,
         "fanOut": 2,
-        "pageRank": 0.00678219,
+        "pageRank": 0.00663408,
         "exports": [
           {
             "name": "getFileByPath",
@@ -1385,7 +1409,7 @@
         ],
         "fanIn": 1,
         "fanOut": 1,
-        "pageRank": 0.00678219,
+        "pageRank": 0.00663408,
         "exports": [
           {
             "name": "GitCommitInsert",
@@ -1454,11 +1478,13 @@
         "imports": [],
         "importedBy": [
           "src/db/files.ts",
-          "src/db/index.ts"
+          "src/db/index.ts",
+          "src/graph/trace.ts",
+          "src/tools/graph-tools.ts"
         ],
-        "fanIn": 2,
+        "fanIn": 4,
         "fanOut": 0,
-        "pageRank": 0.00966463,
+        "pageRank": 0.01269059,
         "exports": [
           {
             "name": "upsertSymbolRefs",
@@ -1551,89 +1577,114 @@
             "line": 631
           },
           {
+            "name": "CallerRef",
+            "kind": "interface",
+            "line": 668
+          },
+          {
+            "name": "getCallersOfExport",
+            "kind": "function",
+            "line": 717
+          },
+          {
+            "name": "getCallersOfLocalSymbol",
+            "kind": "function",
+            "line": 735
+          },
+          {
+            "name": "CallableCandidate",
+            "kind": "interface",
+            "line": 752
+          },
+          {
+            "name": "getCallablesByName",
+            "kind": "function",
+            "line": 763
+          },
+          {
             "name": "countInboundRefsByExport",
             "kind": "function",
-            "line": 667
+            "line": 826
           },
           {
             "name": "resolveAllSymbolRefs",
             "kind": "function",
-            "line": 698
+            "line": 857
           },
           {
             "name": "upsertFileGraph",
             "kind": "function",
-            "line": 720
+            "line": 879
           },
           {
             "name": "clearFileGraph",
             "kind": "function",
-            "line": 776
+            "line": 935
           },
           {
             "name": "resolveImport",
             "kind": "function",
-            "line": 797
+            "line": 956
           },
           {
             "name": "getUnresolvedImports",
             "kind": "function",
-            "line": 804
+            "line": 963
           },
           {
             "name": "getGraph",
             "kind": "function",
-            "line": 816
+            "line": 975
           },
           {
             "name": "getSubgraph",
             "kind": "function",
-            "line": 870
+            "line": 1029
           },
           {
             "name": "getImportsForFile",
             "kind": "function",
-            "line": 983
+            "line": 1142
           },
           {
             "name": "getImportersOf",
             "kind": "function",
-            "line": 992
+            "line": 1151
           },
           {
             "name": "getDependsOn",
             "kind": "function",
-            "line": 1001
+            "line": 1160
           },
           {
             "name": "getDependedOnBy",
             "kind": "function",
-            "line": 1013
+            "line": 1172
           },
           {
             "name": "getDependsOnForFiles",
             "kind": "function",
-            "line": 1030
+            "line": 1189
           },
           {
             "name": "getDependedOnByForFiles",
             "kind": "function",
-            "line": 1054
+            "line": 1213
           },
           {
             "name": "SymbolGraphData",
             "kind": "interface",
-            "line": 1078
+            "line": 1237
           },
           {
             "name": "getSymbolGraphData",
             "kind": "function",
-            "line": 1089
+            "line": 1248
           },
           {
             "name": "getProjectConstants",
             "kind": "function",
-            "line": 1153
+            "line": 1312
           }
         ]
       },
@@ -1662,6 +1713,7 @@
           "benchmarks/quality-bench-worker.ts",
           "benchmarks/subchunk-impact.ts",
           "scripts/regen-meta.ts",
+          "src/cli/commands/affected.ts",
           "src/cli/commands/analytics.ts",
           "src/cli/commands/annotations.ts",
           "src/cli/commands/benchmark-models.ts",
@@ -1679,6 +1731,7 @@
           "src/cli/commands/session-context.ts",
           "src/cli/commands/status.ts",
           "src/graph/resolver.ts",
+          "src/graph/trace.ts",
           "src/indexing/indexer.ts",
           "src/search/benchmark.ts",
           "src/search/eval.ts",
@@ -1696,6 +1749,7 @@
           "tests/graph/graph.test.ts",
           "tests/graph/remove-file-graph.test.ts",
           "tests/graph/symbol-refs.test.ts",
+          "tests/graph/trace.test.ts",
           "tests/indexing/exclude-filter.test.ts",
           "tests/indexing/indexer.test.ts",
           "tests/indexing/line-numbers.test.ts",
@@ -1715,9 +1769,9 @@
           "tests/wiki/eject.test.ts",
           "tests/wiki/update.test.ts"
         ],
-        "fanIn": 61,
+        "fanIn": 64,
         "fanOut": 11,
-        "pageRank": 0.05158377,
+        "pageRank": 0.05038449,
         "exports": [
           {
             "name": "RagDB",
@@ -1737,7 +1791,7 @@
         ],
         "fanIn": 1,
         "fanOut": 2,
-        "pageRank": 0.00678219,
+        "pageRank": 0.00663408,
         "exports": [
           {
             "name": "vectorSearch",
@@ -1779,7 +1833,7 @@
         ],
         "fanIn": 1,
         "fanOut": 0,
-        "pageRank": 0.00678219,
+        "pageRank": 0.00663408,
         "exports": [
           {
             "name": "StoredChunk",
@@ -1877,6 +1931,7 @@
           "tests/graph/graph.test.ts",
           "tests/graph/remove-file-graph.test.ts",
           "tests/graph/symbol-refs.test.ts",
+          "tests/graph/trace.test.ts",
           "tests/indexing/exclude-filter.test.ts",
           "tests/indexing/indexer.test.ts",
           "tests/indexing/line-numbers.test.ts",
@@ -1892,9 +1947,9 @@
           "tests/search/search-symbols.test.ts",
           "tests/search/search.test.ts"
         ],
-        "fanIn": 44,
+        "fanIn": 45,
         "fanOut": 0,
-        "pageRank": 0.06469891,
+        "pageRank": 0.06253948,
         "exports": [
           {
             "name": "configureEmbedder",
@@ -1975,7 +2030,7 @@
         ],
         "fanIn": 2,
         "fanOut": 2,
-        "pageRank": 0.00345506,
+        "pageRank": 0.00338555,
         "exports": [
           {
             "name": "GitIndexResult",
@@ -2008,7 +2063,7 @@
         ],
         "fanIn": 10,
         "fanOut": 1,
-        "pageRank": 0.01012375,
+        "pageRank": 0.00847464,
         "exports": [
           {
             "name": "resolveImports",
@@ -2043,6 +2098,119 @@
         ]
       },
       {
+        "path": "src/graph/trace.ts",
+        "imports": [
+          "src/db/graph.ts",
+          "src/db/index.ts",
+          "src/utils/test-paths.ts"
+        ],
+        "importedBy": [
+          "src/cli/commands/affected.ts",
+          "src/tools/graph-tools.ts",
+          "tests/graph/trace.test.ts"
+        ],
+        "fanIn": 3,
+        "fanOut": 3,
+        "pageRank": 0.00686622,
+        "exports": [
+          {
+            "name": "CallNode",
+            "kind": "interface",
+            "line": 22
+          },
+          {
+            "name": "nodeKey",
+            "kind": "function",
+            "line": 33
+          },
+          {
+            "name": "SymbolResolution",
+            "kind": "interface",
+            "line": 156
+          },
+          {
+            "name": "resolveSymbol",
+            "kind": "function",
+            "line": 175
+          },
+          {
+            "name": "TreeNode",
+            "kind": "interface",
+            "line": 198
+          },
+          {
+            "name": "ImpactResult",
+            "kind": "interface",
+            "line": 207
+          },
+          {
+            "name": "impactWalk",
+            "kind": "function",
+            "line": 224
+          },
+          {
+            "name": "TraceResult",
+            "kind": "interface",
+            "line": 314
+          },
+          {
+            "name": "tracePath",
+            "kind": "function",
+            "line": 364
+          },
+          {
+            "name": "TestImpact",
+            "kind": "interface",
+            "line": 478
+          },
+          {
+            "name": "transitiveImporters",
+            "kind": "function",
+            "line": 487
+          },
+          {
+            "name": "collectTests",
+            "kind": "function",
+            "line": 506
+          },
+          {
+            "name": "AffectedTests",
+            "kind": "interface",
+            "line": 534
+          },
+          {
+            "name": "affectedTests",
+            "kind": "function",
+            "line": 545
+          },
+          {
+            "name": "renderImpact",
+            "kind": "function",
+            "line": 600
+          },
+          {
+            "name": "renderTests",
+            "kind": "function",
+            "line": 636
+          },
+          {
+            "name": "renderTrace",
+            "kind": "function",
+            "line": 654
+          },
+          {
+            "name": "impactToJson",
+            "kind": "function",
+            "line": 704
+          },
+          {
+            "name": "traceToJson",
+            "kind": "function",
+            "line": 719
+          }
+        ]
+      },
+      {
         "path": "src/indexing/chunker.ts",
         "imports": [
           "src/utils/log.ts"
@@ -2061,7 +2229,7 @@
         ],
         "fanIn": 10,
         "fanOut": 1,
-        "pageRank": 0.01057006,
+        "pageRank": 0.01038205,
         "exports": [
           {
             "name": "ChunkReferences",
@@ -2117,6 +2285,7 @@
           "src/tools/index-tools.ts",
           "tests/graph/remove-file-graph.test.ts",
           "tests/graph/symbol-refs.test.ts",
+          "tests/graph/trace.test.ts",
           "tests/indexing/exclude-filter.test.ts",
           "tests/indexing/indexer.test.ts",
           "tests/indexing/line-numbers.test.ts",
@@ -2124,9 +2293,9 @@
           "tests/indexing/watcher.test.ts",
           "tests/search/fts-special-chars.test.ts"
         ],
-        "fanIn": 19,
+        "fanIn": 20,
         "fanOut": 9,
-        "pageRank": 0.01140894,
+        "pageRank": 0.0113365,
         "exports": [
           {
             "name": "IndexResult",
@@ -2169,7 +2338,7 @@
         ],
         "fanIn": 7,
         "fanOut": 0,
-        "pageRank": 0.00719965,
+        "pageRank": 0.00706778,
         "exports": [
           {
             "name": "ParsedFile",
@@ -2195,7 +2364,7 @@
         ],
         "fanIn": 2,
         "fanOut": 2,
-        "pageRank": 0.00330934,
+        "pageRank": 0.00324372,
         "exports": [
           {
             "name": "Watcher",
@@ -2217,7 +2386,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 1,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -2236,7 +2405,7 @@
         ],
         "fanIn": 5,
         "fanOut": 3,
-        "pageRank": 0.00597337,
+        "pageRank": 0.0058502,
         "exports": [
           {
             "name": "BenchmarkQuery",
@@ -2283,7 +2452,7 @@
         ],
         "fanIn": 2,
         "fanOut": 3,
-        "pageRank": 0.00512988,
+        "pageRank": 0.00502419,
         "exports": [
           {
             "name": "EvalTask",
@@ -2332,7 +2501,8 @@
         "imports": [
           "src/db/index.ts",
           "src/embeddings/embed.ts",
-          "src/utils/log.ts"
+          "src/utils/log.ts",
+          "src/utils/test-paths.ts"
         ],
         "importedBy": [
           "benchmarks/count-grouping-sim.ts",
@@ -2351,33 +2521,33 @@
           "tests/search/search.test.ts"
         ],
         "fanIn": 14,
-        "fanOut": 3,
-        "pageRank": 0.01421542,
+        "fanOut": 4,
+        "pageRank": 0.01389571,
         "exports": [
           {
             "name": "DedupedResult",
             "kind": "interface",
-            "line": 39
+            "line": 40
           },
           {
             "name": "ChunkResult",
             "kind": "interface",
-            "line": 45
+            "line": 46
           },
           {
             "name": "mergeHybridScores",
             "kind": "function",
-            "line": 64
+            "line": 65
           },
           {
             "name": "search",
             "kind": "function",
-            "line": 313
+            "line": 307
           },
           {
             "name": "searchChunks",
             "kind": "function",
-            "line": 469
+            "line": 463
           }
         ]
       },
@@ -2391,7 +2561,7 @@
         ],
         "fanIn": 3,
         "fanOut": 0,
-        "pageRank": 0.01816917,
+        "pageRank": 0.01777798,
         "exports": [
           {
             "name": "escapeRegex",
@@ -2423,7 +2593,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 11,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": [
           {
             "name": "getConnectedDBs",
@@ -2447,7 +2617,7 @@
         ],
         "fanIn": 1,
         "fanOut": 1,
-        "pageRank": 0.00426216,
+        "pageRank": 0.00412671,
         "exports": [
           {
             "name": "registerAnalyticsTools",
@@ -2467,7 +2637,7 @@
         ],
         "fanIn": 1,
         "fanOut": 2,
-        "pageRank": 0.00426216,
+        "pageRank": 0.00412671,
         "exports": [
           {
             "name": "registerAnnotationTools",
@@ -2488,7 +2658,7 @@
         ],
         "fanIn": 1,
         "fanOut": 3,
-        "pageRank": 0.00426216,
+        "pageRank": 0.00412671,
         "exports": [
           {
             "name": "registerCheckpointTools",
@@ -2509,7 +2679,7 @@
         ],
         "fanIn": 1,
         "fanOut": 3,
-        "pageRank": 0.00426216,
+        "pageRank": 0.00412671,
         "exports": [
           {
             "name": "registerConversationTools",
@@ -2529,7 +2699,7 @@
         ],
         "fanIn": 1,
         "fanOut": 2,
-        "pageRank": 0.00426216,
+        "pageRank": 0.00412671,
         "exports": [
           {
             "name": "registerGitHistoryTools",
@@ -2544,11 +2714,12 @@
           "src/tools/index.ts"
         ],
         "importedBy": [
+          "src/cli/commands/affected.ts",
           "src/tools/index.ts"
         ],
-        "fanIn": 1,
+        "fanIn": 2,
         "fanOut": 1,
-        "pageRank": 0.00426216,
+        "pageRank": 0.00512516,
         "exports": [
           {
             "name": "runGit",
@@ -2570,20 +2741,22 @@
       {
         "path": "src/tools/graph-tools.ts",
         "imports": [
+          "src/db/graph.ts",
           "src/graph/resolver.ts",
+          "src/graph/trace.ts",
           "src/tools/index.ts"
         ],
         "importedBy": [
           "src/tools/index.ts"
         ],
         "fanIn": 1,
-        "fanOut": 2,
-        "pageRank": 0.00426216,
+        "fanOut": 4,
+        "pageRank": 0.00412671,
         "exports": [
           {
             "name": "registerGraphTools",
             "kind": "function",
-            "line": 7
+            "line": 44
           }
         ]
       },
@@ -2598,7 +2771,7 @@
         ],
         "fanIn": 1,
         "fanOut": 2,
-        "pageRank": 0.00426216,
+        "pageRank": 0.00412671,
         "exports": [
           {
             "name": "registerIndexTools",
@@ -2640,7 +2813,7 @@
         ],
         "fanIn": 12,
         "fanOut": 13,
-        "pageRank": 0.02414529,
+        "pageRank": 0.02282778,
         "exports": [
           {
             "name": "GetDB",
@@ -2675,7 +2848,7 @@
         ],
         "fanIn": 1,
         "fanOut": 2,
-        "pageRank": 0.00426216,
+        "pageRank": 0.00412671,
         "exports": [
           {
             "name": "registerSearchTools",
@@ -2695,7 +2868,7 @@
         ],
         "fanIn": 1,
         "fanOut": 2,
-        "pageRank": 0.00426216,
+        "pageRank": 0.00412671,
         "exports": [
           {
             "name": "ConnectedDBInfo",
@@ -2720,7 +2893,7 @@
         ],
         "fanIn": 1,
         "fanOut": 2,
-        "pageRank": 0.00426216,
+        "pageRank": 0.00412671,
         "exports": [
           {
             "name": "registerWikiTools",
@@ -2735,7 +2908,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": [
           {
             "name": "EmbeddedChunk",
@@ -2753,7 +2926,7 @@
         ],
         "fanIn": 2,
         "fanOut": 0,
-        "pageRank": 0.00382038,
+        "pageRank": 0.00375552,
         "exports": [
           {
             "name": "DirCheckResult",
@@ -2779,7 +2952,7 @@
         ],
         "fanIn": 3,
         "fanOut": 1,
-        "pageRank": 0.00461263,
+        "pageRank": 0.00453206,
         "exports": [
           {
             "name": "IndexLock",
@@ -2797,6 +2970,7 @@
         "path": "src/utils/log.ts",
         "imports": [],
         "importedBy": [
+          "src/cli/commands/affected.ts",
           "src/cli/commands/analytics.ts",
           "src/cli/commands/annotations.ts",
           "src/cli/commands/benchmark-models.ts",
@@ -2827,9 +3001,9 @@
           "src/tools/conversation-tools.ts",
           "src/utils/index-lock.ts"
         ],
-        "fanIn": 29,
+        "fanIn": 30,
         "fanOut": 0,
-        "pageRank": 0.05069988,
+        "pageRank": 0.04916675,
         "exports": [
           {
             "name": "log",
@@ -2854,7 +3028,7 @@
         ],
         "fanIn": 4,
         "fanOut": 0,
-        "pageRank": 0.00875944,
+        "pageRank": 0.00858471,
         "exports": [
           {
             "name": "normalizePath",
@@ -2864,12 +3038,35 @@
         ]
       },
       {
+        "path": "src/utils/test-paths.ts",
+        "imports": [],
+        "importedBy": [
+          "src/graph/trace.ts",
+          "src/search/hybrid.ts"
+        ],
+        "fanIn": 2,
+        "fanOut": 0,
+        "pageRank": 0.00715265,
+        "exports": [
+          {
+            "name": "TEST_PATTERNS",
+            "kind": "variable",
+            "line": 8
+          },
+          {
+            "name": "isTestPath",
+            "kind": "function",
+            "line": 17
+          }
+        ]
+      },
+      {
         "path": "src/wiki/instructions/changelog.md",
         "imports": [],
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -2878,7 +3075,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -2887,7 +3084,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -2896,7 +3093,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -2905,7 +3102,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -2914,7 +3111,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -2923,7 +3120,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -2932,7 +3129,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -2941,7 +3138,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -2950,7 +3147,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -2968,7 +3165,7 @@
         ],
         "fanIn": 5,
         "fanOut": 2,
-        "pageRank": 0.0071824,
+        "pageRank": 0.00701833,
         "exports": [
           {
             "name": "WIKI_DISCOVERY_SCHEMA_VERSION",
@@ -3028,17 +3225,17 @@
           {
             "name": "buildPrefetch",
             "kind": "function",
-            "line": 357
+            "line": 383
           },
           {
             "name": "writePagePrompt",
             "kind": "function",
-            "line": 405
+            "line": 431
           },
           {
             "name": "runWikiRebuild",
             "kind": "function",
-            "line": 930
+            "line": 956
           }
         ]
       },
@@ -3050,7 +3247,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 1,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3061,7 +3258,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 1,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3073,7 +3270,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 2,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3086,7 +3283,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 3,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3101,7 +3298,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 5,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3112,7 +3309,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 1,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3127,7 +3324,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 5,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3140,7 +3337,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 3,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3151,7 +3348,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 1,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3164,7 +3361,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 3,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3177,7 +3374,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 3,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3188,7 +3385,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 1,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3202,7 +3399,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 4,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3211,7 +3408,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3220,7 +3417,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3229,7 +3426,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3238,7 +3435,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3247,7 +3444,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": [
           {
             "name": "createConnection",
@@ -3267,7 +3464,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3282,7 +3479,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 5,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3297,7 +3494,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 5,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3312,7 +3509,23 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 5,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
+        "exports": []
+      },
+      {
+        "path": "tests/graph/trace.test.ts",
+        "imports": [
+          "src/config/index.ts",
+          "src/db/index.ts",
+          "src/embeddings/embed.ts",
+          "src/graph/trace.ts",
+          "src/indexing/indexer.ts",
+          "tests/helpers.ts"
+        ],
+        "importedBy": [],
+        "fanIn": 0,
+        "fanOut": 6,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3333,6 +3546,7 @@
           "tests/graph/graph.test.ts",
           "tests/graph/remove-file-graph.test.ts",
           "tests/graph/symbol-refs.test.ts",
+          "tests/graph/trace.test.ts",
           "tests/indexing/exclude-filter.test.ts",
           "tests/indexing/index-lock.test.ts",
           "tests/indexing/indexer.test.ts",
@@ -3356,9 +3570,9 @@
           "tests/wiki/instructions-parity.test.ts",
           "tests/wiki/update.test.ts"
         ],
-        "fanIn": 36,
+        "fanIn": 37,
         "fanOut": 0,
-        "pageRank": 0.04341223,
+        "pageRank": 0.04308898,
         "exports": [
           {
             "name": "createTempDir",
@@ -3385,7 +3599,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 1,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3401,7 +3615,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 6,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3413,7 +3627,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 2,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3428,7 +3642,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 5,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3443,7 +3657,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 5,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3454,7 +3668,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 1,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3469,7 +3683,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 5,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3485,7 +3699,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 6,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3497,7 +3711,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 2,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3511,7 +3725,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 4,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3525,7 +3739,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 4,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3538,7 +3752,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 3,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3554,7 +3768,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 6,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3568,7 +3782,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 4,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3582,7 +3796,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 4,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3596,7 +3810,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 4,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3611,7 +3825,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 5,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3625,7 +3839,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 4,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3636,7 +3850,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 1,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3647,7 +3861,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 1,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3660,7 +3874,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 3,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3673,7 +3887,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 3,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3682,7 +3896,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3691,7 +3905,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3700,7 +3914,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3709,7 +3923,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3718,7 +3932,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3727,7 +3941,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3739,7 +3953,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 2,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3752,7 +3966,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 3,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3761,7 +3975,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3770,7 +3984,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3779,7 +3993,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3788,7 +4002,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3797,7 +4011,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3806,7 +4020,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3815,7 +4029,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3824,7 +4038,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3833,7 +4047,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3842,7 +4056,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3851,7 +4065,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3860,7 +4074,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3869,7 +4083,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3878,7 +4092,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3887,7 +4101,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3896,7 +4110,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3905,7 +4119,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3914,7 +4128,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3923,7 +4137,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3932,7 +4146,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3941,7 +4155,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3950,7 +4164,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3959,7 +4173,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3968,7 +4182,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3977,7 +4191,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3986,7 +4200,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -3995,7 +4209,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -4004,7 +4218,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -4013,7 +4227,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -4022,7 +4236,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -4031,7 +4245,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -4040,7 +4254,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -4049,7 +4263,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -4058,7 +4272,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -4067,7 +4281,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -4076,7 +4290,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -4085,7 +4299,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -4094,7 +4308,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -4103,7 +4317,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -4112,7 +4326,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -4121,7 +4335,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -4130,7 +4344,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -4139,7 +4353,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -4148,7 +4362,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -4157,7 +4371,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -4166,7 +4380,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -4175,7 +4389,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -4184,7 +4398,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -4193,7 +4407,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -4202,7 +4416,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       },
       {
@@ -4211,7 +4425,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.00279618,
+        "pageRank": 0.00274073,
         "exports": []
       }
     ]

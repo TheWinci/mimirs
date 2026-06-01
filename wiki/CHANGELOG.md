@@ -4,6 +4,24 @@ Notable changes to the generated wiki, newest first, by wiki version. The format
 follows [Keep a Changelog](https://keepachangelog.com/); each version is stamped
 with the source commit the wiki was generated from.
 
+## [8b52efc] - 2026-06-01
+
+### Added
+- New page documenting cli/affected
+- New page documenting tools/impact
+- New page documenting tools/trace
+- New page documenting tools/usages
+- New page documenting tools/dependents
+
+### Removed
+- tools/find-usages
+- tools/depended-on-by
+
+### Changed
+- Regenerated all 53 pages from current source. The `find_usages` → `usages` and `depended_on_by` → `dependents` tool rename was propagated throughout, and drifted source citations were corrected.
+
+_Pages updated: all 53 pages_
+
 ## [5c7b45b] - 2026-05-31
 
 ### Changed

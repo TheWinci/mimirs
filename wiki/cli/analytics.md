@@ -26,9 +26,9 @@ Nothing in the `analytics` command writes log rows. The data comes entirely from
 the search path. When a search runs, the hybrid search function measures how
 long it took, then records one row: the query text, how many results came back,
 the score of the top result (or `null` when there were no results), the path of
-the top result, and the duration in milliseconds — `src/search/hybrid.ts:388`.
+the top result, and the duration in milliseconds — `src/search/hybrid.ts:382-388`.
 A second search variant records the same shape after parent-grouping and doc
-expansion — `src/search/hybrid.ts:546`. Both call the database wrapper
+expansion — `src/search/hybrid.ts:540-546`. Both call the database wrapper
 `db.logQuery(...)`, which inserts into the `query_log` table —
 `src/db/analytics.ts:3`.
 
@@ -82,7 +82,7 @@ sequenceDiagram
 
 1. The user runs `mimirs analytics`, optionally with a directory and a
    `--days N` flag. The top-level dispatcher matches the `analytics` command and
-   calls the handler — `src/cli/index.ts:130-132`.
+   calls the handler — `src/cli/index.ts:134-136`.
 2. The handler resolves the target directory. It uses the first positional
    argument only if it is present and does not start with `--`; otherwise it
    defaults to the current directory — `src/cli/commands/analytics.ts:7`.
@@ -231,7 +231,7 @@ and closing the database connection.
 - **Invalid `--days`** — a non-integer such as `--days abc`, or a value below
   `1`, throws a `CliFlagError` from the flag parser. The dispatcher catches it,
   prints the message, and exits non-zero, rather than letting `NaN` flow into
-  date math — `src/cli/flags.ts:40-53`, `src/cli/index.ts:97-99`.
+  date math — `src/cli/flags.ts:40-53`, `src/cli/index.ts:101-104`.
 - **Empty log / brand-new index** — `totalQueries` is `0`, `avgResultCount`
   coalesces to `0`, and `avgTopScore` stays `null` and prints as `n/a`. The
   zero-result-rate branch short-circuits to `"0"` so there is no division by

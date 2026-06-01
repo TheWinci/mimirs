@@ -37,7 +37,7 @@ sequenceDiagram
     Handler->>Store: db.close()
 ```
 
-1. The CLI entrypoint reads the raw process arguments once at module load — `args` is `process.argv.slice(2)` and the first element becomes `command` (`src/cli/index.ts:25-26`). When `command` is `remove`, the dispatcher awaits `removeCommand(args)` (`src/cli/index.ts:127-129`).
+1. The CLI entrypoint reads the raw process arguments once at module load — `args` is `process.argv.slice(2)` and the first element becomes `command` (`src/cli/index.ts:26-27`). When `command` is `remove`, the dispatcher awaits `removeCommand(args)` (`src/cli/index.ts:131-133`).
 2. The handler treats `args[1]` as the file to remove. If it is missing, the handler prints a usage line and exits with status `1` (`src/cli/commands/remove.ts:6-10`). This is the only argument it validates.
 3. The handler resolves the project directory and the target file to absolute paths. `args[2]` is treated as the optional directory only when it exists and does not start with `--`; otherwise the directory defaults to `.` (the current working directory). The directory is run through Node's `resolve()`, and the file is resolved *relative to that directory* with `resolve(dir, file)` (`src/cli/commands/remove.ts:11`, `src/cli/commands/remove.ts:15`).
 4. The handler opens the index for that directory by constructing a `RagDB` and calls its `removeFile` method with the resolved absolute file path (`src/cli/commands/remove.ts:12`, `src/cli/commands/remove.ts:15`). `RagDB.removeFile` is a thin pass-through to the file-operations module (`src/db/index.ts:622-624`).
@@ -56,7 +56,7 @@ A consequence worth knowing: the path you pass must resolve to the *exact* absol
 
 ## What gets deleted, and how
 
-Foreign keys are declared in the schema (for example `chunks.file_id ... REFERENCES files(id) ON DELETE CASCADE`), but the database never enables `PRAGMA foreign_keys`, so those `ON DELETE CASCADE` clauses never fire (`src/db/index.ts:179-189`, `src/db/graph.ts:764`). Deleting the `files` row alone would therefore leave orphaned chunks, vectors, FTS entries, and graph rows behind. `removeFile` compensates by deleting from `chunks` and the graph tables explicitly, in a deliberate order, all wrapped in a single `db.transaction(...)` so a failure mid-way rolls the whole thing back (`src/db/files.ts:255-264`).
+Foreign keys are declared in the schema (for example `chunks.file_id ... REFERENCES files(id) ON DELETE CASCADE`), but `PRAGMA foreign_keys` defaults to OFF in `bun:sqlite` and the database never turns it on, so those `ON DELETE CASCADE` clauses never fire (`src/db/index.ts:179-189`, `src/db/graph.ts:923-924`). Deleting the `files` row alone would therefore leave orphaned chunks, vectors, FTS entries, and graph rows behind. `removeFile` compensates by deleting from `chunks` and the graph tables explicitly, in a deliberate order, all wrapped in a single `db.transaction(...)` so a failure mid-way rolls the whole thing back (`src/db/files.ts:255-264`).
 
 Three layers of derived data are removed:
 
@@ -65,11 +65,11 @@ Three layers of derived data are removed:
 | Semantic chunks | `chunks` | Explicit `DELETE FROM chunks WHERE file_id = ?` (`src/db/files.ts:258`) |
 | Full-text search | `fts_chunks` | The `chunks_ad` AFTER-DELETE trigger pushes a `'delete'` into the FTS5 contentless index for each removed chunk (`src/db/index.ts:205-207`) |
 | Vector embeddings | `vec_chunks` | The `chunks_vec_ad` AFTER-DELETE trigger deletes the row whose `chunk_id` matches each removed chunk (`src/db/index.ts:218-220`) |
-| Dependency graph | `symbol_refs`, `file_exports`, `file_imports` | `clearFileGraph(db, fileId)` (`src/db/files.ts:259`, `src/db/graph.ts:777-795`) |
+| Dependency graph | `symbol_refs`, `file_exports`, `file_imports` | `clearFileGraph(db, fileId)` (`src/db/files.ts:259`, `src/db/graph.ts:936-953`) |
 
 The two FTS/vector triggers matter because `fts_chunks` is a contentless FTS5 table and `vec_chunks` is a `vec0` virtual table — neither can be an FK child, so a cascade could never reach them even if foreign keys were on. The triggers fire on *any* delete from `chunks`, which is exactly why `removeFile` only has to delete the chunk rows and the search and embedding rows follow automatically (`src/db/index.ts:213-220`).
 
-`clearFileGraph` does more than delete the file's own graph rows. The dependency graph also stores cross-file pointers in *other* files — `symbol_refs.resolved_export_id` pointing at this file's exports, and `file_imports.resolved_file_id` pointing at this file. Because foreign keys are off, the schema's `ON DELETE SET NULL` on those pointers never fires either. So `clearFileGraph` first nulls those inbound pointers in other files, and only then deletes this file's `symbol_refs`, `file_exports`, and `file_imports` rows (`src/db/graph.ts:777-795`). Skipping this would corrupt [depends_on](../tools/depends-on.md), [depended_on_by](../tools/depended-on-by.md), and [find_usages](../tools/find-usages.md) results for files that referenced the removed file (`src/db/graph.ts:769-771`).
+`clearFileGraph` does more than delete the file's own graph rows. The dependency graph also stores cross-file pointers in *other* files — `symbol_refs.resolved_export_id` pointing at this file's exports, and `file_imports.resolved_file_id` pointing at this file. Because foreign keys are off, the schema's `ON DELETE SET NULL` on those pointers never fires either. So `clearFileGraph` first nulls those inbound pointers in other files (`src/db/graph.ts:938-949`), and only then deletes this file's `symbol_refs`, `file_exports`, and `file_imports` rows (`src/db/graph.ts:951-953`). Skipping this would corrupt [depends_on](../tools/depends-on.md), [dependents](../tools/dependents.md), and [usages](../tools/usages.md) results for files that referenced the removed file (`src/db/graph.ts:926-930`).
 
 ## State changes
 
@@ -79,7 +79,7 @@ The two FTS/vector triggers matter because `fts_chunks` is a contentless FTS5 ta
 | Chunks | N rows in `chunks` for the file | All deleted | The file's content stops being searchable and disappears from read results (`src/db/files.ts:258`) |
 | FTS entries | Matching rows in `fts_chunks` | Removed via `chunks_ad` trigger | Keyword search stops returning the file (`src/db/index.ts:205-207`) |
 | Vector entries | Matching rows in `vec_chunks` | Removed via `chunks_vec_ad` trigger | Semantic search stops returning the file (`src/db/index.ts:218-220`) |
-| Graph rows | The file's `symbol_refs` / `file_exports` / `file_imports`, plus inbound pointers in other files | Own rows deleted; inbound pointers nulled | Keeps dependency and usage queries from pointing at a file that no longer exists (`src/db/graph.ts:777-795`) |
+| Graph rows | The file's `symbol_refs` / `file_exports` / `file_imports`, plus inbound pointers in other files | Own rows deleted; inbound pointers nulled | Keeps dependency and usage queries from pointing at a file that no longer exists (`src/db/graph.ts:936-953`) |
 
 All of these happen inside one transaction, so the file is either fully removed across every table or not touched at all (`src/db/files.ts:255-263`).
 
@@ -89,7 +89,7 @@ All of these happen inside one transaction, so the file is either fully removed 
 - **File not in the index.** `getFileByPath` returns `null`, `removeFile` returns `false` without running the transaction, and the handler prints `<file> was not in the index` (`src/db/files.ts:252-253`, `src/cli/commands/remove.ts:16`). This is not an error: the process still exits `0`.
 - **File present.** The transaction runs and `removeFile` returns `true`, producing `Removed <file>` (`src/db/files.ts:264`, `src/cli/commands/remove.ts:16`).
 - **Optional directory parsing.** A second positional argument is used as the project directory only when it is present and not a flag (`!args[2].startsWith("--")`); otherwise the directory falls back to `.` (`src/cli/commands/remove.ts:11`). The command does not parse any flags of its own.
-- **No flag errors.** Unlike commands that read numeric flags, `remove` does not call the flag parser, so it never throws the `CliFlagError` handled in `main` (`src/cli/index.ts:97-100`).
+- **No flag errors.** Unlike commands that read numeric flags, `remove` does not call the flag parser, so it never throws the `CliFlagError` handled in `main` (`src/cli/index.ts:101-104`).
 - **Transaction safety.** All deletes are wrapped in `db.transaction(...)`; if any statement throws, SQLite rolls back and no partial deletion is committed (`src/db/files.ts:255-263`).
 
 ## Inputs
@@ -136,7 +136,7 @@ The [remove_file](../tools/remove-file.md) MCP tool exposes the same operation t
 
 ## Key source files
 
-- `src/cli/index.ts` — argument parsing and the `remove` dispatch case (`src/cli/index.ts:25-26`, `src/cli/index.ts:127-129`).
+- `src/cli/index.ts` — argument parsing and the `remove` dispatch case (`src/cli/index.ts:26-27`, `src/cli/index.ts:131-133`).
 - `src/cli/commands/remove.ts` — the command handler: validate, resolve, call `removeFile`, print, close.
 - `src/db/index.ts` — `RagDB.removeFile` wrapper, the schema, and the FTS/vector triggers that keep derived tables in sync.
 - `src/db/files.ts` — the store-level `removeFile`: lookup, transactional deletes, return value.

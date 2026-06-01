@@ -4,7 +4,7 @@
 
 This is a maintainer/evaluation tool, not part of normal indexing or serving. You reach for it when you are considering changing the default embedding model and want hard recall numbers on real queries before touching `embeddingModel` in config. It never touches your real index: every model gets its own temporary index directory that is deleted as soon as its turn is over.
 
-The command is registered in the CLI dispatcher at `src/cli/index.ts:139-140`, which routes `benchmark-models` to `benchmarkModelsCommand` in `src/cli/commands/benchmark-models.ts:33`.
+The command is registered in the CLI dispatcher at `src/cli/index.ts:146-148`, which routes `benchmark-models` to `benchmarkModelsCommand` in `src/cli/commands/benchmark-models.ts:33`.
 
 ## How it works
 
@@ -127,7 +127,7 @@ The `autoEmbeddingConfig: false` option is directly tied to this. Normally the `
 - **No queries file** — if `args[1]` is absent, the handler prints usage plus the known-model list and exits with code 1 — `src/cli/commands/benchmark-models.ts:34-42`.
 - **Missing `--models`** — prints an error with an example and exits 1 — `src/cli/commands/benchmark-models.ts:49-52`.
 - **Unknown model name** — `parseModelArg` throws `Unknown model "..."` when the argument is neither a known model nor a value that splits into exactly two `:`-separated parts — `src/cli/commands/benchmark-models.ts:23-31`.
-- **Bad `--top`** — a non-integer or `< 1` value throws a `CliFlagError`, which the top-level dispatcher catches to print the message and exit 1 rather than crash — `src/cli/flags.ts:40-53`, `src/cli/index.ts:96-102`.
+- **Bad `--top`** — a non-integer or `< 1` value throws a `CliFlagError`, which the top-level dispatcher catches to print the message and exit 1 rather than crash — `src/cli/flags.ts:40-53`, `src/cli/index.ts:101-104`.
 - **Invalid benchmark file** — `loadBenchmarkQueries` throws if the JSON is not an array, or if any entry lacks a `query` or has an empty/absent `expected` array — `src/search/benchmark.ts:33-41`.
 - **Stale temp directory** — if a previous run died before cleanup and left a `.rag-eval-<model>` directory, it is removed before re-creation, so the index always starts empty — `src/cli/commands/benchmark-models.ts:69`.
 - **Indexing or benchmark error mid-loop** — the `try/finally` still closes the DB and deletes the temp directory, so a failure on one model leaves no stray `.rag-eval-*` folder behind. The error then propagates out of the loop, and because cleanup runs but the embedder restore at the end does not, a thrown error leaves the singleton configured for the failing model — `src/cli/commands/benchmark-models.ts:79-102`.

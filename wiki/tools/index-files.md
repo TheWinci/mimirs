@@ -1,6 +1,6 @@
 # Tool: index_files
 
-`index_files` is the MCP tool that builds or refreshes the semantic search index for a project. Every other read tool — `search`, `read_relevant`, `search_symbols`, `find_usages`, `project_map` — only sees files that this tool has written into the SQLite index at `.mimirs/index.db`. If you create or change files and want them findable, this is the tool that makes them so.
+`index_files` is the MCP tool that builds or refreshes the semantic search index for a project. Every other read tool — `search`, `read_relevant`, `search_symbols`, `usages`, `project_map` — only sees files that this tool has written into the SQLite index at `.mimirs/index.db`. If you create or change files and want them findable, this is the tool that makes them so.
 
 It has two modes, chosen by whether the caller passes `patterns`:
 
@@ -85,7 +85,7 @@ Because a scoped refresh never prunes, it cannot *shrink* the index. To drop fil
 
 - **Before**: the index reflects the previous run — some files may be missing, stale, or deleted on disk but still present as rows.
 - **After**: every matched file that changed is re-chunked, re-embedded, and rewritten; unchanged files (same content hash) are left as-is; and on a full run, files that are gone from disk or now excluded have their rows removed.
-- **Why it matters**: this is the only path that updates what the search and graph tools can see. A file that is never indexed is invisible to `search`, `read_relevant`, `find_usages`, and the rest.
+- **Why it matters**: this is the only path that updates what the search and graph tools can see. A file that is never indexed is invisible to `search`, `read_relevant`, `usages`, and the rest.
 - **Where**: `processFile` decides per file. For a changed or new file it calls `db.upsertFileStart(filePath, hash)` to write the `files` row, `db.insertChunkBatch(...)` for chunk rows (which populate the vector and FTS tables via triggers), `db.upsertFileGraph(...)` for imports/exports, and `db.upsertSymbolRefs(...)` for identifier references (`src/indexing/indexer.ts:464-515`). After the loop, `db.pruneDeleted(...)` removes stale files on a full run, deleting their `chunks`, graph rows, and `files` row inside one transaction (`src/indexing/indexer.ts:778`, `src/db/files.ts:279-289`). Finally, `resolveImports` plus `db.resolveAllSymbolRefs()` rebuild cross-file edges when anything was indexed (`src/indexing/indexer.ts:785-793`).
 
 ## Branches and failure cases

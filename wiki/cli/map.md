@@ -8,7 +8,7 @@ picture of what depends on what, without opening import statements across many
 files.
 
 The command is registered in the CLI dispatcher and forwards straight to its
-handler `src/cli/index.ts:133-135`. The handler opens the database, calls the
+handler `src/cli/index.ts:137-139`. The handler opens the database, calls the
 shared graph renderer `generateProjectMap`, prints the result, and closes the
 database `src/cli/commands/map.ts:6-20`.
 
@@ -54,7 +54,7 @@ sequenceDiagram
    `--zoom`. The first positional word after `map` is the directory; flags can
    appear in any order.
 2. The dispatcher matches the `map` command and calls the handler with the raw
-   argument list and a `getFlag` lookup `src/cli/index.ts:133-135`.
+   argument list and a `getFlag` lookup `src/cli/index.ts:137-139`.
 3. The handler resolves the target directory: it uses `args[1]` only when that
    word exists and does not start with `--`, otherwise it defaults to the
    current directory `.` `src/cli/commands/map.ts:7`. It then reads `--focus`
@@ -70,7 +70,7 @@ sequenceDiagram
    `src/graph/resolver.ts:195-204`.
 7. The database returns plain node and edge arrays. Nodes carry each file's id,
    path, and its exported symbols; edges carry resolved import relationships
-   `src/db/graph.ts:816-868`.
+   `src/db/graph.ts:975-1027`.
 8. The renderer turns that graph into text — file-level by default, or
    directory-level when `--zoom directory` was given
    `src/graph/resolver.ts:220-224`.
@@ -107,7 +107,7 @@ The "no importers" group is printed first under a `### Files With No Importers`
 heading, then the rest under `### Files` `src/graph/resolver.ts:293-306`. For
 each file the renderer prints, in order, its relative path, up to eight exports
 as `name (type)` with a `, +N more` suffix when there are more, its
-`depends_on` list, and its `depended_on_by` list — each list omitted when empty
+`depends_on` list, and its `dependents` list — each list omitted when empty
 `src/graph/resolver.ts:269-291`. The comment in source is explicit that "no
 importers" is structural fan-in inside the indexed set, not a guarantee that
 the file is a real application entry point `src/graph/resolver.ts:253-254`.
@@ -137,13 +137,13 @@ seeded by that file id, expanded by the default two hops
 The subgraph walk is a breadth-first expansion run directly in SQL. It starts
 from the focus file and, per hop, pulls every import edge where the focus side
 appears as either importer or importee, then folds the newly seen files into
-the next frontier until two hops are done `src/db/graph.ts:880-908`. After the
+the next frontier until two hops are done `src/db/graph.ts:1039-1067`. After the
 walk it loads nodes and edges only for the visited file ids, batching queries to
-stay under SQLite's parameter limit `src/db/graph.ts:910-981`. A prior version
+stay under SQLite's 999-parameter limit `src/db/graph.ts:1069-1137`. A prior version
 batched both edge endpoints with the same slice and silently dropped edges whose
 ends fell in different batches; the current code batches by `file_id` alone and
 filters the other end in JS against the visited set
-`src/db/graph.ts:944-978`. The resulting neighborhood is then rendered with the
+`src/db/graph.ts:1103-1137`. The resulting neighborhood is then rendered with the
 same file-level or directory-level formatter as a full graph.
 
 ## Branches and failure cases
@@ -162,7 +162,7 @@ Two further points matter when reading the output:
 
 - The graph only reflects imports that indexing managed to resolve to another
   indexed file. Edges come exclusively from `file_imports` rows whose
-  `resolved_file_id` is set `src/db/graph.ts:847-857`. Bare/external packages
+  `resolved_file_id` is set `src/db/graph.ts:1011-1015`. Bare/external packages
   and imports to files outside the index never appear as edges, so a file can
   show an empty `depends_on` even though its source imports third-party
   modules.
@@ -200,16 +200,16 @@ Illustrative file-level output (paths and counts are synthetic):
   src/cli/index.ts
     exports: main (function)
     depends_on: src/cli/commands/map.ts
-    depended_on_by: src/main.ts
+    dependents: src/main.ts
   src/cli/commands/map.ts
     exports: mapCommand (function)
-    depended_on_by: src/cli/index.ts
+    dependents: src/cli/index.ts
 ```
 
 ## Open questions
 
 The built-in usage text advertises `mimirs map` as generating a "project
-dependency graph (structured text)" `src/cli/index.ts:48-49`. That phrasing is
+dependency graph (structured text)" `src/cli/index.ts:49-50`. That phrasing is
 current, but the doc comment on `generateProjectMap` still records that the
 format replaced an older Mermaid output `src/graph/resolver.ts:176-179` — worth
 knowing if you grep for "Mermaid" expecting this command to emit it. It does
@@ -220,7 +220,7 @@ not; it emits indented text.
 The `project_map` MCP tool is the in-server counterpart to this command. It
 calls the same `generateProjectMap` renderer with the same `focus`/`zoom`
 options, and additionally exposes a `format` argument that can return the graph
-as JSON `src/tools/graph-tools.ts:4`, `src/tools/graph-tools.ts:29-39`. The CLI
+as JSON `src/tools/graph-tools.ts:4`, `src/tools/graph-tools.ts:61-80`. The CLI
 command never passes `format`, so it always uses the default text rendering. See
 [project_map](../tools/project-map.md).
 
@@ -228,7 +228,7 @@ command never passes `format`, so it always uses the default text rendering. See
 
 | path | role |
 | --- | --- |
-| `src/cli/index.ts` | Registers the `map` command and dispatches to the handler `src/cli/index.ts:133-135`. |
+| `src/cli/index.ts` | Registers the `map` command and dispatches to the handler `src/cli/index.ts:137-139`. |
 | `src/cli/commands/map.ts` | Handler: resolves args, opens the index, calls the renderer, prints, closes `src/cli/commands/map.ts:6-20`. |
 | `src/graph/resolver.ts` | Hosts `generateProjectMap` and the file-level and directory-level text formatters `src/graph/resolver.ts:180-356`. |
-| `src/db/graph.ts` | Backs the renderer with `getGraph` (full graph) and `getSubgraph` (focused neighborhood) `src/db/graph.ts:816-981`. |
+| `src/db/graph.ts` | Backs the renderer with `getGraph` (full graph) and `getSubgraph` (focused neighborhood) `src/db/graph.ts:975-1140`. |

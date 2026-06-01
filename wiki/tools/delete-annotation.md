@@ -55,7 +55,7 @@ sequenceDiagram
 
 1. The MCP caller invokes the tool with an `id` and an optional `directory`. The argument schema has already enforced that `id` is an integer of at least 1, so the handler body only runs for structurally valid input (`src/tools/annotation-tools.ts:93-100`).
 2. The handler resolves which project to act on. `resolveProject` turns the optional `directory` into an absolute path (falling back to `RAG_PROJECT_DIR` then `process.cwd()`), verifies the directory exists, loads that project's config, applies its embedding settings, and hands back the project's `RagDB` instance (`src/tools/index.ts:21-37`). If the directory does not exist, it throws `Directory does not exist: <path>` and the deletion never starts (`src/tools/index.ts:30-32`).
-3. The handler calls `ragDb.deleteAnnotation(id)` and keeps its boolean result (`src/tools/annotation-tools.ts:103`). `RagDB` is a thin facade — this method forwards straight to the annotation store module (`src/db/index.ts:838-840`).
+3. The handler calls `ragDb.deleteAnnotation(id)` and keeps its boolean result (`src/tools/annotation-tools.ts:103`). `RagDB` is a thin facade — this method forwards straight to the annotation store module (`src/db/index.ts:847-849`).
 4. The store first runs `SELECT id, note FROM annotations WHERE id = ?` to confirm the row exists and to capture its `note` text (`src/db/annotations.ts:176-180`). The note text is captured because the next step needs it, not just for the existence check.
 5. If that lookup returns nothing, the function returns `false` immediately, without opening a transaction or touching any table (`src/db/annotations.ts:181`).
 6. If the row exists, one SQLite transaction removes it from all three places it lives: the full-text index, the vector index, and the base table (`src/db/annotations.ts:183-192`). The transaction keeps the three consistent — either all three deletes land or none do.
@@ -128,7 +128,7 @@ Annotation #42 not found.
 | --- | --- |
 | `src/tools/annotation-tools.ts` | Registers the `delete_annotation` MCP tool, resolves the project, calls the store, and formats the deleted / not-found text response (`:90-114`). |
 | `src/db/annotations.ts` | `deleteAnnotation` — the lookup-then-transaction logic that removes the row plus its FTS and vector entries (`:175-194`). |
-| `src/db/index.ts` | Declares the `annotations`, `fts_annotations`, and `vec_annotations` tables, resolves the per-project database path, and exposes `RagDB.deleteAnnotation` as a thin forwarder to the store (`:398-420`, `:101-134`, `:838-840`). |
+| `src/db/index.ts` | Declares the `annotations`, `fts_annotations`, and `vec_annotations` tables, resolves the per-project database path, and exposes `RagDB.deleteAnnotation` as a thin forwarder to the store (`:398-420`, `:101-134`, `:847-849`). |
 | `src/tools/index.ts` | Defines `resolveProject` (directory resolution and validation) and wires `registerAnnotationTools` into the server (`:21-37`, `:50`). |
 
 ## Related tools

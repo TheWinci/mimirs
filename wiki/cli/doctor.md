@@ -2,11 +2,11 @@
 
 `mimirs doctor` runs a sequence of environment checks that reproduce, in the foreground, the work the MCP server does at startup. The server is launched as a detached background process by your editor, so when it fails to come up there is usually no terminal to show the error. `doctor` re-does that startup work where you can see it — confirming the Bun runtime, loading an extension-capable SQLite plus `sqlite-vec`, opening the real database, and importing the embedding module — and prints a pass/fail line plus an actionable fix for each. Run it when the server will not start, when search returns nothing, or right after installing on a new machine.
 
-The command is dispatched from the CLI's `doctor` case, which forwards the raw argument list to the handler (`src/cli/index.ts:160-162`). All of the work lives in `doctorCommand` (`src/cli/commands/doctor.ts:11-184`).
+The command is dispatched from the CLI's `doctor` case, which forwards the raw argument list to the handler (`src/cli/index.ts:167-168`). All of the work lives in `doctorCommand` (`src/cli/commands/doctor.ts:11-184`).
 
 ## Why doctor stays lightweight
 
-The point of `doctor` is to run even when the heavy parts of mimirs are broken. Its only top-level imports are `fs`, `path`, `os`, and the CLI logger (`src/cli/commands/doctor.ts:1-4`). Everything that could itself fail to load — `bun:sqlite`, `sqlite-vec`, the database wrapper, the embedding module — is pulled in lazily with `require()` inside the individual check functions (`src/cli/commands/doctor.ts:28-29`, `src/cli/commands/doctor.ts:95`, `src/cli/commands/doctor.ts:110`, `src/cli/commands/doctor.ts:122`). The CLI entry follows the same rule for `serve`: it imports the server module dynamically inside the dispatch switch, because the server's transitive native dependencies and top-level awaits would crash the whole CLI at module-load time and block even `doctor` (`src/cli/index.ts:16-18`, `src/cli/index.ts:107-110`). On top of that, each check is wrapped in a try/catch so a thrown error becomes a recorded failure rather than an uncaught exception that aborts the run (`src/cli/commands/doctor.ts:138-153`).
+The point of `doctor` is to run even when the heavy parts of mimirs are broken. Its only top-level imports are `fs`, `path`, `os`, and the CLI logger (`src/cli/commands/doctor.ts:1-4`). Everything that could itself fail to load — `bun:sqlite`, `sqlite-vec`, the database wrapper, the embedding module — is pulled in lazily with `require()` inside the individual check functions (`src/cli/commands/doctor.ts:28-29`, `src/cli/commands/doctor.ts:95`, `src/cli/commands/doctor.ts:110`, `src/cli/commands/doctor.ts:122`). The CLI entry follows the same rule for `serve`: it imports the server module dynamically inside the dispatch switch, because the server's transitive native dependencies and top-level awaits would crash the whole CLI at module-load time and block even `doctor` (`src/cli/index.ts:17-19`, `src/cli/index.ts:111-112`). On top of that, each check is wrapped in a try/catch so a thrown error becomes a recorded failure rather than an uncaught exception that aborts the run (`src/cli/commands/doctor.ts:138-153`).
 
 ## How it works
 
@@ -51,7 +51,7 @@ All output goes to stdout through the shared CLI logger, whose `log` method is a
 | `RAG_PROJECT_DIR` | env var | no | Used as the project directory when no positional argument is given (`src/cli/commands/doctor.ts:12`). |
 | `RAG_DB_DIR` | env var | no | When set, the writability probe and the `RagDB` open both target this directory instead of `<projectDir>/.mimirs` (`src/cli/commands/doctor.ts:75-77`, `src/db/index.ts:101-105`). |
 
-The argument array that reaches the handler is the whole CLI token list; index `0` is the command word `doctor`, so the positional directory is read from index `1` (`src/cli/index.ts:25-26`, `src/cli/commands/doctor.ts:12`).
+The argument array that reaches the handler is the whole CLI token list; index `0` is the command word `doctor`, so the positional directory is read from index `1` (`src/cli/index.ts:26-27`, `src/cli/commands/doctor.ts:12`).
 
 ## Outputs
 

@@ -206,7 +206,7 @@ Turn 12 (2024-01-01T10:15:00Z) [search, read_relevant]
   the chunk index so Windows and POSIX entries collide on the same key...
   Files: src/db/files.ts, src/search/hybrid.ts
 
-Turn 9 (2024-01-01T09:58:00Z) [find_usages]
+Turn 9 (2024-01-01T09:58:00Z) [usages]
   Found three call sites that joined paths with the platform separator...
   Files: src/db/index.ts
 ```

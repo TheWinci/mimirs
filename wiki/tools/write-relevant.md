@@ -71,11 +71,11 @@ sequenceDiagram
 4. `searchChunks` embeds the query, runs a vector search and a BM25 text search over
    chunks, merges and rescores them, groups child chunks under their parent, expands
    documentation hits, and returns a ranked `ChunkResult[]`
-   (`src/search/hybrid.ts:470-555`).
+   (`src/search/hybrid.ts:464-549`).
 5. As its final step, `searchChunks` records the query in the analytics log — the
    same write that powers [search_analytics](./search-analytics.md). This is the one
    persistent side effect of an otherwise read-only tool
-   (`src/search/hybrid.ts:544-552`).
+   (`src/search/hybrid.ts:540-546`).
 6. If the search returned nothing above the threshold, the handler short-circuits
    with a plain message telling the caller the index may be empty and to run
    `index_files` first (`src/tools/search.ts:314-318`).
@@ -90,7 +90,7 @@ sequenceDiagram
 ### Chunk search, then best-per-file selection
 
 `searchChunks` deliberately does **not** deduplicate by file — two chunks from the
-same file can both appear in its ranked output (`src/search/hybrid.ts:466-469`).
+same file can both appear in its ranked output (`src/search/hybrid.ts:460-463`).
 That is the right behaviour when you want to read several relevant snippets, but for
 placement it is noise: you only want one insertion point per file. So the handler
 does its own file-level dedup. It walks the chunk list and keeps, per path, the
@@ -115,7 +115,7 @@ Each returned candidate carries two placement hints. The first is a human-readab
 insert position. If the chunk corresponds to a named entity (a function or class),
 the line reads `after \`<entityName>\` (chunk <chunkIndex>)`; otherwise it falls
 back to `after chunk <chunkIndex>`. Both `entityName` and `chunkIndex` come straight
-off the `ChunkResult` shape (`src/search/hybrid.ts:45-55`,
+off the `ChunkResult` shape (`src/search/hybrid.ts:46-56`,
 `src/tools/search.ts:335-337`).
 
 The second hint is the **anchor**: the last 150 characters of the chunk's content,
@@ -126,7 +126,7 @@ line numbers that may have drifted.
 
 One subtlety worth knowing: when chunk search consolidates several sibling chunks
 into their parent (parent grouping), the promoted parent chunk is emitted with
-`chunkIndex: -1` (`src/search/hybrid.ts:441-451`). In that case the suggestion will
+`chunkIndex: -1` (`src/search/hybrid.ts:435-446`). In that case the suggestion will
 read `(chunk -1)`, which signals that the match is a whole parent unit (for example
 an entire file or large block) rather than a precise sub-chunk. The anchor text is
 still meaningful, but the chunk index is not a real position.
@@ -155,19 +155,19 @@ path filter, so the whole index is in scope (`src/tools/search.ts:310`).
 
 The scores are the post-rescoring chunk scores from `searchChunks`, formatted with
 `toFixed(2)`. Because path-based multipliers and an importer-count boost are applied
-inside the search, a score can exceed `1.0` (`src/search/hybrid.ts:495-534`).
+inside the search, a score can exceed `1.0` (`src/search/hybrid.ts:489-528`).
 
 ## State changes
 
 | item | before | after | trigger |
 | --- | --- | --- | --- |
-| `query_log` row | no row for this call | one new row recording the query text, result count, top score, top path, and duration | `db.logQuery(...)` at the end of `searchChunks` (`src/search/hybrid.ts:544-552`) |
+| `query_log` row | no row for this call | one new row recording the query text, result count, top score, top path, and duration | `db.logQuery(...)` at the end of `searchChunks` (`src/search/hybrid.ts:540-546`) |
 
 Although `write_relevant` reads the index and never writes code or chunks, it does
 leave a footprint. Every call flows through `searchChunks`, whose last action is to
-insert an analytics row. The `RagDB.logQuery` wrapper delegates to the analytics
+insert an analytics row before returning. The `RagDB.logQuery` wrapper delegates to the analytics
 helper, which runs a single `INSERT` into the `query_log` table
-(`src/db/index.ts:880-885`, `src/db/analytics.ts:3-8`). The row's columns are
+(`src/db/index.ts:889-893`, `src/db/analytics.ts:3-8`). The row's columns are
 defined by the table schema — `query`, `result_count`, `top_score`, `top_path`,
 `duration_ms`, and an ISO `created_at` timestamp (`src/db/index.ts:340-348`).
 
@@ -196,13 +196,13 @@ analytics row is written before the handler's own reduction step.
   (`src/tools/search.ts:302-306`).
 - **Parent-grouped match.** When a candidate is a consolidated parent chunk, its
   reported chunk index is `-1`; the suggestion still names the entity and anchor but
-  the index is not a literal position (`src/search/hybrid.ts:441-451`).
+  the index is not a literal position (`src/search/hybrid.ts:435-446`).
 - **Unnamed chunk.** When a chunk has no `entityName`, the insert line drops the
   entity reference and reads `after chunk <chunkIndex>`
   (`src/tools/search.ts:335-337`).
 - **FTS failure inside search.** If the BM25 text query throws, `searchChunks` logs
   a debug line and continues vector-only; `write_relevant` is unaffected and still
-  returns vector-based candidates (`src/search/hybrid.ts:486-490`).
+  returns vector-based candidates (`src/search/hybrid.ts:480-484`).
 
 ## Example
 
@@ -246,7 +246,7 @@ with the same content shows the real surrounding lines before you write the edit
   (`src/tools/search.ts:277-348`).
 - `src/search/hybrid.ts` — `searchChunks`, the shared chunk search that does the
   embedding, hybrid scoring, parent grouping, and the analytics write
-  (`src/search/hybrid.ts:470-555`).
+  (`src/search/hybrid.ts:464-549`).
 - `src/tools/index.ts` — `resolveProject`, which resolves the directory and supplies
   the database and config (`src/tools/index.ts:21-37`).
 - `src/db/index.ts` / `src/db/analytics.ts` — the `RagDB.logQuery` wrapper, the

@@ -6,7 +6,7 @@ The command is deliberately surgical. It does not wipe whole config files blindl
 
 ## What runs
 
-`cleanup` is one of the static command cases in the CLI dispatcher. The CLI reads its arguments once at module load: `args` is `process.argv.slice(2)` and `command` is `args[0]` (`src/cli/index.ts:25-26`). When `command` is `cleanup`, `dispatch()` calls `cleanupCommand(args)` with the full argument array (`src/cli/index.ts:163-164`). All the real work lives in `cleanupCommand` (`src/cli/commands/cleanup.ts:113`).
+`cleanup` is one of the static command cases in the CLI dispatcher. The CLI reads its arguments once at module load: `args` is `process.argv.slice(2)` and `command` is `args[0]` (`src/cli/index.ts:26-27`). When `command` is `cleanup`, `dispatch()` calls `cleanupCommand(args)` with the full argument array (`src/cli/index.ts:170-171`). All the real work lives in `cleanupCommand` (`src/cli/commands/cleanup.ts:113`).
 
 The handler builds a list of pending removal actions, optionally asks the user to confirm, then runs each action in order and prints what it actually changed.
 
@@ -27,7 +27,7 @@ flowchart TD
 ```
 
 1. The user runs `mimirs cleanup`, optionally with a directory and the `-y`/`--yes` flag.
-2. `dispatch()` matches the `cleanup` case and calls `cleanupCommand(args)` (`src/cli/index.ts:163-164`).
+2. `dispatch()` matches the `cleanup` case and calls `cleanupCommand(args)` (`src/cli/index.ts:170-171`).
 3. The handler resolves the target directory and decides whether confirmation is suppressed. The directory is `args[1]` when it is present and does not start with `--`, otherwise the current directory (`"."`), resolved to an absolute path with `resolve()`; `autoYes` is true when `args` contains `--yes` or `-y` (`src/cli/commands/cleanup.ts:114-115`).
 4. It assembles a list of zero-argument async functions, one per thing that might need removing. Nothing is deleted yet at this stage — the list is just closures that will run later (`src/cli/commands/cleanup.ts:118-142`).
 5. Unless `autoYes` is set, it prints a plain-language summary of what will be removed and calls `confirm("Proceed? [y/N] ")` (`src/cli/commands/cleanup.ts:144-151`).
@@ -87,7 +87,7 @@ These changes matter because they make `init` reversible. After `cleanup` a chec
 
 ## Branches and failure cases
 
-- **Confirmation is "proceed unless 'n'".** The prompt reads `Proceed? [y/N] `, but `confirm` returns `false` only when the trimmed, lower-cased answer is exactly `"n"`; every other answer — including pressing Enter — proceeds (`src/cli/setup.ts:314-322`). Despite the `[y/N]` styling suggesting No is the default, an empty answer deletes. Use `-y`/`--yes` for non-interactive runs, and answer `n` to abort.
+- **Confirmation is "proceed unless 'n'".** The prompt reads `Proceed? [y/N] `, but `confirm` returns `false` only when the trimmed, lower-cased answer is exactly `"n"`; every other answer — including pressing Enter — proceeds (`src/cli/setup.ts:320-326`). Despite the `[y/N]` styling suggesting No is the default, an empty answer deletes. Use `-y`/`--yes` for non-interactive runs, and answer `n` to abort.
 - **`-y` as the only argument is misread as a directory.** The directory check rejects only arguments starting with `--`, so `mimirs cleanup -y` puts `-y` into `args[1]`, which fails the `--` check and is resolved as the target directory — pointing cleanup at a `-y` subfolder of the cwd rather than the project. (`autoYes` still becomes true because `-y` is in `args`, so the prompt is still skipped — it is just aimed at the wrong directory, where it finds nothing and prints `Nothing to clean up`.) The `--yes` long form is rejected by the `--` check and is never mistaken for a directory. To skip the prompt for the current directory, prefer `mimirs cleanup . -y` or `mimirs cleanup --yes` (`src/cli/commands/cleanup.ts:114-115`).
 - **Nothing to clean up.** If every action returns `null` — no `.mimirs/`, no MCP entries, no instruction blocks, no `.gitignore` line — the command prints `Nothing to clean up — no mimirs files found.` and changes nothing (`src/cli/commands/cleanup.ts:164-165`).
 - **Missing files are skipped silently.** Every helper guards with `existsSync` (or a JSON parse) and returns `null` when its target is absent or irrelevant, so cleanup never errors on a partially-installed project (`src/cli/commands/cleanup.ts:16`, `:54`, `:84`, `:94`).
@@ -132,7 +132,7 @@ The summary text and result lines above match the literal strings the command pr
 
 | File | Role |
 | --- | --- |
-| `src/cli/index.ts` | CLI dispatcher; routes the `cleanup` command to its handler (`:163-164`). |
+| `src/cli/index.ts` | CLI dispatcher; routes the `cleanup` command to its handler (`:170-171`). |
 | `src/cli/commands/cleanup.ts` | The command itself plus all removal helpers (`removeInstructionsBlock`, `removeMcpEntry`, `removeOwnedFile`, `removeGitignoreEntry`, `cleanupCommand`). |
 | `src/cli/setup.ts` | Home of `confirm`, the prompt helper, and the `init` writers whose effects this command reverses. |
 | `src/utils/log.ts` | `cli.log` — the stdout console wrapper used for all output. |

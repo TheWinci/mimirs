@@ -1,8 +1,8 @@
 {
   "metadata": {
     "schemaVersion": 1,
-    "prefetchCommitHash": "5c7b45b00a7c9cf57038a98ad628b7f5279da0fb",
-    "createdAt": "2026-05-31T21:40:00.000Z"
+    "prefetchCommitHash": "8b52efc578171f4c1811165342fd6db79e7ca635",
+    "createdAt": "2026-06-01T09:46:33.000Z"
   },
   "flows": [
     {
@@ -627,7 +627,7 @@
       "id": "tools/read-relevant",
       "title": "Tool: read_relevant",
       "kind": "tool",
-      "summary": "MCP tool that runs a hybrid chunk search and returns the actual content of ranked chunks with exact line ranges, inlining any matching file/symbol annotations as [NOTE] blocks and a find_usages tip.",
+      "summary": "MCP tool that runs a hybrid chunk search and returns the actual content of ranked chunks with exact line ranges, inlining any matching file/symbol annotations as [NOTE] blocks and a usages tip.",
       "confidence": "high",
       "entrypoints": ["read_relevant (MCP tool)"],
       "files": [
@@ -649,7 +649,7 @@
           "evidence": [{ "path": "src/search/hybrid.ts", "startLine": 544, "endLine": 552 }]
         }
       ],
-      "relatedFlows": ["tools/search", "cli/read", "tools/get-annotations", "tools/find-usages"]
+      "relatedFlows": ["tools/search", "cli/read", "tools/get-annotations", "tools/usages"]
     },
 
     {
@@ -666,7 +666,7 @@
       "evidence": [
         { "path": "src/tools/search.ts", "startLine": 219, "endLine": 275 }
       ],
-      "relatedFlows": ["tools/find-usages", "tools/read-relevant"]
+      "relatedFlows": ["tools/usages", "tools/read-relevant"]
     },
 
     {
@@ -787,16 +787,16 @@
       "evidence": [
         { "path": "src/tools/graph-tools.ts", "startLine": 8, "endLine": 51 }
       ],
-      "relatedFlows": ["cli/map", "tools/depends-on", "tools/depended-on-by"]
+      "relatedFlows": ["cli/map", "tools/depends-on", "tools/dependents"]
     },
 
     {
-      "id": "tools/find-usages",
-      "title": "Tool: find_usages",
+      "id": "tools/usages",
+      "title": "Tool: usages",
       "kind": "tool",
       "summary": "MCP tool that finds every call site or reference to a symbol across indexed files (from the chunk/symbol-ref index), grouped by file with line numbers and matching snippets. Supports exact word-boundary matching.",
       "confidence": "high",
-      "entrypoints": ["find_usages (MCP tool)"],
+      "entrypoints": ["usages (MCP tool)"],
       "files": [
         { "path": "src/tools/graph-tools.ts", "role": "entrypoint" },
         { "path": "src/db/graph.ts", "role": "store" }
@@ -804,7 +804,7 @@
       "evidence": [
         { "path": "src/tools/graph-tools.ts", "startLine": 53, "endLine": 107 }
       ],
-      "relatedFlows": ["tools/search-symbols", "tools/depended-on-by"]
+      "relatedFlows": ["tools/search-symbols", "tools/dependents"]
     },
 
     {
@@ -821,16 +821,16 @@
       "evidence": [
         { "path": "src/tools/graph-tools.ts", "startLine": 109, "endLine": 140 }
       ],
-      "relatedFlows": ["tools/depended-on-by", "tools/project-map"]
+      "relatedFlows": ["tools/dependents", "tools/project-map"]
     },
 
     {
-      "id": "tools/depended-on-by",
-      "title": "Tool: depended_on_by",
+      "id": "tools/dependents",
+      "title": "Tool: dependents",
       "kind": "tool",
       "summary": "MCP tool that lists the files that import a given file (reverse dependencies / blast radius) from the import graph.",
       "confidence": "high",
-      "entrypoints": ["depended_on_by (MCP tool)"],
+      "entrypoints": ["dependents (MCP tool)"],
       "files": [
         { "path": "src/tools/graph-tools.ts", "role": "entrypoint" },
         { "path": "src/db/graph.ts", "role": "store" }
@@ -838,7 +838,64 @@
       "evidence": [
         { "path": "src/tools/graph-tools.ts", "startLine": 142, "endLine": 173 }
       ],
-      "relatedFlows": ["tools/depends-on", "tools/project-map", "tools/find-usages"]
+      "relatedFlows": ["tools/depends-on", "tools/project-map", "tools/usages"]
+    },
+
+    {
+      "id": "tools/impact",
+      "title": "Tool: impact",
+      "kind": "tool",
+      "summary": "MCP tool that reports a symbol's transitive callers as a pruned call tree (symbol-level blast radius) plus the test files to run, walking the resolved symbol-ref graph. The printed tree is bounded by depth/budget and prunes ambient (high fan-in) callers, but a second count pass reports the true caller and file totals so the headline is honest.",
+      "confidence": "high",
+      "entrypoints": ["impact (MCP tool)"],
+      "files": [
+        { "path": "src/tools/graph-tools.ts", "role": "entrypoint" },
+        { "path": "src/graph/trace.ts", "role": "service" },
+        { "path": "src/db/graph.ts", "role": "store" }
+      ],
+      "evidence": [
+        { "path": "src/tools/graph-tools.ts", "startLine": 212, "endLine": 250 },
+        { "path": "src/graph/trace.ts", "startLine": 224, "endLine": 300 }
+      ],
+      "relatedFlows": ["tools/trace", "tools/usages", "tools/dependents", "cli/affected"]
+    },
+
+    {
+      "id": "tools/trace",
+      "title": "Tool: trace",
+      "kind": "tool",
+      "summary": "MCP tool that shows how one symbol reaches another: the reachable call sub-graph from `from` to `to`, computed as forward-reachable-from-source intersected with backward-reachable-to-target, with branches that never reach the target pruned and the shortest path highlighted as a spine. Resolution is static, so a dynamic-dispatch hop ends a chain and is reported as a no-path frontier.",
+      "confidence": "high",
+      "entrypoints": ["trace (MCP tool)"],
+      "files": [
+        { "path": "src/tools/graph-tools.ts", "role": "entrypoint" },
+        { "path": "src/graph/trace.ts", "role": "service" },
+        { "path": "src/db/graph.ts", "role": "store" }
+      ],
+      "evidence": [
+        { "path": "src/tools/graph-tools.ts", "startLine": 252, "endLine": 298 },
+        { "path": "src/graph/trace.ts", "startLine": 364, "endLine": 460 }
+      ],
+      "relatedFlows": ["tools/impact", "tools/usages"]
+    },
+
+    {
+      "id": "cli/affected",
+      "title": "CLI: affected",
+      "kind": "command",
+      "summary": "CLI command that prints the test files affected by a set of changed files, by walking the transitive importer closure and keeping the tests. Reads file paths from arguments, from --stdin (e.g. piped `git diff --name-only`), or from `git diff --name-only HEAD` when none are given; supports --quiet (bare paths for piping) and --json.",
+      "confidence": "high",
+      "entrypoints": ["mimirs affected [files...] (CLI)"],
+      "files": [
+        { "path": "src/cli/commands/affected.ts", "role": "entrypoint" },
+        { "path": "src/graph/trace.ts", "role": "service" },
+        { "path": "src/cli/index.ts", "role": "other" }
+      ],
+      "evidence": [
+        { "path": "src/cli/commands/affected.ts", "startLine": 20, "endLine": 93 },
+        { "path": "src/graph/trace.ts", "startLine": 488, "endLine": 575 }
+      ],
+      "relatedFlows": ["tools/impact", "cli/map"]
     },
 
     {
@@ -1174,11 +1231,17 @@
 
     { "slug": "tools/project-map", "title": "Tool: project_map", "kind": "tool", "flowIds": ["tools/project-map"], "primaryFiles": ["src/tools/graph-tools.ts", "src/graph/resolver.ts", "src/db/graph.ts"], "mustCover": ["generateProjectMap from import/export graph", "focus and zoom options", "text vs json (fan-in/fan-out) output"], "inputs": ["directory", "focus", "zoom", "format"], "outputs": ["dependency map (text or json)"] },
 
-    { "slug": "tools/find-usages", "title": "Tool: find_usages", "kind": "tool", "flowIds": ["tools/find-usages"], "primaryFiles": ["src/tools/graph-tools.ts", "src/db/graph.ts"], "mustCover": ["findUsages across the chunk/symbol-ref index", "grouping by file with line numbers and snippets", "exact word-boundary option"], "inputs": ["symbol", "exact", "top", "directory"], "outputs": ["usages grouped by file"] },
+    { "slug": "tools/usages", "title": "Tool: usages", "kind": "tool", "flowIds": ["tools/usages"], "primaryFiles": ["src/tools/graph-tools.ts", "src/db/graph.ts"], "mustCover": ["findUsages across the chunk/symbol-ref index", "grouping by file with line numbers and snippets", "exact word-boundary option"], "inputs": ["symbol", "exact", "top", "directory"], "outputs": ["usages grouped by file"] },
 
     { "slug": "tools/depends-on", "title": "Tool: depends_on", "kind": "tool", "flowIds": ["tools/depends-on"], "primaryFiles": ["src/tools/graph-tools.ts", "src/db/graph.ts"], "mustCover": ["getDependsOn resolved dependencies", "file-not-in-index handling"], "inputs": ["file", "directory"], "outputs": ["list of imported files with import sources"] },
 
-    { "slug": "tools/depended-on-by", "title": "Tool: depended_on_by", "kind": "tool", "flowIds": ["tools/depended-on-by"], "primaryFiles": ["src/tools/graph-tools.ts", "src/db/graph.ts"], "mustCover": ["getDependedOnBy reverse dependencies (blast radius)", "file-not-in-index handling"], "inputs": ["file", "directory"], "outputs": ["list of importer files with import sources"] },
+    { "slug": "tools/dependents", "title": "Tool: dependents", "kind": "tool", "flowIds": ["tools/dependents"], "primaryFiles": ["src/tools/graph-tools.ts", "src/db/graph.ts"], "mustCover": ["getDependedOnBy reverse dependencies (blast radius)", "file-not-in-index handling"], "inputs": ["file", "directory"], "outputs": ["list of importer files with import sources"] },
+
+    { "slug": "tools/impact", "title": "Tool: impact", "kind": "tool", "flowIds": ["tools/impact"], "primaryFiles": ["src/tools/graph-tools.ts", "src/graph/trace.ts", "src/db/graph.ts"], "mustCover": ["transitive caller walk over the symbol-ref graph", "symbol resolution + ambiguity handling via getCallablesByName", "ambient-prune by per-export inbound count (not name fan-in)", "honest total vs shown counts when depth/budget bound the tree", "Tests to run: precise (reference the symbol) vs broad (import affected files)"], "inputs": ["symbol", "file", "depth", "directory", "format"], "outputs": ["pruned caller tree", "test files to run", "json structured result"] },
+
+    { "slug": "tools/trace", "title": "Tool: trace", "kind": "tool", "flowIds": ["tools/trace"], "primaryFiles": ["src/tools/graph-tools.ts", "src/graph/trace.ts"], "mustCover": ["reachable sub-graph = forward-from-source intersected with backward-to-target", "pruning branches that do not reach the target", "shortest-path spine", "no-path frontier report and the static-resolution limitation"], "inputs": ["from", "to", "from_file", "to_file", "max_depth", "directory", "format"], "outputs": ["reachable sub-graph tree", "shortest-path spine", "no-path frontier"] },
+
+    { "slug": "cli/affected", "title": "CLI: affected", "kind": "command", "flowIds": ["cli/affected"], "primaryFiles": ["src/cli/commands/affected.ts", "src/graph/trace.ts"], "mustCover": ["input modes: file args, --stdin, git diff auto-detect", "transitiveImporters closure filtered to test files", "--quiet (bare paths) and --json output", "unknown-file reporting"], "inputs": ["files", "--stdin", "--json", "--quiet", "--dir"], "outputs": ["affected test file list"] },
 
     { "slug": "tools/search-conversation", "title": "Tool: search_conversation", "kind": "tool", "flowIds": ["tools/search-conversation"], "primaryFiles": ["src/tools/conversation-tools.ts", "src/db/conversation.ts"], "mustCover": ["embed query then vector + BM25 over turns", "hybrid scoring deduped by turnId", "FTS failure fallback to vector-only", "optional sessionId scope"], "inputs": ["query", "directory", "sessionId", "top"], "outputs": ["ranked conversation turns with tools/files referenced"] },
 

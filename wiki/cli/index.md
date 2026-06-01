@@ -6,7 +6,7 @@ The command is a thin CLI wrapper. The real work lives in `indexDirectory`, the 
 
 ## How it runs
 
-The top-level CLI reads `process.argv`, matches the first word `index`, and calls `indexCommand(args, getFlag)` `src/cli/index.ts:115-116`. Everything after that is in the handler `src/cli/commands/index-cmd.ts:8-49`.
+The top-level CLI reads `process.argv`, matches the first word `index`, and calls `indexCommand(args, getFlag)` `src/cli/index.ts:119-120`. Everything after that is in the handler `src/cli/commands/index-cmd.ts:8-49`.
 
 ```mermaid
 flowchart TD
@@ -100,7 +100,7 @@ After the file loop, unless pruning is explicitly disabled, `indexDirectory` col
 
 ### Cross-file resolution: per-file refs → resolved edges
 
-Once at least one file was indexed, the engine resolves import paths across all files and then resolves symbol references against that import scope `src/indexing/indexer.ts:785-793`. Symbol resolution must follow import resolution because cross-file reference edges depend on `file_imports.resolved_file_id`. This is what makes `find_usages`, `depends_on`, and `depended_on_by` return cross-file results after indexing.
+Once at least one file was indexed, the engine resolves import paths across all files and then resolves symbol references against that import scope `src/indexing/indexer.ts:785-793`. Symbol resolution must follow import resolution because cross-file reference edges depend on `file_imports.resolved_file_id`. This is what makes `usages`, `depends_on`, and `dependents` return cross-file results after indexing.
 
 ## Branches and failure cases
 
@@ -129,7 +129,7 @@ mimirs index . --patterns "**/*.ts,**/*.md"
 
 ## Key source files
 
-- `src/cli/index.ts` — top-level CLI dispatcher; routes the `index` command to the handler `src/cli/index.ts:115-116`.
+- `src/cli/index.ts` — top-level CLI dispatcher; routes the `index` command to the handler `src/cli/index.ts:119-120`.
 - `src/cli/commands/index-cmd.ts` — the `index` command handler: parses args, loads config, applies `--patterns`, runs the engine, prints the summary.
 - `src/indexing/indexer.ts` — `indexDirectory` and `processFile`: scanning, locking, embedding, writing, pruning, and cross-file resolution.
 - `src/cli/progress.ts` — `cliProgress` and `createQuietProgress`: verbose vs quiet terminal output.

@@ -40,13 +40,13 @@ sequenceDiagram
     Cmd->>DB: db.close()
 ```
 
-1. The user runs `mimirs eval <file>` with optional flags. The top-level dispatcher matches the `eval` case and calls `evalCommand(args, getFlag)`; `getFlag` is a small helper that scans `args` for a flag name and returns the next token (`src/cli/index.ts:142-143`, `src/cli/index.ts:81-84`).
+1. The user runs `mimirs eval <file>` with optional flags. The top-level dispatcher matches the `eval` case and calls `evalCommand(args, getFlag)`; `getFlag` is a small helper that scans `args` for a flag name and returns the next token (`src/cli/index.ts:149-151`, `src/cli/index.ts:85-88`).
 2. The handler requires a task file as the first positional argument. `args[1]` is the file path (`args[0]` is the literal word `eval`). If it is missing, the command prints the usage line and exits with code 1 (`src/cli/commands/eval.ts:9-13`).
 3. It resolves the project directory from `--dir` (default `.`), reads the optional `--out` path, opens the index with `new RagDB(dir)`, loads the project config, and resolves the result count. `--top` is parsed by `intFlag`, which rejects non-integer input and enforces a minimum of 1; when `--top` is absent it falls back to `config.benchmarkTopK` (default 5) (`src/cli/commands/eval.ts:15-19`).
 4. `loadEvalTasks` reads and parses the task file, validating that it is a JSON array and that every entry has both a `task` and a `grading` string (`src/search/eval.ts:40-55`).
 5. For each task, `runEval` calls `runEvalTask` twice — once in the `with-rag` condition and once in the `without-rag` condition — and pushes both traces (`src/search/eval.ts:101-105`).
 6. In the `with-rag` condition, `runEvalTask` loads the config again and calls the real hybrid `search` with the task text as the query, the resolved `topK`, a zero score threshold, the configured hybrid weight, and the generated-file patterns (`src/search/eval.ts:73-77`).
-7. The hybrid `search` runs a vector query plus a BM25 query against the SQLite index, merges the scores, and returns results deduplicated to one entry per file path (`src/search/hybrid.ts:326-352`).
+7. The hybrid `search` runs a vector query plus a BM25 query against the SQLite index, merges the scores, and returns results deduplicated to one entry per file path (`src/search/hybrid.ts:316-353`).
 8. The `without-rag` condition skips search entirely. The `if (condition === "with-rag")` block never runs, so the result set stays empty — this simulates an agent that has no index to lean on (`src/search/eval.ts:70-77`).
 9. After all tasks run, `runEval` splits the traces by condition, computes averages and a file hit rate for each side with its local `computeStats` helper, and returns an `EvalSummary` (`src/search/eval.ts:107-141`).
 10. The handler prints `formatEvalReport(summary)` to stdout — the side-by-side table plus the per-task breakdown (`src/cli/commands/eval.ts:25`).
@@ -132,7 +132,7 @@ The write happens through `saveEvalTraces`, called by the handler only when `--o
 - **Task file not valid JSON.** `loadEvalTasks` calls `JSON.parse` with no guard, so malformed JSON throws and the command aborts (`src/search/eval.ts:41-42`).
 - **Top level is not an array.** `loadEvalTasks` throws `Eval file must be a JSON array of { task, grading } objects` (`src/search/eval.ts:44-46`).
 - **Entry missing `task` or `grading`.** Each entry is validated; a missing field throws an error that includes the offending entry as JSON (`src/search/eval.ts:48-52`).
-- **Bad `--top` value.** A non-integer or out-of-range value raises `CliFlagError`, which the dispatcher catches to print a clear message and exit 1 instead of crashing with an opaque error (`src/cli/flags.ts:40-52`, `src/cli/index.ts:97-100`).
+- **Bad `--top` value.** A non-integer or out-of-range value raises `CliFlagError`, which the dispatcher catches to print a clear message and exit 1 instead of crashing with an opaque error (`src/cli/flags.ts:40-53`, `src/cli/index.ts:101-104`).
 - **`--out` omitted.** The trace file write and its confirmation line are skipped; only the report is printed (`src/cli/commands/eval.ts:27-30`).
 - **No `expectedFiles` on any task.** The file hit rate is reported as 0% for both conditions because there is nothing to score against (`src/search/eval.ts:130`).
 - **Empty index or no matches.** Search can legitimately return zero results for a task; that trace records an empty file list, and the per-task breakdown shows `(none)` (`src/search/eval.ts:158-160`).

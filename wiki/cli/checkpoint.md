@@ -14,7 +14,7 @@ getting them back out. It groups three subcommands under one verb:
 | `search <query>` | Embeds the query and returns the semantically closest checkpoints. |
 
 All three share a single entry function, `checkpointCommand`, which the top-level
-dispatcher calls for the `checkpoint` command word (`src/cli/index.ts:148-149`).
+dispatcher calls for the `checkpoint` command word (`src/cli/index.ts:155-156`).
 That function opens one `RagDB` against the resolved project directory, branches
 on the second argument, and always closes the database before returning
 (`src/cli/commands/checkpoint.ts:8-87`).
@@ -22,12 +22,12 @@ on the second argument, and always closes the database before returning
 ## How the command is wired up
 
 The CLI takes the first token of `process.argv` as the command and routes
-`checkpoint` into `checkpointCommand(args, getFlag)` (`src/cli/index.ts:148-149`).
+`checkpoint` into `checkpointCommand(args, getFlag)` (`src/cli/index.ts:155-156`).
 `args` is the full argument list, so inside the handler `args[0]` is the literal
 string `checkpoint`, `args[1]` is the subcommand, and the remaining positions hold
 subcommand operands. `getFlag` is a tiny lookup that finds a flag by name and
 returns the token after it, or `undefined` when the flag is absent
-(`src/cli/index.ts:81-84`).
+(`src/cli/index.ts:85-88`).
 
 The handler resolves the target directory once — from `--dir` or the current
 working directory — and constructs a `RagDB` for it before looking at the
@@ -146,7 +146,7 @@ below 1 (`src/cli/commands/checkpoint.ts:39-40`). The numeric parse goes through
 `intFlag`, which uses strict `Number` parsing and throws a `CliFlagError` on
 garbage like `--top 5abc`; the dispatcher catches that, prints the message, and
 exits non-zero rather than crashing (`src/cli/flags.ts:40-53`,
-`src/cli/index.ts:94-102`).
+`src/cli/index.ts:96-106`).
 
 It then calls `db.listCheckpoints(undefined, type, top)`. The first argument is
 the session filter, which the CLI deliberately leaves `undefined` so that **all**
@@ -255,7 +255,7 @@ itself perform no writes to the checkpoint tables.
   (`src/cli/commands/checkpoint.ts:27-30`, `src/conversation/parser.ts:302-332`).
 - **Bad `--top`** — a non-integer or out-of-range value throws `CliFlagError`,
   which the dispatcher converts into a clear stderr message and a non-zero exit
-  (`src/cli/flags.ts:40-53`, `src/cli/index.ts:94-102`).
+  (`src/cli/flags.ts:40-53`, `src/cli/index.ts:96-106`).
 - **Empty `list` result** — prints `No checkpoints found.` and writes nothing
   (`src/cli/commands/checkpoint.ts:43-44`).
 - **Empty `search` result** — prints `No matching checkpoints found.`

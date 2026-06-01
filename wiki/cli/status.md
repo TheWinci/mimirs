@@ -6,7 +6,7 @@ The command does almost no work of its own. It opens the project database, runs 
 
 ## How it runs
 
-The CLI entry point reads the process arguments and dispatches on the first word. When that word is `status`, it awaits the status handler with the full argument list `src/cli/index.ts:124-125`. The handler resolves the target directory, opens the index, reads the stats, prints them, and closes the connection `src/cli/commands/status.ts:5-14`.
+The CLI entry point reads the process arguments and dispatches on the first word. When that word is `status`, it awaits the status handler with the full argument list `src/cli/index.ts:128-129`. The handler resolves the target directory, opens the index, reads the stats, prints them, and closes the connection `src/cli/commands/status.ts:5-14`.
 
 ```mermaid
 sequenceDiagram
@@ -30,8 +30,8 @@ sequenceDiagram
     Handler->>DB: db.close()
 ```
 
-1. The user runs `mimirs status` with an optional directory. The shell hands the arguments to the CLI, which slices off the program name and treats the remaining words as `args`, dispatching on `args[0]` `src/cli/index.ts:25-26`.
-2. The `status` branch of the dispatcher awaits `statusCommand(args)`, passing the whole argument array so the handler can read the optional directory itself `src/cli/index.ts:124-125`.
+1. The user runs `mimirs status` with an optional directory. The shell hands the arguments to the CLI, which slices off the program name and treats the remaining words as `args`, dispatching on `args[0]` `src/cli/index.ts:26-27`.
+2. The `status` branch of the dispatcher awaits `statusCommand(args)`, passing the whole argument array so the handler can read the optional directory itself `src/cli/index.ts:128-129`.
 3. The handler resolves the target directory. It uses `args[1]` only when that argument exists and does not start with `--`; otherwise it falls back to the current directory `"."`. The chosen value is run through `resolve(...)` so the printed path and the database location are absolute `src/cli/commands/status.ts:6`.
 4. The handler constructs a `RagDB` for that directory. The constructor locates the index folder (`.mimirs` under the project, or an override), ensures it exists, opens `index.db`, and creates the schema if it is not already present `src/db/index.ts:94-140`.
 5. The handler calls `db.getStatus()`, which delegates to the `getStatus` helper in the files module `src/db/index.ts:646-648`.
@@ -66,7 +66,7 @@ All four lines go to stdout through the CLI logger, which is a thin wrapper over
 - `totalChunks` is `SELECT COUNT(*) FROM chunks`. Each chunk is a semantic unit (a function, class, or section) belonging to a file via `file_id`, and is what search actually ranks `src/db/index.ts:179-189`.
 - `lastIndexed` is the single newest `indexed_at`, found by `ORDER BY indexed_at DESC LIMIT 1`. The value is an ISO 8601 string written with `new Date().toISOString()` whenever a file is inserted or re-indexed `src/db/files.ts:51-61`. Because indexing updates a file's `indexed_at` in place on every run, this reflects the most recent indexing activity, not the first.
 
-The same `getStatus` method backs other surfaces, so the numbers here match what those report. The MCP `index_status` tool reads the same fields and prints a near-identical `Files` / `Chunks` / `Last indexed` block `src/tools/index-tools.ts:104-111`, the post-index summary calls it to show the resulting counts `src/tools/index-tools.ts:56-60`, and the session-context summary reuses it too `src/cli/commands/session-context.ts:38-41`. See [index_status](../tools/index-status.md) for the agent-facing equivalent of this command.
+The same `getStatus` method backs other surfaces, so the numbers here match what those report. The MCP `index_status` tool reads the same fields and prints a near-identical `Files` / `Chunks` / `Last indexed` block `src/tools/index-tools.ts:105-111`, the post-index summary calls it to show the resulting counts `src/tools/index-tools.ts:56-60`, and the session-context summary reuses it too `src/cli/commands/session-context.ts:38-41`. See [index_status](../tools/index-status.md) for the agent-facing equivalent of this command.
 
 ## Branches and failure cases
 
@@ -112,7 +112,7 @@ The second example shows a directory with no prior index: zero files, zero chunk
 
 ## Key source files
 
-- `src/cli/index.ts` — CLI entry point; slices process args and dispatches `status` to the handler `src/cli/index.ts:124-125`.
+- `src/cli/index.ts` — CLI entry point; slices process args and dispatches `status` to the handler `src/cli/index.ts:128-129`.
 - `src/cli/commands/status.ts` — the handler; resolves the directory, opens the DB, reads stats, prints four lines, closes the DB.
 - `src/db/index.ts` — the `RagDB` class; the constructor opens or creates `index.db` and `getStatus` delegates to the files module.
 - `src/db/files.ts` — `getStatus` runs the three counting queries that produce `totalFiles`, `totalChunks`, and `lastIndexed`.

@@ -136,7 +136,7 @@ query at read time and compare it against vectors that already exist.
 ## Inserting the checkpoint row
 
 `RagDB.createCheckpoint` is a thin wrapper that forwards to the store function in
-`src/db/checkpoints.ts` (`src/db/index.ts:801-810`). That function performs both
+`src/db/checkpoints.ts` (`src/db/index.ts:810-819`). That function performs both
 writes inside one transaction so the row and its vector always land together
 (`src/db/checkpoints.ts:4-49`). It first inserts into `conversation_checkpoints`
 with the session id, turn index, ISO timestamp, type, title, summary, and the

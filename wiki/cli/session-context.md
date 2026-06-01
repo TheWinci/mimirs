@@ -10,7 +10,7 @@ Run it when you (or an agent) open a project and want a fast picture of its curr
 
 ## How it works
 
-The dispatcher in `src/cli/index.ts` maps the `session-context` subcommand to `sessionContextCommand`, passing the raw argument list and a `getFlag` helper that looks up a named flag's value (`src/cli/index.ts:157-158`). The handler then resolves the target directory and builds up an array of Markdown sections, one per data source, before joining and printing them at the end (`src/cli/commands/session-context.ts:16-101`).
+The dispatcher in `src/cli/index.ts` maps the `session-context` subcommand to `sessionContextCommand`, passing the raw argument list and a `getFlag` helper that looks up a named flag's value (`src/cli/index.ts:164-165`). The handler then resolves the target directory and builds up an array of Markdown sections, one per data source, before joining and printing them at the end (`src/cli/commands/session-context.ts:16-101`).
 
 The interesting part of this command is not the call order — it is the chain of guards. Every section is conditional, so the page below the diagram is mostly about which branch fires when.
 

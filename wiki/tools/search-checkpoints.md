@@ -40,7 +40,7 @@ sequenceDiagram
 1. The agent calls the tool with a `query` and optional `type`, `limit`, and `directory`. Zod validates the arguments before the handler runs, so a missing or empty `query` is rejected before any work happens (`src/tools/checkpoint-tools.ts:123-134`).
 2. `resolveProject` turns the optional `directory` into an absolute path, verifies it exists, loads the project config, applies its embedding settings, and returns the project's `RagDB` handle (`src/tools/index.ts:22-37`). This is what lets the same server serve checkpoints for multiple projects.
 3. The handler embeds the query string into a vector with `embed` (`src/tools/checkpoint-tools.ts:138`).
-4. The vector is passed to `ragDb.searchCheckpoints`, which forwards to the database helper with the `limit` as `topK` and the optional `type` (`src/db/index.ts:814-816`).
+4. The vector is passed to `ragDb.searchCheckpoints`, which forwards to the database helper with the `limit` as `topK` and the optional `type` (`src/db/index.ts:823-825`).
 5. The helper runs a `MATCH` query against `vec_checkpoints` ordered by distance, joined to the base checkpoint rows. It deliberately over-fetches — it asks for `topK * 2` candidates (`src/db/checkpoints.ts:114-120`).
 6. It walks the candidates, skips any whose `type` does not match the requested filter, converts each distance into a `score` of `1 / (1 + distance)`, and stops once it has collected `topK` results (`src/db/checkpoints.ts:124-141`).
 7. If nothing survives, the handler returns the fixed string `"No matching checkpoints found."` (`src/tools/checkpoint-tools.ts:141-145`).
