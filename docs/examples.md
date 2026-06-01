@@ -272,17 +272,17 @@ export interface StoredChunk {
   parentId: number | null;
 }
 
-── Tip: call find_usages("Chunk") to see all call sites, or read_relevant("Chunk")
+── Tip: call usages("Chunk") to see all call sites, or read_relevant("Chunk")
    for full context. ──
 ```
 
 Results include `referenceCount` and `referenceModuleCount` (omitted from display above) — the MCP response lets the agent rank by "most-imported symbol in the codebase", surfacing what's structurally central.
 
-## `find_usages` — the refactoring tool
+## `usages` — the refactoring tool
 
 Every call site and import of a symbol with exact file:line positions. Use before renaming or changing a signature to understand the blast radius.
 
-**Call:** `find_usages(symbol: "searchChunks", top: 10)`
+**Call:** `usages(symbol: "searchChunks", top: 10)`
 
 ```
 Found 10 usages of "searchChunks" across 8 files:
@@ -313,16 +313,16 @@ benchmarks/count-grouping-sim.ts
 src/tools/search.ts
   :5  import { search, searchChunks } from "../search/hybrid";
 
-── Tip: call depended_on_by("<file>") on any file above to see its full importer tree. ──
+── Tip: call dependents("<file>") on any file above to see its full importer tree. ──
 ```
 
 Handles re-exports and aliased imports that a naive grep would miss.
 
-## `depended_on_by` — file-level blast radius
+## `dependents` — file-level blast radius
 
 Reverse-dependency lookup: every file that imports the given file. Useful before modifying a shared module.
 
-**Call:** `depended_on_by(file: "src/search/hybrid.ts")`
+**Call:** `dependents(file: "src/search/hybrid.ts")`
 
 ```
 src/search/hybrid.ts is imported by 20 files:
@@ -343,7 +343,7 @@ src/search/hybrid.ts is imported by 20 files:
   src/cli/commands/demo.ts  (import: ../../search/hybrid)
 ```
 
-Paired with `find_usages` at symbol-level, this gives the agent complete refactoring context before touching shared code.
+Paired with `usages` at symbol-level, this gives the agent complete refactoring context before touching shared code.
 
 ---
 

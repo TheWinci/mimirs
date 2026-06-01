@@ -206,8 +206,8 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
         .join("\n\n---\n\n");
 
       const footerHint = topEntity
-        ? `call find_usages("${topEntity}") to see all call sites before modifying.`
-        : `call find_usages("<symbol>") to see all call sites before modifying.`;
+        ? `call usages("${topEntity}") to see all call sites before modifying.`
+        : `call usages("<symbol>") to see all call sites before modifying.`;
       const footer = `\n── Tip: ${footerHint} ──`;
 
       return {
@@ -218,7 +218,7 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
 
   server.tool(
     "search_symbols",
-    "Find where a function, class, type, or interface is defined — by name, not semantics. Faster than grep for symbol lookup: searches the pre-built symbol index across all indexed files. Omit symbol to list all exports (filtered by type). Returns enrichment data: hasChildren, childCount, referenceCount, isReexport. Use find_usages next to see where the symbol is called.",
+    "Find where a function, class, type, or interface is defined — by name, not semantics. Faster than grep for symbol lookup: searches the pre-built symbol index across all indexed files. Omit symbol to list all exports (filtered by type). Returns enrichment data: hasChildren, childCount, referenceCount, isReexport. Use usages next to see where the symbol is called.",
     {
       symbol: z
         .string()
@@ -268,7 +268,7 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
         .join("\n\n---\n\n");
 
       const topSymbol = results[0].symbolName;
-      const footer = `\n── Tip: call find_usages("${topSymbol}") to see all call sites, or read_relevant("${topSymbol}") for full context. ──`;
+      const footer = `\n── Tip: call usages("${topSymbol}") to see all call sites, or read_relevant("${topSymbol}") for full context. ──`;
 
       return { content: [{ type: "text" as const, text: `${body}${footer}` }] };
     }

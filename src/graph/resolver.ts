@@ -286,7 +286,7 @@ function generateFileMap(
 
     const importers = dependedOnBy.get(node.id)!;
     if (importers.length > 0) {
-      lines.push(`    depended_on_by: ${importers.join(", ")}`);
+      lines.push(`    dependents: ${importers.join(", ")}`);
     }
   }
 

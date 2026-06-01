@@ -40,7 +40,7 @@ This project has a local RAG index (mimirs). Use these MCP tools:
   results — this reveals documentation gaps.
 - **\`search_symbols\`**: When you know a symbol name (function, class, type, etc.),
   find it directly by name instead of using semantic search.
-- **\`find_usages\`**: Before changing a function or type, find all its call sites.
+- **\`usages\`**: Before changing a function or type, find all its call sites.
   Use this to understand the blast radius of a rename or API change. Faster and
   more reliable than semantic search for finding usages.
 - **\`git_context\`**: At the start of a session (or any time you need orientation),
@@ -56,7 +56,7 @@ This project has a local RAG index (mimirs). Use these MCP tools:
   fixed bug, a lifted constraint, or a note on deleted code. Use
   \`get_annotations\` first to find the ID.
 - **\`depends_on\`**: List all files that a given file imports — its dependencies.
-- **\`depended_on_by\`**: List all files that import a given file — reverse
+- **\`dependents\`**: List all files that import a given file — reverse
   dependencies. Use before modifying a shared module to see who depends on it.
 - **\`write_relevant\`**: Before adding new code or docs, find the best insertion
   point — returns the most semantically appropriate file and anchor.

@@ -927,7 +927,7 @@ export function upsertFileGraph(
  * `pruneDeleted` leave behind: the file's own orphaned imports/exports/refs,
  * stale `file_imports.resolved_file_id` in files that imported it, and stale
  * `symbol_refs.resolved_export_id` in files that referenced its exports —
- * which corrupts depends_on / depended_on_by / find_usages results.
+ * which corrupts depends_on / dependents / usages results.
  *
  * Reindexing a file does this per-table in upsertFileGraph/upsertSymbolRefs;
  * this is the equivalent for outright removal. Caller is expected to wrap this

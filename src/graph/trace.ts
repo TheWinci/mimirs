@@ -629,7 +629,7 @@ export function renderImpact(res: ImpactResult, projectDir: string, tests: TestI
   }
 
   lines.push("", renderTests(tests));
-  lines.push("", `── Tip: read_relevant("${r.name}") for the code, or find_usages("${r.name}") for every raw reference. ──`);
+  lines.push("", `── Tip: read_relevant("${r.name}") for the code, or usages("${r.name}") for every raw reference. ──`);
   return lines.join("\n");
 }
 

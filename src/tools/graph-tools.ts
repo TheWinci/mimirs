@@ -79,7 +79,7 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
         };
       }
 
-      const footer = `\n── Tip: call search("<topic>") to find files related to a specific area, or depends_on/depended_on_by for a single file's connections. ──`;
+      const footer = `\n── Tip: call search("<topic>") to find files related to a specific area, or depends_on/dependents for a single file's connections. ──`;
 
       return {
         content: [{ type: "text" as const, text: `${map}${footer}` }],
@@ -88,7 +88,7 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
   );
 
   server.tool(
-    "find_usages",
+    "usages",
     "Find every call site or reference to a symbol across all indexed files — with file paths, line numbers, and matching lines. More reliable than grep for usage analysis: searches the chunk index so it won't miss aliased imports or re-exports. Use this before renaming or changing a function signature.",
     {
       symbol: z.string().min(1).max(200).describe("Symbol name to search for"),
@@ -134,7 +134,7 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
         lines.push("");
       }
 
-      const footer = `── Tip: call depended_on_by("<file>") on any file above to see its full importer tree. ──`;
+      const footer = `── Tip: call dependents("<file>") on any file above to see its full importer tree. ──`;
       lines.push(footer);
 
       return {
@@ -145,7 +145,7 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
 
   server.tool(
     "depends_on",
-    "List all files that a given file imports (its dependencies). Shows the resolved import graph — what this file actually depends on. Use depended_on_by for the reverse direction.",
+    "List all files that a given file imports (its dependencies). Shows the resolved import graph — what this file actually depends on. Use dependents for the reverse direction.",
     {
       file: z.string().describe("File path (relative to project) to query"),
       directory: z
@@ -177,8 +177,8 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
   );
 
   server.tool(
-    "depended_on_by",
-    "List all files that import a given file (reverse dependencies). Shows the blast radius before modifying a file — every file that would be affected by a change. Use find_usages for symbol-level granularity.",
+    "dependents",
+    "List all files that import a given file (reverse dependencies). Shows the blast radius before modifying a file — every file that would be affected by a change. Use usages for symbol-level granularity.",
     {
       file: z.string().describe("File path (relative to project) to query"),
       directory: z
@@ -211,7 +211,7 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
 
   server.tool(
     "impact",
-    "Symbol-level blast radius: the transitive callers of a function or method as a pruned call tree, plus the test files to run for the change. More precise than depended_on_by (which is file-level). Use before changing a signature or behavior. Pass 'file' to disambiguate a name defined in several places. Tracks functions and methods (not classes/constants).",
+    "Symbol-level blast radius: the transitive callers of a function or method as a pruned call tree, plus the test files to run for the change. More precise than dependents (which is file-level). Use before changing a signature or behavior. Pass 'file' to disambiguate a name defined in several places. Tracks functions and methods (not classes/constants).",
     {
       symbol: z.string().min(1).max(200).describe("Function or method name to analyze"),
       file: z

@@ -1,7 +1,7 @@
 /**
- * Utilities for the find_usages feature.
+ * Utilities for the usages feature.
  *
- * find_usages works at query time rather than pre-indexing call sites:
+ * usages works at query time rather than pre-indexing call sites:
  *   1. FTS search finds chunks containing the symbol name.
  *   2. Defining files are excluded via the file_exports table.
  *   3. Within each matching chunk, a word-boundary regex locates the exact line.

@@ -48,7 +48,7 @@ describe("removeFile graph cleanup", () => {
   // PRAGMA foreign_keys is OFF, so the schema's ON DELETE CASCADE / SET NULL
   // clauses never fire. removeFile must clean graph rows by hand; this guards
   // against a regression that would leave orphaned imports/exports/refs and
-  // stale cross-file resolved_* pointers (corrupting depends_on / find_usages).
+  // stale cross-file resolved_* pointers (corrupting depends_on / usages).
   test("removing a file deletes its graph rows and nulls cross-file pointers", async () => {
     await writeFixture(
       tempDir,

@@ -218,7 +218,7 @@ describe("generateProjectMap", () => {
     expect(map).toContain("server.ts");
     expect(map).toContain("db.ts");
     expect(map).toContain("depends_on:");
-    expect(map).toContain("depended_on_by:");
+    expect(map).toContain("dependents:");
   });
 
   test("generates directory-level map", () => {

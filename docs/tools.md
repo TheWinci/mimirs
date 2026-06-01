@@ -16,15 +16,15 @@ These tools are available to any MCP client (Claude Code, Cursor, Windsurf, VS C
 | `list_checkpoints` | List checkpoints, most recent first. Filter by session or type |
 | `search_checkpoints` | Semantic search over checkpoint titles and summaries |
 | `search_symbols` | Find exported symbols by name — functions, classes, types, interfaces, enums. Faster than semantic search when you know the symbol name |
-| `find_usages` | Find every call site of a symbol across the codebase — returns file paths, line numbers (`path:line`), and the matching line. Excludes the defining file |
+| `usages` | Find every call site of a symbol across the codebase — returns file paths, line numbers (`path:line`), and the matching line. Excludes the defining file |
 | `git_context` | Show uncommitted changes (annotated `[indexed]`/`[not indexed]`), recent commits, and changed files. Optional unified diff (`include_diff`). Non-git directories return a graceful message |
 | `search_commits` | Semantically search indexed git commit history — find why code changed, when decisions were made, or what an author worked on. Supports filters: `author`, `since`, `until`, `path`, `threshold` |
 | `file_history` | Get the commit history for a specific file — returns commits that touched it, sorted by date (newest first) |
 | `annotate` | Attach a persistent note to a file or symbol. Notes survive sessions and surface inline in `read_relevant` results. Upserts by `(path, symbol)` key |
 | `get_annotations` | Retrieve notes by file path, or search semantically across all annotations |
 | `depends_on` | List all files that a given file imports (its dependencies) |
-| `depended_on_by` | List all files that import a given file (reverse dependencies) |
-| `impact` | Symbol-level blast radius — the transitive callers of a function/method as a pruned call tree, plus the test files to run (precise: reference the symbol; broad: import affected files). More precise than `depended_on_by`. `file` disambiguates, `depth` (default 3) bounds the walk, `format: json` for structured output |
+| `dependents` | List all files that import a given file (reverse dependencies) |
+| `impact` | Symbol-level blast radius — the transitive callers of a function/method as a pruned call tree, plus the test files to run (precise: reference the symbol; broad: import affected files). More precise than `dependents`. `file` disambiguates, `depth` (default 3) bounds the walk, `format: json` for structured output |
 | `trace` | Show how one symbol reaches another — the reachable call sub-graph from `from` to `to`, shortest path highlighted. Branches that don't reach `to` are pruned; static resolution reports when a dynamic-dispatch hop breaks the chain. `from_file`/`to_file` disambiguate, `format: json` for structured output |
 | `write_relevant` | Find the best insertion point for new content — returns semantically appropriate files and anchors |
 | `wiki` | Run the wiki rebuild workflow. `shape` writes prefetch data and returns the discovery prompt; `validate-discovery` checks `wiki/_discovery.json`; `write` and `write:page:<slug>` coordinate page writing by slug |
