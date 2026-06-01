@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-06-01
+
+### Added
+- **`impact` tool**: symbol-level blast radius — the transitive callers of a function or method as a pruned call tree, plus the test files to run for the change (precise = tests that reference the symbol, broad = tests that import affected files). The printed tree is bounded by `depth` and a node budget and prunes ambient (high fan-in) callers, but a second count pass reports the true caller/file totals so the headline count stays honest. Backed by `src/graph/trace.ts` and new reverse-edge graph queries in `src/db/graph.ts` (`getCallersOfExport`, `getCallersOfLocalSymbol`, `getCallablesByName`)
+- **`trace` tool**: how one symbol reaches another — the reachable call sub-graph from `from` to `to` (the set forward-reachable from the source intersected with the set backward-reachable to the target), with branches that never reach the target pruned and the shortest path highlighted as a spine. Resolution is static name-matching, so an unresolved dynamic-dispatch hop ends a chain and is reported as a no-path frontier
+- **`mimirs affected` CLI**: the test files affected by a set of changed files, by walking the transitive importer graph and keeping the tests. Reads file arguments, `--stdin` (e.g. `git diff --name-only | mimirs affected --stdin`), or auto-detects from `git diff --name-only HEAD`; `--quiet` prints bare paths for piping into a test runner and `--json` prints the full result
+
+### Changed
+- **Breaking — MCP tools renamed, no aliases**: `find_usages` → `usages` and `depended_on_by` → `dependents`. Update permission allowlists to `mcp__mimirs__usages` and `mcp__mimirs__dependents` (clients pick up the new names on reconnect). The `project_map` reverse-dependency output label changed to match: `depended_on_by:` → `dependents:`
+- Shared the test-path patterns (`src/utils/test-paths.ts`) and the transitive-importer closure (`transitiveImporters`) between search ranking, the `impact` tool, and the `affected` CLI
+
+## [1.3.0] - 2026-05-28 to 2026-05-31
+
+### Added
+- **Flow-based wiki generation**: a page per externally-triggered flow (CLI subcommand, MCP tool, server start, route) instead of community/aggregate grouping, via a `wiki shape` → discovery → `wiki write:page:<slug>` workflow with prose served from editable instructions
+- **`wiki update`**: cause-based change detection regenerates only the pages a source change affects, falling back to a full rebuild when too much changed
+- **`wiki changelog` command**: curated, per-version entries for the generated wiki's own changelog
+- Index every project conversation via a folder watch, not just the active session
+
+### Changed
+- Wiki generation prose moved out of code into editable markdown under `src/wiki/instructions/`
+- Flow pages pick the diagram type that best fits each flow
+
+### Fixed
+- Correctness fixes from a codebase review; doc/code drift in `map` help and the agent tool list; community/pipeline vocabulary no longer leaks into generated pages
+
+## [1.2.0] - [1.2.5] - 2026-04-26 to 2026-04-28
+
+### Added
+- **Community-organized wiki** (Louvain): groups related modules into wiki sections via Louvain community detection — later superseded by flow-based generation in 1.3.0
+- Backend-service-aware wiki generation
+- Aggregate-page sharding: large sections split into folders once they pass size thresholds
+- Richer wiki update logging
+
+### Changed
+- Wiki regenerates on version bump only, not on every change
+
+### Fixed
+- Windows path-separator normalization
+- Broken generated mermaid diagrams
+- Incremental wiki update incorrectly falling back to a full regeneration
+- Aggregate page sharding edge cases
+
+## [1.1.3] - [1.1.8] - 2026-04-19 to 2026-04-21
+
+### Added
+- Louvain community-detection groundwork for wiki organization
+
+### Fixed
+- Large-project handling in graph/wiki generation: removed overly tight graph-size caps and batched SQL to stay under the parameter limit
+- Wiki incremental generation when a manifest is present; first-generation logging and LLM-authored prose; per-phase console logging during generation
+- Restored the Claude Code plugin after the package rename; corrected the `demo` command
+
 ## [1.1.0] - [1.1.2] - 2026-04-17 to 2026-04-18
 
 ### Added
