@@ -227,7 +227,7 @@ Kubernetes excludes test files and demotes generated files. With `searchTopK: 15
 
 2. **Embed** — Each chunk becomes a 384-dimensional vector using all-MiniLM-L6-v2 (in-process via Transformers.js + ONNX, no API calls). Vectors are stored in sqlite-vec.
 
-3. **Build dependency graph** — Import specifiers and exported symbols are captured during AST chunking, then resolved to build a file-level dependency graph.
+3. **Build dependency graph** — Import specifiers and exported symbols are captured during AST chunking, then resolved to build a file-level dependency graph and a symbol-level call graph. `impact` walks the transitive callers of a function (blast radius + tests to run); `trace` finds how one symbol reaches another; the `mimirs affected` CLI turns a git diff into the exact set of tests to run.
 
 4. **Hybrid search** — Queries run vector similarity and BM25 in parallel, blended by configurable weight. Results are boosted by dependency graph centrality and path heuristics. `read_relevant` returns individual chunks with entity names and exact line ranges (`path:start-end`).
 

@@ -1,6 +1,7 @@
 import { embed } from "../embeddings/embed";
 import { RagDB, type SearchResult, type ChunkSearchResult, type PathFilter } from "../db";
 import { log } from "../utils/log";
+import { TEST_PATTERNS } from "../utils/test-paths";
 import { basename, extname } from "path";
 
 /**
@@ -91,14 +92,7 @@ export function mergeHybridScores<T extends { score: number; path: string; chunk
 }
 
 // ── Source file boost ────────────────────────────────────────────
-// Common test path patterns
-const TEST_PATTERNS = [
-  /(?:^|[/\\])tests?[/\\]/i,
-  /(?:^|[/\\])__tests__[/\\]/i,
-  /(?:^|[/\\])spec[/\\]/i,
-  /\.(?:test|spec)\.[^/\\]+$/i,
-  /(?:^|[/\\])test_/i,
-];
+// Test patterns live in ../utils/test-paths (shared with the impact tool).
 const SOURCE_PATTERNS = [
   /(?:^|[/\\])(?:src|lib|app|pkg|packages|internal|cmd)[/\\]/i,
 ];

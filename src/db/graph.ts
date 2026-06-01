@@ -658,6 +658,165 @@ export function getSymbolReferencesByName(
 }
 
 /**
+ * A caller of some symbol: the enclosing callable that contains an inbound
+ * ref. Derived from `symbol_refs` → the chunk the ref sits in, folding body
+ * slices up to their named `parent_id` (bun-chunk splits big functions into a
+ * parent bookend + child slices; the ref lives in a child).
+ *
+ * `callerName` is null when the ref sits at module scope (not inside any named
+ * callable) — the trace walker drops those. `refLine` is surfaced 1-indexed.
+ */
+export interface CallerRef {
+  callerName: string | null;
+  fileId: number;
+  filePath: string;
+  startLine: number | null;
+  endLine: number | null;
+  refLine: number;
+}
+
+// Shared projection for both caller queries. GROUP BY collapses N refs from the
+// same caller into one row; COALESCE folds a body-slice chunk to its named
+// parent so the caller is the function, not an anonymous slice.
+const CALLERS_SELECT = `
+  SELECT sr.file_id AS file_id,
+         f.path AS path,
+         COALESCE(c.entity_name, pc.entity_name) AS caller_name,
+         MIN(sr.line) AS ref_line,
+         MIN(COALESCE(c.start_line, pc.start_line)) AS caller_start,
+         MAX(COALESCE(c.end_line, pc.end_line)) AS caller_end
+  FROM symbol_refs sr
+  JOIN files f ON f.id = sr.file_id
+  JOIN chunks c ON c.id = sr.chunk_id
+  LEFT JOIN chunks pc ON pc.id = c.parent_id`;
+
+interface CallerRow {
+  file_id: number;
+  path: string;
+  caller_name: string | null;
+  ref_line: number;
+  caller_start: number | null;
+  caller_end: number | null;
+}
+
+function mapCallerRow(r: CallerRow): CallerRef {
+  return {
+    callerName: r.caller_name,
+    fileId: r.file_id,
+    filePath: r.path,
+    startLine: r.caller_start,
+    endLine: r.caller_end,
+    refLine: r.ref_line + 1,
+  };
+}
+
+/**
+ * Reverse of {@link getCalleeRefsForExport}: the callables that call the export
+ * with `exportId`. One row per distinct (file, enclosing-callable). This is the
+ * edge data {@link countInboundRefsByExport} only counted.
+ */
+export function getCallersOfExport(db: Database, exportId: number): CallerRef[] {
+  return db
+    .query<CallerRow, [number]>(
+      `${CALLERS_SELECT}
+       WHERE sr.resolved_export_id = ?
+       GROUP BY sr.file_id, caller_name`,
+    )
+    .all(exportId)
+    .map(mapCallerRow);
+}
+
+/**
+ * Same-file callers of a non-exported symbol. Locals aren't importable, so
+ * every caller is in the declaring file. Name-based and best-effort — mirrors
+ * the matching {@link getCalleeRefsForLocalSymbol} relies on. Unresolved refs
+ * only (resolved ones point at a real export and are handled by the export
+ * path), so a local shadowing an imported name won't be double-counted.
+ */
+export function getCallersOfLocalSymbol(db: Database, fileId: number, name: string): CallerRef[] {
+  return db
+    .query<CallerRow, [number, string]>(
+      `${CALLERS_SELECT}
+       WHERE sr.file_id = ? AND sr.name = ? AND sr.resolved_export_id IS NULL
+       GROUP BY sr.file_id, caller_name`,
+    )
+    .all(fileId, name)
+    .map(mapCallerRow);
+}
+
+/**
+ * A callable matching a name, for resolving the `symbol` argument of the
+ * `impact`/`trace` tools. Returns both exported (function/method) and
+ * file-local (non-exported) callables, so an ambiguous name surfaces every
+ * definition for the agent to disambiguate by file.
+ */
+export interface CallableCandidate {
+  exportId: number | null;
+  name: string;
+  fileId: number;
+  filePath: string;
+  startLine: number | null;
+  endLine: number | null;
+  isExport: boolean;
+}
+
+export function getCallablesByName(db: Database, name: string): CallableCandidate[] {
+  const exports = db
+    .query<
+      { export_id: number; name: string; file_id: number; path: string; start_line: number | null; end_line: number | null },
+      [string]
+    >(
+      `SELECT fe.id AS export_id, fe.name AS name, f.id AS file_id, f.path AS path,
+              MIN(c.start_line) AS start_line, MAX(c.end_line) AS end_line
+       FROM file_exports fe
+       JOIN files f ON f.id = fe.file_id
+       LEFT JOIN chunks c ON c.file_id = fe.file_id AND c.entity_name = fe.name
+       WHERE fe.name = ? AND fe.type IN ('function', 'method')
+       GROUP BY fe.id, f.id, f.path`,
+    )
+    .all(name)
+    .map((r) => ({
+      exportId: r.export_id,
+      name: r.name,
+      fileId: r.file_id,
+      filePath: r.path,
+      startLine: r.start_line,
+      endLine: r.end_line,
+      isExport: true,
+    }));
+
+  const locals = db
+    .query<
+      { name: string; file_id: number; path: string; start_line: number | null; end_line: number | null },
+      [string]
+    >(
+      `SELECT c.entity_name AS name, f.id AS file_id, f.path AS path,
+              MIN(c.start_line) AS start_line, MAX(c.end_line) AS end_line
+       FROM chunks c
+       JOIN files f ON f.id = c.file_id
+       WHERE c.entity_name = ?
+         AND c.chunk_type IN ('function', 'method')
+         AND NOT EXISTS (
+           SELECT 1 FROM file_exports fe
+           WHERE fe.file_id = c.file_id AND fe.name = c.entity_name
+         )
+       GROUP BY c.file_id, c.entity_name, f.path`,
+    )
+    .all(name)
+    .map((r) => ({
+      exportId: null,
+      name: r.name,
+      fileId: r.file_id,
+      filePath: r.path,
+      startLine: r.start_line,
+      endLine: r.end_line,
+      isExport: false,
+    }));
+
+  return [...exports, ...locals];
+}
+
+/**
  * Count inbound refs to each export from non-test files. Returns a map
  * `exportId → count`. Used by the structural rule: a callable with zero
  * inbound refs is a Tier 1 entry candidate.

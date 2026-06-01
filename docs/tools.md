@@ -24,6 +24,8 @@ These tools are available to any MCP client (Claude Code, Cursor, Windsurf, VS C
 | `get_annotations` | Retrieve notes by file path, or search semantically across all annotations |
 | `depends_on` | List all files that a given file imports (its dependencies) |
 | `depended_on_by` | List all files that import a given file (reverse dependencies) |
+| `impact` | Symbol-level blast radius — the transitive callers of a function/method as a pruned call tree, plus the test files to run (precise: reference the symbol; broad: import affected files). More precise than `depended_on_by`. `file` disambiguates, `depth` (default 3) bounds the walk, `format: json` for structured output |
+| `trace` | Show how one symbol reaches another — the reachable call sub-graph from `from` to `to`, shortest path highlighted. Branches that don't reach `to` are pruned; static resolution reports when a dynamic-dispatch hop breaks the chain. `from_file`/`to_file` disambiguate, `format: json` for structured output |
 | `write_relevant` | Find the best insertion point for new content — returns semantically appropriate files and anchors |
 | `wiki` | Run the wiki rebuild workflow. `shape` writes prefetch data and returns the discovery prompt; `validate-discovery` checks `wiki/_discovery.json`; `write` and `write:page:<slug>` coordinate page writing by slug |
 
@@ -41,6 +43,7 @@ mimirs status [dir]       # Show index stats
 mimirs remove <path>      # Remove a file from the index
 mimirs analytics [dir]    # Usage analytics with trend comparison
 mimirs map [dir]          # Dependency graph (text format)
+mimirs affected [files…]  # Test files affected by changed files (--stdin, --json, --quiet; no files → git diff vs HEAD)
 mimirs benchmark [dir]    # Run search quality benchmark
 mimirs eval [dir]         # A/B eval harness
 mimirs history            # Git history subcommands (index, search, status)
@@ -50,6 +53,22 @@ mimirs annotations [dir]  # List annotations (optionally filter by --path)
 mimirs session-context    # Session start context summary (used by hook)
 mimirs demo [dir]         # Interactive feature demo
 ```
+
+### `affected` — run only the tests a change touches
+
+Walks the import graph transitively to find which test files a set of changed
+files affects. Pipe a git diff in and run just those tests instead of the whole
+suite:
+
+```bash
+# pre-commit / CI: test only what changed
+AFFECTED=$(git diff --name-only HEAD | mimirs affected --stdin --quiet)
+[ -n "$AFFECTED" ] && bun test $AFFECTED
+```
+
+With no file arguments it falls back to `git diff --name-only HEAD` itself. The
+interactive counterpart is the `impact` tool, which reports the same tests for a
+single symbol alongside its caller tree.
 
 ## Analytics
 

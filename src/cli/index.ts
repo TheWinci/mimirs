@@ -5,6 +5,7 @@ import { statusCommand } from "./commands/status";
 import { removeCommand } from "./commands/remove";
 import { analyticsCommand } from "./commands/analytics";
 import { mapCommand } from "./commands/map";
+import { affectedCommand } from "./commands/affected";
 import { benchmarkCommand } from "./commands/benchmark";
 import { benchmarkModelsCommand } from "./commands/benchmark-models";
 import { evalCommand } from "./commands/eval";
@@ -47,6 +48,9 @@ Usage:
                   [--top N] [--out F]
   mimirs map [dir] [--focus F]      Generate project dependency graph
                 [--zoom file|directory]     (structured text)
+  mimirs affected [files...]        Test files affected by changed files
+                [--stdin] [--json] [--quiet] [--dir D]
+                (no files → uses git diff against HEAD)
   mimirs conversation search <query> Search conversation history
                 [--dir D] [--top N]
   mimirs conversation sessions      List indexed sessions
@@ -132,6 +136,9 @@ async function dispatch() {
       break;
     case "map":
       await mapCommand(args, getFlag);
+      break;
+    case "affected":
+      await affectedCommand(args, getFlag);
       break;
     case "benchmark":
       await benchmarkCommand(args, getFlag);

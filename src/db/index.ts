@@ -701,6 +701,15 @@ export class RagDB {
   getCalleeRefsForLocalSymbol(fileId: number, name: string) {
     return graphOps.getCalleeRefsForLocalSymbol(this.db, fileId, name);
   }
+  getCallersOfExport(exportId: number) {
+    return graphOps.getCallersOfExport(this.db, exportId);
+  }
+  getCallersOfLocalSymbol(fileId: number, name: string) {
+    return graphOps.getCallersOfLocalSymbol(this.db, fileId, name);
+  }
+  getCallablesByName(name: string) {
+    return graphOps.getCallablesByName(this.db, name);
+  }
   getLocalCallable(fileId: number, name: string) {
     return graphOps.getLocalCallable(this.db, fileId, name);
   }

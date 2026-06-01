@@ -2,7 +2,44 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { resolve, relative } from "path";
 import { generateProjectMap } from "../graph/resolver";
+import type { CallableCandidate } from "../db/graph";
+import {
+  resolveSymbol,
+  impactWalk,
+  tracePath,
+  collectTests,
+  renderImpact,
+  renderTrace,
+  impactToJson,
+  traceToJson,
+  type SymbolResolution,
+} from "../graph/trace";
 import { type GetDB, resolveProject } from "./index";
+
+function textResult(t: string) {
+  return { content: [{ type: "text" as const, text: t }] };
+}
+
+function formatAmbiguous(symbol: string, cands: CallableCandidate[], projectDir: string): string {
+  const lines = [`"${symbol}" is defined in ${cands.length} places — pass a file to pick one:`];
+  for (const c of cands.slice(0, 15)) {
+    const ln = c.startLine != null ? `:${c.startLine}` : "";
+    lines.push(`  ${relative(projectDir, c.filePath)}${ln}  (${c.isExport ? "exported" : "local"})`);
+  }
+  if (cands.length > 15) lines.push(`  … +${cands.length - 15} more`);
+  return lines.join("\n");
+}
+
+function resolveError(
+  role: string,
+  name: string,
+  file: string | undefined,
+  res: SymbolResolution,
+  projectDir: string,
+): string {
+  if (res.status === "ambiguous") return formatAmbiguous(name, res.candidates!, projectDir);
+  return `No callable named "${name}"${file ? ` in ${file}` : ""} found for \`${role}\`. impact/trace track functions and methods, not classes/constants/types.`;
+}
 
 export function registerGraphTools(server: McpServer, getDB: GetDB) {
   server.tool(
@@ -169,6 +206,87 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
       }
 
       return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+    }
+  );
+
+  server.tool(
+    "impact",
+    "Symbol-level blast radius: the transitive callers of a function or method as a pruned call tree, plus the test files to run for the change. More precise than depended_on_by (which is file-level). Use before changing a signature or behavior. Pass 'file' to disambiguate a name defined in several places. Tracks functions and methods (not classes/constants).",
+    {
+      symbol: z.string().min(1).max(200).describe("Function or method name to analyze"),
+      file: z
+        .string()
+        .optional()
+        .describe("File path (relative) to disambiguate when the name is defined in multiple places"),
+      depth: z.number().int().min(1).max(6).optional().describe("Caller levels to walk (default 3)"),
+      directory: z
+        .string()
+        .optional()
+        .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
+      format: z.enum(["text", "json"]).optional().describe("Output format: 'text' (default) or 'json'"),
+    },
+    async ({ symbol, file, depth, directory, format }) => {
+      const { projectDir, db: ragDb } = await resolveProject(directory, getDB);
+
+      const resolution = resolveSymbol(ragDb, symbol, file);
+      if (resolution.status === "not_found") {
+        return textResult(
+          `No callable named "${symbol}"${file ? ` in ${file}` : ""} found in the index. It may be a class/constant/type (impact tracks functions and methods), live in an excluded path, or not be indexed yet.`,
+        );
+      }
+      if (resolution.status === "ambiguous") {
+        return textResult(formatAmbiguous(symbol, resolution.candidates!, projectDir));
+      }
+
+      const root = resolution.node!;
+      const res = impactWalk(ragDb, root, { maxDepth: depth ?? 3 });
+      const tests = collectTests(ragDb, root, projectDir);
+
+      if (format === "json") {
+        return textResult(JSON.stringify(impactToJson(res, tests, projectDir), null, 2));
+      }
+      return textResult(renderImpact(res, projectDir, tests));
+    }
+  );
+
+  server.tool(
+    "trace",
+    "Show how one symbol reaches another: the reachable call sub-graph from 'from' to 'to', with the shortest path highlighted. Answers 'how does X reach Y'. Branches that don't reach 'to' are pruned. Static resolution — a dynamic-dispatch hop (callback, interface→impl, DI) can break the chain, and is reported when it does. Pass 'from_file'/'to_file' to disambiguate.",
+    {
+      from: z.string().min(1).max(200).describe("Source symbol (function/method) the path starts at"),
+      to: z.string().min(1).max(200).describe("Target symbol the path should reach"),
+      from_file: z.string().optional().describe("File path (relative) to disambiguate 'from'"),
+      to_file: z.string().optional().describe("File path (relative) to disambiguate 'to'"),
+      max_depth: z
+        .number()
+        .int()
+        .min(1)
+        .max(12)
+        .optional()
+        .describe("Max hops to search in each direction (default 6)"),
+      directory: z
+        .string()
+        .optional()
+        .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
+      format: z.enum(["text", "json"]).optional().describe("Output format: 'text' (default) or 'json'"),
+    },
+    async ({ from, to, from_file, to_file, max_depth, directory, format }) => {
+      const { projectDir, db: ragDb } = await resolveProject(directory, getDB);
+
+      const fromRes = resolveSymbol(ragDb, from, from_file);
+      if (fromRes.status !== "ok") {
+        return textResult(resolveError("from", from, from_file, fromRes, projectDir));
+      }
+      const toRes = resolveSymbol(ragDb, to, to_file);
+      if (toRes.status !== "ok") {
+        return textResult(resolveError("to", to, to_file, toRes, projectDir));
+      }
+
+      const res = tracePath(ragDb, fromRes.node!, toRes.node!, { maxDepth: max_depth ?? 6 });
+      if (format === "json") {
+        return textResult(JSON.stringify(traceToJson(res, projectDir), null, 2));
+      }
+      return textResult(renderTrace(res, projectDir));
     }
   );
 }
