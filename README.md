@@ -191,16 +191,16 @@ bunx mimirs demo
 
 ## Search quality
 
-90–98% Recall@10. Benchmarked on four real codebases across three languages (120 queries total) — from 97 files to 8,553 — with known expected results per query. Full methodology in [BENCHMARKS.md](BENCHMARKS.md).
+93–100% Recall@10, MRR 0.76–0.90. Benchmarked on four real codebases across three languages (30 queries each), re-measured 2026-06 on the current pipeline. Full methodology in [BENCHMARKS.md](BENCHMARKS.md).
 
-| Codebase | Language | Files | Queries | Recall@10 | MRR | Zero-miss |
-|---|---|---|---|---|---|---|
-| mimirs | TypeScript | 97 | 30 | 98.3% | 0.683 | 0.0% |
-| Excalidraw | TypeScript | 693 | 30 | 96.7% | 0.442 | 3.3% |
-| Django | Python | 3,090 | 30 | 93.3% | 0.688 | 6.7% |
-| Kubernetes | Go | 8,553 | 30 | 90.0% | 0.589 | 10.0% |
+| Codebase | Language | Files | Recall@10 | MRR | Zero-miss |
+|---|---|---|---|---|---|
+| mimirs | TypeScript | 89 | 100.0% | 0.883 | 0.0% |
+| Excalidraw | TypeScript | 692 | 96.7% | 0.900 | 3.3% |
+| Django | Python | 3,113 | 96.7% | 0.903 | 3.3% |
+| Kubernetes | Go | 8,795 | 93.3% | 0.759 | 6.7% |
 
-Kubernetes excludes test files and demotes generated files. With `searchTopK: 15`, recall reaches 100%. See [Kubernetes benchmarks](BENCHMARKS.md#kubernetes-8553-files-30-queries) for details.
+Kubernetes is large enough (8.8k files) that several correct files rank just past the top-10; recall climbs to 100% by top-20, so set `searchTopK: 15–20` on very large repos.
 
 ## How it compares
 
@@ -208,7 +208,7 @@ Kubernetes excludes test files and demotes generated files. With `searchTopK: 15
 |---|---|---|---|---|
 | Setup | One command | Nothing | Nothing | API keys, accounts |
 | Token cost | ~91K/prompt | ~380K/prompt | Entire codebase | Varies |
-| Search quality | 90–98% Recall@10 | Depends on keywords | N/A (everything loaded) | Varies |
+| Search quality | 93–100% Recall@10 | Depends on keywords | N/A (everything loaded) | Varies |
 | Code understanding | AST-aware (24 langs) | Line-level | None | Usually line-level |
 | Cross-session memory | Conversations + checkpoints | None | None | Some |
 | Privacy | Fully local | Local | Local | Data leaves your machine |
