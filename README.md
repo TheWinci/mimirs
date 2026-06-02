@@ -229,7 +229,7 @@ Kubernetes excludes test files and demotes generated files. With `searchTopK: 15
 
 3. **Build dependency graph** — Import specifiers and exported symbols are captured during AST chunking, then resolved to build a file-level dependency graph and a symbol-level call graph. `impact` walks the transitive callers of a function (blast radius + tests to run); `trace` finds how one symbol reaches another; the `mimirs affected` CLI turns a git diff into the exact set of tests to run.
 
-4. **Hybrid search** — Queries run vector similarity and BM25 in parallel, blended by configurable weight. Results are boosted by dependency graph centrality and path heuristics. `read_relevant` returns individual chunks with entity names and exact line ranges (`path:start-end`).
+4. **Hybrid search** — Queries run vector similarity and BM25 in parallel, combined by reciprocal-rank fusion (weighted, default 0.5) — robust to the two scorers' very different score scales. Identifiers are split (camelCase/snake_case) so a search for `depends` matches `getDependsOn`. Results are then boosted by dependency graph centrality and path heuristics. `read_relevant` returns individual chunks with entity names and exact line ranges (`path:start-end`).
 
 5. **Watch & re-index** — File changes are detected with a 2-second debounce. Changed files are re-indexed; deleted files are pruned.
 

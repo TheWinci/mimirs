@@ -16,11 +16,20 @@ env.cacheDir = CACHE_DIR;
 const DEFAULT_MODEL_ID = "Xenova/all-MiniLM-L6-v2";
 const DEFAULT_EMBEDDING_DIM = 384;
 
+// Pooling and quantization are model-dependent: sentence-transformers models
+// (all-MiniLM) want mean pooling; BGE/GTE/ModernBERT/Arctic want CLS. Configurable
+// so a different embedding model can be pooled correctly.
+export type EmbeddingPooling = "mean" | "cls" | "none";
+export const DEFAULT_POOLING: EmbeddingPooling = "mean";
+export const DEFAULT_DTYPE = "q8";
+
 const MODEL_MAX_TOKENS = 256;
 const MERGE_WINDOW_OVERLAP = 32;
 
 let currentModelId = DEFAULT_MODEL_ID;
 let currentDim = DEFAULT_EMBEDDING_DIM;
+let currentPooling: EmbeddingPooling = DEFAULT_POOLING;
+let currentDtype: string = DEFAULT_DTYPE;
 let extractor: FeatureExtractionPipeline | null = null;
 let tokenizer: PreTrainedTokenizer | null = null;
 
@@ -32,12 +41,19 @@ function defaultThreadCount(): number {
  * Configure a different embedding model. Must be called before getEmbedder().
  * Resets the singleton if the model changes.
  */
-export function configureEmbedder(modelId: string, dim: number): void {
-  if (modelId !== currentModelId || dim !== currentDim) {
+export function configureEmbedder(
+  modelId: string,
+  dim: number,
+  pooling: EmbeddingPooling = DEFAULT_POOLING,
+  dtype: string = DEFAULT_DTYPE,
+): void {
+  if (modelId !== currentModelId || dim !== currentDim || pooling !== currentPooling || dtype !== currentDtype) {
     extractor = null;
     tokenizer = null;
     currentModelId = modelId;
     currentDim = dim;
+    currentPooling = pooling;
+    currentDtype = dtype;
   }
 }
 
@@ -48,7 +64,7 @@ export async function getEmbedder(
   if (!extractor) {
     const numThreads = threads ?? defaultThreadCount();
     const pipelineOptions = {
-      dtype: "q8" as const,
+      dtype: currentDtype as "q8",
       session_options: {
         intraOpNumThreads: numThreads,
         interOpNumThreads: numThreads,
@@ -81,7 +97,7 @@ export async function embed(
   onProgress?: (msg: string) => void,
 ): Promise<Float32Array> {
   const model = await getEmbedder(threads, onProgress);
-  const output = await model(text, { pooling: "mean", normalize: true });
+  const output = await model(text, { pooling: currentPooling, normalize: true });
   return new Float32Array(output.data as Float64Array);
 }
 
@@ -92,7 +108,7 @@ export async function embedBatch(
 ): Promise<Float32Array[]> {
   if (texts.length === 0) return [];
   const model = await getEmbedder(threads, onProgress);
-  const output = await model(texts, { pooling: "mean", normalize: true });
+  const output = await model(texts, { pooling: currentPooling, normalize: true });
   const flat = new Float32Array(output.data as Float64Array);
   const result: Float32Array[] = [];
   for (let i = 0; i < texts.length; i++) {

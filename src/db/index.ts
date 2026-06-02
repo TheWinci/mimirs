@@ -1,6 +1,7 @@
 import { Database } from "bun:sqlite";
 import * as sqliteVec from "sqlite-vec";
 import { getEmbeddingDim } from "../embeddings/embed";
+import { identifierParts } from "../indexing/identifiers";
 import { applyEmbeddingConfigFromDisk } from "../config";
 import { join, resolve } from "path";
 import { mkdirSync, existsSync } from "fs";
@@ -185,7 +186,8 @@ export class RagDB {
         chunk_type TEXT,
         start_line INTEGER,
         end_line INTEGER,
-        content_hash TEXT
+        content_hash TEXT,
+        parts TEXT
       );
 
       CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
@@ -195,19 +197,20 @@ export class RagDB {
 
       CREATE VIRTUAL TABLE IF NOT EXISTS fts_chunks USING fts5(
         snippet,
+        parts,
         content='chunks',
         content_rowid='id'
       );
 
       CREATE TRIGGER IF NOT EXISTS chunks_ai AFTER INSERT ON chunks BEGIN
-        INSERT INTO fts_chunks(rowid, snippet) VALUES (new.id, new.snippet);
+        INSERT INTO fts_chunks(rowid, snippet, parts) VALUES (new.id, new.snippet, new.parts);
       END;
       CREATE TRIGGER IF NOT EXISTS chunks_ad AFTER DELETE ON chunks BEGIN
-        INSERT INTO fts_chunks(fts_chunks, rowid, snippet) VALUES ('delete', old.id, old.snippet);
+        INSERT INTO fts_chunks(fts_chunks, rowid, snippet, parts) VALUES ('delete', old.id, old.snippet, old.parts);
       END;
       CREATE TRIGGER IF NOT EXISTS chunks_au AFTER UPDATE ON chunks BEGIN
-        INSERT INTO fts_chunks(fts_chunks, rowid, snippet) VALUES ('delete', old.id, old.snippet);
-        INSERT INTO fts_chunks(rowid, snippet) VALUES (new.id, new.snippet);
+        INSERT INTO fts_chunks(fts_chunks, rowid, snippet, parts) VALUES ('delete', old.id, old.snippet, old.parts);
+        INSERT INTO fts_chunks(rowid, snippet, parts) VALUES (new.id, new.snippet, new.parts);
       END;
 
       -- vec_chunks is a vec0 virtual table, so it can't be an FK child and a
@@ -422,6 +425,7 @@ export class RagDB {
     this.migrateChunksEntityColumns();
     this.migrateParentChunkColumns();
     this.migrateGraphColumns();
+    this.migrateSearchPartsColumn();
     this.dedupeChunks();
     this.backfillMissingSymbolRefs();
   }
@@ -545,6 +549,62 @@ export class RagDB {
     if (!cols.includes("content_hash")) {
       this.db.exec("ALTER TABLE chunks ADD COLUMN content_hash TEXT");
     }
+  }
+
+  // Identifier-aware FTS: add a `parts` column holding split identifier words and
+  // rebuild fts_chunks to index (snippet, parts) so `depends` matches `getDependsOn`.
+  // Existing indexes are migrated in place (recreate FTS + backfill parts, which
+  // repopulates the index via the update trigger) — no re-embed needed.
+  private migrateSearchPartsColumn() {
+    const cols = this.db
+      .query<{ name: string }, []>("PRAGMA table_info(chunks)")
+      .all()
+      .map((c) => c.name);
+    if (!cols.includes("parts")) {
+      this.db.exec("ALTER TABLE chunks ADD COLUMN parts TEXT");
+    }
+
+    const ftsSql =
+      this.db.query<{ sql: string | null }, []>("SELECT sql FROM sqlite_master WHERE name = 'fts_chunks'").get()?.sql ?? "";
+    if (ftsSql.includes("parts")) return; // already migrated (or fresh DB created with the new schema)
+
+    // Drop the old FTS + triggers FIRST, so backfilling `parts` doesn't fire a
+    // trigger that issues a 'delete' against a half-built external-content index
+    // (which raises SQLITE_CORRUPT_VTAB).
+    this.db.exec(`
+      DROP TRIGGER IF EXISTS chunks_ai;
+      DROP TRIGGER IF EXISTS chunks_ad;
+      DROP TRIGGER IF EXISTS chunks_au;
+      DROP TABLE IF EXISTS fts_chunks;
+    `);
+
+    // Backfill parts for existing rows with NO triggers active.
+    const rows = this.db.query<{ id: number; snippet: string }, []>("SELECT id, snippet FROM chunks").all();
+    if (rows.length > 0) {
+      const upd = this.db.prepare("UPDATE chunks SET parts = ? WHERE id = ?");
+      const tx = this.db.transaction(() => {
+        for (const r of rows) upd.run(identifierParts(r.snippet), r.id);
+      });
+      tx();
+    }
+
+    // Recreate the FTS over (snippet, parts) + triggers, then populate the whole
+    // index from the content table via FTS5 'rebuild' (the correct way to seed an
+    // external-content table — no per-row 'delete' of absent rows).
+    this.db.exec(`
+      CREATE VIRTUAL TABLE fts_chunks USING fts5(snippet, parts, content='chunks', content_rowid='id');
+      CREATE TRIGGER chunks_ai AFTER INSERT ON chunks BEGIN
+        INSERT INTO fts_chunks(rowid, snippet, parts) VALUES (new.id, new.snippet, new.parts);
+      END;
+      CREATE TRIGGER chunks_ad AFTER DELETE ON chunks BEGIN
+        INSERT INTO fts_chunks(fts_chunks, rowid, snippet, parts) VALUES ('delete', old.id, old.snippet, old.parts);
+      END;
+      CREATE TRIGGER chunks_au AFTER UPDATE ON chunks BEGIN
+        INSERT INTO fts_chunks(fts_chunks, rowid, snippet, parts) VALUES ('delete', old.id, old.snippet, old.parts);
+        INSERT INTO fts_chunks(rowid, snippet, parts) VALUES (new.id, new.snippet, new.parts);
+      END;
+      INSERT INTO fts_chunks(fts_chunks) VALUES('rebuild');
+    `);
   }
 
   private migrateParentChunkColumns() {

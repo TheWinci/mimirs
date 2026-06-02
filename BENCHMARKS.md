@@ -6,7 +6,9 @@ Search quality benchmarks measured on four codebases. Last updated 2026-04-09.
 
 ## Results
 
-All results use hybrid search (70% vector / 30% BM25) with pipeline improvements (source/test path boost, symbol expansion, dependency graph boost, doc expansion, filename affinity boost, boilerplate demotion). Default top-K is 10.
+All results use hybrid search combining vector similarity and BM25 by reciprocal-rank fusion (weighted, default 0.5), plus pipeline improvements (source/test path boost, symbol expansion, dependency graph boost, doc expansion, filename affinity boost, boilerplate demotion). Default top-K is 10.
+
+> **Pipeline overhaul (2026-06):** the per-codebase figures below were measured before a search-pipeline fix and are effectively **vector-only** — a bug joined FTS query terms with implicit AND, so BM25 returned nothing for any multi-term query and the "70/30 blend" never actually blended. The fusion is now rank-based (so the two incomparable score scales combine properly), the default weight is 0.5, and FTS is identifier-aware (camelCase/snake_case split). These tables are being re-measured against the new pipeline; expect them to hold or improve.
 
 ### mimirs (97 files, 30 queries)
 
@@ -94,7 +96,7 @@ K=10 hits 90–98% recall across all codebases. Django and Kubernetes both reach
 
 ### Model comparison
 
-Six 384-dimension ONNX embedding models were evaluated on mimirs and Excalidraw with hybrid search (70/30 vector/BM25). The two viable options:
+Six 384-dimension ONNX embedding models were evaluated on mimirs and Excalidraw with hybrid search (rank fusion). The two viable options:
 
 | Model | Download | Recall (Excalidraw) | MRR (Excalidraw) | Index speed |
 |---|---|---|---|---|

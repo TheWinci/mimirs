@@ -111,8 +111,13 @@ describe("search", () => {
   test("threshold filters low-scoring results", async () => {
     await seedDB();
 
-    // Very high threshold should filter most results
-    const results = await search("database", db, 5, 0.99);
-    expect(results.length).toBe(0);
+    // Scores are rank-fusion values bounded at 1.0 before boosts, so no
+    // threshold returns results while a threshold above that range filters
+    // them all. (Asserts the threshold mechanism, not a scale-specific cutoff.)
+    const all = await search("database", db, 5, 0);
+    expect(all.length).toBeGreaterThan(0);
+
+    const filtered = await search("database", db, 5, 5);
+    expect(filtered.length).toBe(0);
   });
 });

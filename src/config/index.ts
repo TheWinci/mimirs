@@ -20,7 +20,7 @@ const RagConfigSchema = z.object({
   generated: globList,
   chunkSize: z.number().int().min(64).default(512),
   chunkOverlap: z.number().int().min(0).default(50),
-  hybridWeight: z.number().min(0).max(1).default(0.7),
+  hybridWeight: z.number().min(0).max(1).default(0.5),
   searchTopK: z.number().int().min(1).default(10),
   indexBatchSize: z.number().int().min(1).optional(),
   indexThreads: z.number().int().min(1).optional(),
@@ -28,6 +28,8 @@ const RagConfigSchema = z.object({
   embeddingMerge: z.boolean().default(true),
   embeddingModel: z.string().optional(),
   embeddingDim: z.number().int().min(1).optional(),
+  embeddingPooling: z.enum(["mean", "cls", "none"]).optional(),
+  embeddingDtype: z.string().optional(),
   parentGroupingMinCount: z.number().int().min(2).default(2),
   benchmarkTopK: z.number().int().min(1).default(5),
   benchmarkMinRecall: z.number().min(0).max(1).default(0.8),
@@ -113,7 +115,7 @@ const DEFAULT_CONFIG: RagConfig = {
   generated: [],
   chunkSize: 512,
   chunkOverlap: 50,
-  hybridWeight: 0.7,
+  hybridWeight: 0.5,
   searchTopK: 10,
   incrementalChunks: false,
   embeddingMerge: true,
@@ -166,7 +168,7 @@ export async function loadConfig(projectDir: string): Promise<RagConfig> {
 export function applyEmbeddingConfig(config: RagConfig): void {
   const model = config.embeddingModel ?? DEFAULT_MODEL_ID;
   const dim = config.embeddingDim ?? DEFAULT_EMBEDDING_DIM;
-  configureEmbedder(model, dim);
+  configureEmbedder(model, dim, config.embeddingPooling, config.embeddingDtype);
 }
 
 /**
@@ -183,21 +185,29 @@ export function applyEmbeddingConfigFromDisk(projectDir: string): void {
   const configPath = join(projectDir, ".mimirs", "config.json");
   let model = DEFAULT_MODEL_ID;
   let dim = DEFAULT_EMBEDDING_DIM;
+  let pooling: "mean" | "cls" | "none" | undefined;
+  let dtype: string | undefined;
 
   if (existsSync(configPath)) {
     try {
       const parsed = JSON.parse(readFileSync(configPath, "utf-8")) as {
         embeddingModel?: unknown;
         embeddingDim?: unknown;
+        embeddingPooling?: unknown;
+        embeddingDtype?: unknown;
       };
       if (typeof parsed.embeddingModel === "string") model = parsed.embeddingModel;
       if (Number.isInteger(parsed.embeddingDim) && (parsed.embeddingDim as number) > 0) {
         dim = parsed.embeddingDim as number;
       }
+      if (parsed.embeddingPooling === "mean" || parsed.embeddingPooling === "cls" || parsed.embeddingPooling === "none") {
+        pooling = parsed.embeddingPooling;
+      }
+      if (typeof parsed.embeddingDtype === "string") dtype = parsed.embeddingDtype;
     } catch {
       // Malformed JSON — fall back to defaults; loadConfig() surfaces the warning.
     }
   }
 
-  configureEmbedder(model, dim);
+  configureEmbedder(model, dim, pooling, dtype);
 }

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { embed } from "../embeddings/embed";
+import { rrfFuse } from "../search/hybrid";
 import { log } from "../utils/log";
 import { type GetDB, resolveProject } from "./index";
 
@@ -40,24 +41,8 @@ export function registerConversationTools(server: McpServer, getDB: GetDB) {
         log.debug(`Conversation FTS query failed, falling back to vector-only: ${err instanceof Error ? err.message : err}`, "conversation");
       }
 
-      // Merge and deduplicate by turnId using hybrid scoring
-      const { hybridWeight } = config;
-      const scoreMap = new Map<number, { item: (typeof vecResults)[0]; vecScore: number; txtScore: number }>();
-
-      for (const r of vecResults) {
-        scoreMap.set(r.turnId, { item: r, vecScore: r.score, txtScore: 0 });
-      }
-      for (const r of bm25Results) {
-        const existing = scoreMap.get(r.turnId);
-        if (existing) {
-          existing.txtScore = r.score;
-        } else {
-          scoreMap.set(r.turnId, { item: r, vecScore: 0, txtScore: r.score });
-        }
-      }
-
-      const results = [...scoreMap.values()]
-        .map((e) => ({ ...e.item, score: hybridWeight * e.vecScore + (1 - hybridWeight) * e.txtScore }))
+      // Merge and dedup by turnId via shared rank fusion (same as chunk search).
+      const results = rrfFuse(vecResults, bm25Results, config.hybridWeight, (r) => r.turnId)
         .sort((a, b) => b.score - a.score)
         .slice(0, top);
 

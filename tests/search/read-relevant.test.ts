@@ -141,9 +141,14 @@ describe("searchChunks (read_relevant)", () => {
   test("threshold filters low-scoring chunks", async () => {
     await seedWithEntities();
 
-    // Very high threshold should filter everything
-    const results = await searchChunks("markdown splitting", db, 5, 0.99);
-    expect(results.length).toBe(0);
+    // Fused scores are rank-based (≤1.0 before boosts), so no threshold returns
+    // results while a threshold above that range filters them all. (Asserts the
+    // threshold mechanism, not a scale-specific cutoff.)
+    const all = await searchChunks("markdown splitting", db, 5, 0);
+    expect(all.length).toBeGreaterThan(0);
+
+    const filtered = await searchChunks("markdown splitting", db, 5, 5);
+    expect(filtered.length).toBe(0);
   });
 
   test("respects topK limit", async () => {

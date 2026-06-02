@@ -2,6 +2,7 @@ import { resolve } from "path";
 import { RagDB } from "../../db";
 import { loadConfig } from "../../config";
 import { embed } from "../../embeddings/embed";
+import { rrfFuse } from "../../search/hybrid";
 import { discoverSessions } from "../../conversation/parser";
 import { indexConversation } from "../../conversation/indexer";
 import { intFlag } from "../flags";
@@ -39,20 +40,10 @@ export async function conversationCommand(args: string[], getFlag: (flag: string
       bm25Results = db.textSearchConversation(query, top);
     } catch { /* FTS can fail on special chars */ }
 
-    const merged = new Map<number, (typeof vecResults)[0]>();
-    for (const r of vecResults) {
-      merged.set(r.turnId, { ...r, score: r.score * config.hybridWeight });
-    }
-    for (const r of bm25Results) {
-      const existing = merged.get(r.turnId);
-      if (existing) {
-        existing.score += r.score * (1 - config.hybridWeight);
-      } else {
-        merged.set(r.turnId, { ...r, score: r.score * (1 - config.hybridWeight) });
-      }
-    }
-
-    const results = [...merged.values()].sort((a, b) => b.score - a.score).slice(0, top);
+    // Shared rank fusion (same as chunk search) — raw cosine/BM25 scales don't blend.
+    const results = rrfFuse(vecResults, bm25Results, config.hybridWeight, (r) => r.turnId)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, top);
 
     if (results.length === 0) {
       cli.log("No conversation results found.");

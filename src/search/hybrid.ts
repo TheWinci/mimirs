@@ -56,39 +56,62 @@ export interface ChunkResult {
 }
 
 // Default: 70% vector, 30% BM25
-const DEFAULT_HYBRID_WEIGHT = 0.7;
+// 0.5 = equal weight to semantic (vector) and lexical (BM25) rank signals.
+// A sweep over keyword and purely-semantic query sets put the optimum here:
+// keyword queries hit 100% recall and semantic queries peak (recall collapses
+// below ~0.3 as vector signal is starved). See benchmarks/semantic-sweep.ts.
+const DEFAULT_HYBRID_WEIGHT = 0.5;
 
 /**
- * Merge vector and text search results using hybrid scoring.
- * Each result must have `score`, `path`, and `chunkIndex` at minimum.
- * Extra fields from the vector results are preserved on the merged output.
+ * Reciprocal-rank fusion of two result lists already sorted best-first.
+ *
+ * Vector (cosine) and text (BM25-derived 1/(1+|rank|)) scores live on different,
+ * non-comparable scales, so a raw linear blend is dominated by whichever has the
+ * larger magnitude — making the weight nearly inert and (for BM25) the score is
+ * even inverted. Fuse by RANK instead: each list contributes K/(K+rank) in (0,1]
+ * (1 at rank 0), blended by `weight` toward the primary list. Scale-free, keeps
+ * scores compressed near the top (so downstream boosts still rank), and dedups
+ * across lists by `key`. The single source of truth for all hybrid fusion —
+ * chunk search and conversation search both go through here.
+ */
+export function rrfFuse<T extends { score: number }>(
+  primary: T[],
+  secondary: T[],
+  weight: number,
+  key: (item: T) => string | number,
+): T[] {
+  const RRF_K = 60;
+  const ranks = (list: T[]): Map<string | number, number> => {
+    const m = new Map<string | number, number>();
+    list.forEach((r, i) => m.set(key(r), RRF_K / (RRF_K + i)));
+    return m;
+  };
+  const primaryRank = ranks(primary);
+  const secondaryRank = ranks(secondary);
+
+  const items = new Map<string | number, T>();
+  for (const r of primary) items.set(key(r), r);
+  for (const r of secondary) {
+    const k = key(r);
+    if (!items.has(k)) items.set(k, r);
+  }
+
+  return Array.from(items.entries()).map(([k, item]) => ({
+    ...item,
+    score: weight * (primaryRank.get(k) ?? 0) + (1 - weight) * (secondaryRank.get(k) ?? 0),
+  }));
+}
+
+/**
+ * Merge chunk vector and text search results using hybrid rank fusion.
+ * Each result must have `score`, `path`, and `chunkIndex`.
  */
 export function mergeHybridScores<T extends { score: number; path: string; chunkIndex: number }>(
   vectorResults: T[],
   textResults: T[],
   hybridWeight: number
 ): T[] {
-  const scoreMap = new Map<string, { item: T; vectorScore: number; textScore: number }>();
-
-  for (const r of vectorResults) {
-    const key = `${r.path}:${r.chunkIndex}`;
-    scoreMap.set(key, { item: r, vectorScore: r.score, textScore: 0 });
-  }
-
-  for (const r of textResults) {
-    const key = `${r.path}:${r.chunkIndex}`;
-    const existing = scoreMap.get(key);
-    if (existing) {
-      existing.textScore = r.score;
-    } else {
-      scoreMap.set(key, { item: r, vectorScore: 0, textScore: r.score });
-    }
-  }
-
-  return Array.from(scoreMap.values()).map((entry) => ({
-    ...entry.item,
-    score: hybridWeight * entry.vectorScore + (1 - hybridWeight) * entry.textScore,
-  }));
+  return rrfFuse(vectorResults, textResults, hybridWeight, (r) => `${r.path}:${r.chunkIndex}`);
 }
 
 // ── Source file boost ────────────────────────────────────────────
@@ -377,12 +400,15 @@ export async function search(
   // Doc expansion — docs are bonus results, don't displace code
   const results = expandForDocs(allSorted, topK);
 
-  // Log query for analytics
+  // Log query for analytics. The result score is now a rank-fusion value
+  // (positional, ~1 at the top), so log the raw top vector cosine as the
+  // relevance signal instead — that keeps "avg top score" and the low-relevance
+  // (< 0.3) heuristic meaningful.
   const durationMs = Math.round(performance.now() - start);
   db.logQuery(
     query,
     results.length,
-    results[0]?.score ?? null,
+    vectorResults[0]?.score ?? null,
     results[0]?.path ?? null,
     durationMs
   );
@@ -535,12 +561,13 @@ export async function searchChunks(
   // Doc expansion
   results = expandForDocs(results, topK);
 
-  // Log query for analytics
+  // Log query for analytics — log the raw top vector cosine as the relevance
+  // signal (the result score is now a positional rank-fusion value).
   const durationMs = Math.round(performance.now() - start);
   db.logQuery(
     query,
     results.length,
-    results[0]?.score ?? null,
+    vectorResults[0]?.score ?? null,
     results[0]?.path ?? null,
     durationMs
   );

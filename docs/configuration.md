@@ -10,10 +10,12 @@ Create `.mimirs/config.json` in your project root, or run `bunx mimirs init` to 
 | `exclude` | `["node_modules/**", ...]` | Glob patterns to skip |
 | `chunkSize` | `512` | Max tokens per chunk |
 | `chunkOverlap` | `50` | Overlap tokens between chunks |
-| `hybridWeight` | `0.7` | Blend ratio: 1.0 = vector only, 0.0 = BM25 only |
+| `hybridWeight` | `0.5` | Rank-fusion weight toward vector: 1.0 = vector only, 0.0 = BM25 only |
 | `embeddingMerge` | `true` | Merge windowed embeddings for oversized chunks (see [below](#embedding-merge)) |
 | `embeddingModel` | _(default)_ | Override the embedding model (HuggingFace model ID). Must have ONNX weights. Requires re-index |
 | `embeddingDim` | _(default)_ | Embedding dimension to match the model (e.g. 384 for bge-small-en-v1.5) |
+| `embeddingPooling` | `mean` | Pooling for the model: `mean` (sentence-transformers, e.g. all-MiniLM) or `cls` (BGE/GTE/ModernBERT/Arctic). Requires re-index |
+| `embeddingDtype` | `q8` | ONNX quantization (`q8`, `fp16`, `fp32`, `q4`, …); must exist for the model. Requires re-index |
 | `searchTopK` | `10` | Default number of search results |
 | `incrementalChunks` | `false` | When enabled, only re-embeds chunks whose content hash changed. Falls back to full re-index if >50% of chunks differ |
 
@@ -81,7 +83,7 @@ Adjust `hybridWeight` to shift between semantic and keyword matching:
 
 - `1.0` = pure vector (semantic only) — better for natural-language questions
 - `0.0` = pure BM25 (keyword only) — better for exact symbol/term lookups
-- `0.7` (default) — works well for most codebases
+- `0.5` (default) — equal vector/BM25 rank weight; the measured optimum across keyword and semantic queries
 
 ## Environment variables
 

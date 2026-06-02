@@ -19,9 +19,15 @@ export function escapeRegex(s: string): string {
  * Sanitize a user query for FTS5 MATCH by quoting each token.
  * FTS5 treats bare +, -, *, AND, OR, NOT, NEAR, ( ) as operators.
  * Wrapping each token in double quotes forces literal matching.
+ *
+ * Tokens are joined with OR, not the implicit AND of space-joining. With AND,
+ * any query of more than ~2-3 distinct terms requires all of them to co-occur
+ * in a single chunk and so matches nothing — which silently disabled BM25 for
+ * realistic multi-word/NL queries (collapsing hybrid search to vector-only).
+ * OR lets BM25 rank candidates by how many/which terms they match.
  */
 export function sanitizeFTS(query: string): string {
   const tokens = query.split(/\s+/).filter(Boolean);
   if (tokens.length === 0) return '""';
-  return tokens.map(t => `"${t.replace(/"/g, '""')}"`).join(" ");
+  return tokens.map(t => `"${t.replace(/"/g, '""')}"`).join(" OR ");
 }
