@@ -4,6 +4,13 @@ Notable changes to the generated wiki, newest first, by wiki version. The format
 follows [Keep a Changelog](https://keepachangelog.com/); each version is stamped
 with the source commit the wiki was generated from.
 
+## [094fb87] - 2026-06-02
+
+### Changed
+- Regenerated all 53 pages from current source (45 changed). The search internals were corrected throughout: vector and BM25 results are now fused by reciprocal-rank fusion (`rrfFuse`), replacing the obsolete linear blend; the default `hybridWeight` is 0.5; and identifier-aware full-text search (the `parts` column with camelCase/snake_case splitting) is documented across the search, data-model, and overview pages. The configuration page gains `embeddingPooling` / `embeddingDtype`. Git-history search (search_commits, cli/history) keeps its fixed 0.7 blend. Drifted source citations were corrected.
+
+_Pages updated: all 53 pages_
+
 ## [8b52efc] - 2026-06-01
 
 ### Added

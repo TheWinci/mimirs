@@ -40,7 +40,7 @@ sequenceDiagram
 
 1. The caller invokes the tool with a required `symbol`, an optional `exact` flag, an optional `top` limit, and an optional `directory`. The handler is registered inside `registerGraphTools` at `src/tools/graph-tools.ts:90-144`.
 2. `resolveProject` turns the optional `directory` into an absolute path — falling back to the `RAG_PROJECT_DIR` environment variable or the current working directory — verifies it exists, loads that project's config, and opens its index database (`src/tools/index.ts:22-37`).
-3. The handler calls `ragDb.findUsages(symbol, exact ?? true, top ?? 30)`. A missing `exact` defaults to `true` and a missing `top` defaults to `30` (`src/tools/graph-tools.ts:108`). The method on the database class just forwards to the query layer (`src/db/index.ts:667-669`).
+3. The handler calls `ragDb.findUsages(symbol, exact ?? true, top ?? 30)`. A missing `exact` defaults to `true` and a missing `top` defaults to `30` (`src/tools/graph-tools.ts:108`). The method on the database class just forwards to the query layer (`src/db/index.ts:727-728`).
 4. The query function first collects the ids of every file that *defines* the symbol, by matching the name (case-insensitively) against the `file_exports` table. These ids are used later to drop the declaration from the results (`src/db/search.ts:427-434`).
 5. The primary lookup queries the `symbol_refs` reference index, joined to the chunks and files tables, for rows whose recorded name matches the requested symbol. This is the precise path — only real identifier occurrences (`src/db/search.ts:442-466`).
 6. If the precise path does not already fill the `top` budget, a fallback runs a full-text search over chunk text and then locates the matching line inside each chunk with a word-boundary regular expression (`src/db/search.ts:489-550`).
@@ -150,5 +150,5 @@ src/example/other.ts
 - `src/db/search.ts` — the `findUsages` query function: defining-file exclusion, the `symbol_refs` primary path, the FTS-plus-regex fallback, deduplication, and line/snippet computation (`src/db/search.ts:426-553`).
 - `src/db/graph.ts` — `upsertSymbolRefs` populates and maintains the `symbol_refs` reference index that the primary path reads (`src/db/graph.ts:10-35`).
 - `src/search/usages.ts` — the `escapeRegex` helper used to build a literal word-boundary pattern (`src/search/usages.ts:14-16`).
-- `src/db/index.ts` — exposes the `findUsages` wrapper on the database class (`src/db/index.ts:667-669`).
+- `src/db/index.ts` — exposes the `findUsages` wrapper on the database class (`src/db/index.ts:727-728`).
 - `src/tools/index.ts` — `resolveProject`, which resolves the target directory and opens its index before the query runs (`src/tools/index.ts:22-37`).

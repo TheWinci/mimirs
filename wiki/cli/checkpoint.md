@@ -34,7 +34,7 @@ working directory — and constructs a `RagDB` for it before looking at the
 subcommand (`src/cli/commands/checkpoint.ts:9-11`). Opening the database runs the
 full schema bootstrap, so the `conversation_checkpoints` table and its companion
 `vec_checkpoints` vector table exist even on a brand-new index
-(`src/db/index.ts:320-338`). If none of `create`, `list`, or `search` matches
+(`src/db/index.ts:323-341`). If none of `create`, `list`, or `search` matches
 `args[1]`, the handler prints a usage line to stderr and exits non-zero
 (`src/cli/commands/checkpoint.ts:81-84`).
 
@@ -126,10 +126,10 @@ turns it returns 0 and the turn index is 0 too
 
 The title and summary are joined as `` `${title}. ${summary}` `` and embedded into
 a single vector by the local model. `embed` runs the text through the model with
-mean pooling and L2 normalization, returning a `Float32Array`
-(`src/cli/commands/checkpoint.ts:32`, `src/embeddings/embed.ts:78-86`). The vector
+the configured pooling and `normalize: true`, returning a `Float32Array`
+(`src/cli/commands/checkpoint.ts:32`, `src/embeddings/embed.ts:94-102`). The vector
 width matches the configured embedding dimension, 384 by default
-(`src/embeddings/embed.ts:17`, `src/db/index.ts:335-338`).
+(`src/embeddings/embed.ts:17`, `src/db/index.ts:338-341`).
 
 `db.createCheckpoint` then writes the row and its vector and returns the new id,
 which the handler prints as a one-line confirmation including the id, type, and
@@ -232,7 +232,7 @@ column. It then reads `last_insert_rowid()` to learn the new id and inserts the
 vector into the `vec_checkpoints` virtual table keyed by that id, passing the
 float buffer as raw bytes (`src/db/checkpoints.ts:18-48`). The split between a
 plain table and a vec0 virtual table mirrors how chunks and `vec_chunks` are
-stored elsewhere in the schema (`src/db/index.ts:320-338`).
+stored elsewhere in the schema (`src/db/index.ts:323-341`).
 
 The transaction matters: if the vector insert failed, the row insert would roll
 back too, so a checkpoint can never exist without its embedding — which would

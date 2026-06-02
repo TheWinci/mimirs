@@ -47,9 +47,9 @@ sequenceDiagram
 
 The core idea is a set intersection. A function lies on *some* path from `from` to `to` if and only if two things are true at once: `from` can reach it (it is forward-reachable along callee edges), and it can reach `to` (it is backward-reachable along caller edges from the target). Nodes that satisfy only one of those are dead ends — reachable from the source but going nowhere useful, or feeding the target but not from this source — and have no business in the answer.
 
-`tracePath` computes this with two breadth-first searches sharing one `CallGraph` view (`src/graph/trace.ts:372`). The forward search walks `callees` outward from `from`; the backward search walks `callers` outward from `to` (`src/graph/trace.ts:391-392`). The callee and caller edges come from the resolved symbol-ref graph — `getCalleeRefsForExport` / `getCalleeRefsForLocalSymbol` forward, `getCallersOfExport` / `getCallersOfLocalSymbol` backward — with unresolved or non-callable refs dropped as leaves (`src/graph/trace.ts:81-151`). The reachable sub-graph is the set of keys present in *both* searches (`src/graph/trace.ts:395-396`). This is what "branches that don't reach the target are pruned" means concretely: a node only survives if it appears in both directions.
+`tracePath` computes this with two breadth-first searches sharing one `CallGraph` view (`src/graph/trace.ts:372`). The forward search walks `callees` outward from `from`; the backward search walks `callers` outward from `to` (`src/graph/trace.ts:391-392`). The callee and caller edges come from the resolved symbol-ref graph — `getCalleeRefsForExport` / `getCalleeRefsForLocalSymbol` forward, `getCallersOfExport` / `getCallersOfLocalSymbol` backward — with unresolved or non-callable refs dropped as leaves (`src/graph/trace.ts:81-150`). The reachable sub-graph is the set of keys present in *both* searches (`src/graph/trace.ts:395-396`). This is what "branches that don't reach the target are pruned" means concretely: a node only survives if it appears in both directions.
 
-Each search is bounded by `maxDepth` (default 6) and a node `budget` (default 300); hitting either sets a `truncated` flag so a capped search can say a longer path might exist beyond the bound (`src/graph/trace.ts:333-361`, `src/graph/trace.ts:370-371`). A trivial case short-circuits first: if `from` and `to` resolve to the same node, the trace is a single node with nothing to walk (`src/graph/trace.ts:376-387`).
+Each search is bounded by `maxDepth` (default 6) and a node `budget` (default 300); hitting either sets a `truncated` flag so a capped search can say a longer path might exist beyond the bound (`src/graph/trace.ts:345-361`, `src/graph/trace.ts:370-371`). A trivial case short-circuits first: if `from` and `to` resolve to the same node, the trace is a single node with nothing to walk (`src/graph/trace.ts:376-387`).
 
 ## The forward tree and the shortest-path spine
 
@@ -59,7 +59,7 @@ Second, it computes the **spine** — the shortest path from `from` to `to` — 
 
 ## When there is no path: frontiers and the static-resolution limit
 
-If the intersection is missing either endpoint, the two functions are not connected within the search bounds, and the tool says so plainly. To make the gap diagnosable rather than a dead "not found," it returns two frontiers: the deepest nodes the forward search reached from `from`, and the direct callers of `to` — each capped at 8 entries (`src/graph/trace.ts:398-414`). Read together, they show where the forward reach stopped and what feeds the target, so you can spot the missing hop.
+If the intersection is missing either endpoint, the two functions are not connected within the search bounds, and the tool says so plainly. To make the gap diagnosable rather than a dead "not found," it returns two frontiers: the deepest nodes the forward search reached from `from`, and the direct callers of `to` — each capped at 8 entries (`src/graph/trace.ts:398-413`). Read together, they show where the forward reach stopped and what feeds the target, so you can spot the missing hop.
 
 That missing hop is usually the same thing: **resolution is static name-match.** The walk follows edges only where a callee or caller resolves to an indexed callable. A dynamic-dispatch hop — a callback passed as a value, an interface method dispatched to an implementation, a dependency-injected service — has no statically resolvable edge, so the chain ends there (`src/graph/trace.ts:11-14`). The no-path message states this explicitly and points the reader at `read_relevant` to inspect the gap manually (`src/graph/trace.ts:658-672`). This is a real limitation, not a bug: a "no path" result means *no statically resolvable path*, and a genuine runtime path may still exist across a dynamic boundary.
 
@@ -83,7 +83,7 @@ That missing hop is usually the same thing: **resolution is static name-match.**
 | Shortest-path spine | A `spine (shortest): from → … → to (N hops)` line below the tree (`src/graph/trace.ts:683-684`). |
 | No-path frontier | When unconnected, text: a "No call path …" line, the static-resolution note, the deepest forward-reached nodes, and the direct callers of `to` (`src/graph/trace.ts:658-672`). |
 
-For `format: "json"`, the structured object carries `from`, `to`, `found`, `maxDepth`, `subgraphSize`, `truncated`, the `spine`, the `tree`, and (when not found) `forwardFrontier` / `backwardFrontier` (`src/graph/trace.ts:719-732`).
+For `format: "json"`, the structured object carries `from`, `to`, `found`, `maxDepth`, `subgraphSize`, `truncated`, the `spine`, the `tree`, and (when not found) `forwardFrontier` / `backwardFrontier` (`src/graph/trace.ts:719-731`).
 
 This tool only reads the index; it writes nothing back, so it produces no persistent state changes.
 
@@ -93,7 +93,7 @@ This tool only reads the index; it writes nothing back, so it produces no persis
 - **`to` unresolved.** Same handling for the `to` role (`src/tools/graph-tools.ts:280-283`). The error names whether the symbol was missing or defined in multiple places and reminds the caller that `trace` tracks functions and methods, not classes/constants/types (`src/tools/graph-tools.ts:33-42`).
 - **Same symbol.** When `from` and `to` resolve to the same node, the trace short-circuits to a one-node result, and the renderer reports "resolve to the same symbol — nothing to trace" (`src/graph/trace.ts:376-387`, `src/graph/trace.ts:655-657`).
 - **No path within bounds.** When the forward/backward intersection misses an endpoint, `found` is false and the frontier report is returned (`src/graph/trace.ts:398-414`, `src/graph/trace.ts:658-672`).
-- **Search truncated.** Hitting `maxDepth` or the 300-node budget in either direction sets `truncated`; the renderer adds a note that a longer path may exist beyond the bound — both on the no-path branch and below a found sub-graph (`src/graph/trace.ts:352-355`, `src/graph/trace.ts:671`, `src/graph/trace.ts:685`).
+- **Search truncated.** Hitting `maxDepth` or the 300-node budget in either direction sets `truncated`; the renderer adds a note that a longer path may exist beyond the bound — both on the no-path branch and below a found sub-graph (`src/graph/trace.ts:352-354`, `src/graph/trace.ts:671`, `src/graph/trace.ts:685`).
 - **Dynamic-dispatch gap.** A callback, interface→impl, or DI hop has no static edge and ends the chain; this commonly produces the no-path branch and is called out in its message (`src/graph/trace.ts:11-14`, `src/graph/trace.ts:661`).
 - **Missing directory.** A non-existent `directory` makes `resolveProject` throw before any search runs (`src/tools/index.ts:30-32`).
 

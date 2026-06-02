@@ -34,7 +34,7 @@ sequenceDiagram
 
 1. The caller invokes the tool with an optional `symbol`, an optional `exact` flag, an optional `type` filter, an optional `top` limit, and an optional `directory`. The handler is registered in `src/tools/search.ts:219-275`.
 2. `resolveProject` turns the optional `directory` into an absolute path (falling back to the `RAG_PROJECT_DIR` environment variable or the current working directory), verifies it exists, loads that project's config, and opens its index database (`src/tools/index.ts:22-37`).
-3. The handler calls `ragDb.searchSymbols(symbol, exact ?? false, type, top)`. A missing `exact` defaults to `false`, so the default behavior is a case-insensitive substring match (`src/tools/search.ts:250`). The method is a thin pass-through to the query function in the search layer (`src/db/index.ts:664-665`).
+3. The handler calls `ragDb.searchSymbols(symbol, exact ?? false, type, top)`. A missing `exact` defaults to `false`, so the default behavior is a case-insensitive substring match (`src/tools/search.ts:250`). The method is a thin pass-through to the query function in the search layer (`src/db/index.ts:724-725`).
 4. The query layer first fetches base rows from `file_exports` joined to `files`, applying the name pattern, the optional type filter, an `ORDER BY fe.name`, and the row limit (`src/db/search.ts:254-288`).
 5. If no rows match, the function returns an empty array and the handler replies with a single "No exported symbols ... found." line, naming whichever filter was active (`src/tools/search.ts:252-256`).
 6. Otherwise the query layer batch-loads supporting data — a code snippet per symbol, child-member counts, and the reference fan-in — then composes one `SymbolResult` per base row (`src/db/search.ts:290-406`).

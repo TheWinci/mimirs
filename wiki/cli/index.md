@@ -29,7 +29,7 @@ flowchart TD
 1. The user runs the command. `dir` is the first positional argument; if it is missing or looks like a flag (starts with `--`), the handler defaults to `.` and resolves it to an absolute path `src/cli/commands/index-cmd.ts:9`.
 2. Verbose mode is on if the args contain `--verbose` or `-v` `src/cli/commands/index-cmd.ts:10`. This only changes how progress is printed, not what gets indexed.
 3. A `RagDB` is opened for the directory. Its constructor creates the `.mimirs/` directory, opens `index.db`, applies the project's embedding model and dimension from disk, loads the sqlite-vec extension, and creates the schema if it does not exist. The comment at `src/cli/commands/index-cmd.ts:12-13` notes that this is why the handler does not call `applyEmbeddingConfig` separately.
-4. `loadConfig(dir)` reads `.mimirs/config.json`. If the file is absent it writes the defaults there first and returns them, so a first run always has a config on disk to edit `src/config/index.ts:136-140`.
+4. `loadConfig(dir)` reads `.mimirs/config.json`. If the file is absent it writes the defaults there first and returns them, so a first run always has a config on disk to edit `src/config/index.ts:138-141`.
 5. If `--patterns` was passed, its comma-separated value replaces `config.include` entirely (each pattern trimmed) `src/cli/commands/index-cmd.ts:16-19`. This is an override, not an addition.
 6. `indexDirectory(dir, db, config, progress)` does the scanning, embedding, and writing `src/cli/commands/index-cmd.ts:39`. It first acquires a per-directory lock; if another live process holds it, the call returns immediately with an all-zero result.
 7. With the lock held, the engine scans the tree, loads the embedding model once files are found, and processes each matched file — upserting its rows into the database (details under State changes).
@@ -43,7 +43,7 @@ flowchart TD
 | `dir` | positional path | no | Directory to index. Defaults to the current directory. Ignored if it begins with `--` so flags are not mistaken for the path `src/cli/commands/index-cmd.ts:9`. |
 | `--patterns` | comma-separated glob string | no | Overrides the config's `include` list with exactly these patterns, e.g. `--patterns "**/*.ts,**/*.md"`. Each entry is trimmed `src/cli/commands/index-cmd.ts:16-19`. |
 | `-v` / `--verbose` | boolean flag | no | Prints per-file progress (`Indexing ...`, `Indexed: ...`) instead of a single updating progress line `src/cli/commands/index-cmd.ts:10`. |
-| `.mimirs/config.json` | file on disk | no | Supplies `include`, `exclude`, embedding model/dim, chunk size, and indexing options. Created with defaults on first run `src/config/index.ts:132-140`. |
+| `.mimirs/config.json` | file on disk | no | Supplies `include`, `exclude`, embedding model/dim, chunk size, and indexing options. Created with defaults on first run `src/config/index.ts:138-141`. |
 
 The default `include` list covers source languages (TypeScript, Python, Go, Rust, Java, C/C++, and more), Markdown and text, build files like `Makefile` and `Dockerfile`, shell scripts, and structured config such as YAML, TOML, and SQL `src/config/index.ts:40-85`. Passing `--patterns` discards all of that for the run and uses only what you supply.
 
@@ -51,7 +51,7 @@ The default `include` list covers source languages (TypeScript, Python, Go, Rust
 
 | output | where it lands / shape / description |
 | --- | --- |
-| File and chunk rows | Written to `index.db`: a `files` row per indexed file plus `chunks` rows for its semantic pieces, each with an embedding mirrored into `vec_chunks` `src/db/files.ts:97-100` and full-text content mirrored into `fts_chunks` via triggers. |
+| File and chunk rows | Written to `index.db`: a `files` row per indexed file plus `chunks` rows for its semantic pieces, each with an embedding mirrored into `vec_chunks` `src/db/files.ts:98-101` and full-text content mirrored into `fts_chunks` via triggers. |
 | Graph + symbol data | `file_imports`, `file_exports`, and `symbol_refs` rows derived per file `src/indexing/indexer.ts:505-515`, then cross-resolved after the file loop `src/indexing/indexer.ts:785-793`. |
 | Summary line | `Done: <indexed> indexed, <skipped> skipped, <pruned> pruned (<elapsed>s)` printed to stdout `src/cli/commands/index-cmd.ts:42-44`. |
 | Error report | If any file failed, an `Errors: ...` block listing each message `src/cli/commands/index-cmd.ts:45-47`. |
@@ -96,7 +96,7 @@ When incremental chunking is enabled and the file already has hashed chunks, `pr
 
 ### Deleted files: present in index → pruned
 
-After the file loop, unless pruning is explicitly disabled, `indexDirectory` collects the set of files it just matched and calls `db.pruneDeleted(existingPaths)` `src/indexing/indexer.ts:774-781`. `pruneDeleted` deletes every `files` row whose path is not in that set, removing its chunks (and, via the trigger, its vectors) and clearing its graph rows `src/db/files.ts:267-290`. The returned count becomes `result.pruned`. This is why a full CLI index keeps the index honest: rename or delete a file and the next run drops it. Pruning is scoped to the matched set `src/indexing/indexer.ts:776-777`, so a narrowed `--patterns` run only ever compares against the files those patterns match — see the failure note below.
+After the file loop, unless pruning is explicitly disabled, `indexDirectory` collects the set of files it just matched and calls `db.pruneDeleted(existingPaths)` `src/indexing/indexer.ts:774-781`. `pruneDeleted` deletes every `files` row whose path is not in that set, removing its chunks (and, via the trigger, its vectors) and clearing its graph rows `src/db/files.ts:268-291`. The returned count becomes `result.pruned`. This is why a full CLI index keeps the index honest: rename or delete a file and the next run drops it. Pruning is scoped to the matched set `src/indexing/indexer.ts:776-777`, so a narrowed `--patterns` run only ever compares against the files those patterns match — see the failure note below.
 
 ### Cross-file resolution: per-file refs → resolved edges
 

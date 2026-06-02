@@ -69,8 +69,8 @@ sequenceDiagram
 1. The caller invokes `annotate` with at least a `path` and a `note`; the other fields are optional.
 2. The handler calls `resolveProject(directory, getDB)`, which resolves the directory to an absolute path, verifies it exists, loads config, applies the embedding config, and hands back the `RagDB` for that project (`src/tools/index.ts:28-37`).
 3. The text to embed is built. If a `symbol` was provided, the note is prefixed with the symbol name as `"<symbol>: <note>"`; otherwise the raw note is used (`src/tools/annotation-tools.ts:30`). Prefixing the symbol makes a symbol-scoped note easier to find by meaning later, because the symbol name becomes part of the embedded text.
-4. `embed()` turns that text into a normalized 384-dimension vector. It lazily loads the embedding model (`Xenova/all-MiniLM-L6-v2` by default) and runs the model with mean pooling and normalization (`src/embeddings/embed.ts:78-86`). This is an async step and is the slowest part of the call, because it may have to load the model on first use.
-5. `ragDb.upsertAnnotation(path, note, embedding, symbol ?? null, author ?? "agent")` writes the note. `RagDB.upsertAnnotation` is a thin wrapper that forwards to the implementation, and the whole write runs inside a single SQLite transaction (`src/db/index.ts:832-837`, `src/db/annotations.ts:14-65`).
+4. `embed()` turns that text into a normalized 384-dimension vector. It lazily loads the embedding model (`Xenova/all-MiniLM-L6-v2` by default) and runs the model with the configured pooling and normalization (`src/embeddings/embed.ts:94-102`). This is an async step and is the slowest part of the call, because it may have to load the model on first use.
+5. `ragDb.upsertAnnotation(path, note, embedding, symbol ?? null, author ?? "agent")` writes the note. `RagDB.upsertAnnotation` is a thin wrapper that forwards to the implementation, and the whole write runs inside a single SQLite transaction (`src/db/index.ts:892-897`, `src/db/annotations.ts:14-65`).
 6. Inside the transaction the code first runs a `SELECT` to see whether a row already exists for this exact `path` plus `symbol_name`. The presence or absence of that row decides the branch (`src/db/annotations.ts:15-28`).
 7. If a matching row exists, it is updated in place and its full-text and vector entries are refreshed. If not, a new row is inserted along with fresh full-text and vector entries (see [State changes](#state-changes)).
 8. The transaction commits and the row id is returned up the chain (`src/db/annotations.ts:64-65`).
@@ -80,7 +80,7 @@ sequenceDiagram
 
 ### Annotation row (inserted or updated)
 
-The single durable change is a row in the `annotations` table, kept in sync with two companion virtual tables: `fts_annotations` (an FTS5 full-text index over the note, content-backed by the `annotations` table) and `vec_annotations` (a `vec0` vector table holding the embedding). All three are created on database setup, and the vector column width is tied to the active embedding dimension via `embedding FLOAT[${getEmbeddingDim()}]` (`src/db/index.ts:399-419`).
+The single durable change is a row in the `annotations` table, kept in sync with two companion virtual tables: `fts_annotations` (an FTS5 full-text index over the note, content-backed by the `annotations` table) and `vec_annotations` (a `vec0` vector table holding the embedding). All three are created on database setup, and the vector column width is tied to the active embedding dimension via `embedding FLOAT[${getEmbeddingDim()}]` (`src/db/index.ts:401-422`).
 
 The write is keyed by `path` + `symbol_name`, not by id. The existing-row lookup uses two different queries depending on whether a symbol was given (`src/db/annotations.ts:16-28`):
 
@@ -108,7 +108,7 @@ Note that the surfacing filter compares the stored `path` against the result pat
 - **Author defaulting.** When `author` is omitted the handler substitutes `"agent"` before calling the store, so notes written through this tool always carry an author (`src/tools/annotation-tools.ts:32`). The store itself accepts a null author and would persist it, but this tool never passes one.
 - **Missing or invalid directory.** `resolveProject` resolves the directory and throws `Directory does not exist: <path>` if it is not present, surfacing as a tool error before any embedding or write happens (`src/tools/index.ts:30-32`).
 - **Input validation.** Schema constraints reject empty or oversized input before the handler runs: `path` must be 1–500 characters and `note` must be 1–2000 characters (`src/tools/annotation-tools.ts:12-13`).
-- **Embedding model load.** `embed()` must load the model on first use. If the cached model is corrupted (`Protobuf parsing failed` or `Load model`), `getEmbedder` deletes the model cache directory and retries the load once; other load errors propagate (`src/embeddings/embed.ts:61-72`). A propagated error here aborts the call before any row is written.
+- **Embedding model load.** `embed()` must load the model on first use. If the cached model is corrupted (`Protobuf parsing failed` or `Load model`), `getEmbedder` deletes the model cache directory and retries the load once; other load errors propagate (`src/embeddings/embed.ts:77-88`). A propagated error here aborts the call before any row is written.
 - **No partial writes.** Because the row plus its FTS and vector entries are written inside one transaction, an error mid-write rolls the whole thing back rather than leaving the indexes out of sync (`src/db/annotations.ts:14-65`).
 
 ## Example

@@ -11,9 +11,9 @@ flowchart TD
   startNode([mimirs affected]) --> mode{how are<br>files given?}
   mode -->|--stdin| stdin[read stdin lines<br>resolve vs cwd]
   mode -->|positional args| args[resolve args<br>vs cwd]
-  mode -->|none| git{git repo?}
-  git -->|no| failNode[error + exit 1]
-  git -->|yes| diff[git diff --name-only HEAD<br>resolve vs git root]
+  mode -->|none| gitChk{git repo?}
+  gitChk -->|no| failNode[error + exit 1]
+  gitChk -->|yes| diff[git diff --name-only HEAD<br>resolve vs git root]
   diff --> emptyChk{diff empty?}
   emptyChk -->|yes| noChange[print 'No changed files' / empty json]
   stdin --> walk
@@ -30,8 +30,8 @@ flowchart TD
 3. **Positional args.** If no `--stdin` but file arguments were given, those are resolved against the working directory (`src/cli/commands/affected.ts:42-43`).
 4. **Git auto-detect.** With no input at all, it finds the git root and runs `git diff --name-only HEAD` to get the working-tree changes, resolving each path against the git root (`src/cli/commands/affected.ts:44-61`).
 5. **Empty / no-repo guards.** If there is no git root, it errors and exits non-zero; if the diff is empty, it prints a "no changed files" message (or empty JSON) and returns (`src/cli/commands/affected.ts:46-59`).
-6. **The walk.** `affectedTests` opens the index, maps the changed files to file ids, walks their transitive importers, and keeps the ones that are test files (`src/cli/commands/affected.ts:63-65`, `src/graph/trace.ts:546-571`).
-7. **Output.** The result is printed as JSON, as bare paths (`--quiet`), or as the default human-readable summary (`src/cli/commands/affected.ts:67-86`).
+6. **The walk.** `affectedTests` opens the index, maps the changed files to file ids, walks their transitive importers, and keeps the ones that are test files (`src/cli/commands/affected.ts:63-65`, `src/graph/trace.ts:546-570`).
+7. **Output.** The result is printed as JSON, as bare paths (`--quiet`), or as the default human-readable summary (`src/cli/commands/affected.ts:67-85`).
 
 ## Input modes in detail
 
@@ -47,9 +47,9 @@ Positional collection skips flags and the `--dir` value so they aren't mistaken 
 
 ## The importer closure, filtered to tests
 
-The matching is done by `affectedTests` (`src/graph/trace.ts:546-571`). It first builds a map from file id to path from the project graph, then resolves each changed absolute path to an indexed file id with `getFileByPath`. Paths that exist in the index become the `changed` set and feed the walk; paths not in the index are collected separately as `unknown` and skipped (`src/graph/trace.ts:554-562`).
+The matching is done by `affectedTests` (`src/graph/trace.ts:546-570`). It first builds a map from file id to path from the project graph, then resolves each changed absolute path to an indexed file id with `getFileByPath`. Paths that exist in the index become the `changed` set and feed the walk; paths not in the index are collected separately as `unknown` and skipped (`src/graph/trace.ts:554-562`).
 
-The walk itself is `transitiveImporters`: starting from the changed file ids, it repeatedly asks `getImportersOf` for every file that imports a file already in the closure, adding new ones until nothing new appears (`src/graph/trace.ts:488-504`). This is the file-level reverse-dependency graph — the same edges [`dependents`](../tools/dependents.md) reads, walked transitively. Because the closure is a visited set, it terminates without a depth cap. Finally, every file id in the closure whose path is a test file — decided by the shared `isTestPath` patterns (`tests/`, `__tests__/`, `spec/`, `test_`, or a `.test.`/`.spec.` suffix) — is kept as an affected test (`src/graph/trace.ts:565-567`, `src/utils/test-paths.ts:9-19`). The result is three sorted, project-relative lists: `changed`, `unknown`, and `tests`.
+The walk itself is `transitiveImporters`: starting from the changed file ids, it repeatedly asks `getImportersOf` for every file that imports a file already in the closure, adding new ones until nothing new appears (`src/graph/trace.ts:488-504`). This is the file-level reverse-dependency graph — the same edges [`dependents`](../tools/dependents.md) reads, walked transitively. Because the closure is a visited set, it terminates without a depth cap. Finally, every file id in the closure whose path is a test file — decided by the shared `isTestPath` patterns (`tests/`, `__tests__/`, `spec/`, `test_`, or a `.test.`/`.spec.` suffix) — is kept as an affected test (`src/graph/trace.ts:565-567`, `src/utils/test-paths.ts:9-18`). The result is three sorted, project-relative lists: `changed`, `unknown`, and `tests`.
 
 ## Output modes
 
@@ -59,7 +59,7 @@ The walk itself is `transitiveImporters`: starting from the changed file ids, it
 | `--quiet` | one bare test path per line, nothing else | piping straight into a test runner |
 | (none) | unknown-file note, a count line, then indented test paths | a human reading the terminal |
 
-The default output is the most informative: when any input files were not in the index it prints a `Note: N file(s) not in the index, skipped: …` line so a stale index doesn't silently swallow inputs, then either "No affected test files found." or a count line followed by the indented test list (`src/cli/commands/affected.ts:75-86`). `--json` and `--quiet` are checked before that and return early — `--json` emits the whole result (including `unknown`), `--quiet` emits only the bare test paths with no notes or headers, which is exactly what a `$(...)` substitution or an `xargs` pipe wants (`src/cli/commands/affected.ts:67-74`).
+The default output is the most informative: when any input files were not in the index it prints a `Note: N file(s) not in the index, skipped: …` line so a stale index doesn't silently swallow inputs, then either "No affected test files found." or a count line followed by the indented test list (`src/cli/commands/affected.ts:75-85`). `--json` and `--quiet` are checked before that and return early — `--json` emits the whole result (including `unknown`), `--quiet` emits only the bare test paths with no notes or headers, which is exactly what a `$(...)` substitution or an `xargs` pipe wants (`src/cli/commands/affected.ts:67-74`).
 
 ## Inputs
 
@@ -71,15 +71,15 @@ The default output is the most informative: when any input files were not in the
 | `--quiet` | flag | no | Print only bare test file paths, one per line (`src/cli/commands/affected.ts:71-74`). |
 | `--dir` | string | no | Project directory whose index to query; resolved to an absolute path. Defaults to `.` (`src/cli/commands/affected.ts:21`). |
 
-When no `files`, `--stdin`, and the directory is a git repo, the input is auto-detected from `git diff --name-only HEAD` (`src/cli/commands/affected.ts:44-61`).
+When there are no `files`, no `--stdin`, and the directory is a git repo, the input is auto-detected from `git diff --name-only HEAD` (`src/cli/commands/affected.ts:44-61`).
 
 ## Outputs
 
 | output | where it lands / shape / description |
 | --- | --- |
-| Affected test file list | Written to stdout. `--json`: the `{ changed, unknown, tests }` object (`src/cli/commands/affected.ts:67-70`). `--quiet`: bare test paths, one per line (`src/cli/commands/affected.ts:71-74`). Default: an optional unknown-files note, then either "No affected test files found." or an `N test file(s) affected by M changed file(s):` count line with indented paths (`src/cli/commands/affected.ts:75-86`). |
+| Affected test file list | Written to stdout. `--json`: the `{ changed, unknown, tests }` object (`src/cli/commands/affected.ts:67-70`). `--quiet`: bare test paths, one per line (`src/cli/commands/affected.ts:71-74`). Default: an optional unknown-files note, then either "No affected test files found." or an `N test file(s) affected by M changed file(s):` count line with indented paths (`src/cli/commands/affected.ts:75-85`). |
 
-The command opens the index read-only and closes it after the walk (`src/cli/commands/affected.ts:63-65`); it writes nothing back, so it changes no persistent state.
+The command opens the index and closes it after the walk (`src/cli/commands/affected.ts:63-65`); it writes nothing back, so it changes no persistent state.
 
 ## Branches and failure cases
 
@@ -118,7 +118,7 @@ Note: 1 file(s) not in the index, skipped: docs/notes.md
 ## Key source files
 
 - `src/cli/commands/affected.ts` — the command: input-mode selection, git fallback, output formatting (`src/cli/commands/affected.ts:20-93`).
-- `src/graph/trace.ts` — `affectedTests` resolves changed paths and filters the closure to tests; `transitiveImporters` walks the importer graph (`src/graph/trace.ts:488-571`).
+- `src/graph/trace.ts` — `affectedTests` resolves changed paths and filters the closure to tests; `transitiveImporters` walks the importer graph (`src/graph/trace.ts:488-570`).
 - `src/utils/test-paths.ts` — `isTestPath` and the patterns that decide what counts as a test file.
-- `src/tools/git-tools.ts` — `findGitRoot` and `runGit`, used for the git auto-detect mode (`src/tools/git-tools.ts:6-17`).
+- `src/tools/git-tools.ts` — `findGitRoot` and `runGit`, used for the git auto-detect mode (`src/tools/git-tools.ts:6-19`).
 - `src/cli/index.ts` — dispatches the `affected` subcommand to `affectedCommand` (`src/cli/index.ts:140-141`).

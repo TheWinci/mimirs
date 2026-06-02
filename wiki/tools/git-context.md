@@ -86,7 +86,7 @@ sequenceDiagram
    indexed (`src/tools/git-tools.ts:59-65`).
 7. `RagDB.getFileByPath` queries the `files` table by normalized path; a row
    means the file is indexed, `null` means it is not
-   (`src/db/index.ts:595-597`, `src/db/files.ts:7-13`).
+   (`src/db/index.ts:655-657`, `src/db/files.ts:8-14`).
 8. Unless `files_only` is set, the handler appends the recent-commit log for the
    `since..HEAD` range (`src/tools/git-tools.ts:71-76`).
 9. The handler always queries the names of files changed across `since..HEAD`
@@ -133,7 +133,7 @@ That relative path is resolved against the git root into an absolute path, and
 `[indexed]`, otherwise `[not indexed]` (`src/tools/git-tools.ts:62-63`). The
 lookup normalizes separators to forward slashes before comparing, so the tag is
 correct on Windows where `resolve` produces `\`-separated paths
-(`src/db/files.ts:12`, `src/utils/path.ts:12-14`). In normal mode the tag is
+(`src/db/files.ts:13`, `src/utils/path.ts:12-14`). In normal mode the tag is
 appended to the raw status line (preserving the `M `/`??` prefix); in
 `files_only` mode the prefix is dropped and only the path plus tag remains
 (`src/tools/git-tools.ts:64`).
@@ -259,6 +259,6 @@ data.
 - `src/tools/index.ts` — `resolveProject`, which resolves the directory and
   database, and registers the git tools (`src/tools/index.ts:22-37`, `:52`).
 - `src/db/files.ts` — `getFileByPath`, the indexed-file lookup behind the
-  `[indexed]`/`[not indexed]` tag (`src/db/files.ts:7-13`).
+  `[indexed]`/`[not indexed]` tag (`src/db/files.ts:8-14`).
 - `src/utils/path.ts` — `normalizePath`, which makes the path comparison
   platform-independent (`src/utils/path.ts:12-14`).

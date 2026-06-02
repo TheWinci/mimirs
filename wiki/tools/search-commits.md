@@ -71,7 +71,7 @@ flowchart TD
    (`src/tools/git-history-tools.ts:58-66`).
 4. The query string is embedded once. `embed` loads the shared
    sentence-transformer model and returns a single mean-pooled, L2-normalized
-   `Float32Array` (`src/embeddings/embed.ts:78-86`).
+   `Float32Array` (`src/embeddings/embed.ts:94-102`).
 5. The vector, the requested count, and the four filters are passed to
    `searchGitCommits`, which runs a nearest-neighbor search over the
    `vec_git_commits` virtual table, joins back to the commit rows, applies the
@@ -132,11 +132,12 @@ mapping a smaller distance to a higher score (`src/db/git-history.ts:179`).
 **Full-text search.** `textSearchGitCommits` matches the query against the
 `fts_git_commits` FTS5 table — which indexes the commit `message` and
 `diff_summary` columns — and orders by FTS5's built-in `rank`
-(`src/db/git-history.ts:206-213`, `src/db/index.ts:381-386`). The query is first
+(`src/db/git-history.ts:206-213`, `src/db/index.ts:384-389`). The query is first
 run through `sanitizeFTS`, which splits on whitespace and wraps every token in
-double quotes so that characters FTS5 would otherwise treat as operators (`+`,
-`-`, `*`, `AND`, `OR`, `NOT`, `NEAR`, parentheses) are matched literally instead
-of throwing a syntax error (`src/search/usages.ts:23-27`). Its `score` is
+double quotes (joining them with `OR`) so that characters FTS5 would otherwise
+treat as operators (`+`, `-`, `*`, `AND`, `OR`, `NOT`, `NEAR`, parentheses) are
+matched literally instead of throwing a syntax error
+(`src/search/usages.ts:29-33`). Its `score` is
 `1 / (1 + abs(rank))`; FTS5 ranks are negative, so the absolute value turns the
 best (most negative) rank into the highest score (`src/db/git-history.ts:217`).
 
@@ -197,7 +198,7 @@ sliced to `top` (`src/tools/git-history-tools.ts:90-93`).
 Unlike the conversation search tool, this handler does not wrap the full-text
 search in a try/catch; the token quoting done by `sanitizeFTS` is what keeps a
 stray operator character in the query from making the FTS match throw
-(`src/search/usages.ts:23-27`).
+(`src/search/usages.ts:29-33`).
 
 ## Example
 

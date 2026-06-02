@@ -104,7 +104,7 @@ A minimal queries file looks like this:
 `runBenchmark` is the scoring engine (`src/search/benchmark.ts:52-105`). It loads
 the config for the project directory and picks the hybrid weight from the
 optional `hybridWeight` argument, falling back to `config.hybridWeight` (default
-`0.7`) (`src/search/benchmark.ts:59-60`). The CLI does not pass an override, so
+`0.5`) (`src/search/benchmark.ts:59-60`). The CLI does not pass an override, so
 the benchmark uses the project's configured weight — the same one real searches
 use.
 
@@ -192,7 +192,7 @@ fail the run.
 
 The default thresholds are `benchmarkMinRecall = 0.8` and `benchmarkMinMrr =
 0.6`, both configurable in the project config and validated to the `0..1` range
-by the schema (`src/config/index.ts:33-34`). A run that meets or exceeds both
+by the schema (`src/config/index.ts:35-36`). A run that meets or exceeds both
 thresholds falls through to a normal exit (code `0`).
 
 | Outcome | Exit code | Cause |
@@ -258,7 +258,7 @@ re-indexed, and the query file is read but never modified.
   (`src/cli/commands/benchmark.ts:29-31`).
 - **FTS unavailable** — inside the hybrid search, if the BM25 text query fails it
   logs at debug level and falls back to vector-only results, so the benchmark
-  still completes (`src/search/hybrid.ts:324-328`).
+  still completes (`src/search/hybrid.ts:349-350`).
 
 ## Example
 

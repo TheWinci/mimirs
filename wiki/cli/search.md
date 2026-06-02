@@ -2,11 +2,11 @@
 
 `mimirs search <query>` is the command-line front door to the index. You give it a natural-language phrase or a symbol name, and it prints a ranked list of files that best match, each with a short snippet preview. Reach for it when you want to know *where* something lives in a codebase without opening files one by one. Its sibling command [`mimirs read`](read.md) is the one to use when you want the actual chunk *content* instead of just file paths.
 
-Under the hood this command runs a **hybrid search**: it blends semantic vector similarity (does the meaning match?) with BM25 keyword ranking (do the exact words appear?), then applies a series of relevance adjustments before collapsing everything down to file-level results. Every run also records one row in an analytics log so usage can be reviewed later with [`mimirs analytics`](analytics.md).
+Under the hood this command runs a **hybrid search**: it retrieves candidates two independent ways — semantic vector similarity (does the meaning match?) and BM25 keyword ranking (do the exact words appear?) — then fuses the two lists by *reciprocal-rank fusion* rather than blending the raw scores, applies a series of relevance adjustments, and collapses everything down to file-level results. Every run also records one row in an analytics log so usage can be reviewed later with [`mimirs analytics`](analytics.md).
 
 ## How a search runs
 
-The CLI dispatcher reads the first process argument as the command name and routes `search` to `searchCommand` `src/cli/index.ts:122-123`. The handler itself lives in `src/cli/commands/search-cmd.ts:33`. From there the real ranking work happens in the shared `search()` function `src/search/hybrid.ts:307`, which is the same engine the [`search` MCP tool](../tools/search.md) uses.
+The CLI dispatcher reads the first process argument as the command name and routes `search` to `searchCommand` `src/cli/index.ts:122-123`. The handler itself lives in `src/cli/commands/search-cmd.ts:33`. From there the real ranking work happens in the shared `search()` function `src/search/hybrid.ts:330`, which is the same engine the [`search` MCP tool](../tools/search.md) uses.
 
 ```mermaid
 sequenceDiagram
@@ -23,8 +23,8 @@ sequenceDiagram
     CLI->>CLI: parse --top, build path filter
     CLI->>Hybrid: search(query, db, top, 0, hybridWeight, generated, filter)
     Hybrid->>Embed: embed(query) -> vector
-    Hybrid->>DB: vector search (topK*4) + BM25 text search (topK*4)
-    Hybrid->>Hybrid: merge scores, dedupe by path, symbol expand, boost, sort
+    Hybrid->>DB: vector kNN (topK*4) + BM25 FTS (topK*4)
+    Hybrid->>Hybrid: rrfFuse by rank, dedupe by path, symbol expand, boost, sort
     Hybrid->>DB: logQuery(...) -> query_log row
     Hybrid-->>CLI: ranked DedupedResult[]
     CLI-->>User: print "score  path" + snippet preview
@@ -36,10 +36,10 @@ sequenceDiagram
 3. The handler resolves the project directory (`--dir`, default `.`), opens the on-disk index by constructing a `RagDB`, and loads the merged config `src/cli/commands/search-cmd.ts:40-42`.
 4. `--top` is parsed into an integer (default `searchTopK`, which is `10`), and the three path filters are folded into a single filter object `src/cli/commands/search-cmd.ts:43-44`.
 5. `search()` is called with a fixed threshold of `0`, the configured hybrid weight, the configured generated-file patterns, and the optional filter `src/cli/commands/search-cmd.ts:46`.
-6. Inside `search()`, the query string is turned into an embedding vector via `embed()` `src/search/hybrid.ts:317`.
-7. The index is queried twice: a vector (cosine-distance) search and a BM25 full-text search, each over-fetching `topK * 4` candidates so deduplication and boosting have a deep enough pool `src/search/hybrid.ts:320-328`.
-8. The two result sets are merged into hybrid scores, collapsed to one entry per file path, optionally augmented with exact symbol-name hits, re-ranked by several boosts, sorted, and lightly expanded for docs `src/search/hybrid.ts:330-378`.
-9. One row is written to the `query_log` table for analytics `src/search/hybrid.ts:380-388`.
+6. Inside `search()`, the query string is turned into an embedding vector via `embed()` `src/search/hybrid.ts:340`.
+7. The index is queried twice: a vector (cosine-distance) kNN search and a BM25 full-text search, each over-fetching `topK * 4` candidates so deduplication and boosting have a deep enough pool `src/search/hybrid.ts:343-351`.
+8. The two result sets are fused by *rank* into hybrid scores, collapsed to one entry per file path, optionally augmented with exact symbol-name hits, re-ranked by several boosts, sorted, and lightly expanded for docs `src/search/hybrid.ts:353-401`.
+9. One row is written to the `query_log` table for analytics `src/search/hybrid.ts:407-414`.
 10. The ranked list returns to the handler, which prints each result as a score, a path, and a one-line snippet preview — or a "no results" message if the list is empty `src/cli/commands/search-cmd.ts:48-57`.
 11. The database handle is closed `src/cli/commands/search-cmd.ts:58`.
 
@@ -62,36 +62,46 @@ The three list flags are parsed by `parseListFlag`, which splits on commas, trim
 |--------|--------------------------------------|
 | Ranked file lines | Printed to stdout. For each result, one line `<score>  <path>` (score formatted to 4 decimals) followed by an indented preview line of the first snippet, truncated to 120 characters with newlines flattened to spaces and a trailing `...`, then a blank line `src/cli/commands/search-cmd.ts:51-56`. |
 | Empty-result message | When nothing matches, the single line `No results found. Has the directory been indexed?` is printed instead of any result lines `src/cli/commands/search-cmd.ts:48-49`. |
-| `query_log` row | Persisted to the index database on every run (even zero-result runs). Stores the query text, result count, top score, top path, and elapsed milliseconds `src/search/hybrid.ts:382-388`, `src/db/analytics.ts:3-8`. |
+| `query_log` row | Persisted to the index database on every run (even zero-result runs). Stores the query text, result count, the top vector cosine score, the top result path, and elapsed milliseconds `src/search/hybrid.ts:408-414`, `src/db/analytics.ts:3-8`. |
 
 A result is a `DedupedResult`: a `path`, a numeric `score`, and an array of `snippets` `src/search/hybrid.ts:40-44`. The CLI only prints the score, the path, and the first snippet — any extra snippets are accumulated but not shown here.
 
 ## Hybrid search over the index
 
-The ranking engine blends two independent retrieval methods. First, `embed()` converts the query into a dense vector and `db.search(...)` (which delegates to `vectorSearch`) finds the nearest chunk vectors by distance, converting distance to a `0..1` score with `1 / (1 + distance)` `src/db/search.ts:88-95`. Second, `db.textSearch(...)` runs an FTS5 BM25 query over the same chunks, converting the FTS `rank` to a score with `1 / (1 + abs(rank))` `src/db/search.ts:130-137`. Both queries fetch `topK * 4` candidates so the later dedup and boost steps have a deep enough pool `src/search/hybrid.ts:320,325`.
+The ranking engine retrieves candidates two independent ways. First, `embed()` converts the query into a dense vector and `db.search(...)` (which delegates to `vectorSearch`) finds the nearest chunk vectors by distance, converting distance to a `0..1` score with `1 / (1 + distance)` `src/db/search.ts:88-95`. Second, `db.textSearch(...)` runs an FTS5 BM25 query over the same chunks, converting the FTS `rank` to a score with `1 / (1 + abs(rank))` `src/db/search.ts:130-137`. Both queries fetch `topK * 4` candidates so the later dedup and boost steps have a deep enough pool `src/search/hybrid.ts:343,348`.
 
-The two lists are combined in `mergeHybridScores`, keyed by `path:chunkIndex`. Each chunk's final score is `hybridWeight * vectorScore + (1 - hybridWeight) * textScore` `src/search/hybrid.ts:88-90`. With the default `hybridWeight` of `0.7` that is 70% semantic, 30% keyword `src/config/index.ts:113-117`. A chunk that appears in only one of the two lists still scores, just with a zero contribution from the side that missed it.
+The two lists are not blended by their raw scores. Vector cosine scores and BM25-derived scores live on different, non-comparable scales, so a raw linear blend would be dominated by whichever side has the larger magnitude — the weight would be nearly inert. Instead the lists are fused by **reciprocal-rank fusion** in `rrfFuse`: each list is treated as an ordered ranking, and a chunk at position `i` contributes `K / (K + i)` from that list, with `K = 60` `src/search/hybrid.ts:83-88`. The final score per chunk is `hybridWeight * primaryRank + (1 - hybridWeight) * secondaryRank`, where the *primary* list is the vector results and the *secondary* list is the BM25 results `src/search/hybrid.ts:99-102`. A chunk that appears in only one of the two lists still scores, just with a zero contribution from the side that missed it.
 
-Because two chunks can come from the same file, results are then deduplicated by path, keeping the highest-scoring chunk per file and accumulating each distinct snippet `src/search/hybrid.ts:333-353`. This is what makes `search` a *file-level* view, in contrast to [`mimirs read`](read.md), which keeps individual chunks separate and never deduplicates by file.
+The fusion is keyed per chunk by `path:chunkIndex`, wired up in `mergeHybridScores` `src/search/hybrid.ts:109-115`. The weight defaults to `0.5` — equal trust in the semantic and lexical rankings `src/search/hybrid.ts:63`, `src/config/index.ts:118`. A sweep over keyword and semantic query sets put the optimum at equal weight: keyword queries hold full recall while semantic recall collapses once the vector signal is starved much below that, so `0.5` is the balance point rather than a lean toward either side.
+
+Because the fused scores are positional (close to `1` at the very top and compressed below), the later multiplicative boosts can still reorder results meaningfully instead of being swamped by raw magnitude differences.
+
+Because two chunks can come from the same file, results are then deduplicated by path, keeping the highest-scoring chunk per file and accumulating each distinct snippet `src/search/hybrid.ts:356-376`. This is what makes `search` a *file-level* view, in contrast to [`mimirs read`](read.md), which keeps individual chunks separate and never deduplicates by file.
+
+### Identifier-aware keyword matching
+
+The BM25 half is not a plain word search. FTS5's default tokenizer splits on punctuation and whitespace but not on case boundaries, so an identifier like `getDependsOn` would be one opaque token that a search for `depends` could never match. To fix this, each chunk is indexed in `fts_chunks` over two columns — `snippet` (the raw code) and `parts` — and the `parts` column holds the split word-pieces of every *compound* identifier in the chunk `src/db/index.ts:198-201`. `identifierParts` produces that column by splitting camelCase, PascalCase, snake_case, kebab, and dotted names into lowercase pieces of two or more characters; single plain words are skipped because they already live in the snippet `src/indexing/identifiers.ts:13-35`. The `parts` column is kept in sync with the `chunks` table by FTS triggers `src/db/index.ts:205-214`, and older indexes built before this column existed are migrated in place `src/db/index.ts:562-607`. The upshot: a keyword query for `depends` matches a chunk that only ever spells it `getDependsOn`.
 
 After deduplication, several score adjustments run in sequence on the per-file candidates:
 
-- **Symbol expansion.** Identifier-looking words in the query (camelCase, snake_case, dotted names, 3+ chars, not stop words) trigger an exact symbol-name lookup via `db.searchSymbols(id, true, ...)`. A file already in the pool that also matches by symbol name has its score boosted by `1.3x`; a brand-new symbol-only hit is added with a high base score of `0.75` `src/search/hybrid.ts:355-367`, `src/search/hybrid.ts:255-273`.
-- **Source vs. test boost.** Paths under `src`/`lib`/`app`/etc. are multiplied by `1.1`; test paths are multiplied by `0.85` `src/search/hybrid.ts:100-109`.
-- **Filename and path affinity.** When query words appear in the filename stem (+`0.1` each) or directory segments (+`0.05` each), the score is nudged up; boilerplate basenames (`types.ts`, `index.d.ts`, …) are demoted to `0.8x` and configured generated files to `0.75x` `src/search/hybrid.ts:181-229`.
-- **Dependency-graph boost.** A file imported by many others gets a modest logarithmic bump (`0.05 * log2(importerCount + 1)`), on the theory that widely-used files are more central `src/search/hybrid.ts:295-305`.
+- **Symbol expansion.** Identifier-looking words in the query (camelCase, PascalCase, snake_case, dotted names, 3+ chars, not stop words) trigger an exact symbol-name lookup via `db.searchSymbols(id, true, ...)`. A file already in the pool that also matches by symbol name has its score boosted by `1.3x`; a brand-new symbol-only hit is added with a high base score of `0.75` `src/search/hybrid.ts:379-391`, `src/search/hybrid.ts:278-296`.
+- **Source vs. test boost.** Paths under `src`/`lib`/`app`/etc. are multiplied by `1.1`; test paths are multiplied by `0.85` `src/search/hybrid.ts:123-132`.
+- **Filename and path affinity.** When query words appear in the filename stem (+`0.1` each) or directory segments (+`0.05` each), the score is nudged up; boilerplate basenames (`types.ts`, `index.d.ts`, …) are demoted to `0.8x` and configured generated files to `0.75x` `src/search/hybrid.ts:204-252`.
+- **Dependency-graph boost.** A file imported by many others gets a modest logarithmic bump (`0.05 * log2(importerCount + 1)`), on the theory that widely-used files are more central `src/search/hybrid.ts:318-328`.
 
-The boosted list is sorted by score descending, then run through `expandForDocs`, which lets Markdown results ride along as bonus entries so they do not push code files out of the top slots `src/search/hybrid.ts:372-378`, `src/search/hybrid.ts:281-292`.
+The boosted list is sorted by score descending, then run through `expandForDocs`, which lets Markdown results ride along as bonus entries so they do not push code files out of the top slots `src/search/hybrid.ts:395-401`, `src/search/hybrid.ts:304-315`.
 
 ## Path filters (`--ext` / `--in` / `--exclude`)
 
 Filtering happens in two places. Inside the SQL queries, `buildPathFilter` turns the filter into parametrized `LIKE` / `NOT LIKE` clauses: extensions become `f.path LIKE '%<ext>'`, included dirs become `f.path LIKE '<dir>/%'`, and excluded dirs become `f.path NOT LIKE '<dir>/%'` `src/db/search.ts:16-51`. When any filter is active the inner vector/FTS query over-fetches by a factor of five (`FILTER_OVERFETCH`) so enough rows survive the filter `src/db/search.ts:53-64`. Because the dir clauses are prefix matches against the stored absolute paths, the CLI resolves `--in` / `--exclude` values to absolute paths before passing them down `src/cli/commands/search-cmd.ts:28-29`.
 
-There is also a second, in-memory filter. Symbol-expansion hits bypass the SQL layer (they come from the symbol index, not the chunk search), so each is re-checked with `matchesFilter` before it can join the result set `src/search/hybrid.ts:362`, `src/search/hybrid.ts:11-37`. This mirrors the SQL rules so a `--ext`/`--in`/`--exclude` constraint applies uniformly no matter which retrieval path produced a hit.
+There is also a second, in-memory filter. Symbol-expansion hits bypass the SQL layer (they come from the symbol index, not the chunk search), so each is re-checked with `matchesFilter` before it can join the result set `src/search/hybrid.ts:385`, `src/search/hybrid.ts:11-38`. This mirrors the SQL rules so a `--ext`/`--in`/`--exclude` constraint applies uniformly no matter which retrieval path produced a hit.
 
 ## Ranked file output with snippet preview
 
 The print loop is deliberately compact. For each ranked result it emits the score to four decimal places and the path on one line, then an indented preview line built from the first snippet, then a blank separator line `src/cli/commands/search-cmd.ts:51-56`. The preview is the snippet sliced to its first 120 characters, with every newline replaced by a space so it stays on a single visual line, and a literal `...` appended to signal truncation. Only the first snippet is shown even when a file matched through several chunks.
+
+Because scores are reciprocal-rank-fusion values that have then been multiplied and added to by the boosts, the printed number is a relative ranking signal, not a similarity percentage — a top result typically lands somewhere under `1.0` and the gaps between results matter more than the absolute values.
 
 Example invocation and output (paths and scores are illustrative):
 
@@ -111,7 +121,7 @@ $ mimirs search "hybrid search scoring" --top 3 --ext .ts --in src
 
 ### `query_log` row written per search
 
-Before returning, `search()` records the run for analytics. It measures wall-clock duration with `performance.now()`, then calls `db.logQuery(...)` with the query text, the result count, the top result's score and path (or `null` when there are no results), and the rounded duration in milliseconds `src/search/hybrid.ts:381-388`.
+Before returning, `search()` records the run for analytics. It measures wall-clock duration with `performance.now()`, then calls `db.logQuery(...)` with the query text, the result count, the top result's path (or `null` when there are no results), the rounded duration in milliseconds, and — as the relevance signal — the top *vector cosine* score `src/search/hybrid.ts:407-414`. The fused result scores are positional rank-fusion values (always near `1` at the top), so they are useless as a quality gauge; logging the raw top cosine instead keeps the "average top score" and the low-relevance (`< 0.3`) heuristic in [`mimirs analytics`](analytics.md) meaningful.
 
 | State | Before | After |
 |-------|--------|-------|
@@ -122,19 +132,21 @@ The write is a plain `INSERT` into the `query_log` table, with `created_at` set 
 ## Branches and failure cases
 
 - **Missing query.** No query argument prints the usage string to stderr and exits with code 1 `src/cli/commands/search-cmd.ts:35-38`.
-- **No results.** When the ranked list is empty, the command prints `No results found. Has the directory been indexed?` and writes a `query_log` row with `result_count = 0` and null top score/path `src/cli/commands/search-cmd.ts:48-49`, `src/search/hybrid.ts:384-386`.
-- **Bad `--top` value.** A non-integer (or out-of-range) value throws a `CliFlagError` via strict `Number` parsing — unlike `parseInt`, `"12abc"` is rejected rather than silently truncated. The top-level dispatcher catches it, prints the message, and exits 1 rather than crashing with a stack trace `src/cli/flags.ts:40-53`, `src/cli/index.ts:101-104`.
-- **FTS query failure.** If the BM25 query throws (for example on a query string the FTS tokenizer rejects despite `sanitizeFTS`), the error is caught, logged at debug level, and the search proceeds vector-only `src/search/hybrid.ts:324-328`. The command still returns ranked results; only the keyword half of the blend is lost for that run.
+- **No results.** When the ranked list is empty, the command prints `No results found. Has the directory been indexed?` and writes a `query_log` row with `result_count = 0` and a null top path `src/cli/commands/search-cmd.ts:48-49`, `src/search/hybrid.ts:408-414`. The top score logged is whatever the top vector hit scored, or `null` if there were no vector hits at all.
+- **Bad `--top` value.** A non-integer value throws a `CliFlagError` via strict `Number` parsing — unlike `parseInt`, `"12abc"` is rejected rather than silently truncated, and values below `1` fail the `min` check. The top-level dispatcher catches it, prints the message, and exits 1 rather than crashing with a stack trace `src/cli/flags.ts:40-53`, `src/cli/index.ts:98-106`.
+- **FTS query failure.** If the BM25 query throws (for example on a query string the FTS tokenizer rejects despite `sanitizeFTS`), the error is caught, logged at debug level, and the search proceeds vector-only `src/search/hybrid.ts:346-351`. The command still returns ranked results; only the keyword half of the fusion is lost for that run.
 - **No filter flags.** When none of `--ext`/`--in`/`--exclude` is given, no filter object is constructed and the search is unscoped, so the inner queries fetch only `topK * 4` rows without the 5x over-fetch `src/cli/commands/search-cmd.ts:25`, `src/db/search.ts:64`.
-- **Unindexed or missing index.** Constructing `RagDB` creates the `.mimirs` directory and schema if absent, so a never-indexed project simply yields zero results and the "Has the directory been indexed?" hint rather than an error `src/db/index.ts:108-139`. A read-only or permission-denied directory (`EROFS`/`EACCES`) instead raises a clear, actionable error pointing at `RAG_DB_DIR` `src/db/index.ts:112-120`.
-- **Symbol expansion skipped.** If the query contains no identifier-looking words, the symbol-lookup block is skipped entirely and ranking relies on the hybrid + boost path alone `src/search/hybrid.ts:355-357`.
+- **Unindexed or missing index.** Constructing `RagDB` creates the `.mimirs` directory and schema if absent, so a never-indexed project simply yields zero results and the "Has the directory been indexed?" hint rather than an error `src/db/index.ts:105-139`. A read-only or permission-denied directory (`EROFS`/`EACCES`) instead raises a clear, actionable error pointing at `RAG_DB_DIR` `src/db/index.ts:111-124`.
+- **Symbol expansion skipped.** If the query contains no identifier-looking words, the symbol-lookup block is skipped entirely and ranking relies on the hybrid + boost path alone `src/search/hybrid.ts:379-380`.
 
 ## Key source files
 
 - `src/cli/index.ts` — CLI dispatcher; routes the `search` subcommand to the handler and catches flag errors `src/cli/index.ts:122-123`.
 - `src/cli/commands/search-cmd.ts` — `searchCommand` handler: argument and flag parsing, filter building, result printing.
 - `src/cli/flags.ts` — strict numeric flag parsing (`intFlag`) that rejects garbage `--top` values at the boundary.
-- `src/search/hybrid.ts` — the shared `search()` engine: embedding, hybrid merge, dedup, symbol expansion, boosts, doc expansion, and the analytics log call.
+- `src/search/hybrid.ts` — the shared `search()` engine: embedding, reciprocal-rank fusion (`rrfFuse`), dedup, symbol expansion, boosts, doc expansion, and the analytics log call.
 - `src/db/search.ts` — `vectorSearch` / `textSearch` and `buildPathFilter`: the SQL that backs both retrieval halves and the path filtering.
+- `src/indexing/identifiers.ts` — `identifierParts` / `splitIdentifier`: the camelCase/snake_case splitting that populates the FTS `parts` column.
+- `src/db/index.ts` — schema for `fts_chunks` (the `snippet`/`parts` columns and their triggers) and `query_log`, plus the in-place migration for older indexes.
 - `src/db/analytics.ts` — `logQuery`, which inserts the per-search `query_log` row.
-- `src/config/index.ts` — defaults for `searchTopK` (10), `hybridWeight` (0.7), and `generated` ([]).
+- `src/config/index.ts` — defaults for `searchTopK` (10), `hybridWeight` (0.5), and `generated` ([]).

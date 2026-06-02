@@ -38,21 +38,21 @@ sequenceDiagram
 3. `resolveProject` picks the target directory: the explicit argument if given, else the `RAG_PROJECT_DIR` environment variable, else the current working directory (`src/tools/index.ts:26`).
 4. It calls `resolve()` to make the path absolute and rejects a path that does not exist on disk, throwing `Directory does not exist: <path>` (`src/tools/index.ts:29-32`).
 5. `getDB(resolved)` returns a database connection. On the server this is a cached handle: the first call for a directory constructs a `RagDB` and stores it; later calls reuse it (`src/server/index.ts:34-51`).
-6. The handler asks the connection for status via `ragDb.getStatus()` (`src/tools/index-tools.ts:105`), which is a thin pass-through to the file-operations module (`src/db/index.ts:646-648`).
-7. `getStatus` runs three independent queries against the SQLite database — a row count of `files`, a row count of `chunks`, and the single most recent `indexed_at` value (`src/db/files.ts:354-372`).
+6. The handler asks the connection for status via `ragDb.getStatus()` (`src/tools/index-tools.ts:105`), which is a thin pass-through to the file-operations module (`src/db/index.ts:706-708`).
+7. `getStatus` runs three independent queries against the SQLite database — a row count of `files`, a row count of `chunks`, and the single most recent `indexed_at` value (`src/db/files.ts:355-373`).
 8. The handler formats the three values into one text block and returns it as the tool result (`src/tools/index-tools.ts:107-114`).
 
 ## The status query
 
-`getStatus` is the only data source for this tool. It runs three small, separate statements rather than one joined query (`src/db/files.ts:354-372`):
+`getStatus` is the only data source for this tool. It runs three small, separate statements rather than one joined query (`src/db/files.ts:355-373`):
 
 - `SELECT COUNT(*) FROM files` — the number of indexed file records. Each row in `files` is one source file mimirs has chunked and embedded.
 - `SELECT COUNT(*) FROM chunks` — the number of semantic chunks. A single file usually produces several chunks (one per function, class, or markdown section), so this number is normally larger than the file count.
 - `SELECT indexed_at FROM files ORDER BY indexed_at DESC LIMIT 1` — the newest indexing timestamp across all files.
 
-The result shape is fixed: `{ totalFiles, totalChunks, lastIndexed }`, where `lastIndexed` is the raw ISO-8601 string stored in the row, or `null` when the `files` table is empty (`src/db/files.ts:367-371`).
+The result shape is fixed: `{ totalFiles, totalChunks, lastIndexed }`, where `lastIndexed` is the raw ISO-8601 string stored in the row, or `null` when the `files` table is empty (`src/db/files.ts:368-372`).
 
-The timestamp is not a single global "last full index" marker. Every file row carries its own `indexed_at`, written with `new Date().toISOString()` when that file is first inserted or re-indexed (`src/db/files.ts:50-52`, `src/db/files.ts:59-62`; the schema requires the column at `src/db/index.ts:172-177`). `getStatus` simply surfaces the maximum of those per-file timestamps, so "last indexed" really means "the most recently touched file." A partial refresh that only re-indexed a handful of files still moves this value forward.
+The timestamp is not a single global "last full index" marker. Every file row carries its own `indexed_at`, written with `new Date().toISOString()` when that file is first inserted or re-indexed (`src/db/files.ts:51-54`, `src/db/files.ts:60-63`; the schema requires the column at `src/db/index.ts:173-178`). `getStatus` simply surfaces the maximum of those per-file timestamps, so "last indexed" really means "the most recently touched file." A partial refresh that only re-indexed a handful of files still moves this value forward.
 
 ## Inputs
 
@@ -72,10 +72,10 @@ The `never` fallback comes from the `status.lastIndexed || "never"` expression: 
 
 This tool has very little branching because it neither writes nor scans the file system. The cases that do exist:
 
-- **Empty index.** When `files` has no rows, both counts are `0` and `lastIndexed` is `null`. The output shows `Files: 0`, `Chunks: 0`, and `Last indexed: never` (`src/db/files.ts:367-371`, `src/tools/index-tools.ts:111`).
+- **Empty index.** When `files` has no rows, both counts are `0` and `lastIndexed` is `null`. The output shows `Files: 0`, `Chunks: 0`, and `Last indexed: never` (`src/db/files.ts:368-372`, `src/tools/index-tools.ts:111`).
 - **Missing directory.** If the resolved path does not exist, `resolveProject` throws `Directory does not exist: <resolved>` before any query runs, and the tool call fails rather than returning a status block (`src/tools/index.ts:30-32`).
 - **No `directory` argument.** The handler does not require it; the fallback chain in `resolveProject` always produces a path (`src/tools/index.ts:26`).
-- **Database open failure.** `getDB` constructs a `RagDB` on first use, which creates the `.mimirs` directory and opens `index.db`. If that directory cannot be written — for example a read-only file system — the constructor catches the `EROFS`/`EACCES` error and throws a guidance error pointing at `RAG_DB_DIR`, and that error surfaces from the tool call (`src/db/index.ts:108-123`). A fresh-but-writable directory does not fail: the schema is created on demand in `initSchema`, so the tool simply reports an empty index (`src/db/index.ts:170-189`).
+- **Database open failure.** `getDB` constructs a `RagDB` on first use, which creates the `.mimirs` directory and opens `index.db`. If that directory cannot be written — for example a read-only file system — the constructor catches the `EROFS`/`EACCES` error and throws a guidance error pointing at `RAG_DB_DIR`, and that error surfaces from the tool call (`src/db/index.ts:108-123`). A fresh-but-writable directory does not fail: the schema is created on demand in `initSchema`, so the tool simply reports an empty index (`src/db/index.ts:171-191`).
 - **Cached permanent error.** On the server, an earlier non-retryable initialization failure is remembered, and `getDB` re-throws it immediately on the next call without retrying (`src/server/index.ts:34-37`). A status request made after such a failure fails the same way.
 
 There is no locking or query-only mode here. Those concerns belong to [index_files](./index-files.md), which writes to the index; `index_status` only reads.
@@ -118,6 +118,6 @@ Index status:
 
 - `src/tools/index-tools.ts` — registers `index_status` (and its siblings) and formats the status text (`src/tools/index-tools.ts:94-116`).
 - `src/tools/index.ts` — `resolveProject` resolves the directory, validates it, and supplies the database handle (`src/tools/index.ts:22-37`).
-- `src/db/index.ts` — `RagDB.getStatus` forwards to the file-operations module and owns the schema for the `files` and `chunks` tables (`src/db/index.ts:646-648`, `src/db/index.ts:170-189`).
-- `src/db/files.ts` — `getStatus` runs the three counting queries that produce the reported numbers (`src/db/files.ts:354-372`).
+- `src/db/index.ts` — `RagDB.getStatus` forwards to the file-operations module and owns the schema for the `files` and `chunks` tables (`src/db/index.ts:706-708`, `src/db/index.ts:171-191`).
+- `src/db/files.ts` — `getStatus` runs the three counting queries that produce the reported numbers (`src/db/files.ts:355-373`).
 - `src/server/index.ts` — the `getDB` factory that caches one `RagDB` per project directory (`src/server/index.ts:34-51`).

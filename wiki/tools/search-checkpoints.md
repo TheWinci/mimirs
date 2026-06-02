@@ -8,9 +8,9 @@ The tool is registered on the MCP server inside `registerCheckpointTools`, along
 
 When a checkpoint is created, its title and summary are concatenated into one string (`${title}. ${summary}`) and embedded into a single vector (`src/tools/checkpoint-tools.ts:46-47`). That vector is written to a dedicated virtual table while the human-readable fields go to a separate base table (`src/db/checkpoints.ts:41-44`). Searching reverses that: the incoming query string is embedded with the same model, and that query vector is compared against every stored checkpoint vector to find the nearest ones.
 
-The embedding step is shared with the rest of mimirs. `embed` loads (or reuses) a singleton transformer pipeline — by default `Xenova/all-MiniLM-L6-v2` producing 384-dimensional vectors — and returns a mean-pooled, L2-normalized `Float32Array` for the text (`src/embeddings/embed.ts:78-86`). Because the model is a singleton, the first search in a process can be slow while the model loads; later searches reuse the loaded pipeline.
+The embedding step is shared with the rest of mimirs. `embed` loads (or reuses) a singleton transformer pipeline — by default `Xenova/all-MiniLM-L6-v2` producing 384-dimensional vectors — and returns a mean-pooled, L2-normalized `Float32Array` for the text (`src/embeddings/embed.ts:94-102`). Because the model is a singleton, the first search in a process can be slow while the model loads; later searches reuse the loaded pipeline.
 
-The nearest-neighbor lookup uses a `vec0` virtual table named `vec_checkpoints`, created with the project database; its embedding width is the configured embedding dimension, 384 by default (`src/db/index.ts:335-338`). The query joins the vector hits back to the `conversation_checkpoints` base table so each match carries its full title, summary, type, files, and tags (`src/db/checkpoints.ts:114-118`).
+The nearest-neighbor lookup uses a `vec0` virtual table named `vec_checkpoints`, created with the project database; its embedding width is the configured embedding dimension, 384 by default (`src/db/index.ts:338-341`). The query joins the vector hits back to the `conversation_checkpoints` base table so each match carries its full title, summary, type, files, and tags (`src/db/checkpoints.ts:114-118`).
 
 ```mermaid
 sequenceDiagram
@@ -40,7 +40,7 @@ sequenceDiagram
 1. The agent calls the tool with a `query` and optional `type`, `limit`, and `directory`. Zod validates the arguments before the handler runs, so a missing or empty `query` is rejected before any work happens (`src/tools/checkpoint-tools.ts:123-134`).
 2. `resolveProject` turns the optional `directory` into an absolute path, verifies it exists, loads the project config, applies its embedding settings, and returns the project's `RagDB` handle (`src/tools/index.ts:22-37`). This is what lets the same server serve checkpoints for multiple projects.
 3. The handler embeds the query string into a vector with `embed` (`src/tools/checkpoint-tools.ts:138`).
-4. The vector is passed to `ragDb.searchCheckpoints`, which forwards to the database helper with the `limit` as `topK` and the optional `type` (`src/db/index.ts:823-825`).
+4. The vector is passed to `ragDb.searchCheckpoints`, which forwards to the database helper with the `limit` as `topK` and the optional `type` (`src/db/index.ts:883-885`).
 5. The helper runs a `MATCH` query against `vec_checkpoints` ordered by distance, joined to the base checkpoint rows. It deliberately over-fetches — it asks for `topK * 2` candidates (`src/db/checkpoints.ts:114-120`).
 6. It walks the candidates, skips any whose `type` does not match the requested filter, converts each distance into a `score` of `1 / (1 + distance)`, and stops once it has collected `topK` results (`src/db/checkpoints.ts:124-141`).
 7. If nothing survives, the handler returns the fixed string `"No matching checkpoints found."` (`src/tools/checkpoint-tools.ts:141-145`).
@@ -79,7 +79,7 @@ Vector search returns a `distance` (smaller means closer). The helper turns that
 | No checkpoints stored / none match | The vector query yields no surviving rows and the handler returns `"No matching checkpoints found."` (`src/tools/checkpoint-tools.ts:141-145`). |
 | Checkpoint has no involved files | The `Files:` line is omitted from that block; only score, id, type, title, and summary are shown (`src/tools/checkpoint-tools.ts:149-152`). |
 | `directory` does not exist | `resolveProject` throws `Directory does not exist: <path>` before any search (`src/tools/index.ts:30-32`). |
-| Model load failure | Surfaces from `embed` / `getEmbedder`. A corrupted cached model is deleted and the load is retried once; other load errors propagate (`src/embeddings/embed.ts:61-72`). |
+| Model load failure | Surfaces from `embed` / `getEmbedder`. A corrupted cached model is deleted and the load is retried once; other load errors propagate (`src/embeddings/embed.ts:77-88`). |
 
 ### The over-fetch and post-filter
 

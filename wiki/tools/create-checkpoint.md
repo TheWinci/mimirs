@@ -86,7 +86,7 @@ sequenceDiagram
    (`src/tools/checkpoint-tools.ts:43`).
 7. The title and summary are joined as `"${title}. ${summary}"` and embedded
    into one normalized vector by the local embedding model
-   (`src/tools/checkpoint-tools.ts:46-47`, `src/embeddings/embed.ts:78-86`).
+   (`src/tools/checkpoint-tools.ts:46-47`, `src/embeddings/embed.ts:94-102`).
 8. `RagDB.createCheckpoint` writes the base row and its vector inside a single
    transaction and returns the new id (`src/tools/checkpoint-tools.ts:49-59`,
    `src/db/checkpoints.ts:4-49`).
@@ -126,7 +126,7 @@ The checkpoint is made semantically searchable up front by embedding it at write
 time. The handler concatenates the title and summary into a single string and
 passes it to `embed`, which loads the configured local feature-extraction model
 and returns one mean-pooled, L2-normalized vector
-(`src/tools/checkpoint-tools.ts:46-47`, `src/embeddings/embed.ts:78-86`). With
+(`src/tools/checkpoint-tools.ts:46-47`, `src/embeddings/embed.ts:94-102`). With
 the default model (`Xenova/all-MiniLM-L6-v2`) that vector is 384 dimensions
 (`src/embeddings/embed.ts:16-17`); a project configured for a different model
 produces a vector of that model's dimension instead. Because the vector is
@@ -136,7 +136,7 @@ query at read time and compare it against vectors that already exist.
 ## Inserting the checkpoint row
 
 `RagDB.createCheckpoint` is a thin wrapper that forwards to the store function in
-`src/db/checkpoints.ts` (`src/db/index.ts:810-819`). That function performs both
+`src/db/checkpoints.ts` (`src/db/index.ts:870-879`). That function performs both
 writes inside one transaction so the row and its vector always land together
 (`src/db/checkpoints.ts:4-49`). It first inserts into `conversation_checkpoints`
 with the session id, turn index, ISO timestamp, type, title, summary, and the
@@ -151,7 +151,7 @@ human-readable columns and the `vec0` virtual table holds the vector, mirroring
 how code chunks are stored as `chunks` plus `vec_chunks`. Both tables are created
 once in the schema: `conversation_checkpoints` has an `AUTOINCREMENT` primary key
 plus indexes on `session_id` and `type`, and `vec_checkpoints` is a `vec0` table
-sized to the configured embedding dimension (`src/db/index.ts:320-338`). The
+sized to the configured embedding dimension (`src/db/index.ts:323-341`). The
 transaction wrapper means a failure midway — for example a dimension mismatch on
 the vector insert — rolls back the base-table row too, so you never get a
 checkpoint with no vector.
@@ -199,7 +199,7 @@ row, and no annotation are created or updated by this tool.
   embedding-dimension mismatch between the project config and the existing index
   is also caught up front, before any checkpoint write — the guard inspects the
   stored `vec_chunks` table and throws if its dimension differs from the
-  configured model (`src/db/index.ts:149-167`).
+  configured model (`src/db/index.ts:150-167`).
 - **No transcripts found.** When `discoverSessions` finds no `*.jsonl` files —
   the transcript directory does not exist or is empty — it returns an empty
   array, and the handler stores the session id as the literal `"unknown"`

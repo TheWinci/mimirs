@@ -10,7 +10,7 @@ The tool is registered in `src/tools/graph-tools.ts:179-210` and is a thin wrapp
 
 `dependents` only knows about edges that already exist in the database. Those edges are written during indexing, not when the tool runs.
 
-When the indexer processes a file, it stores that file's imports and exports into the `file_imports` and `file_exports` tables via `upsertFileGraph` (`src/db/graph.ts:879-934`). At that point each `file_imports` row records the raw import specifier (the literal string in the `import` statement, e.g. `"../db"`) but its `resolved_file_id` column is still null — the indexer does not yet know which on-disk file that specifier points to.
+When the indexer processes a file, it stores that file's imports and exports into the `file_imports` and `file_exports` tables via `upsertFileGraph` (`src/db/graph.ts:879-918`). At that point each `file_imports` row records the raw import specifier (the literal string in the `import` statement, e.g. `"../db"`) but its `resolved_file_id` column is still null — the indexer does not yet know which on-disk file that specifier points to.
 
 A later project-wide pass turns specifiers into concrete file ids (`src/graph/resolver.ts`). For each unresolved import it first asks the filesystem resolver (which understands `tsconfig` path aliases, plus Python and Rust import styles), then falls back to probing indexed paths with common extensions. Bare/external specifiers like `"zod"` are skipped for JS/TS, so a row only gets a `resolved_file_id` when the target is an indexed file in this project. That resolved column is exactly what `dependents` reads — so the tool reports *resolved, in-project* importers, never external packages.
 
@@ -48,7 +48,7 @@ sequenceDiagram
 1. The caller invokes the tool with a `file` path and an optional `directory`. The arguments are validated by a small Zod schema: `file` is a required string, `directory` an optional string (`src/tools/graph-tools.ts:182-188`).
 2. `resolveProject` turns the optional `directory` into an absolute project root (falling back to the `RAG_PROJECT_DIR` env var, then the current working directory), verifies it exists, loads the project config, applies the embedding config, and hands back the open `RagDB` for that project (`src/tools/index.ts:22-37`).
 3. The tool resolves the user-supplied `file` against the project root with `resolve(projectDir, file)`, producing the absolute path the database keys rows by (`src/tools/graph-tools.ts:192`).
-4. It looks the file up with `getFileByPath(absPath)`. That query normalizes the path before matching `files.path`, so a Windows-style `\` path still matches the stored canonical form (`src/db/files.ts:7-13`).
+4. It looks the file up with `getFileByPath(absPath)`. That query normalizes the path before matching `files.path`, so a Windows-style `\` path still matches the stored canonical form (`src/db/files.ts:8-14`).
 5. If no row matches, the tool returns the message `File "<file>" not found in index.` and stops — see [Branches and failure cases](#branches-and-failure-cases).
 6. With a real file id, the tool calls `getDependedOnBy(fileId)`, which runs the reverse-dependency query and returns one `{ path, source }` row per importer (`src/db/graph.ts:1172-1182`).
 7. If the result is empty, it returns `No files import <file>.` — the file is indexed but nothing in the project imports it (an entry point, or genuinely unused).
@@ -78,7 +78,7 @@ The exact mirror is `getDependsOn`, which joins `files` on `fi.resolved_file_id`
 
 | name | type | required | description |
 | --- | --- | --- | --- |
-| `file` | string | yes | The file to find importers of, as a path relative to the project root (an absolute path also works, since it is passed through `resolve`). Resolved against `projectDir` and matched against the stored, normalized `files.path` (`src/tools/graph-tools.ts:183`, `src/db/files.ts:7-13`). |
+| `file` | string | yes | The file to find importers of, as a path relative to the project root (an absolute path also works, since it is passed through `resolve`). Resolved against `projectDir` and matched against the stored, normalized `files.path` (`src/tools/graph-tools.ts:183`, `src/db/files.ts:8-14`). |
 | `directory` | string | no | Project directory whose index to query. Defaults to the `RAG_PROJECT_DIR` environment variable, then the current working directory. Must exist or `resolveProject` throws (`src/tools/index.ts:26-32`). |
 
 ## Outputs
@@ -99,7 +99,7 @@ The tool reads the graph only; it does not write to the database, start backgrou
 - **Indexed but no importers.** The file exists in the index but no resolved import points at it, so the query returns zero rows and the tool returns `No files import <file>.` (`src/tools/graph-tools.ts:198-201`). This is the normal result for an entry point (a CLI command file, the server bootstrap) or a genuinely unused module.
 - **Importers that resolve to the file.** The success path lists every matching importer. The `import:` annotation shows the raw specifier, which is useful for spotting whether a file is reached by a relative path, an alias, or both.
 - **Unresolved imports are invisible.** If a file imports the target but the resolver never linked the specifier to an indexed file id (external package, a not-yet-indexed file, or a resolution miss), there is no row with `resolved_file_id` set, so that importer will not appear. The result reflects the *resolved* graph, not every textual `import` line.
-- **Stale index after edits.** The graph is only as current as the last indexing pass. If you add or remove an import and have not re-indexed, the result will not reflect the change. Removing a file goes through `clearFileGraph`, which first nulls the `resolved_file_id` pointers other files held to it and then deletes its own rows, so the graph stays consistent (`src/db/graph.ts:935-955`) (see [`remove_file`](remove-file.md)).
+- **Stale index after edits.** The graph is only as current as the last indexing pass. If you add or remove an import and have not re-indexed, the result will not reflect the change. Removing a file goes through `clearFileGraph`, which first nulls the `resolved_file_id` pointers other files held to it and then deletes its own rows, so the graph stays consistent (`src/db/graph.ts:936-954`) (see [`remove_file`](remove-file.md)).
 - **Missing or non-existent directory.** If `directory` (or the resolved default) does not exist, `resolveProject` throws `Directory does not exist: <path>` before the tool runs any query (`src/tools/index.ts:30-32`).
 
 ## File granularity vs. symbol granularity
@@ -139,6 +139,6 @@ The header counts the rows; each line is one importer and the specifier it used 
 
 - `src/tools/graph-tools.ts` — registers the `dependents` MCP tool, resolves the project, looks up the file, formats the text output (`src/tools/graph-tools.ts:179-210`).
 - `src/db/graph.ts` — `getDependedOnBy` runs the reverse-dependency join (`src/db/graph.ts:1172-1182`); `getDependsOn` is its forward mirror (`src/db/graph.ts:1160-1170`); `upsertFileGraph` writes graph rows during indexing; `clearFileGraph` keeps the graph consistent on file removal.
-- `src/db/files.ts` — `getFileByPath` resolves a path to a `files` row, normalizing separators first (`src/db/files.ts:7-13`).
+- `src/db/files.ts` — `getFileByPath` resolves a path to a `files` row, normalizing separators first (`src/db/files.ts:8-14`).
 - `src/tools/index.ts` — `resolveProject` opens the right project database and applies its config (`src/tools/index.ts:22-37`).
 - `src/graph/resolver.ts` — the import-resolution pass that fills in `resolved_file_id`, the column this tool reads.

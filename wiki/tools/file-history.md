@@ -37,8 +37,8 @@ sequenceDiagram
 
 1. The caller invokes the tool with a file `path` and optional `top`, `since`, and `directory` arguments. The argument shape is validated by the Zod schema declared on the tool; `path` is the only required field `src/tools/git-history-tools.ts:115`.
 2. The handler resolves which project to read. `resolveProject` turns the optional `directory` (falling back to `RAG_PROJECT_DIR`, then the current working directory) into an absolute path, verifies it exists, loads that project's config, applies the embedding config, and hands back the `RagDB` for that directory `src/tools/index.ts:22`.
-3. The handler calls `ragDb.getFileHistory(path, top, since)` `src/tools/git-history-tools.ts:126`. This `RagDB` method is a thin wrapper that forwards to the standalone query function with the same arguments `src/db/index.ts:868-870`.
-4. The query joins `git_commit_files` to `git_commits` and matches the file with a `LIKE '%' || path` suffix pattern, optionally adds a `date >= since` clause, orders by commit date descending, and limits to `top` rows `src/db/git-history.ts:273`.
+3. The handler calls `ragDb.getFileHistory(path, top, since)` `src/tools/git-history-tools.ts:126`. This `RagDB` method is a thin wrapper that forwards to the standalone query function with the same arguments `src/db/index.ts:928-929`.
+4. The query joins `git_commit_files` to `git_commits` and matches the file with a `LIKE '%' || path` suffix pattern, optionally adds a `date >= since` clause, orders by commit date descending, and limits to `top` rows `src/db/git-history.ts:273-285`.
 5. SQLite returns the raw rows, already sorted newest-first by the `ORDER BY gc.date DESC` clause.
 6. Each raw row is turned into a `GitCommitRow` by `parseRow`, which decodes the JSON `files_changed` and `refs` columns and coerces the merge flag to a boolean `src/db/git-history.ts:89`.
 7. If the result list is empty, the handler returns a single text line telling the caller no commits matched and asking whether git history is indexed `src/tools/git-history-tools.ts:128`.
@@ -91,7 +91,7 @@ The per-commit block carries no relevance score. That is the visible difference 
 
 ## Where the data comes from
 
-`file_history` is purely a reader; it depends on two tables being populated by the indexer. `git_commits` holds one row per commit with its hash, message, author, date, and aggregate insertion/deletion counts; `git_commit_files` holds one row per (commit, changed file) pair `src/db/index.ts:350`. The join in `getFileHistory` walks `git_commit_files` to find which commits touched a path, then pulls the full commit record from `git_commits`. There is an index on `git_commit_files(file_path)` so the suffix lookup does not scan every row from scratch `src/db/index.ts:374`.
+`file_history` is purely a reader; it depends on two tables being populated by the indexer. `git_commits` holds one row per commit with its hash, message, author, date, and aggregate insertion/deletion counts; `git_commit_files` holds one row per (commit, changed file) pair `src/db/index.ts:353-377`. The join in `getFileHistory` walks `git_commit_files` to find which commits touched a path, then pulls the full commit record from `git_commits`. There is an index on `git_commit_files(file_path)` so the suffix lookup does not scan every row from scratch `src/db/index.ts:377`.
 
 Those rows are written when commit history is indexed — see the [history](../cli/history.md) CLI page for how the indexer walks `git log` and calls `insertCommitBatch` to populate both tables `src/db/git-history.ts:21`. This tool reads them; it never writes, so it has no state changes of its own.
 

@@ -44,7 +44,7 @@ sequenceDiagram
 5. For each model, `configureEmbedder(model.id, model.dim)` records the new model and dimension on the singleton, and `resetEmbedder()` clears the cached pipeline and tokenizer so the next embed call reloads the candidate model — `src/cli/commands/benchmark-models.ts:64-65`.
 6. A temporary index directory `.rag-eval-<model>` is created inside the project dir (any stale copy is deleted first), and a `RagDB` is opened against it with `autoEmbeddingConfig: false` so the constructor does not overwrite the dimension the command just set — `src/cli/commands/benchmark-models.ts:67-77`.
 7. `indexDirectory` walks the project and embeds every chunk into the temp DB at the current model's dimension. The handler times this with `performance.now()` and prints how many files were indexed — `src/cli/commands/benchmark-models.ts:81-87`.
-8. `runBenchmark` runs each query through the normal hybrid search against the temp index (passing `config.hybridWeight`, default 0.7) and computes recall@K, mean reciprocal rank, and zero-miss rate — `src/cli/commands/benchmark-models.ts:90-97`, `src/search/benchmark.ts:52-105`.
+8. `runBenchmark` runs each query through the normal hybrid search against the temp index (passing `config.hybridWeight`, default 0.5) and computes recall@K, mean reciprocal rank, and zero-miss rate — `src/cli/commands/benchmark-models.ts:90-97`, `src/search/benchmark.ts:52-105`.
 9. In a `finally` block the DB is closed and the temp directory is removed with `rmSync(..., { recursive: true, force: true })`, so the temp index never survives the model's turn even if indexing or benchmarking threw — `src/cli/commands/benchmark-models.ts:98-102`.
 10. After all models are done, the embedder is restored to the project default (`configureEmbedder(DEFAULT_MODEL_ID, DEFAULT_EMBEDDING_DIM)` + `resetEmbedder()`) so the process is left in a clean state — `src/cli/commands/benchmark-models.ts:106-107`.
 11. The handler prints a Markdown comparison table and, when more than one model ran, a per-candidate verdict comparing each model against the first — `src/cli/commands/benchmark-models.ts:110-141`.
@@ -110,7 +110,7 @@ For each model the handler computes `tmpDir = join(dir, ".rag-eval-<model-id-wit
 
 This matters for two reasons. First, **isolation**: different models produce vectors of different sizes (384, 512, 768…), and the vector table is built at a fixed dimension, so each model needs its own index — reusing one index across dimensions would trip the dimension guard. Second, **safety**: your real `.mimirs` index is never opened, so running this benchmark cannot corrupt or invalidate the index your editor or MCP server is using.
 
-The `autoEmbeddingConfig: false` option is directly tied to this. Normally the `RagDB` constructor reads the project's stored embedding config and applies it *before* creating the vector tables, so the index is built at the configured dimension regardless of call ordering. But here the command has *already* set the embedder to the candidate model, and the default behaviour would reset the dimension back to the project default. Opting out lets the command stay in control of which model is active — `src/db/index.ts:125-132`.
+The `autoEmbeddingConfig: false` option is directly tied to this. Normally the `RagDB` constructor reads the project's stored embedding config and applies it *before* creating the vector tables, so the index is built at the configured dimension regardless of call ordering. But here the command has *already* set the embedder to the candidate model, and the default behaviour would reset the dimension back to the project default. Opting out lets the command stay in control of which model is active — `src/db/index.ts:126-133`.
 
 ### Embedder singleton model/dim
 
@@ -120,7 +120,7 @@ The `autoEmbeddingConfig: false` option is directly tied to this. Normally the `
 | During | The candidate model id and dimension. |
 | After the run | Restored to the project default model and dimension. |
 
-`configureEmbedder` only swaps the singleton's recorded model and clears the cached pipeline and tokenizer when the id or dim actually changed; `resetEmbedder` then unconditionally clears the cached extractor and tokenizer so the next embed call reloads — `src/embeddings/embed.ts:35-42,195-199`. Because this state is process-wide, the handler deliberately restores the default at the end so a long-lived process is not left configured for the last candidate — `src/cli/commands/benchmark-models.ts:106-107`.
+`configureEmbedder` only swaps the singleton's recorded model and clears the cached pipeline and tokenizer when the id or dim actually changed; `resetEmbedder` then unconditionally clears the cached extractor and tokenizer so the next embed call reloads — `src/embeddings/embed.ts:50-57,212-215`. Because this state is process-wide, the handler deliberately restores the default at the end so a long-lived process is not left configured for the last candidate — `src/cli/commands/benchmark-models.ts:106-107`.
 
 ## Branches and failure cases
 

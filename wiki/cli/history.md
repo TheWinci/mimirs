@@ -74,7 +74,7 @@ The flow inside the indexer:
 
 `insertCommitBatch` wraps the whole batch in one SQLite transaction `src/db/git-history.ts:21`. For each commit it does `INSERT OR IGNORE INTO git_commits`, storing the changed-file list as a JSON array of *paths only* and the ref list as a JSON array `src/db/git-history.ts:24`. It reads `changes()` and skips the rest of the work when the row was ignored (already present). For a genuinely new row it reads `last_insert_rowid()`, inserts the embedding into the `vec_git_commits` vector table keyed by that id, and inserts one `git_commit_files` row per changed file with its own insertion/deletion counts `src/db/git-history.ts:46`.
 
-The keyword index is populated automatically: an `AFTER INSERT` trigger on `git_commits` copies the message and diff summary into the `fts_git_commits` FTS5 table, and an `AFTER DELETE` trigger removes them `src/db/index.ts:388`. The indexer never writes the FTS table directly.
+The keyword index is populated automatically: an `AFTER INSERT` trigger on `git_commits` copies the message and diff summary into the `fts_git_commits` FTS5 table, and an `AFTER DELETE` trigger removes them `src/db/index.ts:391-398`. The indexer never writes the FTS table directly.
 
 ## `search` — hybrid search over indexed commits
 

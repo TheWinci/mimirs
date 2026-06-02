@@ -46,7 +46,7 @@ sequenceDiagram
 4. `loadEvalTasks` reads and parses the task file, validating that it is a JSON array and that every entry has both a `task` and a `grading` string (`src/search/eval.ts:40-55`).
 5. For each task, `runEval` calls `runEvalTask` twice — once in the `with-rag` condition and once in the `without-rag` condition — and pushes both traces (`src/search/eval.ts:101-105`).
 6. In the `with-rag` condition, `runEvalTask` loads the config again and calls the real hybrid `search` with the task text as the query, the resolved `topK`, a zero score threshold, the configured hybrid weight, and the generated-file patterns (`src/search/eval.ts:73-77`).
-7. The hybrid `search` runs a vector query plus a BM25 query against the SQLite index, merges the scores, and returns results deduplicated to one entry per file path (`src/search/hybrid.ts:316-353`).
+7. The hybrid `search` runs a vector query plus a BM25 query against the SQLite index, merges the scores, and returns results deduplicated to one entry per file path (`src/search/hybrid.ts:330-376`).
 8. The `without-rag` condition skips search entirely. The `if (condition === "with-rag")` block never runs, so the result set stays empty — this simulates an agent that has no index to lean on (`src/search/eval.ts:70-77`).
 9. After all tasks run, `runEval` splits the traces by condition, computes averages and a file hit rate for each side with its local `computeStats` helper, and returns an `EvalSummary` (`src/search/eval.ts:107-141`).
 10. The handler prints `formatEvalReport(summary)` to stdout — the side-by-side table plus the per-task breakdown (`src/cli/commands/eval.ts:25`).
@@ -106,7 +106,7 @@ One subtlety: `computeStats` indexes the trace set positionally against the task
 | --- | --- | --- | --- |
 | `<file>` | positional path | yes | Path to the JSON task array. Resolved to an absolute path before loading. Missing argument prints usage and exits 1 (`src/cli/commands/eval.ts:9-13`, `src/cli/commands/eval.ts:21`). |
 | `--dir D` | path | no | Project directory whose index to evaluate against. Defaults to the current directory and is resolved to an absolute path (`src/cli/commands/eval.ts:15`). |
-| `--top N` | integer | no | Number of search results per task in the with-RAG condition. Must be an integer >= 1; defaults to `config.benchmarkTopK` (5). Bad values throw a flag error and exit non-zero (`src/cli/commands/eval.ts:19`, `src/config/index.ts:32`). |
+| `--top N` | integer | no | Number of search results per task in the with-RAG condition. Must be an integer >= 1; defaults to `config.benchmarkTopK` (5). Bad values throw a flag error and exit non-zero (`src/cli/commands/eval.ts:19`, `src/config/index.ts:34`). |
 | `--out F` | path | no | When present, writes the full per-task trace array to this JSON file after the report (`src/cli/commands/eval.ts:16`, `src/cli/commands/eval.ts:27-30`). |
 
 ## Outputs
