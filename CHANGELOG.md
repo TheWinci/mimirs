@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-06-02
+
+### Fixed
+- **Hybrid search was effectively vector-only.** `sanitizeFTS` joined query terms with a space (FTS5 implicit AND), so BM25 returned nothing for any query of more than ~2–3 terms; and even when it matched, the blend combined raw cosine with a BM25-derived score on an incomparable scale *and* inverted (the best match scored lowest), so `hybridWeight` was nearly inert. The two ranked lists are now combined by **reciprocal-rank fusion** (`rrfFuse` in `src/search/hybrid.ts`), which is scale-free, so BM25 genuinely contributes. The same raw-score blend bug in conversation search (the `conversation` CLI and the `search_conversation` tool) is fixed via the shared helper.
+
+### Changed
+- **Default `hybridWeight` 0.7 → 0.5.** With the blend working, a sweep over keyword and purely-semantic query sets put the optimum at 0.5 — keyword queries reach 100% recall and semantic recall peaks there (it collapses below ~0.3 as the vector signal is starved).
+- **Identifier-aware full-text search.** Compound identifiers are split (camelCase / snake_case / dotted) and indexed alongside the whole token via a new `parts` column, so a search for `depends` matches `getDependsOn` (~+7pp semantic recall). Existing indexes migrate in place — the FTS index is rebuilt from the content table, no re-embedding needed.
+- **Benchmarks re-measured** on the fixed pipeline; `BENCHMARKS.md` rewritten leaner. Recall held or improved and MRR rose substantially across all four codebases (e.g. Excalidraw MRR 0.44 → 0.90).
+
+### Added
+- Configurable `embeddingPooling` (`mean` / `cls`) and `embeddingDtype` in `.mimirs/config.json`, so an alternate ONNX embedding model can be pooled and quantized correctly. (A/B harness: `benchmarks/model-ab.ts`.)
+
 ## [1.4.0] - 2026-06-01
 
 ### Added
