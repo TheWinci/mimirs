@@ -78,3 +78,38 @@ describe("usages behavior (pinned)", () => {
     expect(results.some((r) => r.path.endsWith("comment.ts"))).toBe(true);
   });
 });
+
+describe("aliased usages survive an upgrade from a pre-1.2 index", () => {
+  function rawOf(d: RagDB): import("bun:sqlite").Database {
+    return (d as unknown as { db: import("bun:sqlite").Database }).db;
+  }
+
+  test("migration backfills the imported column and re-resolves aliases", async () => {
+    await seed(); // db.ts exports getDB; alias.ts does `import { getDB as g }; g("x")`
+
+    // Simulate a pre-1.2 index: drop the imported column and the version stamp.
+    const raw = rawOf(db);
+    raw.exec("ALTER TABLE file_imports DROP COLUMN imported");
+    raw.exec("PRAGMA user_version = 0");
+    db.close();
+
+    // Reopen → migrateGraphColumns re-adds `imported` AND clears the hash of
+    // files that have imports, so the next index repopulates it.
+    db = new RagDB(tempDir);
+    const raw2 = rawOf(db);
+    const hasCol = raw2
+      .query<{ name: string }, []>("PRAGMA table_info(file_imports)")
+      .all()
+      .some((c) => c.name === "imported");
+    expect(hasCol).toBe(true);
+    // alias.ts and direct.ts import getDB → their hashes were cleared.
+    expect(
+      raw2.query<{ n: number }, []>("SELECT COUNT(*) n FROM files WHERE hash = ''").get()!.n,
+    ).toBeGreaterThan(0);
+
+    // After re-indexing, the aliased call resolves again end-to-end.
+    await indexDirectory(tempDir, db, config);
+    const results = db.findUsages("getDB", true, 30);
+    expect(results.some((r) => r.path.endsWith("alias.ts") && r.snippet.includes('g("x")'))).toBe(true);
+  });
+});

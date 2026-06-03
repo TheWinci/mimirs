@@ -734,6 +734,14 @@ export class RagDB {
     if (!importCols.includes("imported")) {
       // Original source name for aliased imports (import { getDB as g } → "getDB").
       this.db.exec("ALTER TABLE file_imports ADD COLUMN imported TEXT");
+      // Existing import rows have imported=NULL and won't repopulate on a no-op
+      // re-index (hash unchanged → skipped), so aliased usages would stay
+      // unresolved. Force re-extraction of files that have imports by clearing
+      // their hash (mirrors backfillMissingSymbolRefs); the next index pass
+      // repopulates `imported`.
+      this.db.exec(
+        "UPDATE files SET hash = '' WHERE id IN (SELECT DISTINCT file_id FROM file_imports)",
+      );
     }
 
     const exportCols = this.db

@@ -112,6 +112,11 @@ export function resolveSymbolRefs(db: Database, fileId: number) {
       if (namespaceAliases.has(name)) continue;
 
       // For an aliased import, resolve against the ORIGINAL exported name.
+      // Note: this UPDATE is name-scoped, not binding-scoped — if an aliased
+      // name (e.g. `g`) also names an unrelated local elsewhere in the file,
+      // that local's refs get resolved too, so `usages` may over-report. Same
+      // scope-blindness as the direct-import case; a precise fix needs per-scope
+      // resolution.
       const exportName = aliasToImported.get(name) ?? name;
       const exp = db
         .query<{ id: number }, [number, string]>(

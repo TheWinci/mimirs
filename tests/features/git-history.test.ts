@@ -246,6 +246,15 @@ describe("file history path anchoring", () => {
     await runGit(["add", "."], anchorDir);
     await runGit(["commit", "-m", "Add mydb module only"], anchorDir);
 
+    // "_" is a LIKE wildcard — fooXbar.ts must not match a query for foo_bar.ts.
+    await writeFixture(anchorDir, "src/foo_bar.ts", "export const a = 1;");
+    await runGit(["add", "."], anchorDir);
+    await runGit(["commit", "-m", "Add foo underscore bar"], anchorDir);
+
+    await writeFixture(anchorDir, "src/fooXbar.ts", "export const b = 2;");
+    await runGit(["add", "."], anchorDir);
+    await runGit(["commit", "-m", "Add fooX bar only"], anchorDir);
+
     anchorDb = new RagDB(anchorDir);
     await indexGitHistory(anchorDir, anchorDb);
   });
@@ -253,6 +262,12 @@ describe("file history path anchoring", () => {
   afterAll(async () => {
     anchorDb.close();
     await cleanupTempDir(anchorDir);
+  });
+
+  test("getFileHistory treats '_' literally, not as a LIKE wildcard", () => {
+    const results = anchorDb.getFileHistory("foo_bar.ts");
+    expect(results.some((c) => c.message.includes("Add foo underscore bar"))).toBe(true);
+    expect(results.some((c) => c.message.includes("Add fooX bar only"))).toBe(false);
   });
 
   test("getFileHistory does not match an unrelated path with the same suffix", () => {

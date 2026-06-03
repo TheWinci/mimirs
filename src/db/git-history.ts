@@ -272,11 +272,14 @@ export function getFileHistory(
 ): GitCommitRow[] {
   // Match the exact repo-relative path or any path ending at a "/" boundary,
   // so getFileHistory("db.ts") matches "src/db.ts" but never "src/mydb.ts".
+  // Escape LIKE metacharacters (%, _) so a path like "foo_bar.ts" matches
+  // literally rather than treating "_" as a wildcard.
+  const escaped = filePath.replace(/[%_\\]/g, "\\$&");
   let sql = `SELECT gc.*
      FROM git_commit_files gcf
      JOIN git_commits gc ON gc.id = gcf.commit_id
-     WHERE (gcf.file_path = ? OR gcf.file_path LIKE ?)`;
-  const params: (string | number)[] = [filePath, `%/${filePath}`];
+     WHERE (gcf.file_path = ? OR gcf.file_path LIKE ? ESCAPE '\\')`;
+  const params: (string | number)[] = [filePath, `%/${escaped}`];
 
   if (since) {
     sql += " AND gc.date >= ?";

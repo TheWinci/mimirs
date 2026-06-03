@@ -457,7 +457,12 @@ async function processFile(
   if (useIncremental) {
     const result = await processFileIncremental(filePath, hash, existing.id, chunks, chunkResult, db, opts);
     if (result !== null) return result;
-    // null means incremental wasn't viable (>50% changed) — fall through to full re-index
+    // null means incremental wasn't viable. If it bailed because the run was
+    // aborted, skip rather than fall into the full path — the full path would
+    // delete the file's still-valid chunks and then bail too, leaving it empty
+    // until the next run. The old hash is intact, so it re-indexes next time.
+    if (signal?.aborted) return "skipped";
+    // Otherwise it was a real fallback (>50% changed / parent groups) — full re-index.
   }
 
   // Full re-index: delete all chunks, re-embed, re-insert. The file hash is

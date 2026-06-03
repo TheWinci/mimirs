@@ -40,6 +40,14 @@ describe("vectorScoreToCosine", () => {
     expect(vectorScoreToCosine(undefined)).toBeNull();
     expect(vectorScoreToCosine(0)).toBeNull();
   });
+
+  test("clamps out-of-range results to [-1, 1]", () => {
+    // A degenerate (non-unit) embedding can push the stored score below the
+    // normal ~0.333 floor; the raw conversion would then exceed cosine range.
+    // score 0.2 → 1 - (1/0.2 - 1)²/2 = -7, must clamp to -1.
+    expect(vectorScoreToCosine(0.2)).toBe(-1);
+    expect(vectorScoreToCosine(1)).toBe(1); // distance 0 → cosine 1, stays in range
+  });
 });
 
 describe("analytics logs cosine, not the raw L2 score", () => {

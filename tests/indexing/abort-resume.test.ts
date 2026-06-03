@@ -63,3 +63,33 @@ describe("B3: an interrupted index does not strand the file as 'unchanged'", () 
     expect(chunkCount(db)).toBeGreaterThan(0);
   });
 });
+
+describe("aborting an incremental update preserves the existing index", () => {
+  const incConfig: RagConfig = { ...tsConfig, chunkSize: 512, incrementalChunks: true };
+
+  function manyFns(tag: string): string {
+    return Array.from({ length: 12 }, (_, i) =>
+      `export function fn${i}(x: number): number {${i === 3 ? ` // ${tag}` : ""}\n  return x * ${i};\n}`,
+    ).join("\n\n");
+  }
+
+  test("a cancelled incremental update does not wipe the file's chunks", async () => {
+    await writeFixture(tempDir, "f.ts", manyFns("ORIG"));
+    await indexDirectory(tempDir, db, incConfig);
+    const before = chunkCount(db);
+    expect(before).toBeGreaterThan(1);
+
+    // Edit one function (small change → incremental path), then abort as the
+    // incremental update begins.
+    await writeFixture(tempDir, "f.ts", manyFns("EDITED"));
+    const controller = new AbortController();
+    const onProgress = (m: string) => {
+      if (m.includes("Incremental update")) controller.abort();
+    };
+    await indexDirectory(tempDir, db, incConfig, onProgress, controller.signal);
+
+    // The full-path fallback would have deleted every chunk then bailed; the
+    // abort guard must instead preserve the existing index (not wiped to 0).
+    expect(chunkCount(db)).toBeGreaterThan(0);
+  });
+});

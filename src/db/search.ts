@@ -19,7 +19,9 @@ import { log } from "../utils/log";
 export function vectorScoreToCosine(score: number | null | undefined): number | null {
   if (score == null || score <= 0) return null;
   const distance = 1 / score - 1;
-  return 1 - (distance * distance) / 2;
+  // Clamp to the valid cosine range: a degenerate (non-unit) embedding could push
+  // the derived value slightly outside [-1, 1].
+  return Math.max(-1, Math.min(1, 1 - (distance * distance) / 2));
 }
 
 /**
