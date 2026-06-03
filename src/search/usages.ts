@@ -16,6 +16,16 @@ export function escapeRegex(s: string): string {
 }
 
 /**
+ * Escape the SQL LIKE metacharacters `%`, `_`, and `\` in a user-supplied
+ * string so it matches literally. Pair with `LIKE ? ESCAPE '\'` in the query.
+ * Without this, a name/path containing `_` (e.g. `my_module`, `do_thing`)
+ * silently matches `myXmodule` / `doXthing`.
+ */
+export function escapeLike(s: string): string {
+  return s.replace(/[%_\\]/g, "\\$&");
+}
+
+/**
  * Sanitize a user query for FTS5 MATCH by quoting each token.
  * FTS5 treats bare +, -, *, AND, OR, NOT, NEAR, ( ) as operators.
  * Wrapping each token in double quotes forces literal matching.

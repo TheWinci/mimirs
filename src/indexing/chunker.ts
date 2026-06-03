@@ -546,15 +546,22 @@ function splitBySize(
   chunkSize: number,
   overlap: number
 ): string[] {
+  // Defensively clamp the window so `start` always advances by ≥1 char. The
+  // config schema rejects overlap >= chunkSize, but this function is reachable
+  // from other call sites too — without the clamp, overlap >= size makes
+  // `start = end - overlap` stall (or go backwards) and loops forever.
+  const size = Math.max(1, Math.floor(chunkSize));
+  const safeOverlap = Math.min(Math.max(0, Math.floor(overlap)), size - 1);
+
   const chunks: string[] = [];
   let start = 0;
 
   while (start < text.length) {
-    const end = Math.min(start + chunkSize, text.length);
+    const end = Math.min(start + size, text.length);
     chunks.push(text.slice(start, end));
 
     if (end >= text.length) break;
-    start = end - overlap;
+    start = end - safeOverlap;
   }
 
   return chunks;

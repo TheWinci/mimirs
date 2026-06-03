@@ -25,7 +25,11 @@ function parseModelArg(arg: string): ModelSpec {
   // Allow model:dim format for unknown models
   const parts = arg.split(":");
   if (parts.length === 2) {
-    return { id: parts[0], dim: parseInt(parts[1], 10) };
+    const dim = Number(parts[1]);
+    if (!Number.isInteger(dim) || dim <= 0) {
+      throw new Error(`Invalid dimension "${parts[1]}" for model "${parts[0]}" — expected a positive integer (e.g. "${parts[0]}:768").`);
+    }
+    return { id: parts[0], dim };
   }
   throw new Error(`Unknown model "${arg}". Use a known model or specify as "model-id:dim". Known models: ${Object.keys(KNOWN_MODELS).join(", ")}`);
 }

@@ -66,7 +66,9 @@ export async function checkpointCommand(args: string[], getFlag: (flag: string) 
     }
   } else if (subCommand === "search") {
     const query = args[2];
-    if (!query) {
+    // Reject a leading flag as the query — `checkpoint search --type T "q"`
+    // would otherwise embed the literal "--type" and silently ignore "q".
+    if (!query || query.startsWith("--")) {
       cli.error("Usage: mimirs checkpoint search <query> [--dir D] [--type T] [--top N]");
       process.exit(1);
     }

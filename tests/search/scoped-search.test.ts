@@ -106,6 +106,20 @@ describe("scoped search — dirs filter", () => {
     });
     expect(results).toEqual([]);
   });
+
+  test("an underscore in a dir name is matched literally, not as a wildcard", async () => {
+    const emb = await embed("authenticate user password");
+    const modDir = join(tempDir, "src", "my_module");
+    const otherDir = join(tempDir, "src", "myXmodule");
+    db.upsertFile(join(modDir, "a.ts"), "h1", [{ snippet: "authenticate user password in my_module", embedding: emb }]);
+    db.upsertFile(join(otherDir, "b.ts"), "h2", [{ snippet: "authenticate user password in myXmodule", embedding: emb }]);
+
+    const results = await search("authenticate user password", db, 10, 0, 0.7, [], { dirs: [modDir] });
+    expect(results.length).toBeGreaterThan(0);
+    // The `_` in "my_module" must not LIKE-match "myXmodule".
+    expect(results.every((r) => r.path.startsWith(modDir + "/"))).toBe(true);
+    expect(results.some((r) => r.path.startsWith(otherDir + "/"))).toBe(false);
+  });
 });
 
 describe("scoped search — chunk-level", () => {

@@ -226,7 +226,13 @@ async function listGitFiles(directory: string): Promise<string[] | null> {
     );
     const out = await new Response(proc.stdout).text();
     if ((await proc.exited) !== 0) return null;
-    return out.split("\0").filter(Boolean);
+    const files = out.split("\0").filter(Boolean);
+    // Empty output is ambiguous: the target may be a gitignored subdir (which
+    // the user clearly wants indexed since they pointed us at it) or genuinely
+    // empty. Return null so the caller falls back to a recursive walk rather
+    // than treating "git saw nothing" as "every file was deleted" — the latter
+    // would make a full run prune the entire existing index.
+    return files.length > 0 ? files : null;
   } catch {
     return null; // git not installed, etc.
   }
@@ -422,7 +428,23 @@ async function processFile(
   // (hash + parse) can easily OOM the process. Matches the JSON_PARSE_LIMIT
   // in chunker.ts for consistency.
   const MAX_FILE_SIZE = 50 * 1024 * 1024;
-  const fileStat = await stat(filePath);
+  let fileStat: Awaited<ReturnType<typeof stat>>;
+  try {
+    fileStat = await stat(filePath);
+  } catch (err) {
+    // The file vanished between listing and processing, or it's a broken
+    // symlink. `git ls-files --cached` lists tracked paths that were deleted
+    // from the working tree, and concurrent edits can delete a file mid-run —
+    // skip quietly rather than surfacing it as an indexing error.
+    const code = (err as NodeJS.ErrnoException)?.code;
+    if (code === "ENOENT" || code === "ELOOP") return "skipped";
+    throw err;
+  }
+  if (!fileStat.isFile()) {
+    // A directory or submodule gitlink (git lists submodule paths as bare
+    // directory entries) — nothing to read.
+    return "skipped";
+  }
   if (fileStat.size > MAX_FILE_SIZE) {
     const relPath = baseDir ? relative(baseDir, filePath) : filePath;
     const sizeMB = (fileStat.size / 1024 / 1024).toFixed(1);
@@ -826,9 +848,15 @@ export async function indexDirectory(
 
   if (signal?.aborted) return result;
 
-  if (options?.prune !== false) {
+  if (options?.prune !== false && matchedFiles.length > 0) {
     // Prune files that no longer exist from full-project index runs. Scoped
     // re-indexes must not delete every indexed file outside their include set.
+    //
+    // Guard on a non-empty scan: an empty `matchedFiles` almost always means a
+    // degenerate scan (git returned nothing, a transient fs error, a bad
+    // filter) rather than "the project legitimately has zero files." Pruning on
+    // it would call pruneDeleted(∅) and wipe the whole index. A genuinely
+    // emptied project can be cleared explicitly via `remove`/`cleanup`.
     const existingPaths = new Set(matchedFiles);
     result.pruned = timed("prune", () => db.pruneDeleted(existingPaths));
     if (result.pruned > 0) {

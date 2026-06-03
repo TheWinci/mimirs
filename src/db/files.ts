@@ -140,18 +140,23 @@ export function insertChunkReturningId(
   chunkIndex: number
 ): number {
   const { snippet, embedding, entityName, chunkType, startLine, endLine, contentHash } = chunk;
-  db.run(
-    "INSERT INTO chunks (file_id, chunk_index, snippet, entity_name, chunk_type, start_line, end_line, content_hash, parts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    [fileId, chunkIndex, snippet, entityName ?? null, chunkType ?? null, startLine ?? null, endLine ?? null, contentHash ?? null, identifierParts(snippet)]
-  );
-  const chunkId = Number(
-    db.query<{ id: number }, []>("SELECT last_insert_rowid() as id").get()!.id
-  );
-  db.run(
-    "INSERT INTO vec_chunks (chunk_id, embedding) VALUES (?, ?)",
-    [chunkId, new Uint8Array(embedding.buffer)]
-  );
-  return chunkId;
+  // Wrap both inserts in one transaction (like insertChunkBatch) so a failure
+  // on the vec insert can't leave a chunk + its FTS row behind with no vector.
+  const insert = db.transaction(() => {
+    db.run(
+      "INSERT INTO chunks (file_id, chunk_index, snippet, entity_name, chunk_type, start_line, end_line, content_hash, parts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [fileId, chunkIndex, snippet, entityName ?? null, chunkType ?? null, startLine ?? null, endLine ?? null, contentHash ?? null, identifierParts(snippet)]
+    );
+    const chunkId = Number(
+      db.query<{ id: number }, []>("SELECT last_insert_rowid() as id").get()!.id
+    );
+    db.run(
+      "INSERT INTO vec_chunks (chunk_id, embedding) VALUES (?, ?)",
+      [chunkId, new Uint8Array(embedding.buffer)]
+    );
+    return chunkId;
+  });
+  return insert();
 }
 
 /**

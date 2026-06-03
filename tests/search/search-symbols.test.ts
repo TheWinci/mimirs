@@ -345,4 +345,19 @@ describe("searchSymbols — backward compatibility", () => {
     expect(results.length).toBeGreaterThan(0);
     expect(results[0].symbolName).toBe("search");
   });
+
+  test("exact match treats underscores literally, not as LIKE wildcards", async () => {
+    const emb = new Float32Array(384);
+    const p = join(tempDir, "src", "snake.ts");
+    db.upsertFile(p, "hash-snake", [{ snippet: "placeholder", embedding: emb }]);
+    const file = db.getFileByPath(p)!;
+    db.upsertFileGraph(file.id, [], [
+      { name: "do_thing", type: "function" },
+      { name: "doXthing", type: "function" },
+    ]);
+
+    const names = db.searchSymbols("do_thing", true, undefined, 10).map((r) => r.symbolName);
+    expect(names).toContain("do_thing");
+    expect(names).not.toContain("doXthing"); // `_` must not match an arbitrary char
+  });
 });

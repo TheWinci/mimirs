@@ -64,6 +64,16 @@ Third paragraph wrapping things up.`;
     expect(chunks[0].text.length).toBe(200);
   });
 
+  test("terminates when overlap >= chunkSize instead of looping forever", async () => {
+    // Before the defensive clamp, `start = end - overlap` failed to advance (==)
+    // or went backwards (>), spinning until OOM. The 5s timeout fails on a hang.
+    const longText = "A".repeat(1000);
+    const eq = await chunkText(longText, ".txt", 200, 200); // overlap == size
+    expect(eq.chunks.length).toBeGreaterThan(1);
+    const gt = await chunkText(longText, ".txt", 200, 500); // overlap > size
+    expect(gt.chunks.length).toBeGreaterThan(1);
+  }, 5000);
+
   test("overlap is applied between size-based chunks", async () => {
     const text = "ABCDEFGHIJ".repeat(10); // 100 chars
     const { chunks } = await chunkText(text, ".txt", 40, 10);

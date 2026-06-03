@@ -28,3 +28,14 @@ describe("checkpoint create arg parsing", () => {
     expect(list.out).toContain("No checkpoints found."); // nothing was created
   });
 });
+
+describe("checkpoint search arg parsing", () => {
+  test("a leading flag is not captured as the query", async () => {
+    tempDir = await createTempDir();
+    // `checkpoint search --type T` would otherwise embed the literal "--type"
+    // as the query instead of erroring on the missing query.
+    const { out, exitCode } = await run(["checkpoint", "search", "--type", "decision", "--dir", tempDir]);
+    expect(exitCode).toBe(1);
+    expect(out).toContain("Usage:");
+  });
+});

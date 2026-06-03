@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 import { type GitCommitRow, type GitCommitSearchResult } from "./types";
-import { sanitizeFTS } from "../search/usages";
+import { escapeLike, sanitizeFTS } from "../search/usages";
 
 export interface GitCommitInsert {
   hash: string;
@@ -274,7 +274,7 @@ export function getFileHistory(
   // so getFileHistory("db.ts") matches "src/db.ts" but never "src/mydb.ts".
   // Escape LIKE metacharacters (%, _) so a path like "foo_bar.ts" matches
   // literally rather than treating "_" as a wildcard.
-  const escaped = filePath.replace(/[%_\\]/g, "\\$&");
+  const escaped = escapeLike(filePath);
   let sql = `SELECT gc.*
      FROM git_commit_files gcf
      JOIN git_commits gc ON gc.id = gcf.commit_id

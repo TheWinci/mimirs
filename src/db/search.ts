@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import { dirname, basename } from "path";
 import { type SearchResult, type ChunkSearchResult, type SymbolResult, type UsageResult, type PathFilter } from "./types";
-import { escapeRegex, sanitizeFTS } from "../search/usages";
+import { escapeRegex, escapeLike, sanitizeFTS } from "../search/usages";
 import { log } from "../utils/log";
 
 /**
@@ -40,30 +40,33 @@ function buildPathFilter(filter?: PathFilter): { clauses: string[]; params: stri
 
   if (!filter) return { clauses, params, active };
 
+  // All three filters reach LIKE, so user-supplied extensions/dir names must
+  // have %/_/\ escaped (ESCAPE '\') — otherwise an underscore in a dir name
+  // (e.g. "my_module") acts as a wildcard and silently over-matches.
   if (filter.extensions && filter.extensions.length > 0) {
     active = true;
-    const extClauses = filter.extensions.map(() => "f.path LIKE ?");
+    const extClauses = filter.extensions.map(() => "f.path LIKE ? ESCAPE '\\'");
     clauses.push(`(${extClauses.join(" OR ")})`);
     for (const ext of filter.extensions) {
       const normalized = ext.startsWith(".") ? ext : `.${ext}`;
-      params.push(`%${normalized}`);
+      params.push(`%${escapeLike(normalized)}`);
     }
   }
 
   if (filter.dirs && filter.dirs.length > 0) {
     active = true;
-    const dirClauses = filter.dirs.map(() => "f.path LIKE ?");
+    const dirClauses = filter.dirs.map(() => "f.path LIKE ? ESCAPE '\\'");
     clauses.push(`(${dirClauses.join(" OR ")})`);
     for (const dir of filter.dirs) {
-      params.push(`${dir.replace(/\/$/, "")}/%`);
+      params.push(`${escapeLike(dir.replace(/\/$/, ""))}/%`);
     }
   }
 
   if (filter.excludeDirs && filter.excludeDirs.length > 0) {
     active = true;
     for (const dir of filter.excludeDirs) {
-      clauses.push("f.path NOT LIKE ?");
-      params.push(`${dir.replace(/\/$/, "")}/%`);
+      clauses.push("f.path NOT LIKE ? ESCAPE '\\'");
+      params.push(`${escapeLike(dir.replace(/\/$/, ""))}/%`);
     }
   }
 
@@ -279,9 +282,15 @@ export function searchSymbols(
   const params: (string | number)[] = [];
 
   if (query) {
-    const pattern = exact ? query : `%${query}%`;
-    sql += " WHERE LOWER(fe.name) LIKE LOWER(?)";
-    params.push(pattern);
+    if (exact) {
+      // Equality, not LIKE — otherwise `_`/`%` in the name act as wildcards
+      // and an "exact" lookup of `do_thing` also returns `doXthing`.
+      sql += " WHERE LOWER(fe.name) = LOWER(?)";
+      params.push(query);
+    } else {
+      sql += " WHERE LOWER(fe.name) LIKE LOWER(?) ESCAPE '\\'";
+      params.push(`%${escapeLike(query)}%`);
+    }
   } else {
     sql += " WHERE 1=1";
   }
@@ -487,12 +496,14 @@ export function findUsages(db: Database, symbolName: string, exact: boolean, top
            FROM symbol_refs sr
            JOIN chunks c ON c.id = sr.chunk_id
            JOIN files f ON f.id = sr.file_id
-           WHERE LOWER(sr.name) LIKE LOWER(?) || '%'
+           WHERE LOWER(sr.name) LIKE LOWER(?) || '%' ESCAPE '\\'
               OR sr.resolved_export_id IN (
-                SELECT id FROM file_exports WHERE LOWER(name) LIKE LOWER(?) || '%'
+                SELECT id FROM file_exports WHERE LOWER(name) LIKE LOWER(?) || '%' ESCAPE '\\'
               )`
         )
-        .all(symbolName, symbolName);
+        // Escape %/_/\ so a name like `do_thing` prefix-matches literally; the
+        // trailing `|| '%'` is the intended prefix wildcard.
+        .all(escapeLike(symbolName), escapeLike(symbolName));
 
   for (const row of refRows) {
     if (definingFileIds.has(row.file_id)) continue;

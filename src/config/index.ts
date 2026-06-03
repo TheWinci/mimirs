@@ -34,6 +34,12 @@ const RagConfigSchema = z.object({
   benchmarkTopK: z.number().int().min(1).default(5),
   benchmarkMinRecall: z.number().min(0).max(1).default(0.8),
   benchmarkMinMrr: z.number().min(0).max(1).default(0.6),
+}).refine((c) => c.chunkOverlap < c.chunkSize, {
+  // An overlap >= chunkSize stalls the size-splitter's sliding window (it would
+  // loop forever). splitBySize also clamps defensively, but reject it here so a
+  // bad config surfaces a warning and falls back to defaults instead.
+  message: "chunkOverlap must be less than chunkSize",
+  path: ["chunkOverlap"],
 });
 
 export type RagConfig = z.infer<typeof RagConfigSchema>;

@@ -15,7 +15,9 @@ export async function conversationCommand(args: string[], getFlag: (flag: string
 
   if (subCommand === "search") {
     const query = args[2];
-    if (!query) {
+    // Reject a leading flag as the query — `conversation search --top N "q"`
+    // would otherwise embed the literal "--top" and silently ignore "q".
+    if (!query || query.startsWith("--")) {
       cli.error("Usage: mimirs conversation search <query> [--dir D] [--top N]");
       process.exit(1);
     }

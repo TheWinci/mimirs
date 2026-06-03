@@ -27,6 +27,17 @@ describe("loadConfig", () => {
     expect(config.exclude).toContain("**/node_modules/**");
   });
 
+  test("rejects chunkOverlap >= chunkSize (would stall the size-splitter)", async () => {
+    await mkdir(join(tempDir, ".mimirs"), { recursive: true });
+    // overlap == size makes splitBySize's window fail to advance → infinite loop.
+    await writeFile(join(tempDir, ".mimirs", "config.json"), JSON.stringify({ chunkSize: 100, chunkOverlap: 100 }));
+
+    const config = await loadConfig(tempDir);
+    // Invalid relation fails validation → fall back to defaults, not the dangerous values.
+    expect(config.chunkSize).toBe(512);
+    expect(config.chunkOverlap).toBe(50);
+  });
+
   test("an explicit empty include is respected (not overridden)", async () => {
     await mkdir(join(tempDir, ".mimirs"), { recursive: true });
     await writeFile(join(tempDir, ".mimirs", "config.json"), JSON.stringify({ include: [] }));

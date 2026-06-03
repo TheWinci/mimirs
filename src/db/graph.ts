@@ -1,4 +1,5 @@
 import { Database } from "bun:sqlite";
+import { escapeLike } from "../search/usages";
 
 /**
  * Replace all symbol references for a file. Refs come from bun-chunk's
@@ -333,7 +334,7 @@ export function getUniqueLocalCallableBySuffix(
   db: Database,
   suffix: string,
 ): LocalCallable | null {
-  const dottedRows = queryLocalCallableByNamePattern(db, `%.${suffix}`);
+  const dottedRows = queryLocalCallableByNamePattern(db, `%.${escapeLike(suffix)}`);
   if (dottedRows.length === 1) return localCallableFromRow(dottedRows[0]);
   if (dottedRows.length > 1) return null;
 
@@ -363,7 +364,7 @@ function queryLocalCallableByNamePattern(db: Database, pattern: string): LocalCa
               MAX(c.end_line) AS end_line
        FROM chunks c
        JOIN files f ON f.id = c.file_id
-       WHERE c.entity_name LIKE ?
+       WHERE c.entity_name LIKE ? ESCAPE '\\'
          AND c.chunk_type IN ('function', 'method', 'class')
          AND c.start_line IS NOT NULL
          AND c.end_line IS NOT NULL
