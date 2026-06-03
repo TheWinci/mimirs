@@ -207,6 +207,30 @@ export function buildExcludeFilter(patterns: string[]): (rel: string) => boolean
   };
 }
 
+/**
+ * List the repo's non-ignored files via git, so `.gitignore` is respected
+ * (nested files, negations, global excludes — git parses it all) and ignored
+ * directories like node_modules are skipped entirely instead of walked.
+ * Returns relative paths (to `directory`), or null if `directory` isn't a git
+ * repo / git is unavailable (caller falls back to a plain recursive walk).
+ */
+async function listGitFiles(directory: string): Promise<string[] | null> {
+  try {
+    // --cached: tracked; --others --exclude-standard: untracked but not ignored
+    // (so new, uncommitted source is still indexed). -z: NUL-separated, safe for
+    // any filename.
+    const proc = Bun.spawn(
+      ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+      { cwd: directory, stdout: "pipe", stderr: "ignore" },
+    );
+    const out = await new Response(proc.stdout).text();
+    if ((await proc.exited) !== 0) return null;
+    return out.split("\0").filter(Boolean);
+  } catch {
+    return null; // git not installed, etc.
+  }
+}
+
 async function collectFiles(
   directory: string,
   config: RagConfig,
@@ -218,7 +242,11 @@ async function collectFiles(
 
   onProgress?.("scanning files…");
 
-  const allEntries = await readdir(directory, { recursive: true });
+  // Prefer git's view of the project (respects .gitignore); fall back to a full
+  // recursive walk for non-git directories. The config include/exclude globs
+  // still apply on top of whichever source.
+  const allEntries =
+    (await listGitFiles(directory)) ?? (await readdir(directory, { recursive: true }));
 
   const results: string[] = [];
   let lastReport = 0;

@@ -1,0 +1,67 @@
+import { describe, test, expect, beforeAll, beforeEach, afterEach } from "bun:test";
+import { indexDirectory } from "../../src/indexing/indexer";
+import { RagDB } from "../../src/db";
+import { getEmbedder } from "../../src/embeddings/embed";
+import { createTempDir, cleanupTempDir, writeFixture } from "../helpers";
+import type { RagConfig } from "../../src/config";
+
+let tempDir: string;
+let db: RagDB;
+
+const cfg: RagConfig = {
+  include: ["**/*.ts"],
+  exclude: ["node_modules/**", ".git/**", ".mimirs/**"],
+  chunkSize: 2048,
+  chunkOverlap: 50,
+};
+
+beforeAll(async () => {
+  await getEmbedder();
+});
+beforeEach(async () => {
+  tempDir = await createTempDir();
+  db = new RagDB(tempDir);
+});
+afterEach(async () => {
+  db.close();
+  await cleanupTempDir(tempDir);
+});
+
+function runGit(args: string[], cwd: string): Promise<number> {
+  return Bun.spawn(["git", ...args], { cwd, stdout: "ignore", stderr: "ignore" }).exited;
+}
+
+function indexedRelPaths(): string[] {
+  const raw = (db as unknown as { db: import("bun:sqlite").Database }).db;
+  return raw
+    .query<{ path: string }, []>("SELECT path FROM files")
+    .all()
+    .map((r) => r.path.replace(tempDir, ""));
+}
+
+describe("indexing respects .gitignore", () => {
+  test("a gitignored file is skipped even if it matches an include glob", async () => {
+    await runGit(["init"], tempDir);
+    await writeFixture(tempDir, ".gitignore", "mysecret.ts\ngen/\n");
+    await writeFixture(tempDir, "src/a.ts", "export const a = 1;");
+    await writeFixture(tempDir, "mysecret.ts", "export const secret = 1;"); // gitignored
+    await writeFixture(tempDir, "gen/x.ts", "export const g = 1;"); // gitignored dir
+    await writeFixture(tempDir, "src/b.ts", "export const b = 2;"); // untracked, NOT ignored
+    await runGit(["add", "src/a.ts"], tempDir); // a.ts tracked; b.ts left untracked
+
+    await indexDirectory(tempDir, db, cfg);
+    const paths = indexedRelPaths();
+
+    expect(paths.some((p) => p.endsWith("/src/a.ts"))).toBe(true); // tracked
+    expect(paths.some((p) => p.endsWith("/src/b.ts"))).toBe(true); // untracked but not ignored
+    expect(paths.some((p) => p.endsWith("/mysecret.ts"))).toBe(false); // gitignored
+    expect(paths.some((p) => p.includes("/gen/"))).toBe(false); // gitignored directory
+  });
+
+  test("a non-git directory falls back to a full walk", async () => {
+    // No git init — should still index .ts files via the recursive walk.
+    await writeFixture(tempDir, "src/a.ts", "export const a = 1;");
+    await indexDirectory(tempDir, db, cfg);
+    expect(indexedRelPaths().some((p) => p.endsWith("/src/a.ts"))).toBe(true);
+  });
+});
