@@ -292,6 +292,14 @@ interface ProcessFileOptions {
   baseDir?: string;
   onProgress?: (msg: string, opts?: { transient?: boolean }) => void;
   signal?: AbortSignal;
+  /**
+   * Treat a missing / non-regular file as a silent skip rather than an error.
+   * Set by the directory scan, where `git ls-files --cached` can list tracked
+   * paths deleted from the working tree (and concurrent edits can delete a file
+   * mid-run). A direct `indexFile()` call leaves this off, so naming a missing
+   * file is still a real error.
+   */
+  skipMissing?: boolean;
 }
 
 /**
@@ -421,7 +429,7 @@ async function processFile(
   db: RagDB,
   opts: ProcessFileOptions
 ): Promise<"indexed" | "skipped"> {
-  const { config, baseDir, onProgress, signal } = opts;
+  const { config, baseDir, onProgress, signal, skipMissing } = opts;
   const batchSize = config.indexBatchSize ?? 50;
 
   // Skip files larger than 50 MB — reading them fully into memory twice
@@ -432,17 +440,16 @@ async function processFile(
   try {
     fileStat = await stat(filePath);
   } catch (err) {
-    // The file vanished between listing and processing, or it's a broken
-    // symlink. `git ls-files --cached` lists tracked paths that were deleted
-    // from the working tree, and concurrent edits can delete a file mid-run —
-    // skip quietly rather than surfacing it as an indexing error.
+    // During a directory scan the file may have vanished between listing and
+    // processing, or be a broken symlink — skip quietly. A direct indexFile()
+    // call (skipMissing off) still treats a missing path as a real error.
     const code = (err as NodeJS.ErrnoException)?.code;
-    if (code === "ENOENT" || code === "ELOOP") return "skipped";
+    if (skipMissing && (code === "ENOENT" || code === "ELOOP")) return "skipped";
     throw err;
   }
-  if (!fileStat.isFile()) {
+  if (skipMissing && !fileStat.isFile()) {
     // A directory or submodule gitlink (git lists submodule paths as bare
-    // directory entries) — nothing to read.
+    // directory entries) surfaced by the scan — nothing to read.
     return "skipped";
   }
   if (fileStat.size > MAX_FILE_SIZE) {
@@ -831,6 +838,7 @@ export async function indexDirectory(
         baseDir: directory,
         onProgress,
         signal,
+        skipMissing: true,
       });
 
       if (status === "indexed") {
