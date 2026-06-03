@@ -40,7 +40,10 @@ export async function affectedCommand(args: string[], getFlag: (flag: string) =>
     const input = await Bun.stdin.text();
     const lines = splitLines(input);
     if (lines.length === 0) {
-      cli.log(quiet ? "" : "No affected test files found.");
+      // Match the output contract of the other modes: valid JSON under --json,
+      // nothing under --quiet (so a consumer piping this doesn't get a blank arg).
+      if (json) cli.log(JSON.stringify({ changed: [], unknown: [], tests: [] }, null, 2));
+      else if (!quiet) cli.log("No affected test files found.");
       return;
     }
     // Resolve against the project dir, not cwd — in CI the runner's cwd is

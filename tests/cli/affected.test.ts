@@ -38,6 +38,18 @@ async function runAffected(cwd: string, ...args: string[]) {
   return { out, exitCode };
 }
 
+async function runAffectedStdin(stdin: string, ...args: string[]) {
+  const proc = Bun.spawn(["bun", "run", CLI, "affected", "--stdin", ...args], {
+    stdin: new Response(stdin),
+    stdout: "pipe",
+    stderr: "pipe",
+    env: process.env,
+  });
+  const out = await new Response(proc.stdout).text();
+  const exitCode = await proc.exited;
+  return { out, exitCode };
+}
+
 describe("affected resolves changed files against --dir, not cwd", () => {
   test("finds the affected test from a cwd different than --dir", async () => {
     tempDir = await createTempDir();
@@ -51,5 +63,20 @@ describe("affected resolves changed files against --dir, not cwd", () => {
     const { out, exitCode } = await runAffected(tmpdir(), "src/a.ts", "--dir", tempDir, "--quiet");
     expect(exitCode).toBe(0);
     expect(out).toContain("a.test.ts");
+  });
+
+  test("empty stdin under --json emits valid empty JSON (CI contract)", async () => {
+    tempDir = await createTempDir();
+    const { out, exitCode } = await runAffectedStdin("", "--json", "--dir", tempDir);
+    expect(exitCode).toBe(0);
+    // A consumer doing JSON.parse(output) must not throw.
+    expect(() => JSON.parse(out)).not.toThrow();
+    expect(JSON.parse(out)).toEqual({ changed: [], unknown: [], tests: [] });
+  });
+
+  test("empty stdin under --quiet emits nothing (no blank arg)", async () => {
+    tempDir = await createTempDir();
+    const { out } = await runAffectedStdin("", "--quiet", "--dir", tempDir);
+    expect(out).toBe("");
   });
 });
