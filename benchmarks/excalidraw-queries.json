@@ -1,122 +1,506 @@
 [
   {
     "query": "newElement newTextElement constructor create element",
-    "expected": ["packages/element/src/newElement.ts"]
+    "expected": [
+      "packages/element/src/newElement.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "ExcalidrawElement type definitions Rectangle Diamond Ellipse",
-    "expected": ["packages/element/src/types.ts"]
+    "expected": [
+      "packages/element/src/types.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "renderInteractiveScene canvas transform handles selection",
-    "expected": ["packages/excalidraw/renderer/interactiveScene.ts"]
+    "expected": [
+      "packages/excalidraw/renderer/interactiveScene.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "renderStaticSvgScene SVG element conversion",
-    "expected": ["packages/excalidraw/renderer/staticSvgScene.ts"]
+    "expected": [
+      "packages/excalidraw/renderer/staticSvgScene.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "generateShape roughjs geometric element to shape",
-    "expected": ["packages/element/src/shape.ts"]
+    "expected": [
+      "packages/element/src/shape.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "HistoryDelta undo redo apply inverse",
-    "expected": ["packages/excalidraw/history.ts"]
+    "expected": [
+      "packages/excalidraw/history.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "Store CaptureUpdateAction state delta changes",
-    "expected": ["packages/element/src/store.ts"]
+    "expected": [
+      "packages/element/src/store.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "bindLinearElement arrow binding endpoint",
-    "expected": ["packages/element/src/binding.ts"]
+    "expected": [
+      "packages/element/src/binding.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "ElbowArrow routing A* pathfinding grid obstacles",
-    "expected": ["packages/element/src/elbowArrow.ts"]
+    "expected": [
+      "packages/element/src/elbowArrow.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "getElementAbsoluteCoords bounding box bounds calculation",
-    "expected": ["packages/element/src/bounds.ts"]
+    "expected": [
+      "packages/element/src/bounds.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "hitTest isPointInElement collision detection",
-    "expected": ["packages/element/src/collision.ts"]
+    "expected": [
+      "packages/element/src/collision.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "wrapText line breaks container width word wrap",
-    "expected": ["packages/element/src/textWrapping.ts"]
+    "expected": [
+      "packages/element/src/textWrapping.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "transformElements resize scale rotate aspect ratio",
-    "expected": ["packages/element/src/resizeElements.ts"]
+    "expected": [
+      "packages/element/src/resizeElements.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "frame element containment getElementsInFrame boundaries",
-    "expected": ["packages/element/src/frame.ts"]
+    "expected": [
+      "packages/element/src/frame.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "restoreElements restoreAppState migrate saved data",
-    "expected": ["packages/excalidraw/data/restore.ts"]
+    "expected": [
+      "packages/excalidraw/data/restore.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "Scene class element map storage getNonDeletedElements",
-    "expected": ["packages/element/src/Scene.ts"]
+    "expected": [
+      "packages/element/src/Scene.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "collaboration portal websocket syncElements",
-    "expected": ["excalidraw-app/collab/Collab.tsx"]
+    "expected": [
+      "excalidraw-app/collab/Collab.tsx"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "renderAction selectedElementActions toolbar ShapesSwitcher",
-    "expected": ["packages/excalidraw/components/Actions.tsx"]
+    "expected": [
+      "packages/excalidraw/components/Actions.tsx"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "actionChangeStrokeColor actionChangeBackgroundColor properties panel",
-    "expected": ["packages/excalidraw/actions/actionProperties.tsx"]
+    "expected": [
+      "packages/excalidraw/actions/actionProperties.tsx"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "actionDeleteSelected fixBindingsAfterDeletion",
-    "expected": ["packages/excalidraw/actions/actionDeleteSelected.tsx"]
+    "expected": [
+      "packages/excalidraw/actions/actionDeleteSelected.tsx"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "pointInPolygon winding number raycast inclusion test",
-    "expected": ["packages/math/src/polygon.ts"]
+    "expected": [
+      "packages/math/src/polygon.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "ellipse intersection point distance perimeter check",
-    "expected": ["packages/math/src/ellipse.ts"]
+    "expected": [
+      "packages/math/src/ellipse.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "colorOn hue saturation dark mode color transformation",
-    "expected": ["packages/common/src/colors.ts"]
+    "expected": [
+      "packages/common/src/colors.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "distanceToElement point nearest curve segment measurement",
-    "expected": ["packages/element/src/distance.ts"]
+    "expected": [
+      "packages/element/src/distance.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "headingForPoint cardinal direction vector angle snap",
-    "expected": ["packages/element/src/heading.ts"]
+    "expected": [
+      "packages/element/src/heading.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "BinaryHeap priority queue push pop bubbleUp sinkDown",
-    "expected": ["packages/common/src/binary-heap.ts"]
+    "expected": [
+      "packages/common/src/binary-heap.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "clipboard paste copy elements parseClipboard mime data",
-    "expected": ["packages/excalidraw/clipboard.ts"]
+    "expected": [
+      "packages/excalidraw/clipboard.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "LaserTrails animated pointer trail collaborative drawing",
-    "expected": ["packages/excalidraw/laser-trails.ts"]
+    "expected": [
+      "packages/excalidraw/laser-trails.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "reconcileElements remote conflict version resolution merge",
-    "expected": ["packages/excalidraw/data/reconcile.ts"]
+    "expected": [
+      "packages/excalidraw/data/reconcile.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "AnimationFrameHandler easing requestAnimationFrame transition",
-    "expected": ["packages/excalidraw/renderer/animation.ts"]
+    "expected": [
+      "packages/excalidraw/renderer/animation.ts"
+    ],
+    "difficulty": "unknown"
+  },
+  {
+    "query": "measureText width and height of a text string for a given font and line height",
+    "expected": [
+      "packages/element/src/textMeasurements.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "isArrowElement and isElbowArrow type guard checks",
+    "expected": [
+      "packages/element/src/typeChecks.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "originalContainerCache get update and reset the cached container height",
+    "expected": [
+      "packages/element/src/containerCache.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "hasBackground hasStrokeColor canChangeRoundness which element types support a property",
+    "expected": [
+      "packages/element/src/comparisons.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "parse an element link URL and build a deep link for the current selection",
+    "expected": [
+      "packages/element/src/elementLink.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "how a bound text element's dimensions and the container grow when the wrapped text exceeds the container max width and height",
+    "expected": [
+      "packages/element/src/textElement.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "convert an embed URL into the iframe src, intrinsic aspect ratio, and sandbox flags for YouTube, Vimeo, Figma, and Twitter",
+    "expected": [
+      "packages/element/src/embeddable.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "normalize svg width height and viewBox so embedded images don't scale wrong at different zoom levels",
+    "expected": [
+      "packages/element/src/image.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "deep clone an excalidraw element while skipping the non-serializable shape and canvas caches",
+    "expected": [
+      "packages/element/src/duplicate.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "mutate an element in place, bump version and versionNonce, and invalidate the shape cache when width height or points change",
+    "expected": [
+      "packages/element/src/mutateElement.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "where dragging the midpoint of a linear element inserts a new point into the points array and updates the selected point indices",
+    "expected": [
+      "packages/element/src/linearElementEditor.ts"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "decide whether to regenerate the cached element canvas based on zoom, theme, bound text version, image crop, and containing frame opacity",
+    "expected": [
+      "packages/element/src/renderElement.ts"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "reorder a flat element array so containers and their bound text stay adjacent and grouped elements remain contiguous, bailing out if any element is lost",
+    "expected": [
+      "packages/element/src/sortElements.ts"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "when dragging a selected arrow that is bound on only one end, decide whether to unbind the start or end so it doesn't snap to zero length",
+    "expected": [
+      "packages/element/src/dragElements.ts"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "given a freshly selected element, expand the selection to the whole group it belongs to unless that group is currently being edited, with memoized caching",
+    "expected": [
+      "packages/element/src/groups.ts"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "fill a circle on the canvas with a given center and radius",
+    "expected": [
+      "packages/excalidraw/renderer/helpers.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "create an inclusive numeric range and check whether two ranges overlap",
+    "expected": [
+      "packages/math/src/range.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "convert degrees to radians and back",
+    "expected": [
+      "packages/math/src/angle.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "dot product and cross product of two 2D vectors",
+    "expected": [
+      "packages/math/src/vector.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "euclidean distance between two points",
+    "expected": [
+      "packages/math/src/point.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "how the scene decides which elements are visible in the current viewport for rendering",
+    "expected": [
+      "packages/excalidraw/scene/Renderer.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "compute the scrollbar position and size from the viewport and the bounding box of all elements",
+    "expected": [
+      "packages/excalidraw/scene/scrollbars.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "recompute scroll offsets so the canvas zooms toward the cursor position",
+    "expected": [
+      "packages/excalidraw/scene/zoom.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "which elements fall inside a drag selection rectangle",
+    "expected": [
+      "packages/element/src/selection.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "scroll the canvas so the existing content is centered in the view",
+    "expected": [
+      "packages/excalidraw/scene/scroll.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "where a point is projected onto a cubic bezier curve to find the closest position",
+    "expected": [
+      "packages/math/src/curve.ts"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "find the closest point where two finite line segments cross using parametric coordinates",
+    "expected": [
+      "packages/math/src/segment.ts"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "barycentric sign test to tell whether a point lies inside a triangle",
+    "expected": [
+      "packages/math/src/triangle.ts"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "align selected elements to the left, right, top, bottom, or center on the canvas",
+    "expected": [
+      "packages/excalidraw/actions/actionAlign.tsx"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "distribute selected elements evenly with equal spacing horizontally or vertically",
+    "expected": [
+      "packages/excalidraw/actions/actionDistribute.tsx"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "group and ungroup selected elements together",
+    "expected": [
+      "packages/excalidraw/actions/actionGroup.tsx"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "send element backward or bring it to front change z-index layer order",
+    "expected": [
+      "packages/excalidraw/actions/actionZindex.tsx"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "serialize elements appState and files into the .excalidraw JSON file format",
+    "expected": [
+      "packages/excalidraw/data/json.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "flip selected shapes horizontally or vertically while keeping arrow bindings",
+    "expected": [
+      "packages/excalidraw/actions/actionFlip.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "toggle the line editor mode to edit individual points of an arrow or line",
+    "expected": [
+      "packages/excalidraw/actions/actionLinearEditor.tsx"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "match a keyboard shortcut to a single action and run it, warning when multiple actions collide",
+    "expected": [
+      "packages/excalidraw/actions/manager.tsx"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "contextual hint text shown to the user based on the active tool and selection",
+    "expected": [
+      "packages/excalidraw/components/HintViewer.tsx"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "generate a unique random id for a new element, deterministic in test mode",
+    "expected": [
+      "packages/common/src/random.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "where the scene is deflated with zlib, encrypted with AES-GCM, and packed into a length-prefixed binary buffer for export",
+    "expected": [
+      "packages/excalidraw/data/encode.ts"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "embed the scene JSON inside a PNG file as a tEXt metadata chunk so the image can be reopened as a drawing",
+    "expected": [
+      "packages/excalidraw/data/image.ts"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "run async tasks one after another so they never overlap, each returning its own promise",
+    "expected": [
+      "packages/common/src/queue.ts"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "geometric test for whether two line segments cross using bounding box and orientation checks",
+    "expected": [
+      "packages/utils/src/bbox.ts"
+    ],
+    "difficulty": "hard"
   }
 ]

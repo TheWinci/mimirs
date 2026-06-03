@@ -1,122 +1,814 @@
 [
   {
     "query": "QuerySet filter exclude annotate aggregate ORM evaluation",
-    "expected": ["django/db/models/query.py"]
+    "expected": [
+      "django/db/models/query.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "Model metaclass Options field contributions class_prepared",
-    "expected": ["django/db/models/base.py"]
+    "expected": [
+      "django/db/models/base.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "MigrationLoader build_graph load_disk applied migrations",
-    "expected": ["django/db/migrations/loader.py"]
+    "expected": [
+      "django/db/migrations/loader.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "HttpRequest POST GET META QueryDict parsing",
-    "expected": ["django/http/request.py"]
+    "expected": [
+      "django/http/request.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "HttpResponse content headers set_cookie streaming",
-    "expected": ["django/http/response.py"]
+    "expected": [
+      "django/http/response.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "View dispatch as_view setup method handler",
-    "expected": ["django/views/generic/base.py"]
+    "expected": [
+      "django/views/generic/base.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "CharField IntegerField EmailField clean validate form",
-    "expected": ["django/forms/fields.py"]
+    "expected": [
+      "django/forms/fields.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "Widget render Input Select RadioSelect HTML attrs",
-    "expected": ["django/forms/widgets.py"]
+    "expected": [
+      "django/forms/widgets.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "Engine find_template get_template DjangoTemplates loaders",
-    "expected": ["django/template/engine.py"]
+    "expected": [
+      "django/template/engine.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "BaseCommand handle add_arguments management execute",
-    "expected": ["django/core/management/base.py"]
+    "expected": [
+      "django/core/management/base.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "Serializer serialize deserialize JSON queryset",
-    "expected": ["django/core/serializers/json.py"]
+    "expected": [
+      "django/core/serializers/json.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "User AbstractUser Permission Group authentication model",
-    "expected": ["django/contrib/auth/models.py"]
+    "expected": [
+      "django/contrib/auth/models.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "AdminSite register get_urls app_index each_context",
-    "expected": ["django/contrib/admin/sites.py"]
+    "expected": [
+      "django/contrib/admin/sites.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "CsrfViewMiddleware _check_token process_view CSRF secret",
-    "expected": ["django/middleware/csrf.py"]
+    "expected": [
+      "django/middleware/csrf.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "URLResolver resolve_error_handler URL pattern matching route",
-    "expected": ["django/urls/resolvers.py"]
+    "expected": [
+      "django/urls/resolvers.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "Signal connect send send_robust receiver dispatch",
-    "expected": ["django/dispatch/dispatcher.py"]
+    "expected": [
+      "django/dispatch/dispatcher.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "LazySettings ENVIRONMENT_VARIABLE Settings configure global",
-    "expected": ["django/conf/__init__.py"]
+    "expected": [
+      "django/conf/__init__.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "method_decorator classonlymethod decorator_from_middleware",
-    "expected": ["django/utils/decorators.py"]
+    "expected": [
+      "django/utils/decorators.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "Field CharField IntegerField db_type contribute_to_class",
-    "expected": ["django/db/models/fields/__init__.py"]
+    "expected": [
+      "django/db/models/fields/__init__.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "Manager BaseManager from_queryset get_queryset objects",
-    "expected": ["django/db/models/manager.py"]
+    "expected": [
+      "django/db/models/manager.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "ForeignKey ManyToManyField OneToOneField related descriptor",
-    "expected": ["django/db/models/fields/related.py"]
+    "expected": [
+      "django/db/models/fields/related.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "ModelForm modelform_factory fields_for_model Meta",
-    "expected": ["django/forms/models.py"]
+    "expected": [
+      "django/forms/models.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "Template compile_string NodeList Lexer Parser render",
-    "expected": ["django/template/base.py"]
+    "expected": [
+      "django/template/base.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "CacheHandler BaseCache cache backends connection",
-    "expected": ["django/core/cache/__init__.py"]
+    "expected": [
+      "django/core/cache/__init__.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "ModelBackend authenticate get_user_permissions has_perm",
-    "expected": ["django/contrib/auth/backends.py"]
+    "expected": [
+      "django/contrib/auth/backends.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "EmailMessage EmailMultiAlternatives send attach SMTP",
-    "expected": ["django/core/mail/message.py"]
+    "expected": [
+      "django/core/mail/message.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "MultipleObjectMixin get_queryset paginate_by ListView",
-    "expected": ["django/views/generic/list.py"]
+    "expected": [
+      "django/views/generic/list.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "ModelAdmin get_changeform changeform_view fieldsets actions",
-    "expected": ["django/contrib/admin/options.py"]
+    "expected": [
+      "django/contrib/admin/options.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "SecurityMiddleware SECURE_HSTS SECURE_SSL_REDIRECT headers",
-    "expected": ["django/middleware/security.py"]
+    "expected": [
+      "django/middleware/security.py"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "Collector collect CASCADE SET_NULL deletion dependencies",
-    "expected": ["django/db/models/deletion.py"]
+    "expected": [
+      "django/db/models/deletion.py"
+    ],
+    "difficulty": "unknown"
+  },
+  {
+    "query": "SQLCompiler as_sql query compilation build SELECT statement",
+    "expected": [
+      "django/db/models/sql/compiler.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "WhereNode as_sql combine child constraints with AND OR connector",
+    "expected": [
+      "django/db/models/sql/where.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "Coalesce Cast Greatest Least NullIf comparison database functions",
+    "expected": [
+      "django/db/models/functions/comparison.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "UniqueConstraint CheckConstraint BaseConstraint validate create_sql",
+    "expected": [
+      "django/db/models/constraints.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "RowNumber Rank DenseRank Lag Lead window function classes",
+    "expected": [
+      "django/db/models/functions/window.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "how an F() expression is resolved into a column reference during query resolution",
+    "expected": [
+      "django/db/models/expressions.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "how a Count or Sum aggregate sets allow_distinct and an empty result default value",
+    "expected": [
+      "django/db/models/aggregates.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "how Choices enum builds .choices .labels and .values for model field choices",
+    "expected": [
+      "django/db/models/enums.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "how a reverse foreign key accessor name like author_set is derived from related_name",
+    "expected": [
+      "django/db/models/fields/reverse_related.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "how an isnull lookup turns into IS NULL or IS NOT NULL SQL",
+    "expected": [
+      "django/db/models/lookups.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "where the ORM splits a filter into WHERE versus HAVING versus QUALIFY when it touches aggregates or window functions",
+    "expected": [
+      "django/db/models/sql/where.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "where a deferred-loaded field triggers a database fetch the first time you access the attribute",
+    "expected": [
+      "django/db/models/query_utils.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "the dynamically built manager that backs accessing related rows from the one side of a one-to-many relationship",
+    "expected": [
+      "django/db/models/fields/related_descriptors.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "how a nested dictionary key path lookup gets translated into a database JSON path string for querying",
+    "expected": [
+      "django/db/models/fields/json.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "MigrationAutodetector detect changes and generate operations from two project states",
+    "expected": [
+      "django/db/migrations/autodetector.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "MigrationExecutor migration_plan apply and unapply migrations",
+    "expected": [
+      "django/db/migrations/executor.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "MigrationOptimizer reduce and merge a list of operations into a shorter list",
+    "expected": [
+      "django/db/migrations/optimizer.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "MigrationRecorder django_migrations table record applied and unapplied migrations",
+    "expected": [
+      "django/db/migrations/recorder.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "RunPython and RunSQL operations that run custom python or raw SQL during a migration",
+    "expected": [
+      "django/db/migrations/operations/special.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "how schema changes are turned into ALTER TABLE statements like adding or dropping a column",
+    "expected": [
+      "django/db/backends/base/schema.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "why SQLite rebuilds the whole table by copying rows into a new one instead of altering columns in place",
+    "expected": [
+      "django/db/backends/sqlite3/schema.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "prompting the user about a default value when adding a non-null column to existing rows",
+    "expected": [
+      "django/db/migrations/questioner.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "in-memory representation of models and fields that migrations mutate as they run",
+    "expected": [
+      "django/db/migrations/state.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "rendering a migration module to a python source file and serializing operations",
+    "expected": [
+      "django/db/migrations/writer.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "where migration dependency ordering and topological plan across apps is computed",
+    "expected": [
+      "django/db/migrations/graph.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "translating backend driver exceptions into Django's common IntegrityError and OperationalError wrappers",
+    "expected": [
+      "django/db/utils.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "shortening an SQL identifier with a hash so long index and constraint names fit the backend limit",
+    "expected": [
+      "django/db/backends/utils.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "converting a serial column to an identity column and managing the underlying sequence on postgres",
+    "expected": [
+      "django/db/backends/postgresql/schema.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "the static template tag that joins a path with STATIC_URL",
+    "expected": [
+      "django/templatetags/static.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "ManagementForm with TOTAL_FORMS and INITIAL_FORMS hidden fields",
+    "expected": [
+      "django/forms/formsets.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "cache template tag that stores a rendered fragment for some seconds",
+    "expected": [
+      "django/templatetags/cache.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "load a template from the filesystem by reading the file contents",
+    "expected": [
+      "django/template/loaders/filesystem.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "get_template and select_template helpers that try each engine",
+    "expected": [
+      "django/template/loader.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "how a formset manages its management form and computes extra and initial form counts",
+    "expected": [
+      "django/forms/formsets.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "registering template filters and inclusion tags with the Library decorator",
+    "expected": [
+      "django/template/library.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "BoundField wrapping a field with its widget subwidgets and errors for rendering",
+    "expected": [
+      "django/forms/boundfield.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "the form renderer that picks the template engine and default form templates",
+    "expected": [
+      "django/forms/renderers.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "lazy template response that defers rendering until content is accessed",
+    "expected": [
+      "django/template/response.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "where the if tag parses operators with binding power in a top-down Pratt parser",
+    "expected": [
+      "django/template/smartif.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "how the context stack resolves a variable by searching dictionaries from the top down and supports push and pop scoping",
+    "expected": [
+      "django/template/context.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "how block inheritance keeps a FIFO queue of overriding blocks so child templates can call block.super",
+    "expected": [
+      "django/template/loader_tags.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "caching loader that memoizes missing templates as TemplateDoesNotExist to avoid repeated filesystem lookups",
+    "expected": [
+      "django/template/loaders/cached.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "where are the request_started and request_finished signals defined",
+    "expected": [
+      "django/core/signals.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "move an uploaded file to its destination safely, falling back to copying across filesystems",
+    "expected": [
+      "django/core/files/move.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "email backend that prints messages to the console instead of sending them",
+    "expected": [
+      "django/core/mail/backends/console.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "RegexValidator and the EMPTY_VALUES tuple for form field validation",
+    "expected": [
+      "django/core/validators.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "how the WSGI handler builds the response from the request and the middleware chain",
+    "expected": [
+      "django/core/handlers/wsgi.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "TemporaryUploadedFile vs InMemoryUploadedFile and sanitizing the uploaded filename",
+    "expected": [
+      "django/core/files/uploadedfile.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "Paginator classes and the InvalidPage, PageNotAnInteger, EmptyPage exceptions",
+    "expected": [
+      "django/core/paginator.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "opening the SMTP connection with TLS or SSL and the EMAIL_USE_TLS mutual-exclusion check",
+    "expected": [
+      "django/core/mail/backends/smtp.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "where Django signs and verifies a timestamped token for cookies and sessions, rejecting it once it is older than max_age",
+    "expected": [
+      "django/core/signing.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "deriving an HMAC key from a salt plus the secret key and comparing digests without leaking timing",
+    "expected": [
+      "django/utils/crypto.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "turning an uncaught view exception into a 404, 403, or 500 response and emitting a security log event",
+    "expected": [
+      "django/core/handlers/exception.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "writing a cache entry into a temp file then atomically renaming it, with pickling and zlib compression on disk",
+    "expected": [
+      "django/core/cache/backends/filebased.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "username regex validator allowing letters numbers and @/./+/-/_ characters",
+    "expected": [
+      "django/contrib/auth/validators.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "X-Frame-Options header middleware to prevent clickjacking",
+    "expected": [
+      "django/middleware/clickjacking.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "login_required decorator that redirects unauthenticated users to the login page",
+    "expected": [
+      "django/contrib/auth/decorators.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "gzip compress the response body when the browser sends Accept-Encoding gzip",
+    "expected": [
+      "django/middleware/gzip.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "management command to create a superuser from the command line",
+    "expected": [
+      "django/contrib/auth/management/commands/createsuperuser.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "password validators for minimum length, common passwords, and entirely numeric",
+    "expected": [
+      "django/contrib/auth/password_validation.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "how passwords are hashed and verified with pluggable hashers and rehashed on login when the work factor changes",
+    "expected": [
+      "django/contrib/auth/hashers.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "generate and check a single-use password reset token tied to the user's password and last login timestamp",
+    "expected": [
+      "django/contrib/auth/tokens.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "ETag and If-Modified-Since handling that returns 304 Not Modified for conditional GET",
+    "expected": [
+      "django/middleware/http.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "append a trailing slash and redirect when the URL isn't found, plus block disallowed user agents",
+    "expected": [
+      "django/middleware/common.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "store the password as an HMAC hash and expose set_password and check_password on the abstract user model",
+    "expected": [
+      "django/contrib/auth/base_user.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "where the admin maps a model field type like ForeignKey or DateField to the right sidebar filter class",
+    "expected": [
+      "django/contrib/admin/filters.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "decide the request language from the URL prefix or Accept-Language and redirect 404s to a prefixed URL",
+    "expected": [
+      "django/middleware/locale.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "select2 AJAX dropdown widget that loads choices remotely with data attributes for the admin",
+    "expected": [
+      "django/contrib/admin/widgets.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "build each row of cells in the admin changelist results table, deciding which column links to the edit page",
+    "expected": [
+      "django/contrib/admin/templatetags/admin_list.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "the bulk delete action that shows a confirmation page listing related objects before removing them",
+    "expected": [
+      "django/contrib/admin/actions.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "parse a Cookie header string into a dict of name/value pairs",
+    "expected": [
+      "django/http/cookie.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "built-in URL path converters like int, slug, uuid and their regex patterns",
+    "expected": [
+      "django/urls/converters.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "import a class or function from a dotted string path",
+    "expected": [
+      "django/utils/module_loading.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "get_object_or_404 helper that raises Http404 when a queryset lookup misses",
+    "expected": [
+      "django/shortcuts.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "add a flash message to the request with a level like info, success, or error",
+    "expected": [
+      "django/contrib/messages/api.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "slugify a string and turn CamelCase into spaced words",
+    "expected": [
+      "django/utils/text.py"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "how multipart/form-data uploads are parsed into files and POST data",
+    "expected": [
+      "django/http/multipartparser.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "convert a duration string in ISO 8601 or Postgres interval format into a timedelta",
+    "expected": [
+      "django/utils/dateparse.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "make a naive datetime timezone-aware and convert between timezones",
+    "expected": [
+      "django/utils/timezone.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "class-based view mixin that builds a form, validates it on POST, and redirects to a success URL",
+    "expected": [
+      "django/views/generic/edit.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "encode a Python value as a JSON script tag safely embedded in HTML",
+    "expected": [
+      "django/utils/html.py"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "rewrite static asset filenames with a content hash and rewrite url() references inside CSS and JS during collectstatic",
+    "expected": [
+      "django/contrib/staticfiles/storage.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "where a lazy/deferred callable is wrapped so translation happens at access time instead of at definition",
+    "expected": [
+      "django/utils/functional.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "descriptor that resolves a polymorphic relation by combining a content type id and an object primary key",
+    "expected": [
+      "django/contrib/contenttypes/fields.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "build a tsvector full-text search expression with weights and a language configuration for Postgres",
+    "expected": [
+      "django/contrib/postgres/search.py"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "dict subclass that keeps multiple values per key so query string and form fields with repeated names are preserved",
+    "expected": [
+      "django/utils/datastructures.py"
+    ],
+    "difficulty": "hard"
   }
 ]

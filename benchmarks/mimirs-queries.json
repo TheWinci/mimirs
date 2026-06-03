@@ -1,122 +1,521 @@
 [
   {
     "query": "hybridSearch vector BM25 blend results",
-    "expected": ["src/search/hybrid.ts"]
+    "expected": [
+      "src/search/hybrid.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "embedBatch transformers.js ONNX model loading",
-    "expected": ["src/embeddings/embed.ts"]
+    "expected": [
+      "src/embeddings/embed.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "mergeHybridScores applyPathBoost applyGraphBoost dedup",
-    "expected": ["src/search/hybrid.ts"]
+    "expected": [
+      "src/search/hybrid.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "chunkText AST tree-sitter splitMarkdown splitCode",
-    "expected": ["src/indexing/chunker.ts"]
+    "expected": [
+      "src/indexing/chunker.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "processFile fileHash embedBatch incremental chunks",
-    "expected": ["src/indexing/indexer.ts"]
+    "expected": [
+      "src/indexing/indexer.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "RagDB initSchema CREATE TABLE chunks vec_chunks",
-    "expected": ["src/db/index.ts"]
+    "expected": [
+      "src/db/index.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "resolveImport loadTsConfig two-pass resolution",
-    "expected": ["src/graph/resolver.ts"]
+    "expected": [
+      "src/graph/resolver.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "generateProjectMap getSubgraph dependency graph",
-    "expected": ["src/graph/resolver.ts"]
+    "expected": [
+      "src/graph/resolver.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "parseJSONL readTurns conversation transcript turns",
-    "expected": ["src/conversation/parser.ts"]
+    "expected": [
+      "src/conversation/parser.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "watchProject debounce fs.watch reindex changed files",
-    "expected": ["src/indexing/watcher.ts"]
+    "expected": [
+      "src/indexing/watcher.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "startServer registerAllTools MCP stdio transport",
-    "expected": ["src/server/index.ts", "src/cli/commands/serve.ts"]
+    "expected": [
+      "src/server/index.ts",
+      "src/cli/commands/serve.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "loadConfig RagConfig chunkSize exclude include glob",
-    "expected": ["src/config/index.ts"]
+    "expected": [
+      "src/config/index.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "findUsages escapeRegex symbol callsites line match",
-    "expected": ["src/search/usages.ts"]
+    "expected": [
+      "src/search/usages.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "createCheckpoint insertCheckpoint embedding blob",
-    "expected": ["src/db/checkpoints.ts"]
+    "expected": [
+      "src/db/checkpoints.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "upsertAnnotation getAnnotations fts_annotations",
-    "expected": ["src/db/annotations.ts"]
+    "expected": [
+      "src/db/annotations.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "logQuery getAnalytics query_log zero-result rate",
-    "expected": ["src/db/analytics.ts"]
+    "expected": [
+      "src/db/analytics.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "vectorSearch textSearch fts_chunks BM25 ranking",
-    "expected": ["src/db/search.ts"]
+    "expected": [
+      "src/db/search.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "parseFile detectExtension frontmatter basename",
-    "expected": ["src/indexing/parse.ts"]
+    "expected": [
+      "src/indexing/parse.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "runBenchmark recall MRR reciprocalRank metric",
-    "expected": ["src/search/benchmark.ts"]
+    "expected": [
+      "src/search/benchmark.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "runEval withRag withoutRag trace comparison",
-    "expected": ["src/search/eval.ts"]
+    "expected": [
+      "src/search/eval.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "initCommand runSetup confirm index project setup",
-    "expected": ["src/cli/commands/init.ts"]
+    "expected": [
+      "src/cli/commands/init.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "doctorCommand health check Bun SQLite sqlite-vec diagnostics",
-    "expected": ["src/cli/commands/doctor.ts"]
+    "expected": [
+      "src/cli/commands/doctor.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "indexConversation parseTurns buildTurnText session offset",
-    "expected": ["src/conversation/indexer.ts"]
+    "expected": [
+      "src/conversation/indexer.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "upsertSession getSession conversation_sessions readOffset",
-    "expected": ["src/db/conversation.ts"]
+    "expected": [
+      "src/db/conversation.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "getFileByPath upsertFileStart writeChunks vec_chunks storage",
-    "expected": ["src/db/files.ts"]
+    "expected": [
+      "src/db/files.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "upsertFileGraph file_imports file_exports dependency edges",
-    "expected": ["src/db/graph.ts"]
+    "expected": [
+      "src/db/graph.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "git_context uncommitted changes recent commits diff status",
-    "expected": ["src/tools/git-tools.ts"]
+    "expected": [
+      "src/tools/git-tools.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "annotate persistent note symbol inline read_relevant",
-    "expected": ["src/tools/annotation-tools.ts"]
+    "expected": [
+      "src/tools/annotation-tools.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "cleanupCommand remove mimirs MCP config uninstall",
-    "expected": ["src/cli/commands/cleanup.ts"]
+    "expected": [
+      "src/cli/commands/cleanup.ts"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "checkIndexDir DANGEROUS_DIRS prevent home root OOM",
-    "expected": ["src/utils/dir-guard.ts"]
+    "expected": [
+      "src/utils/dir-guard.ts"
+    ],
+    "difficulty": "unknown"
+  },
+  {
+    "query": "insertCommitBatch store git commits and their changed files",
+    "expected": [
+      "src/db/git-history.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "get the commit history for a single file path sorted by date",
+    "expected": [
+      "src/db/git-history.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "GitCommitSearchResult and GitCommitRow interfaces",
+    "expected": [
+      "src/db/types.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "PathFilter extensions dirs excludeDirs type for scoping search",
+    "expected": [
+      "src/db/types.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "reciprocal rank fusion of two ranked result lists",
+    "expected": [
+      "src/search/hybrid.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "how reciprocal-rank fusion blends vector and BM25 lists by rank instead of raw score",
+    "expected": [
+      "src/search/hybrid.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "sanitize a user query for FTS5 quoting tokens and joining them with OR",
+    "expected": [
+      "src/search/usages.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "convert a stored L2 vector score back to cosine similarity for the low-relevance heuristic",
+    "expected": [
+      "src/db/search.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "benchmark recall@k mean reciprocal rank and zero-miss rate over a query set",
+    "expected": [
+      "src/search/benchmark.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "A/B eval comparing agent search with and without RAG and file hit rate",
+    "expected": [
+      "src/search/eval.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "where the impact walk computes the true transitive caller set separately from the bounded display tree and stops at the count cap",
+    "expected": [
+      "src/graph/trace.ts"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "high fan-in callables are cited but not expanded so a hot symbol doesn't explode the impact walk",
+    "expected": [
+      "src/graph/trace.ts"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "intersecting forward and backward BFS reachability to find every path from one symbol to another with the shortest spine",
+    "expected": [
+      "src/graph/trace.ts"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "purge indexed git commits no longer reachable after a force push while keeping shared history",
+    "expected": [
+      "src/db/git-history.ts"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "split a compound identifier like getDependsOn into its lowercase camelCase and snake_case word parts for the FTS parts column",
+    "expected": [
+      "src/indexing/identifiers.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "normalize a filesystem path to use forward slashes instead of backslashes on Windows",
+    "expected": [
+      "src/utils/path.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "shared regex patterns that decide whether a file path is a test file",
+    "expected": [
+      "src/utils/test-paths.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "refuse to index dangerous system directories like home or root that would OOM the process",
+    "expected": [
+      "src/utils/dir-guard.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "MCP diagnostic logger that writes level-gated lines to stderr with a mimirs prefix",
+    "expected": [
+      "src/utils/log.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "list a repo's non-ignored files with git ls-files so .gitignore is respected and node_modules is skipped",
+    "expected": [
+      "src/indexing/indexer.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "split oversized text into overlapping 256-token windows, embed each, then average and normalize into one vector",
+    "expected": [
+      "src/embeddings/embed.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "parse git log output using ASCII unit and record separators to handle commit messages with special characters",
+    "expected": [
+      "src/git/indexer.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "debounce rapid file change events and queue them serially so concurrent re-index runs don't interleave",
+    "expected": [
+      "src/indexing/watcher.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "map a basename with no extension like Dockerfile or Makefile to a virtual extension for chunking",
+    "expected": [
+      "src/indexing/parse.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "where the indexer acquires a per-directory lock so two mimirs servers don't double-insert chunk rows, reclaiming stale locks from dead PIDs",
+    "expected": [
+      "src/utils/index-lock.ts"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "recover from a force push by purging indexed commits no longer reachable from any ref and resuming incremental indexing from the latest survivor",
+    "expected": [
+      "src/git/indexer.ts"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "only re-embed chunks whose content hash changed and fall back to a full re-index when more than half the chunks differ",
+    "expected": [
+      "src/indexing/indexer.ts"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "treating EPERM from a signal-0 probe as a still-alive process so a second instance can't reclaim a live cross-user lock",
+    "expected": [
+      "src/utils/index-lock.ts"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "the MCP tool that returns search_analytics with zero-result and low-relevance queries and top searched terms",
+    "expected": [
+      "src/tools/analytics-tools.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "MCP tool to remove a single file from the RAG index by absolute path",
+    "expected": [
+      "src/tools/index-tools.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "server_info tool showing project dir, db location, embedding model and connected databases",
+    "expected": [
+      "src/tools/server-info-tools.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "the wiki MCP tool with colon selector commands like shape, prefetch, discovery and write",
+    "expected": [
+      "src/tools/wiki-tools.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "CLI command that prints index status: file count, chunk count and last indexed time",
+    "expected": [
+      "src/cli/commands/status.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "mimirs map command that renders the project dependency graph with focus and zoom flags",
+    "expected": [
+      "src/cli/commands/map.ts"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "the MCP tool that returns the transitive caller tree and the test files to run for a symbol",
+    "expected": [
+      "src/tools/graph-tools.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "create_checkpoint tool that embeds title plus summary and stores it against the latest session turn",
+    "expected": [
+      "src/tools/checkpoint-tools.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "the search_conversation tool that hybrid-merges vector and BM25 turn results with rank fusion",
+    "expected": [
+      "src/tools/conversation-tools.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "CLI eval command running an A/B benchmark of search tasks and saving traces to an output file",
+    "expected": [
+      "src/cli/commands/eval.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "benchmark command that exits non-zero when recall-at-k or MRR fall below configured thresholds",
+    "expected": [
+      "src/cli/commands/benchmark.ts"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "where the read_relevant tool batch-fetches annotations per file and surfaces [NOTE] blocks inline with chunks",
+    "expected": [
+      "src/tools/search.ts"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "the search_commits tool that fuses vector and full-text git commit results with a hybrid weight after checking history is indexed",
+    "expected": [
+      "src/tools/git-history-tools.ts"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "where the affected command resolves changed files from positional args, stdin, or git diff against HEAD and walks importers to find tests to run",
+    "expected": [
+      "src/cli/commands/affected.ts"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "the command that assembles a session briefing from git status, recent commits, index stats, search gaps and annotations on modified files",
+    "expected": [
+      "src/cli/commands/session-context.ts"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "where the wiki rebuild parses a colon command into mode and selectors and dispatches shape, discovery, write, update and changelog",
+    "expected": [
+      "src/wiki/rebuild.ts"
+    ],
+    "difficulty": "hard"
   }
 ]

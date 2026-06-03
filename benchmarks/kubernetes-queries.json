@@ -1,122 +1,842 @@
 [
   {
     "query": "scheduler scheduleOne scheduling cycle pod to node binding",
-    "expected": ["pkg/scheduler/scheduler.go"]
+    "expected": [
+      "pkg/scheduler/scheduler.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "kubelet syncPod syncLoop run pod workers PLEG container runtime",
-    "expected": ["pkg/kubelet/kubelet.go"]
+    "expected": [
+      "pkg/kubelet/kubelet.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "kubectl apply RunApply applyOptions server-side apply patcher",
-    "expected": ["staging/src/k8s.io/kubectl/pkg/cmd/apply/apply.go"]
+    "expected": [
+      "staging/src/k8s.io/kubectl/pkg/cmd/apply/apply.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "director handler chain API server HTTP request dispatch full handler",
-    "expected": ["staging/src/k8s.io/apiserver/pkg/server/handler.go"]
+    "expected": [
+      "staging/src/k8s.io/apiserver/pkg/server/handler.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "etcd3 store Create Get GuaranteedUpdate Watch implementation",
-    "expected": ["staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go"]
+    "expected": [
+      "staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "admission chain Admit Validate handler plugins ordered interface",
-    "expected": ["staging/src/k8s.io/apiserver/pkg/admission/chain.go"]
+    "expected": [
+      "staging/src/k8s.io/apiserver/pkg/admission/chain.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "kubelet status manager SetPodStatus syncPod patch pod status apiserver",
-    "expected": ["pkg/kubelet/status/status_manager.go"]
+    "expected": [
+      "pkg/kubelet/status/status_manager.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "iptables proxier syncProxyRules service endpoint chains nat rules",
-    "expected": ["pkg/proxy/iptables/proxier.go"]
+    "expected": [
+      "pkg/proxy/iptables/proxier.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "kube-controller-manager NewControllerManagerCommand startControllers run",
-    "expected": ["cmd/kube-controller-manager/app/controllermanager.go"]
+    "expected": [
+      "cmd/kube-controller-manager/app/controllermanager.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "deployment controller syncDeployment rolloutRolling rolloutRecreate reconcile",
-    "expected": ["pkg/controller/deployment/deployment_controller.go"]
+    "expected": [
+      "pkg/controller/deployment/deployment_controller.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "replica set controller syncReplicaSet manageReplicas pod count reconcile",
-    "expected": ["pkg/controller/replicaset/replica_set.go"]
+    "expected": [
+      "pkg/controller/replicaset/replica_set.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "node lifecycle controller monitorNodeHealth taint eviction zone not-ready",
-    "expected": ["pkg/controller/nodelifecycle/node_lifecycle_controller.go"]
+    "expected": [
+      "pkg/controller/nodelifecycle/node_lifecycle_controller.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "horizontal pod autoscaler reconcileAutoscaler computeReplicasForMetrics scale",
-    "expected": ["pkg/controller/podautoscaler/horizontal.go"]
+    "expected": [
+      "pkg/controller/podautoscaler/horizontal.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "garbage collector GarbageCollector attemptToDeleteItem ownerReferences graph",
-    "expected": ["pkg/controller/garbagecollector/garbagecollector.go"]
+    "expected": [
+      "pkg/controller/garbagecollector/garbagecollector.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "resource quota admission controller evaluator usage limit enforce namespace",
-    "expected": ["staging/src/k8s.io/apiserver/pkg/admission/plugin/resourcequota/controller.go"]
+    "expected": [
+      "staging/src/k8s.io/apiserver/pkg/admission/plugin/resourcequota/controller.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "RBAC authorizer RBACAuthorizer Authorize role binding clusterrole policy rules",
-    "expected": ["plugin/pkg/auth/authorizer/rbac/rbac.go"]
+    "expected": [
+      "plugin/pkg/auth/authorizer/rbac/rbac.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "pod security admission Validate enforce baseline restricted level policy",
-    "expected": ["plugin/pkg/admission/security/podsecurity/admission.go"]
+    "expected": [
+      "plugin/pkg/admission/security/podsecurity/admission.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "CRI RuntimeService ImageService interface container runtime gRPC API definition",
-    "expected": ["staging/src/k8s.io/cri-api/pkg/apis/services.go"]
+    "expected": [
+      "staging/src/k8s.io/cri-api/pkg/apis/services.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "CSI csiPlugin Init CanAttach CanSupport volume plugin registration persistent",
-    "expected": ["pkg/volume/csi/csi_plugin.go"]
+    "expected": [
+      "pkg/volume/csi/csi_plugin.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "API discovery rootAPIsHandler goRestfulContainer /apis group version list",
-    "expected": ["staging/src/k8s.io/apiserver/pkg/endpoints/discovery/root.go"]
+    "expected": [
+      "staging/src/k8s.io/apiserver/pkg/endpoints/discovery/root.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "StatefulSet controller syncStatefulSet pod ordinal identity management",
-    "expected": ["pkg/controller/statefulset/stateful_set.go"]
+    "expected": [
+      "pkg/controller/statefulset/stateful_set.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "ClusterRoleAggregation controller applyClusterRole aggregation label rules",
-    "expected": ["pkg/controller/clusterroleaggregation/clusterroleaggregation_controller.go"]
+    "expected": [
+      "pkg/controller/clusterroleaggregation/clusterroleaggregation_controller.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "DaemonSet controller syncDaemonSet manage node pod scheduling",
-    "expected": ["pkg/controller/daemon/daemon_controller.go"]
+    "expected": [
+      "pkg/controller/daemon/daemon_controller.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "master lease endpoint reconciler apiserver election",
-    "expected": ["pkg/controlplane/reconcilers/lease.go"]
+    "expected": [
+      "pkg/controlplane/reconcilers/lease.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "volume binding plugin Reserve PreBind persistent volume claim scheduler",
-    "expected": ["pkg/scheduler/framework/plugins/volumebinding/volume_binding.go"]
+    "expected": [
+      "pkg/scheduler/framework/plugins/volumebinding/volume_binding.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "CronJob controller syncCronJob getRecentUnmetScheduleTimes job creation",
-    "expected": ["pkg/controller/cronjob/cronjob_controllerv2.go"]
+    "expected": [
+      "pkg/controller/cronjob/cronjob_controllerv2.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "deny service external IPs admission validation plugin",
-    "expected": ["plugin/pkg/admission/network/denyserviceexternalips/admission.go"]
+    "expected": [
+      "plugin/pkg/admission/network/denyserviceexternalips/admission.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "node authorizer graph kubelet authorization secret configmap",
-    "expected": ["plugin/pkg/auth/authorizer/node/node_authorizer.go"]
+    "expected": [
+      "plugin/pkg/auth/authorizer/node/node_authorizer.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "goroutine map named operation backoff wait completion",
-    "expected": ["pkg/util/goroutinemap/goroutinemap.go"]
+    "expected": [
+      "pkg/util/goroutinemap/goroutinemap.go"
+    ],
+    "difficulty": "unknown"
   },
   {
     "query": "mutation detector cache object deep copy watch corruption",
-    "expected": ["staging/src/k8s.io/client-go/tools/cache/mutation_detector.go"]
+    "expected": [
+      "staging/src/k8s.io/client-go/tools/cache/mutation_detector.go"
+    ],
+    "difficulty": "unknown"
+  },
+  {
+    "query": "NodeName plugin Filter checks pod spec NodeName matches the node",
+    "expected": [
+      "pkg/scheduler/framework/plugins/nodename/node_name.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "NodeUnschedulable filter rejects nodes with node.Spec.Unschedulable=true unless pod tolerates the unschedulable taint",
+    "expected": [
+      "pkg/scheduler/framework/plugins/nodeunschedulable/node_unschedulable.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "PriorityQueue activeQ backoffQ unschedulablePods scheduling queue",
+    "expected": [
+      "pkg/scheduler/backend/queue/scheduling_queue.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "nominator addNominatedPod nominatedPodToNode map of preemptor pods to nominated node",
+    "expected": [
+      "pkg/scheduler/backend/queue/nominator.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "TaintToleration Filter FindMatchingUntoleratedTaint NoSchedule",
+    "expected": [
+      "pkg/scheduler/framework/plugins/tainttoleration/taint_toleration.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "node ports plugin checking host port conflicts between a pod and pods already on the node",
+    "expected": [
+      "pkg/scheduler/framework/plugins/nodeports/node_ports.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "compute a pod's cpu memory and extended resource requests and check the node has enough allocatable capacity to fit it",
+    "expected": [
+      "pkg/scheduler/framework/plugins/noderesources/fit.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "AssumePod ForgetPod and expiring assumed pods after binding timeout in the scheduler cache",
+    "expected": [
+      "pkg/scheduler/backend/cache/cache.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "match a pod's required nodeAffinity node selector terms against a node during filtering",
+    "expected": [
+      "pkg/scheduler/framework/plugins/nodeaffinity/node_affinity.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "informer event handlers that add update and delete pods and nodes into the scheduler cache and scheduling queue",
+    "expected": [
+      "pkg/scheduler/eventhandlers.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "where the scheduler decides which lower-priority pods to preempt to fit a pending pod, finding the minimum victim set on a node",
+    "expected": [
+      "pkg/scheduler/framework/plugins/defaultpreemption/default_preemption.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "generic preemption evaluator that dry-runs victim selection across candidate nodes in parallel and respects PodDisruptionBudgets",
+    "expected": [
+      "pkg/scheduler/framework/preemption/preemption.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "enforce pod topology spread maxSkew so replicas are evenly distributed across zones or hostnames during filtering",
+    "expected": [
+      "pkg/scheduler/framework/plugins/podtopologyspread/filtering.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "count matching pods per topology domain to satisfy required pod anti-affinity and affinity terms when filtering nodes",
+    "expected": [
+      "pkg/scheduler/framework/plugins/interpodaffinity/filtering.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "orchestrates the configured filter and score extension points and runs each plugin in order for a scheduling cycle",
+    "expected": [
+      "pkg/scheduler/framework/runtime/framework.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "function that hashes a container spec to detect config changes for restart",
+    "expected": [
+      "pkg/kubelet/container/helpers.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "build port mappings from a container's ports for the runtime",
+    "expected": [
+      "pkg/kubelet/container/helpers.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "register the kubelet node with the API server on startup",
+    "expected": [
+      "pkg/kubelet/kubelet_node_status.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "apply the default latest tag to an image reference without a tag",
+    "expected": [
+      "pkg/kubelet/images/image_manager.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "run a container lifecycle handler like postStart or preStop exec, http, or sleep",
+    "expected": [
+      "pkg/kubelet/lifecycle/handlers.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "how the kubelet syncs a single pod through its per-pod worker goroutine loop and dispatches sync, terminating, and terminated phases",
+    "expected": [
+      "pkg/kubelet/pod_workers.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "how the generic PLEG relists running pods from the runtime and emits container lifecycle events",
+    "expected": [
+      "pkg/kubelet/pleg/generic.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "how a probe worker periodically runs liveness or readiness probes and decides to keep going or stop",
+    "expected": [
+      "pkg/kubelet/prober/worker.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "wait for a pod's volumes to be attached and mounted before starting containers",
+    "expected": [
+      "pkg/kubelet/volumemanager/volume_manager.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "build the environment variables for a container from configmaps, secrets, and the downward API",
+    "expected": [
+      "pkg/kubelet/kubelet_pods.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "where the kubelet decides which pods to evict and ranks them when the node is under memory or disk pressure",
+    "expected": [
+      "pkg/kubelet/eviction/eviction_manager.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "compute which containers in a pod need to be started, killed, or restarted by diffing desired spec against actual runtime status",
+    "expected": [
+      "pkg/kubelet/kuberuntime/kuberuntime_manager.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "where exclusive whole CPUs get assigned to guaranteed pods and stale CPU assignments are reconciled back to the runtime",
+    "expected": [
+      "pkg/kubelet/cm/cpumanager/cpu_manager.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "merge per-resource NUMA topology hints from hint providers to pick the best affinity for admitting a pod",
+    "expected": [
+      "pkg/kubelet/cm/topologymanager/topology_manager.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "gracefully terminate a container by running its preStop hook and honoring the effective grace period before sending the stop signal",
+    "expected": [
+      "pkg/kubelet/kuberuntime/kuberuntime_container.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "createHandler decode request body then run admission and store the new object",
+    "expected": [
+      "staging/src/k8s.io/apiserver/pkg/endpoints/handlers/create.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "DeleteResource handler reads DeleteOptions and calls graceful deleter",
+    "expected": [
+      "staging/src/k8s.io/apiserver/pkg/endpoints/handlers/delete.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "WithAuthentication filter that authenticates the request and sets user info",
+    "expected": [
+      "staging/src/k8s.io/apiserver/pkg/endpoints/filters/authentication.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "WithAuthorization filter that checks the authorizer and rejects forbidden requests",
+    "expected": [
+      "staging/src/k8s.io/apiserver/pkg/endpoints/filters/authorization.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "set Insert Union Difference Intersection generic set operations",
+    "expected": [
+      "staging/src/k8s.io/apimachinery/pkg/util/sets/set.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "how a watch request streams object add/update/delete events to the client",
+    "expected": [
+      "staging/src/k8s.io/apiserver/pkg/endpoints/handlers/watch.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "applying a JSON patch or strategic merge patch to the current object then validating",
+    "expected": [
+      "staging/src/k8s.io/apiserver/pkg/endpoints/handlers/patch.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "REST store create path retrying on generated name conflicts before writing to storage",
+    "expected": [
+      "staging/src/k8s.io/apiserver/pkg/registry/generic/registry/store.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "parse a label selector string into requirements and match it against an object's labels",
+    "expected": [
+      "staging/src/k8s.io/apimachinery/pkg/labels/selector.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "Jitter and exponential backoff helpers for retrying with increasing delay",
+    "expected": [
+      "staging/src/k8s.io/apimachinery/pkg/util/wait/wait.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "decoding an etcd watch event and turning a key/value change into a watch.Event",
+    "expected": [
+      "staging/src/k8s.io/apiserver/pkg/storage/etcd3/watcher.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "where the apiserver caches list/watch results to serve reads without hitting etcd",
+    "expected": [
+      "staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "decode bytes into an internal object then convert from external to internal version",
+    "expected": [
+      "staging/src/k8s.io/apimachinery/pkg/runtime/serializer/versioning/versioning.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "registry that maps Go types to group version kinds and performs version conversion and defaulting",
+    "expected": [
+      "staging/src/k8s.io/apimachinery/pkg/runtime/scheme.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "assembling the default request handler chain wrapping auth, audit and timeout filters around the API handler",
+    "expected": [
+      "staging/src/k8s.io/apiserver/pkg/server/config.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "rejecting requests for resources in a namespace that is terminating or does not exist",
+    "expected": [
+      "staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle/admission.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "set ttl annotation on nodes based on cluster size",
+    "expected": [
+      "pkg/controller/ttl/ttl_controller.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "delete expired bootstrap token secrets",
+    "expected": [
+      "pkg/controller/bootstrap/tokencleaner.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "automated approver for kubelet client certificate requests using SubjectAccessReview",
+    "expected": [
+      "pkg/controller/certificates/approver/sarapprove.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "ensure a default service account exists in every namespace",
+    "expected": [
+      "pkg/controller/serviceaccount/serviceaccounts_controller.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "garbage collect terminated and orphaned pods",
+    "expected": [
+      "pkg/controller/podgc/gc_controller.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "how the Job controller tracks completions and removes the tracking finalizer from counted pods",
+    "expected": [
+      "pkg/controller/job/job_controller.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "CA signer that signs CertificateSigningRequests using keys on local disk",
+    "expected": [
+      "pkg/controller/certificates/signer/signer.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "allocate a pod CIDR range to each node from the cluster CIDR",
+    "expected": [
+      "pkg/controller/nodeipam/ipam/range_allocator.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "build endpoint subsets from ready and not-ready pod addresses for a service",
+    "expected": [
+      "pkg/controller/endpoint/endpoints_controller.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "evict pods from nodes tagged with NoExecute taints honoring toleration seconds",
+    "expected": [
+      "pkg/controller/tainteviction/taint_eviction.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "recalculate resource quota usage and replenish when tracked resources change",
+    "expected": [
+      "pkg/controller/resourcequota/resource_quota_controller.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "where PersistentVolumeClaims get bound to a matching PersistentVolume",
+    "expected": [
+      "pkg/controller/volume/persistentvolume/pv_controller.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "compute how many pod disruptions are currently allowed for a budget and detect stale disrupted pods",
+    "expected": [
+      "pkg/controller/disruption/disruption.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "delete every namespaced resource when a namespace is being terminated and estimate remaining cleanup time",
+    "expected": [
+      "pkg/controller/namespace/deletion/namespaced_resources_deleter.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "reconcile desired versus actual attached volumes and force detach after waiting for safe unmount",
+    "expected": [
+      "pkg/controller/volume/attachdetach/attach_detach_controller.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "limit endpoints per slice and distribute them across zones with topology aware hints",
+    "expected": [
+      "pkg/controller/endpointslice/endpointslice_controller.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "how the reflector lists all items and then watches for changes to keep the local store in sync",
+    "expected": [
+      "staging/src/k8s.io/client-go/tools/cache/reflector.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "retry a function on a conflict error using exponential backoff",
+    "expected": [
+      "staging/src/k8s.io/client-go/util/retry/util.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "rate limiting work queue that adds items back after a delay when they fail",
+    "expected": [
+      "staging/src/k8s.io/client-go/util/workqueue/rate_limiting_queue.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "leader election lease acquire and renew loop",
+    "expected": [
+      "staging/src/k8s.io/client-go/tools/leaderelection/leaderelection.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "dynamic client for unstructured resources with create update get list watch",
+    "expected": [
+      "staging/src/k8s.io/client-go/dynamic/simple.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "build and send a REST request to the apiserver with verb, resource, namespace and body",
+    "expected": [
+      "staging/src/k8s.io/client-go/rest/request.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "delaying queue that holds items in a priority queue until their ready time using a timer",
+    "expected": [
+      "staging/src/k8s.io/client-go/util/workqueue/delaying_queue.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "discover which API groups and resources the server supports and pick preferred versions",
+    "expected": [
+      "staging/src/k8s.io/client-go/discovery/discovery_client.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "record an event on a kubernetes object and broadcast it to a sink with deduplication",
+    "expected": [
+      "staging/src/k8s.io/client-go/tools/record/event.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "enable or disable feature gates from a comma separated key value string and validate them",
+    "expected": [
+      "staging/src/k8s.io/component-base/featuregate/feature_gate.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "where the informer fans out add update and delete deltas to each registered event handler in order without blocking",
+    "expected": [
+      "staging/src/k8s.io/client-go/tools/cache/shared_informer.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "queue that coalesces multiple changes to the same object into a slice of deltas so each change is processed at most once",
+    "expected": [
+      "staging/src/k8s.io/client-go/tools/cache/delta_fifo.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "reuse a single pooled HTTP transport across clients that share the same TLS and proxy settings instead of opening new connections",
+    "expected": [
+      "staging/src/k8s.io/client-go/transport/cache.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "the indexed in-memory map that backs the cache, keeping objects and their secondary indexes consistent under a lock",
+    "expected": [
+      "staging/src/k8s.io/client-go/tools/cache/thread_safe_store.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "remove kube-proxy's leftover iptables chains and rules on cleanup",
+    "expected": [
+      "pkg/proxy/iptables/cleanup.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "extract a bearer token from the Authorization header and authenticate it",
+    "expected": [
+      "staging/src/k8s.io/apiserver/pkg/authentication/request/bearertoken/bearertoken.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "chain of request authenticators that tries each one until one succeeds",
+    "expected": [
+      "staging/src/k8s.io/apiserver/pkg/authentication/request/union/union.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "DefaultTolerationSeconds admission adds not-ready and unreachable tolerations to pods",
+    "expected": [
+      "plugin/pkg/admission/defaulttolerationseconds/admission.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "auto-create a namespace when a request references one that does not exist",
+    "expected": [
+      "plugin/pkg/admission/namespace/autoprovision/admission.go"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "query": "authenticate a request using the client TLS certificate chain and convert it to user info",
+    "expected": [
+      "staging/src/k8s.io/apiserver/pkg/authentication/request/x509/x509.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "read a bearer token passed as a websocket subprotocol and validate it",
+    "expected": [
+      "staging/src/k8s.io/apiserver/pkg/authentication/request/websocket/protocol.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "trust a username and group headers from a front proxy after verifying the proxy client cert",
+    "expected": [
+      "staging/src/k8s.io/apiserver/pkg/authentication/request/headerrequest/requestheader.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "enforce LimitRange defaults and maximums on pods and containers during admission",
+    "expected": [
+      "plugin/pkg/admission/limitranger/admission.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "mount the projected service account token volume into a pod's containers",
+    "expected": [
+      "plugin/pkg/admission/serviceaccount/admission.go"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "query": "where Kubernetes signs a service account JWT and validates it against bound audiences",
+    "expected": [
+      "pkg/serviceaccount/jwt.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "build the claims that bind a service account token to a pod, secret, or node",
+    "expected": [
+      "pkg/serviceaccount/claims.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "cache token authentication results keyed by an HMAC hash of the bearer token to avoid revalidating",
+    "expected": [
+      "staging/src/k8s.io/apiserver/pkg/authentication/token/cache/cached_token_authenticator.go"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "query": "resolve which subjects are allowed to perform an action by walking role and cluster role bindings",
+    "expected": [
+      "plugin/pkg/auth/authorizer/rbac/subject_locator.go"
+    ],
+    "difficulty": "hard"
   }
 ]
