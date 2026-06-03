@@ -5,6 +5,24 @@ import { escapeRegex, sanitizeFTS } from "../search/usages";
 import { log } from "../utils/log";
 
 /**
+ * Convert a stored vector score back to cosine similarity.
+ *
+ * Embeddings are L2-normalized (src/embeddings/embed.ts) and vec_chunks uses
+ * vec0's default L2 (Euclidean) distance, so the stored `score = 1/(1+distance)`
+ * is NOT a cosine. For unit vectors L2² = 2(1−cos), hence:
+ *   distance = 1/score − 1,   cosine = 1 − distance²/2.
+ * Verified empirically (orthogonal unit vectors → distance 1.4142, score 0.4142).
+ * The minimum possible score is ≈0.333 (antipode), so a raw-score "< 0.3"
+ * heuristic can never fire — analytics must compare cosine instead. Returns null
+ * for a missing/non-positive score.
+ */
+export function vectorScoreToCosine(score: number | null | undefined): number | null {
+  if (score == null || score <= 0) return null;
+  const distance = 1 / score - 1;
+  return 1 - (distance * distance) / 2;
+}
+
+/**
  * Build parametrized SQL fragments for a PathFilter. Caller concatenates
  * returned clauses with AND. Returns empty arrays when no filter is active.
  *
@@ -439,31 +457,40 @@ export function findUsages(db: Database, symbolName: string, exact: boolean, top
   // Primary path: bun-chunk-derived symbol_refs index. Precise — call sites
   // and reference sites only, no FTS hits inside comments or strings.
   // Exact match: name = ? (case-insensitive). Prefix match: name LIKE ?%.
+  // Also match aliased call sites: a ref whose resolved_export_id points at an
+  // export of this name (e.g. `import { getDB as g }; g()` → the `g` ref
+  // resolves to getDB's export, so searching "getDB" finds it).
   const refRows = exact
     ? db
         .query<
           { snippet: string; file_id: number; start_line: number | null; ref_line: number; path: string },
-          [string]
+          [string, string]
         >(
           `SELECT c.snippet, c.file_id, c.start_line, sr.line AS ref_line, f.path
            FROM symbol_refs sr
            JOIN chunks c ON c.id = sr.chunk_id
            JOIN files f ON f.id = sr.file_id
-           WHERE LOWER(sr.name) = LOWER(?)`
+           WHERE LOWER(sr.name) = LOWER(?)
+              OR sr.resolved_export_id IN (
+                SELECT id FROM file_exports WHERE LOWER(name) = LOWER(?)
+              )`
         )
-        .all(symbolName)
+        .all(symbolName, symbolName)
     : db
         .query<
           { snippet: string; file_id: number; start_line: number | null; ref_line: number; path: string },
-          [string]
+          [string, string]
         >(
           `SELECT c.snippet, c.file_id, c.start_line, sr.line AS ref_line, f.path
            FROM symbol_refs sr
            JOIN chunks c ON c.id = sr.chunk_id
            JOIN files f ON f.id = sr.file_id
-           WHERE LOWER(sr.name) LIKE LOWER(?) || '%'`
+           WHERE LOWER(sr.name) LIKE LOWER(?) || '%'
+              OR sr.resolved_export_id IN (
+                SELECT id FROM file_exports WHERE LOWER(name) LIKE LOWER(?) || '%'
+              )`
         )
-        .all(symbolName);
+        .all(symbolName, symbolName);
 
   for (const row of refRows) {
     if (definingFileIds.has(row.file_id)) continue;

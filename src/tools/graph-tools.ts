@@ -89,7 +89,7 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
 
   server.tool(
     "usages",
-    "Find every call site or reference to a symbol across all indexed files — with file paths, line numbers, and matching lines. More reliable than grep for usage analysis: searches the chunk index so it won't miss aliased imports or re-exports. Use this before renaming or changing a function signature.",
+    "Find call sites and references to a symbol across indexed files — with file paths, line numbers, and matching lines. Resolves aliased imports: searching the original name finds call sites that import it under an alias (`import { getDB as g }; g()`). Primary matches come from an AST-derived reference index (real call/reference sites); for file types without reference extraction (e.g. HTML/CSS/YAML) or names not in that index it falls back to a text search, which can also surface matches inside comments or strings. Use before renaming or changing a function signature.",
     {
       symbol: z.string().min(1).max(200).describe("Symbol name to search for"),
       exact: z

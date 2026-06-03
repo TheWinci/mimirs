@@ -25,7 +25,9 @@ export async function resolveProject(
 ): Promise<{ projectDir: string; db: RagDB; config: RagConfig }> {
   const projectDir = directory || process.env.RAG_PROJECT_DIR || process.cwd();
 
-  // Resolve to absolute and verify it doesn't escape via path traversal
+  // Resolve to an absolute path and confirm it exists. Note: this is not a
+  // sandbox — mimirs is a local tool that already runs with the caller's full
+  // filesystem access, so any existing directory is allowed.
   const resolved = resolve(projectDir);
   if (!existsSync(resolved)) {
     throw new Error(`Directory does not exist: ${resolved}`);

@@ -221,6 +221,56 @@ describe("force push recovery", () => {
   });
 });
 
+describe("file history path anchoring", () => {
+  let anchorDir: string;
+  let anchorDb: RagDB;
+
+  beforeAll(async () => {
+    anchorDir = await createTempDir();
+    await runGit(["init"], anchorDir);
+    await runGit(["config", "user.name", "Anchor Author"], anchorDir);
+    await runGit(["config", "user.email", "anchor@test.com"], anchorDir);
+
+    // Root commit (its file changes aren't indexed by diff-tree without --root),
+    // so put the files-under-test in later commits.
+    await writeFixture(anchorDir, "README.md", "# anchor");
+    await runGit(["add", "."], anchorDir);
+    await runGit(["commit", "-m", "Initial commit"], anchorDir);
+
+    // Two files whose basenames share a suffix: "db.ts" is a suffix of "mydb.ts".
+    await writeFixture(anchorDir, "src/db.ts", "export const db = 1;");
+    await runGit(["add", "."], anchorDir);
+    await runGit(["commit", "-m", "Add db module"], anchorDir);
+
+    await writeFixture(anchorDir, "src/mydb.ts", "export const mydb = 2;");
+    await runGit(["add", "."], anchorDir);
+    await runGit(["commit", "-m", "Add mydb module only"], anchorDir);
+
+    anchorDb = new RagDB(anchorDir);
+    await indexGitHistory(anchorDir, anchorDb);
+  });
+
+  afterAll(async () => {
+    anchorDb.close();
+    await cleanupTempDir(anchorDir);
+  });
+
+  test("getFileHistory does not match an unrelated path with the same suffix", () => {
+    const results = anchorDb.getFileHistory("db.ts");
+
+    // Must include the commit that actually touched src/db.ts...
+    expect(results.some((c) => c.message.includes("Add db module"))).toBe(true);
+    // ...but NOT the commit that only touched src/mydb.ts.
+    expect(results.some((c) => c.message.includes("Add mydb module only"))).toBe(false);
+  });
+
+  test("getFileHistory matches an exact repo-relative path", () => {
+    const results = anchorDb.getFileHistory("src/db.ts");
+    expect(results.some((c) => c.message.includes("Add db module"))).toBe(true);
+    expect(results.some((c) => c.message.includes("Add mydb module only"))).toBe(false);
+  });
+});
+
 // MCP integration tests
 describe("git history MCP tools", () => {
   let client: Client;

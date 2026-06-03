@@ -72,3 +72,43 @@ describe("RagDB embedding dim is correct by construction", () => {
     db.close();
   });
 });
+
+describe("RagDB embedding model is checked, not just dim", () => {
+  test("reopening with a different model at the SAME dim throws", async () => {
+    tempDir = await createTempDir();
+    writeConfig(tempDir, { embeddingModel: "test/model-A", embeddingDim: 384 });
+    const db1 = new RagDB(tempDir);
+    db1.close();
+
+    // Same dim 384, different model — the dim guard can't catch this, but two
+    // models at the same dim are incompatible, so it must fail loudly.
+    writeConfig(tempDir, { embeddingModel: "test/model-B", embeddingDim: 384 });
+    expect(() => new RagDB(tempDir)).toThrow(/model mismatch/i);
+  });
+
+  test("reopening with the same model does not throw", async () => {
+    tempDir = await createTempDir();
+    writeConfig(tempDir, { embeddingModel: "test/model-A", embeddingDim: 384 });
+    new RagDB(tempDir).close();
+    expect(() => {
+      const d = new RagDB(tempDir);
+      d.close();
+    }).not.toThrow();
+  });
+
+  test("a legacy index with no recorded model is grandfathered (no throw)", async () => {
+    tempDir = await createTempDir();
+    writeConfig(tempDir, { embeddingModel: "test/model-A", embeddingDim: 384 });
+    const db1 = new RagDB(tempDir);
+    // Simulate a pre-meta index: erase the recorded model.
+    rawDb(db1).run("DROP TABLE IF EXISTS meta");
+    db1.close();
+
+    // The original model is now unknown, so a different model must be tolerated.
+    writeConfig(tempDir, { embeddingModel: "test/model-B", embeddingDim: 384 });
+    expect(() => {
+      const d = new RagDB(tempDir);
+      d.close();
+    }).not.toThrow();
+  });
+});

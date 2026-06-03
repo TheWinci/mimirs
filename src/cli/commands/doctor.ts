@@ -102,6 +102,60 @@ export async function doctorCommand(args: string[]) {
       },
     },
     {
+      name: "Embedding config matches index",
+      run: () => {
+        const ragDir = process.env.RAG_DB_DIR
+          ? resolve(process.env.RAG_DB_DIR)
+          : join(projectDir, ".mimirs");
+        const dbPath = join(ragDir, "index.db");
+        if (!existsSync(dbPath)) return null; // no index yet — nothing to verify
+        try {
+          const { applyEmbeddingConfigFromDisk } = require("../../config");
+          const { getEmbeddingDim, getModelId } = require("../../embeddings/embed");
+          applyEmbeddingConfigFromDisk(projectDir);
+
+          // Read-only introspection — sqlite_master + meta need no vec extension.
+          const { Database } = require("bun:sqlite");
+          const raw = new Database(dbPath, { readonly: true });
+          const vrow = raw
+            .query("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'vec_chunks'")
+            .get() as { sql: string } | null;
+          const hasMeta = raw
+            .query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'meta'")
+            .get();
+          const mrow = hasMeta
+            ? (raw.query("SELECT value FROM meta WHERE key = 'embedding_model'").get() as { value: string } | null)
+            : null;
+          raw.close();
+
+          if (!vrow) return null; // index has no vector table yet
+          const m = vrow.sql.match(/FLOAT\s*\[\s*(\d+)\s*\]/i);
+          const storedDim = m ? parseInt(m[1], 10) : null;
+          const configuredDim = getEmbeddingDim();
+          if (storedDim != null && storedDim !== configuredDim) {
+            return (
+              `Index was built with ${storedDim}-dim vectors but the configured ` +
+              `model produces ${configuredDim}-dim vectors.\n` +
+              `    Fix: restore embeddingModel/embeddingDim in .mimirs/config.json, or delete the index to rebuild.`
+            );
+          }
+          const storedModel = mrow?.value ?? null;
+          const configuredModel = getModelId();
+          if (storedModel && storedModel !== configuredModel) {
+            return (
+              `Index was built with model "${storedModel}" but the configured model is "${configuredModel}".\n` +
+              `    Fix: restore embeddingModel "${storedModel}" in .mimirs/config.json, or delete the index to rebuild.`
+            );
+          }
+          return null;
+        } catch {
+          // An introspection hiccup shouldn't fail doctor — the "Database opens"
+          // check covers genuine open failures.
+          return null;
+        }
+      },
+    },
+    {
       name: "sqlite-vec extension",
       run: () => {
         // The SQLite check above already validates sqlite-vec loading.

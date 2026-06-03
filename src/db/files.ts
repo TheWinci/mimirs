@@ -38,7 +38,16 @@ export function getFilesByPaths(db: Database, paths: string[]): StoredFile[] {
   return out;
 }
 
-export function upsertFileStart(db: Database, path: string, hash: string): number {
+/**
+ * Begin a full (re)index: clear any existing chunks and ensure a files row
+ * exists, but record an EMPTY hash as an "in progress" marker. The caller must
+ * call updateFileHash() only after all chunks are durably written. Committing
+ * the real hash up front (the old behavior) meant an abort/crash mid-index left
+ * a row whose hash matched the file but had zero chunks — so the file was
+ * "Skipped (unchanged)" forever. An empty hash never matches real content, so
+ * an interrupted index is always retried.
+ */
+export function upsertFileStart(db: Database, path: string): number {
   path = normalizePath(path);
   const existing = getFileByPath(db, path);
   if (existing) {
@@ -49,8 +58,8 @@ export function upsertFileStart(db: Database, path: string, hash: string): numbe
     const tx = db.transaction(() => {
       db.run("DELETE FROM chunks WHERE file_id = ?", [existing.id]);
       db.run(
-        "UPDATE files SET hash = ?, indexed_at = ? WHERE id = ?",
-        [hash, new Date().toISOString(), existing.id]
+        "UPDATE files SET hash = '', indexed_at = ? WHERE id = ?",
+        [new Date().toISOString(), existing.id]
       );
     });
     tx();
@@ -58,8 +67,8 @@ export function upsertFileStart(db: Database, path: string, hash: string): numbe
   }
 
   db.run(
-    "INSERT INTO files (path, hash, indexed_at) VALUES (?, ?, ?)",
-    [path, hash, new Date().toISOString()]
+    "INSERT INTO files (path, hash, indexed_at) VALUES (?, '', ?)",
+    [path, new Date().toISOString()]
   );
   return Number(
     db.query<{ id: number }, []>("SELECT last_insert_rowid() as id").get()!.id
@@ -245,8 +254,10 @@ export function upsertFile(
   hash: string,
   chunks: EmbeddedChunk[]
 ) {
-  const fileId = upsertFileStart(db, path, hash);
+  const fileId = upsertFileStart(db, path);
   insertChunkBatch(db, fileId, chunks, 0);
+  // Commit the hash only after chunks are written (see upsertFileStart).
+  updateFileHash(db, fileId, hash);
 }
 
 export function removeFile(db: Database, path: string): boolean {

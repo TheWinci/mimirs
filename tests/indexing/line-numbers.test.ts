@@ -135,4 +135,56 @@ export function stable(): boolean {
     const second = db.searchChunks(queryEmb, 5);
     expect(second[0]?.startLine).not.toBeNull();
   });
+
+  // Part 2 #5: assert line numbers actually SHIFT after an edit (the test above
+  // only checked non-null, so frozen-stale line numbers would have passed).
+  function startLineOf(d: RagDB, needle: string): number | null {
+    const raw = (d as unknown as { db: import("bun:sqlite").Database }).db;
+    return (
+      raw
+        .query<{ start_line: number | null }, [string]>(
+          "SELECT start_line FROM chunks WHERE snippet LIKE ? AND chunk_index >= 0 ORDER BY start_line LIMIT 1",
+        )
+        .get(`%${needle}%`)?.start_line ?? null
+    );
+  }
+
+  function manyFns(prefixComments: number, marker: string): string {
+    const head = Array.from({ length: prefixComments }, (_, i) => `// header line ${i}`).join("\n");
+    const fns = Array.from({ length: 8 }, (_, i) => {
+      const tag = i === 5 ? ` // ${marker}` : "";
+      return `export function fn${i}(x: number): number {${tag}\n  return x * ${i} + ${i};\n}`;
+    }).join("\n\n");
+    return (head ? head + "\n" : "") + fns + "\n";
+  }
+
+  test("full re-index updates a chunk's start_line after lines are prepended", async () => {
+    await writeFixture(tempDir, "shift.ts", manyFns(0, "MARK_FULL"));
+    await indexDirectory(tempDir, db, tsConfig);
+    const before = startLineOf(db, "MARK_FULL");
+    expect(before).not.toBeNull();
+
+    // Prepend 4 lines; the marked function moves down by exactly 4.
+    await writeFixture(tempDir, "shift.ts", manyFns(4, "MARK_FULL"));
+    await indexDirectory(tempDir, db, tsConfig);
+
+    expect(startLineOf(db, "MARK_FULL")).toBe(before! + 4);
+  });
+
+  test("incremental re-index updates a KEPT chunk's start_line after a shift", async () => {
+    const incConfig: RagConfig = { ...tsConfig, incrementalChunks: true };
+    await writeFixture(tempDir, "shift.ts", manyFns(0, "MARK_INC"));
+    await indexDirectory(tempDir, db, incConfig);
+    const before = startLineOf(db, "MARK_INC");
+    expect(before).not.toBeNull();
+
+    // Prepend 3 lines: the marked fn's text is unchanged (a "kept" chunk) but it
+    // shifts down 3 lines. updateChunkPositions must refresh its start_line.
+    const messages: string[] = [];
+    await writeFixture(tempDir, "shift.ts", manyFns(3, "MARK_INC"));
+    await indexDirectory(tempDir, db, incConfig, (m) => messages.push(m));
+
+    expect(messages.some((m) => m.includes("Incremental update"))).toBe(true);
+    expect(startLineOf(db, "MARK_INC")).toBe(before! + 3);
+  });
 });

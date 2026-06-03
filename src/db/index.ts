@@ -1,8 +1,17 @@
 import { Database } from "bun:sqlite";
 import * as sqliteVec from "sqlite-vec";
-import { getEmbeddingDim } from "../embeddings/embed";
+import { getEmbeddingDim, getModelId } from "../embeddings/embed";
 import { identifierParts } from "../indexing/identifiers";
 import { applyEmbeddingConfigFromDisk } from "../config";
+import { log } from "../utils/log";
+
+/**
+ * Schema version stamped into `PRAGMA user_version`. Bump when the schema shape
+ * changes so an older binary opening a newer index can warn instead of writing
+ * malformed rows. Migrations themselves are column/table-sniffing and idempotent;
+ * this is the forward-safety signal they lacked.
+ */
+export const SCHEMA_VERSION = 1;
 import { join, resolve } from "path";
 import { mkdirSync, existsSync } from "fs";
 import { platform } from "os";
@@ -137,7 +146,61 @@ export class RagDB {
     this.db.exec("PRAGMA busy_timeout = 5000");
     sqliteVec.load(this.db);
     this.assertEmbeddingDimCompatible();
+    this.assertEmbeddingModelCompatible();
     this.initSchema();
+    this.recordEmbeddingModel();
+  }
+
+  private tableExists(name: string): boolean {
+    return !!this.db
+      .query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
+      .get(name);
+  }
+
+  private getMeta(key: string): string | null {
+    if (!this.tableExists("meta")) return null;
+    const row = this.db
+      .query<{ value: string }, [string]>("SELECT value FROM meta WHERE key = ?")
+      .get(key);
+    return row ? row.value : null;
+  }
+
+  private setMeta(key: string, value: string): void {
+    this.db.run(
+      "INSERT INTO meta(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      [key, value],
+    );
+  }
+
+  /**
+   * Guard against opening an index with a different embedding MODEL than it was
+   * built with. The dim check (above) can't catch this: two models often share a
+   * vector dimension (384 is the default for many) yet produce incompatible
+   * vector spaces, so mixing them silently corrupts cosine distances and degrades
+   * search with no error. Legacy indexes built before the model was recorded are
+   * grandfathered (no recorded model → skip), and stamped going forward.
+   */
+  private assertEmbeddingModelCompatible(): void {
+    const recorded = this.getMeta("embedding_model");
+    if (!recorded) return; // fresh DB, or a legacy index from before model stamping
+    const configured = getModelId();
+    if (recorded !== configured) {
+      throw new Error(
+        `mimirs: embedding model mismatch — the index at "${this.ragDir}" was ` +
+        `built with model "${recorded}", but the configured embedding model is ` +
+        `"${configured}". Two models can share a vector dimension yet produce ` +
+        `incompatible embeddings, so search would be silently wrong. Restore ` +
+        `embeddingModel "${recorded}" in .mimirs/config.json, or delete the index ` +
+        `to rebuild it.`,
+      );
+    }
+  }
+
+  /** Record the embedding model on first creation so future opens can verify it. */
+  private recordEmbeddingModel(): void {
+    if (this.getMeta("embedding_model") == null) {
+      this.setMeta("embedding_model", getModelId());
+    }
   }
 
   /**
@@ -170,6 +233,11 @@ export class RagDB {
 
   private initSchema() {
     this.db.exec(`
+      CREATE TABLE IF NOT EXISTS meta (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      );
+
       CREATE TABLE IF NOT EXISTS files (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         path TEXT UNIQUE NOT NULL,
@@ -227,6 +295,7 @@ export class RagDB {
         file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
         source TEXT NOT NULL,
         names TEXT NOT NULL,
+        imported TEXT,
         resolved_file_id INTEGER REFERENCES files(id) ON DELETE SET NULL,
         is_default INTEGER DEFAULT 0,
         is_namespace INTEGER DEFAULT 0
@@ -316,6 +385,13 @@ export class RagDB {
       CREATE TRIGGER IF NOT EXISTS conv_chunks_au AFTER UPDATE ON conversation_chunks BEGIN
         INSERT INTO fts_conversation(fts_conversation, rowid, snippet) VALUES ('delete', old.id, old.snippet);
         INSERT INTO fts_conversation(rowid, snippet) VALUES (new.id, new.snippet);
+      END;
+
+      -- vec_conversation is a vec0 table (can't be an FK child), so mirror
+      -- chunks_vec_ad: whenever a conversation chunk is deleted, drop its vector.
+      -- Without this, deleting a turn/session would orphan vec_conversation rows.
+      CREATE TRIGGER IF NOT EXISTS conv_chunks_vec_ad AFTER DELETE ON conversation_chunks BEGIN
+        DELETE FROM vec_conversation WHERE chunk_id = old.id;
       END;
 
       CREATE INDEX IF NOT EXISTS idx_conv_turns_session ON conversation_turns(session_id);
@@ -428,6 +504,28 @@ export class RagDB {
     this.migrateSearchPartsColumn();
     this.dedupeChunks();
     this.backfillMissingSymbolRefs();
+    this.applySchemaVersion();
+  }
+
+  /**
+   * Stamp/check the schema version. A newer-than-known stamp means the index was
+   * written by a newer mimirs — warn (some columns may be unknown) but keep the
+   * newer stamp rather than downgrading it. Otherwise bump to the current version.
+   */
+  private applySchemaVersion(): void {
+    const stored = this.db.query<{ user_version: number }, []>("PRAGMA user_version").get()?.user_version ?? 0;
+    if (stored > SCHEMA_VERSION) {
+      log.warn(
+        `index at "${this.ragDir}" was created by a newer mimirs (schema v${stored} > v${SCHEMA_VERSION}); ` +
+        `proceeding, but some columns may be unknown to this version`,
+        "db",
+      );
+      return;
+    }
+    if (stored < SCHEMA_VERSION) {
+      // Migrations above already ran (they sniff columns); just record the version.
+      this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+    }
   }
 
   /**
@@ -633,6 +731,10 @@ export class RagDB {
     if (!importCols.includes("is_namespace")) {
       this.db.exec("ALTER TABLE file_imports ADD COLUMN is_namespace INTEGER DEFAULT 0");
     }
+    if (!importCols.includes("imported")) {
+      // Original source name for aliased imports (import { getDB as g } → "getDB").
+      this.db.exec("ALTER TABLE file_imports ADD COLUMN imported TEXT");
+    }
 
     const exportCols = this.db
       .query<{ name: string }, []>("PRAGMA table_info(file_exports)")
@@ -658,8 +760,8 @@ export class RagDB {
   getFilesByPaths(paths: string[]) {
     return fileOps.getFilesByPaths(this.db, paths);
   }
-  upsertFileStart(path: string, hash: string) {
-    return fileOps.upsertFileStart(this.db, path, hash);
+  upsertFileStart(path: string) {
+    return fileOps.upsertFileStart(this.db, path);
   }
   updateFileHash(fileId: number, hash: string) {
     fileOps.updateFileHash(this.db, fileId, hash);

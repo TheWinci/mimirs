@@ -460,8 +460,10 @@ async function processFile(
     // null means incremental wasn't viable (>50% changed) — fall through to full re-index
   }
 
-  // Full re-index: delete all chunks, re-embed, re-insert
-  const fileId = db.upsertFileStart(filePath, hash);
+  // Full re-index: delete all chunks, re-embed, re-insert. The file hash is
+  // committed last (see upsertFileStart) so an abort mid-index doesn't strand
+  // the file with a matching hash but zero chunks.
+  const fileId = db.upsertFileStart(filePath);
   const allEmbedded: EmbeddedChunk[] = [];
 
   for (let i = 0; i < chunks.length; i += batchSize) {
@@ -502,6 +504,10 @@ async function processFile(
     onProgress?.(`Writing ${Math.min(i + DB_BATCH, allEmbedded.length)}/${allEmbedded.length} chunks for ${relPath}`, { transient: true });
   }
 
+  // An abort mid-write leaves partial chunks but an empty hash, so the file is
+  // retried next run rather than skipped — don't commit the hash here.
+  if (signal?.aborted) return "skipped";
+
   // Store graph metadata — use file-level data from bun-chunk when available
   const graphData = chunkResult.fileImports && chunkResult.fileExports
     ? { imports: chunkResult.fileImports, exports: chunkResult.fileExports }
@@ -513,6 +519,9 @@ async function processFile(
   // import-resolution pass (`resolveAllSymbolRefs` at end of indexProject).
   const refsToInsert = collectSymbolRefs(allEmbedded, allChunkIds);
   if (refsToInsert.length > 0) db.upsertSymbolRefs(fileId, refsToInsert);
+
+  // Commit the content hash last — only now is the file fully indexed.
+  db.updateFileHash(fileId, hash);
 
   onProgress?.(`Indexed: ${relPath} (${chunks.length} chunks)`);
   return "indexed";
@@ -574,18 +583,27 @@ async function processFileIncremental(
     return null;
   }
 
+  // Files with parent groups (e.g. a class split into method chunks + a parent
+  // chunk spanning them) can't be updated incrementally without corruption: the
+  // parent's content hash isn't a leaf hash, so deleteStaleChunks would drop it,
+  // and the incremental path never rebuilds parents — orphaning the children's
+  // parent_id. Rebuilding a parent needs every member's embedding (kept ones
+  // live only in the DB), so fall back to a correct full re-index instead.
+  if (detectParentGroups(chunks).length > 0) {
+    return null;
+  }
+
   onProgress?.(`Incremental update: ${newCount} new, ${chunks.length - newCount} kept for ${relPath}`);
 
-  // 1. Update file hash (without deleting chunks)
-  db.updateFileHash(fileId, newFileHash);
-
-  // 2. Delete stale chunks (old hashes not in new set)
+  // 1. Delete stale chunks (old hashes not in new set). The file hash is
+  //    committed last (step 5) so a crash mid-update retries instead of leaving
+  //    a matching hash with missing chunks.
   const deleted = db.deleteStaleChunks(fileId, newHashes);
   if (deleted > 0) {
     onProgress?.(`Removed ${deleted} stale chunks from ${relPath}`, { transient: true });
   }
 
-  // 3. Update positions of kept chunks
+  // 2. Update positions of kept chunks
   const positionUpdates: { contentHash: string; chunkIndex: number; startLine: number | null; endLine: number | null }[] = [];
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i];
@@ -602,7 +620,7 @@ async function processFileIncremental(
     db.updateChunkPositions(fileId, positionUpdates);
   }
 
-  // 4. Embed and insert only new chunks
+  // 3. Embed and insert only new chunks
   const newChunks = chunks.filter(c => !oldHashes.has(c.hash!));
   for (let i = 0; i < newChunks.length; i += batchSize) {
     if (signal?.aborted) return null;
@@ -634,7 +652,7 @@ async function processFileIncremental(
     onProgress?.(`Embedded ${Math.min(i + batchSize, newChunks.length)}/${newChunks.length} new chunks for ${relPath}`, { transient: true });
   }
 
-  // 5. Update graph metadata
+  // 4. Update graph metadata
   const graphData = chunkResult.fileImports && chunkResult.fileExports
     ? { imports: chunkResult.fileImports, exports: chunkResult.fileExports }
     : aggregateGraphData(chunks);
@@ -646,6 +664,9 @@ async function processFileIncremental(
   // simpler than partial diff and aligns with the line-number reality of
   // the current file.
   rewriteSymbolRefsByContentHash(db, fileId, chunks);
+
+  // 5. Commit the file hash last — only now is the incremental update complete.
+  db.updateFileHash(fileId, newFileHash);
 
   onProgress?.(`Indexed (incremental): ${relPath} (${newCount} new, ${chunks.length - newCount} kept)`);
   return "indexed";

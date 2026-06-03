@@ -1,5 +1,6 @@
 import { embed } from "../embeddings/embed";
 import { RagDB, type SearchResult, type ChunkSearchResult, type PathFilter } from "../db";
+import { vectorScoreToCosine } from "../db/search";
 import { log } from "../utils/log";
 import { TEST_PATTERNS } from "../utils/test-paths";
 import { basename, extname } from "path";
@@ -55,12 +56,11 @@ export interface ChunkResult {
   parentId: number | null;
 }
 
-// Default: 70% vector, 30% BM25
-// 0.5 = equal weight to semantic (vector) and lexical (BM25) rank signals.
+// 0.5 = equal weight to the semantic (vector) and lexical (BM25) rank signals.
 // A sweep over keyword and purely-semantic query sets put the optimum here:
 // keyword queries hit 100% recall and semantic queries peak (recall collapses
 // below ~0.3 as vector signal is starved). See benchmarks/semantic-sweep.ts.
-const DEFAULT_HYBRID_WEIGHT = 0.5;
+export const DEFAULT_HYBRID_WEIGHT = 0.5;
 
 /**
  * Reciprocal-rank fusion of two result lists already sorted best-first.
@@ -400,15 +400,17 @@ export async function search(
   // Doc expansion — docs are bonus results, don't displace code
   const results = expandForDocs(allSorted, topK);
 
-  // Log query for analytics. The result score is now a rank-fusion value
-  // (positional, ~1 at the top), so log the raw top vector cosine as the
+  // Log query for analytics. The result score is now a positional rank-fusion
+  // value (~1 at the top), so log the top vector hit's cosine similarity as the
   // relevance signal instead — that keeps "avg top score" and the low-relevance
-  // (< 0.3) heuristic meaningful.
+  // (< 0.3) heuristic on a true cosine scale. The stored vector score is L2-based
+  // (1/(1+distance)) and bottoms out near 0.33, so logging it raw would make the
+  // < 0.3 heuristic dead; vectorScoreToCosine converts it back.
   const durationMs = Math.round(performance.now() - start);
   db.logQuery(
     query,
     results.length,
-    vectorResults[0]?.score ?? null,
+    vectorScoreToCosine(vectorResults[0]?.score),
     results[0]?.path ?? null,
     durationMs
   );
@@ -561,13 +563,15 @@ export async function searchChunks(
   // Doc expansion
   results = expandForDocs(results, topK);
 
-  // Log query for analytics — log the raw top vector cosine as the relevance
-  // signal (the result score is now a positional rank-fusion value).
+  // Log query for analytics — log the top vector hit's cosine similarity as the
+  // relevance signal (the result score is now a positional rank-fusion value).
+  // The stored vector score is L2-based and bottoms out near 0.33, so convert it
+  // back to cosine to keep the low-relevance (< 0.3) heuristic meaningful.
   const durationMs = Math.round(performance.now() - start);
   db.logQuery(
     query,
     results.length,
-    vectorResults[0]?.score ?? null,
+    vectorScoreToCosine(vectorResults[0]?.score),
     results[0]?.path ?? null,
     durationMs
   );

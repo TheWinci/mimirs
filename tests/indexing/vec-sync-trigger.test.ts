@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeAll, beforeEach, afterEach } from "bun:test";
 import { indexDirectory } from "../../src/indexing/indexer";
 import { RagDB } from "../../src/db";
-import { getEmbedder } from "../../src/embeddings/embed";
+import { getEmbedder, DEFAULT_EMBEDDING_DIM } from "../../src/embeddings/embed";
 import { createTempDir, cleanupTempDir, writeFixture } from "../helpers";
 import type { RagConfig } from "../../src/config";
 import { join } from "path";
@@ -98,5 +98,37 @@ describe("chunks_vec_ad trigger keeps vec_chunks in sync", () => {
 
     // The old chunks' vectors must be gone; no vec row may point at a missing chunk.
     expect(counts(db).vecOrphans).toBe(0);
+  });
+});
+
+describe("conv_chunks_vec_ad trigger keeps vec_conversation in sync", () => {
+  function convVecOrphans(d: RagDB): number {
+    return rawDb(d)
+      .query<{ n: number }, []>(
+        "SELECT COUNT(*) n FROM vec_conversation WHERE chunk_id NOT IN (SELECT id FROM conversation_chunks)",
+      )
+      .get()!.n;
+  }
+
+  test("deleting a conversation chunk drops its vector (no orphan)", () => {
+    const raw = rawDb(db);
+    const blob = new Uint8Array(new Float32Array(DEFAULT_EMBEDDING_DIM).buffer);
+
+    // FKs are off, so a chunk row can exist without a matching turn — that's the
+    // exact scenario the trigger must cover (any future session/turn delete).
+    raw.run("INSERT INTO conversation_chunks(turn_id, chunk_index, snippet) VALUES (1, 0, 'hello world')");
+    const cid = raw.query<{ id: number }, []>("SELECT last_insert_rowid() AS id").get()!.id;
+    raw.run("INSERT INTO vec_conversation(chunk_id, embedding) VALUES (?, ?)", [cid, blob]);
+
+    expect(
+      raw.query<{ n: number }, [number]>("SELECT COUNT(*) n FROM vec_conversation WHERE chunk_id = ?").get(cid)!.n,
+    ).toBe(1);
+
+    raw.run("DELETE FROM conversation_chunks WHERE id = ?", [cid]);
+
+    expect(
+      raw.query<{ n: number }, [number]>("SELECT COUNT(*) n FROM vec_conversation WHERE chunk_id = ?").get(cid)!.n,
+    ).toBe(0);
+    expect(convVecOrphans(db)).toBe(0);
   });
 });

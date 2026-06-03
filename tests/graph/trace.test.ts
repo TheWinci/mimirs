@@ -173,6 +173,22 @@ describe("tracePath", () => {
     expect(res.subgraphSize).toBe(1);
     expect(nodeKey(res.from)).toBe(nodeKey(res.to));
   });
+
+  // Part 2 #6: a failed trace must still hand back actionable frontiers — the
+  // only useful output of a no-path result. These were never asserted.
+  test("no-path result populates forward and backward frontiers", () => {
+    // flush reaches only writeRow; persist is NOT forward-reachable from flush.
+    const from = resolveSymbol(db, "flush").node!;
+    const to = resolveSymbol(db, "persist").node!;
+    const res = tracePath(db, from, to, { maxDepth: 6 });
+
+    expect(res.found).toBe(false);
+    expect(res.spine).toEqual([]);
+    // Deepest nodes reached going forward from `flush` (e.g. writeRow).
+    expect(res.forwardFrontier && res.forwardFrontier.length).toBeGreaterThan(0);
+    // Direct callers of the target `persist` — processJob calls it.
+    expect((res.backwardFrontier ?? []).map((n) => n.name)).toContain("processJob");
+  });
 });
 
 describe("collectTests", () => {

@@ -40,12 +40,13 @@ export function resolveSymbolRefs(db: Database, fileId: number) {
     .query<
       {
         names: string;
+        imported: string | null;
         is_namespace: number;
         resolved_file_id: number | null;
       },
       [number]
     >(
-      `SELECT names, is_namespace, resolved_file_id
+      `SELECT names, imported, is_namespace, resolved_file_id
        FROM file_imports
        WHERE file_id = ? AND resolved_file_id IS NOT NULL`
     )
@@ -54,11 +55,16 @@ export function resolveSymbolRefs(db: Database, fileId: number) {
   // Build alias → resolved file id index. For namespace imports
   // (`import * as X`), the alias is the namespace; refs of form `X` get
   // the resolved file but no specific export name. Mark with sentinel.
+  // aliasToImported maps a local binding to the original exported name when the
+  // import is aliased (`import { getDB as g }` → g → getDB), so a ref to the
+  // alias resolves to the real export rather than failing to match by name.
   const aliasToFile = new Map<string, number>();
+  const aliasToImported = new Map<string, string>();
   const namespaceAliases = new Set<string>();
   for (const imp of imports) {
     if (imp.resolved_file_id == null) continue;
     aliasToFile.set(imp.names, imp.resolved_file_id);
+    if (imp.imported && imp.imported !== imp.names) aliasToImported.set(imp.names, imp.imported);
     if (imp.is_namespace === 1) namespaceAliases.add(imp.names);
   }
 
@@ -105,13 +111,15 @@ export function resolveSymbolRefs(db: Database, fileId: number) {
       // in the namespace-member pass below.
       if (namespaceAliases.has(name)) continue;
 
+      // For an aliased import, resolve against the ORIGINAL exported name.
+      const exportName = aliasToImported.get(name) ?? name;
       const exp = db
         .query<{ id: number }, [number, string]>(
           `SELECT id FROM file_exports
            WHERE file_id = ? AND name = ?
            LIMIT 1`
         )
-        .get(resolvedFileId, name);
+        .get(resolvedFileId, exportName);
       if (!exp) continue;
 
       db.run(
@@ -879,7 +887,7 @@ export function resolveAllSymbolRefs(db: Database) {
 export function upsertFileGraph(
   db: Database,
   fileId: number,
-  imports: { name: string; source: string; isDefault?: boolean; isNamespace?: boolean }[],
+  imports: { name: string; source: string; imported?: string; isDefault?: boolean; isNamespace?: boolean }[],
   exports: { name: string; type: string; isDefault?: boolean; isReExport?: boolean; reExportSource?: string }[]
 ) {
   const tx = db.transaction(() => {
@@ -902,8 +910,8 @@ export function upsertFileGraph(
 
     for (const imp of imports) {
       db.run(
-        "INSERT INTO file_imports (file_id, source, names, is_default, is_namespace) VALUES (?, ?, ?, ?, ?)",
-        [fileId, imp.source, imp.name, imp.isDefault ? 1 : 0, imp.isNamespace ? 1 : 0]
+        "INSERT INTO file_imports (file_id, source, names, imported, is_default, is_namespace) VALUES (?, ?, ?, ?, ?, ?)",
+        [fileId, imp.source, imp.name, imp.imported ?? null, imp.isDefault ? 1 : 0, imp.isNamespace ? 1 : 0]
       );
     }
 
