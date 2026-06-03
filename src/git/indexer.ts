@@ -82,8 +82,12 @@ async function getFileChanges(
   for (let i = 0; i < hashes.length; i += BATCH) {
     const batch = hashes.slice(i, i + BATCH);
     for (const hash of batch) {
+      // --root: emit the root (parentless) commit's files too, else any file
+      // first introduced there is invisible to file-history.
+      // core.quotepath=false: keep non-ASCII paths literal ("café.ts"), not
+      // octal-escaped+quoted, so they match in getFileHistory.
       const output = await runGit(
-        ["diff-tree", "--no-commit-id", "-r", "--numstat", hash],
+        ["-c", "core.quotepath=false", "diff-tree", "--no-commit-id", "-r", "--numstat", "--root", hash],
         gitRoot
       );
       if (!output) {

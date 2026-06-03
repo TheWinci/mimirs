@@ -175,6 +175,32 @@ describe("startWatcher", () => {
     watcher.close();
   });
 
+  test("isolates a failing resolve — reports it and keeps running", async () => {
+    const config = await loadConfig(tempDir);
+    // Force the post-index graph resolve to throw (simulates a transient
+    // SQLITE_BUSY). The old code let this reject the unawaited processQueue →
+    // unhandledRejection → server exit; now it must be caught per-file.
+    (db as unknown as { resolveSymbolRefs: (id: number) => void }).resolveSymbolRefs = () => {
+      throw new Error("boom");
+    };
+    const events: string[] = [];
+    const watcher = startWatcher(tempDir, db, config, (msg) => events.push(msg));
+    await settleWatcher();
+
+    await writeFixture(tempDir, "x.ts", `import { y } from "./y";\nexport function f() { return 1; }\n`);
+
+    let caught = false;
+    for (let i = 0; i < 10; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      if (events.some((e) => e.includes("Watch update failed"))) {
+        caught = true;
+        break;
+      }
+    }
+    expect(caught).toBe(true); // error surfaced via onEvent, not thrown out of the queue
+    watcher.close();
+  });
+
   test("ignores excluded paths", async () => {
     const config = await loadConfig(tempDir);
     config.exclude = [...config.exclude, "**/*.log"];

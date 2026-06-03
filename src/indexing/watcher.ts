@@ -6,6 +6,7 @@ import { indexFile } from "./indexer";
 import { type RagConfig } from "../config";
 import { type RagDB } from "../db";
 import { resolveImportsForFile, buildPathToIdMap, buildIdToPathMap } from "../graph/resolver";
+import { normalizePath } from "../utils/path";
 
 const DEBOUNCE_MS = 2000;
 
@@ -47,28 +48,36 @@ export function startWatcher(
         for (const [absPath, action] of batch) {
           const rel = relative(directory, absPath);
 
-          if (action === "remove") {
-            const removed = db.removeFile(absPath);
-            if (removed) onEvent?.(`Removed deleted file: ${rel}`);
-            continue;
-          }
-
-          const result = await indexFile(absPath, db, config);
-          if (result === "indexed") {
-            const file = db.getFileByPath(absPath);
-            if (file) {
-              // Build lookups once and reuse for all resolve calls.
-              // Safe because the queue ensures no concurrent indexFile is running.
-              const pathToId = buildPathToIdMap(db);
-              const idToPath = buildIdToPathMap(pathToId);
-              resolveImportsForFile(db, file.id, directory, pathToId, idToPath);
-              db.resolveSymbolRefs(file.id);
-              for (const importerId of db.getImportersOf(file.id)) {
-                resolveImportsForFile(db, importerId, directory, pathToId, idToPath);
-                db.resolveSymbolRefs(importerId);
-              }
+          // Per-file isolation: a transient failure (e.g. SQLITE_BUSY) must not
+          // abort the rest of the batch or reject processQueue — an unhandled
+          // rejection escalates to the server's handler and exits the process,
+          // tearing down every project it serves.
+          try {
+            if (action === "remove") {
+              const removed = db.removeFile(absPath);
+              if (removed) onEvent?.(`Removed deleted file: ${rel}`);
+              continue;
             }
-            onEvent?.(`Re-indexed: ${rel}`);
+
+            const result = await indexFile(absPath, db, config);
+            if (result === "indexed") {
+              const file = db.getFileByPath(absPath);
+              if (file) {
+                // Build lookups once and reuse for all resolve calls.
+                // Safe because the queue ensures no concurrent indexFile is running.
+                const pathToId = buildPathToIdMap(db);
+                const idToPath = buildIdToPathMap(pathToId);
+                resolveImportsForFile(db, file.id, directory, pathToId, idToPath);
+                db.resolveSymbolRefs(file.id);
+                for (const importerId of db.getImportersOf(file.id)) {
+                  resolveImportsForFile(db, importerId, directory, pathToId, idToPath);
+                  db.resolveSymbolRefs(importerId);
+                }
+              }
+              onEvent?.(`Re-indexed: ${rel}`);
+            }
+          } catch (err) {
+            onEvent?.(`Watch update failed for ${rel}: ${err instanceof Error ? err.message : err}`);
           }
         }
       }
@@ -80,7 +89,10 @@ export function startWatcher(
   const fsWatcher = watch(directory, { recursive: true }, (_event, filename) => {
     if (!filename) return;
 
-    const rel = filename.toString();
+    // Normalize separators (fs.watch yields backslashes on Windows) so the
+    // globs match the same way the full indexer's filter does — otherwise the
+    // watcher would index excluded dirs (e.g. node_modules) the full scan skips.
+    const rel = normalizePath(filename.toString());
 
     if (matchesAny(rel, excludeGlobs)) return;
     if (!matchesAny(rel, includeGlobs)) return;
@@ -101,7 +113,9 @@ export function startWatcher(
           nextBatch.set(absPath, "index");
         }
 
-        processQueue();
+        // Defensive: processQueue isolates per-file errors, but never let the
+        // unawaited promise reject (would become an unhandledRejection).
+        processQueue().catch(() => {});
       }, DEBOUNCE_MS)
     );
   });

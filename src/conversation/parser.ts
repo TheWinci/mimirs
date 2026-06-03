@@ -85,7 +85,17 @@ export function readJSONL(
   } finally {
     closeSync(fd);
   }
-  const text = buf.toString("utf-8");
+  // Only consume up to the last newline. A trailing partial line is normal for
+  // a live-tailed transcript (mid-write); advancing past it (to stat.size) would
+  // leave the saved offset mid-line, so the completion bytes read back as corrupt
+  // JSON next pass and that turn is lost forever. Operate on bytes so a multibyte
+  // UTF-8 sequence never straddles the boundary.
+  const lastNl = buf.lastIndexOf(0x0a);
+  if (lastNl < 0) {
+    // No complete line yet — don't advance.
+    return { entries: [], newOffset: fromOffset };
+  }
+  const text = buf.subarray(0, lastNl + 1).toString("utf-8");
   const entries: JournalEntry[] = [];
 
   for (const line of text.split("\n")) {
@@ -98,7 +108,7 @@ export function readJSONL(
     }
   }
 
-  return { entries, newOffset: stat.size };
+  return { entries, newOffset: fromOffset + lastNl + 1 };
 }
 
 /**

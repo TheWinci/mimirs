@@ -158,6 +158,13 @@ export async function loadConfig(projectDir: string): Promise<RagConfig> {
     return { ...DEFAULT_CONFIG };
   }
 
+  // The glob lists default to [] when omitted, which would index nothing. A
+  // valid config that just sets, say, chunkSize should still inherit the
+  // default include/exclude globs (an explicit `[]` is respected).
+  const obj = parsed as Record<string, unknown>;
+  if (!("include" in obj)) result.data.include = DEFAULT_CONFIG.include;
+  if (!("exclude" in obj)) result.data.exclude = DEFAULT_CONFIG.exclude;
+
   return result.data;
 }
 

@@ -258,11 +258,6 @@ export async function startServer() {
   const startupConfig = await loadConfig(startupDir);
 
   if (!isHomeDirTrap) {
-    // Ensure .mimirs/ is gitignored
-    ensureGitignore(startupDir).catch((err) => {
-      log.warn(`Failed to update .gitignore: ${err instanceof Error ? err.message : err}`, "gitignore");
-    });
-
     // Process-level lock: only one mimirs server per project directory
     // performs indexing/watching. Other instances (e.g. extra IDE windows)
     // share the DB read-only — concurrent indexers double-insert chunks.
@@ -277,6 +272,12 @@ export async function startServer() {
     }
 
     if (indexLock) {
+
+    // Ensure .mimirs/ is gitignored — only the lock holder writes it, so two
+    // instances starting together don't both append (duplicate .gitignore lines).
+    ensureGitignore(startupDir).catch((err) => {
+      log.warn(`Failed to update .gitignore: ${err instanceof Error ? err.message : err}`, "gitignore");
+    });
 
     // Index in background — don't block server startup
     let totalFiles = 0;

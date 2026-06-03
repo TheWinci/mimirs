@@ -38,9 +38,16 @@ export async function affectedCommand(args: string[], getFlag: (flag: string) =>
   let changedAbs: string[];
   if (useStdin) {
     const input = await Bun.stdin.text();
-    changedAbs = splitLines(input).map((f) => resolve(process.cwd(), f));
+    const lines = splitLines(input);
+    if (lines.length === 0) {
+      cli.log(quiet ? "" : "No affected test files found.");
+      return;
+    }
+    // Resolve against the project dir, not cwd — in CI the runner's cwd is
+    // usually not the indexed project, which would silently match nothing.
+    changedAbs = lines.map((f) => resolve(dir, f));
   } else if (positional.length > 0) {
-    changedAbs = positional.map((f) => resolve(process.cwd(), f));
+    changedAbs = positional.map((f) => resolve(dir, f));
   } else {
     // No input given — fall back to git's working-tree diff against HEAD.
     const gitRoot = await findGitRoot(dir);

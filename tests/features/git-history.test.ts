@@ -286,6 +286,44 @@ describe("file history path anchoring", () => {
   });
 });
 
+describe("root commit and non-ASCII paths", () => {
+  let gDir: string;
+  let gDb: RagDB;
+
+  beforeAll(async () => {
+    gDir = await createTempDir();
+    await runGit(["init"], gDir);
+    await runGit(["config", "user.name", "G"], gDir);
+    await runGit(["config", "user.email", "g@test.com"], gDir);
+
+    // File introduced in the ROOT (parentless) commit.
+    await writeFixture(gDir, "src/root_only.ts", "export const r = 1;");
+    await runGit(["add", "."], gDir);
+    await runGit(["commit", "-m", "Root commit adds root_only"], gDir);
+
+    // Non-ASCII path in a later commit.
+    await writeFixture(gDir, "src/café.ts", "export const c = 2;");
+    await runGit(["add", "."], gDir);
+    await runGit(["commit", "-m", "Add cafe module"], gDir);
+
+    gDb = new RagDB(gDir);
+    await indexGitHistory(gDir, gDb);
+  });
+
+  afterAll(async () => {
+    gDb.close();
+    await cleanupTempDir(gDir);
+  });
+
+  test("a file introduced in the root commit has history (--root)", () => {
+    expect(gDb.getFileHistory("src/root_only.ts").length).toBeGreaterThan(0);
+  });
+
+  test("a non-ASCII path is matchable (core.quotepath=false)", () => {
+    expect(gDb.getFileHistory("src/café.ts").length).toBeGreaterThan(0);
+  });
+});
+
 // MCP integration tests
 describe("git history MCP tools", () => {
   let client: Client;

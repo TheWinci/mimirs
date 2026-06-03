@@ -171,6 +171,11 @@ function assertSafeSelector(value: string, label: string) {
   if (!value || value.includes(":")) {
     throw new Error(`Invalid ${label} selector. The ':' character is reserved for wiki command segments.`);
   }
+  // A slug becomes wiki/<slug>.md — reject path traversal, absolute paths, and
+  // backslashes so it can't escape the wiki/ directory.
+  if (value.startsWith("/") || value.includes("\\") || value.split("/").includes("..")) {
+    throw new Error(`Invalid ${label} selector '${value}'. Path traversal and absolute paths are not allowed.`);
+  }
 }
 
 async function lastCommitHash(projectDir: string): Promise<string | null> {
@@ -400,17 +405,26 @@ async function writeJSON(path: string, value: unknown) {
   await writeFile(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-async function readJSON<T>(path: string): Promise<T> {
+async function readJSON<T>(path: string, hint: string): Promise<T> {
+  if (!existsSync(path)) {
+    throw new Error(`Missing ${path.split("/").slice(-2).join("/")}. ${hint}`);
+  }
   const raw = await readFile(path, "utf-8");
-  return JSON.parse(raw) as T;
+  try {
+    return JSON.parse(raw) as T;
+  } catch (err) {
+    throw new Error(
+      `Corrupt JSON in ${path.split("/").slice(-2).join("/")} (${err instanceof Error ? err.message : err}). ${hint}`,
+    );
+  }
 }
 
 async function readPrefetch(projectDir: string): Promise<WikiPrefetch> {
-  return readJSON<WikiPrefetch>(prefetchPath(projectDir));
+  return readJSON<WikiPrefetch>(prefetchPath(projectDir), "Re-run wiki(shape) to regenerate it.");
 }
 
 async function readDiscovery(projectDir: string): Promise<DiscoveryFile> {
-  return readJSON<DiscoveryFile>(discoveryPath(projectDir));
+  return readJSON<DiscoveryFile>(discoveryPath(projectDir), "Run wiki(shape) and write discovery first.");
 }
 
 function renderJSON(value: unknown): string {
@@ -661,6 +675,9 @@ function validateDiscoveryShape(discovery: DiscoveryFile): string[] {
       errors.push(`pages[${index}].kind \`${page.kind}\` is not one of: ${OVERVIEW_KINDS.join(", ")}.`);
     }
     if (page.slug.includes(":")) errors.push(`pages[${index}].slug contains reserved ':' character.`);
+    if (page.slug.startsWith("/") || page.slug.includes("\\") || page.slug.split("/").includes("..")) {
+      errors.push(`pages[${index}].slug '${page.slug}' uses path traversal or an absolute path (would escape wiki/).`);
+    }
     if (overview) {
       const expectedSlug = OVERVIEW_KIND_TO_SLUG[page.kind!];
       if (expectedSlug && page.slug !== expectedSlug) {
@@ -1022,6 +1039,11 @@ export async function runWikiRebuild(ctx: WikiContext, input: string): Promise<s
     const selector = command.selectors[0];
     if (!selector) return await renderInstruction(ctx.projectDir, "write");
     if (selector !== "page") throw new Error(`Unknown write selector '${selector}'.`);
+    if (command.selectors.length > 2) {
+      throw new Error(
+        `Invalid command: 'write:page:<slug>' takes a single slug, but got extra ':' segments. A slug cannot contain ':'.`,
+      );
+    }
     const slug = command.selectors[1];
     if (!slug) throw new Error("Missing page slug. Use `wiki(write:page:<slug>)`.");
     assertSafeSelector(slug, "page slug");

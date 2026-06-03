@@ -92,7 +92,12 @@ function isPidAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;
-  } catch {
-    return false;
+  } catch (err: unknown) {
+    // EPERM means the process exists but is owned by another user (still alive)
+    // — only ESRCH ("no such process") means it's gone. Treating EPERM as dead
+    // would let a second instance reclaim a live cross-user lock and double-index.
+    // (A narrow PID-reuse window after a crash remains; closing it fully needs
+    // process start-time, which isn't portably available.)
+    return (err as NodeJS.ErrnoException)?.code === "EPERM";
   }
 }

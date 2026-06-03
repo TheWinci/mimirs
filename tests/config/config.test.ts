@@ -16,6 +16,24 @@ afterEach(async () => {
 });
 
 describe("loadConfig", () => {
+  test("a valid partial config inherits default include/exclude globs", async () => {
+    await mkdir(join(tempDir, ".mimirs"), { recursive: true });
+    // A user trims config to just one tunable — must not end up indexing nothing.
+    await writeFile(join(tempDir, ".mimirs", "config.json"), JSON.stringify({ chunkSize: 256 }));
+
+    const config = await loadConfig(tempDir);
+    expect(config.chunkSize).toBe(256); // user value respected
+    expect(config.include).toContain("**/*.ts"); // inherited, not []
+    expect(config.exclude).toContain("**/node_modules/**");
+  });
+
+  test("an explicit empty include is respected (not overridden)", async () => {
+    await mkdir(join(tempDir, ".mimirs"), { recursive: true });
+    await writeFile(join(tempDir, ".mimirs", "config.json"), JSON.stringify({ include: [] }));
+    const config = await loadConfig(tempDir);
+    expect(config.include).toEqual([]);
+  });
+
   test("creates config.json with defaults when none exists", async () => {
     const config = await loadConfig(tempDir);
     expect(config.include).toContain("**/*.md");

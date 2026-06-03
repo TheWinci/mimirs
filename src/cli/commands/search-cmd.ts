@@ -38,9 +38,11 @@ export async function searchCommand(args: string[], getFlag: (flag: string) => s
   }
 
   const dir = resolve(getFlag("--dir") || ".");
-  const db = new RagDB(dir);
   const config = await loadConfig(dir);
+  // Validate flags before constructing RagDB so a bad flag reports its own
+  // error rather than a later DB/embedding error masking it.
   const top = intFlag(getFlag("--top"), "--top", config.searchTopK, { min: 1 });
+  const db = new RagDB(dir);
   const filter = buildCliFilter(dir, getFlag);
 
   const results = await search(query, db, top, 0, config.hybridWeight, config.generated, filter);
@@ -66,10 +68,11 @@ export async function readCommand(args: string[], getFlag: (flag: string) => str
   }
 
   const dir = resolve(getFlag("--dir") || ".");
-  const db = new RagDB(dir);
-  const config = await loadConfig(dir);
+  // Validate flags before constructing RagDB (see searchCommand).
   const top = intFlag(getFlag("--top"), "--top", 8, { min: 1 });
   const threshold = floatFlag(getFlag("--threshold"), "--threshold", 0.3, { min: 0, max: 1 });
+  const db = new RagDB(dir);
+  const config = await loadConfig(dir);
   const filter = buildCliFilter(dir, getFlag);
 
   const results = await searchChunks(query, db, top, threshold, config.hybridWeight, config.generated, filter, config.parentGroupingMinCount);

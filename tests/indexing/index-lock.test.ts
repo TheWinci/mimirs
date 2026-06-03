@@ -62,6 +62,20 @@ describe("tryAcquireIndexLock", () => {
     lock!.release();
   });
 
+  test("does not reclaim a live cross-user lock (EPERM means alive)", async () => {
+    tempDir = await createTempDir();
+    mkdirSync(join(tempDir, ".mimirs"), { recursive: true });
+    // PID 1 (launchd/init) is always alive but not signalable by a normal user,
+    // so process.kill(1, 0) throws EPERM. It must be treated as alive, not
+    // reclaimed (the old code caught EPERM and reclaimed → double-index).
+    writeFileSync(join(tempDir, ".mimirs", "index.lock"), "1");
+
+    const lock = tryAcquireIndexLock(tempDir);
+    expect(lock).toBeNull();
+    const content = readFileSync(join(tempDir, ".mimirs", "index.lock"), "utf-8").trim();
+    expect(content).toBe("1"); // untouched
+  });
+
   test("treats unreadable lock as stale", async () => {
     tempDir = await createTempDir();
     mkdirSync(join(tempDir, ".mimirs"), { recursive: true });

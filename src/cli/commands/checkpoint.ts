@@ -11,9 +11,19 @@ export async function checkpointCommand(args: string[], getFlag: (flag: string) 
   const db = new RagDB(dir);
 
   if (subCommand === "create") {
-    const type = args[2];
-    const title = args[3];
-    const summary = args[4];
+    // Collect the 3 positionals, skipping flags + their values — otherwise a
+    // flag token (e.g. `--dir`) lands in `summary` and passes the guard below.
+    const VALUE_FLAGS = new Set(["--dir", "--files", "--tags", "--type", "--top"]);
+    const positional: string[] = [];
+    for (let i = 2; i < args.length; i++) {
+      const a = args[i];
+      if (VALUE_FLAGS.has(a)) { i++; continue; }
+      if (a.startsWith("--")) continue;
+      positional.push(a);
+    }
+    const type = positional[0];
+    const title = positional[1];
+    const summary = positional[2];
     if (!type || !title || !summary) {
       cli.error("Usage: mimirs checkpoint create <type> <title> <summary> [--dir D] [--files f1,f2] [--tags t1,t2]");
       process.exit(1);

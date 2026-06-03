@@ -35,8 +35,10 @@ export function registerWikiTools(server: McpServer, getDB: GetDB) {
         .describe(`Wiki command. Supported commands: ${COMMANDS.join(", ")}. The ':' character is reserved as a selector separator.`),
     },
     async ({ directory, command }) => {
-      const { db, projectDir } = await resolveProject(directory, getDB);
       try {
+        // Inside the try so a bad directory / config-load failure returns the
+        // friendly wiki error instead of a raw MCP protocol error.
+        const { db, projectDir } = await resolveProject(directory, getDB);
         const text = await runWikiRebuild(
           {
             db,
