@@ -11,6 +11,7 @@ import { log } from "../utils/log";
 import { checkIndexDir } from "../utils/dir-guard";
 import { normalizePath } from "../utils/path";
 import { tryAcquireIndexLock } from "../utils/index-lock";
+import { timed } from "../utils/profiler";
 import { type EmbeddedChunk } from "../types";
 
 function aggregateGraphData(chunks: { imports?: ChunkImport[]; exports?: ChunkExport[] }[]): {
@@ -430,9 +431,9 @@ async function processFile(
   }
 
   // Single read: hash and parse from the same string
-  let raw: string | null = await readFile(filePath, "utf-8");
-  const hash = hashString(raw);
-  const existing = db.getFileByPath(filePath);
+  let raw: string | null = await timed("read", () => readFile(filePath, "utf-8"));
+  const hash = timed("hash", () => hashString(raw!));
+  const existing = timed("db-lookup", () => db.getFileByPath(filePath));
 
   if (existing && existing.hash === hash) {
     onProgress?.(`Skipped (unchanged): ${baseDir ? relative(baseDir, filePath) : filePath}`);
@@ -454,7 +455,7 @@ async function processFile(
 
   onProgress?.(`Indexing ${relPath}`);
 
-  const parsed = parseFile(filePath, raw);
+  const parsed = timed("parse", () => parseFile(filePath, raw!));
   raw = null; // free before the expensive embed loop
 
   if (!KNOWN_EXTENSIONS.has(parsed.extension)) {
@@ -467,13 +468,13 @@ async function processFile(
     return "skipped";
   }
 
-  const chunkResult = await chunkText(
+  const chunkResult = await timed("chunk", () => chunkText(
     parsed.content,
     parsed.extension,
     config.chunkSize,
     config.chunkOverlap,
     filePath
-  );
+  ));
   const chunks = chunkResult.chunks;
 
   if (chunks.length > 10000) {
@@ -521,9 +522,9 @@ async function processFile(
   if (signal?.aborted) return "skipped";
 
   // Detect parent groups and create parent chunks before writing children
-  const parentGroups = detectParentGroups(chunks);
+  const parentGroups = timed("parent-group", () => detectParentGroups(chunks));
   if (parentGroups.length > 0) {
-    createParentChunks(parentGroups, chunks, allEmbedded, fileId, db);
+    timed("parent-group", () => createParentChunks(parentGroups, chunks, allEmbedded, fileId, db));
   }
 
   // Write all child chunks (now with parent_id set where applicable)
@@ -532,7 +533,7 @@ async function processFile(
   for (let i = 0; i < allEmbedded.length; i += DB_BATCH) {
     if (signal?.aborted) break;
     const batch = allEmbedded.slice(i, i + DB_BATCH);
-    const ids = db.insertChunkBatch(fileId, batch, i);
+    const ids = timed("db-write-chunks", () => db.insertChunkBatch(fileId, batch, i));
     allChunkIds.push(...ids);
     onProgress?.(`Writing ${Math.min(i + DB_BATCH, allEmbedded.length)}/${allEmbedded.length} chunks for ${relPath}`, { transient: true });
   }
@@ -545,16 +546,16 @@ async function processFile(
   const graphData = chunkResult.fileImports && chunkResult.fileExports
     ? { imports: chunkResult.fileImports, exports: chunkResult.fileExports }
     : aggregateGraphData(chunks);
-  db.upsertFileGraph(fileId, graphData.imports, graphData.exports);
+  timed("db-write-graph", () => db.upsertFileGraph(fileId, graphData.imports, graphData.exports));
 
   // Symbol-level references: bun-chunk emits per-chunk identifier maps.
   // Resolution against import scope happens after the project-wide
   // import-resolution pass (`resolveAllSymbolRefs` at end of indexProject).
-  const refsToInsert = collectSymbolRefs(allEmbedded, allChunkIds);
-  if (refsToInsert.length > 0) db.upsertSymbolRefs(fileId, refsToInsert);
+  const refsToInsert = timed("symbol-refs", () => collectSymbolRefs(allEmbedded, allChunkIds));
+  if (refsToInsert.length > 0) timed("symbol-refs", () => db.upsertSymbolRefs(fileId, refsToInsert));
 
   // Commit the content hash last — only now is the file fully indexed.
-  db.updateFileHash(fileId, hash);
+  timed("db-write-graph", () => db.updateFileHash(fileId, hash));
 
   onProgress?.(`Indexed: ${relPath} (${chunks.length} chunks)`);
   return "indexed";
@@ -785,7 +786,7 @@ export async function indexDirectory(
 
   try {
 
-  const matchedFiles = await collectFiles(directory, config, onProgress, onProgress);
+  const matchedFiles = await timed("scan", () => collectFiles(directory, config, onProgress, onProgress));
 
   onProgress?.(`Found ${matchedFiles.length} files to index`);
 
@@ -793,7 +794,7 @@ export async function indexDirectory(
   // individual file progress begins.
   if (matchedFiles.length > 0) {
     const { getEmbedder } = await import("../embeddings/embed");
-    await getEmbedder(config.indexThreads, onProgress);
+    await timed("model-load", () => getEmbedder(config.indexThreads, onProgress));
   }
 
   for (const filePath of matchedFiles) {
@@ -829,7 +830,7 @@ export async function indexDirectory(
     // Prune files that no longer exist from full-project index runs. Scoped
     // re-indexes must not delete every indexed file outside their include set.
     const existingPaths = new Set(matchedFiles);
-    result.pruned = db.pruneDeleted(existingPaths);
+    result.pruned = timed("prune", () => db.pruneDeleted(existingPaths));
     if (result.pruned > 0) {
       onProgress?.(`Pruned ${result.pruned} deleted files from index`);
     }
@@ -837,13 +838,13 @@ export async function indexDirectory(
 
   // Resolve import paths across all files
   if (result.indexed > 0) {
-    const resolved = resolveImports(db, directory);
+    const resolved = timed("resolve-imports", () => resolveImports(db, directory));
     if (resolved > 0) {
       onProgress?.(`Resolved ${resolved} import paths`);
     }
     // Symbol-level resolution must follow file-level import resolution —
     // cross-file ref edges depend on `file_imports.resolved_file_id`.
-    db.resolveAllSymbolRefs();
+    timed("resolve-symbol-refs", () => db.resolveAllSymbolRefs());
   }
 
   return result;

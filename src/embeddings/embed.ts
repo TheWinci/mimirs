@@ -8,6 +8,7 @@ import {
 import { join } from "node:path";
 import { homedir, cpus } from "node:os";
 import { rmSync } from "node:fs";
+import { timed } from "../utils/profiler";
 
 // Use a stable cache directory so models survive bunx temp dir cleanup
 const CACHE_DIR = join(homedir(), ".cache", "mimirs", "models");
@@ -108,7 +109,9 @@ export async function embedBatch(
 ): Promise<Float32Array[]> {
   if (texts.length === 0) return [];
   const model = await getEmbedder(threads, onProgress);
-  const output = await model(texts, { pooling: currentPooling, normalize: true });
+  const output = await timed("embed-inference", () =>
+    model(texts, { pooling: currentPooling, normalize: true })
+  );
   const flat = new Float32Array(output.data as Float64Array);
   const result: Float32Array[] = [];
   for (let i = 0; i < texts.length; i++) {
@@ -179,33 +182,37 @@ export async function embedBatchMerged(
   const flatTexts: string[] = [];
   const mapping: { type: "short"; flatIdx: number }[] | { type: "oversized"; flatStart: number; flatEnd: number }[] = [];
 
-  for (const text of texts) {
-    const tokenCount = Array.from(tok.encode(text)).length;
-    if (tokenCount <= MODEL_MAX_TOKENS) {
-      (mapping as any[]).push({ type: "short", flatIdx: flatTexts.length });
-      flatTexts.push(text);
-    } else {
-      const windows = tokenWindows(text, tok, MODEL_MAX_TOKENS, MERGE_WINDOW_OVERLAP);
-      const start = flatTexts.length;
-      flatTexts.push(...windows);
-      (mapping as any[]).push({ type: "oversized", flatStart: start, flatEnd: flatTexts.length });
+  timed("classify", () => {
+    for (const text of texts) {
+      const tokenCount = Array.from(tok.encode(text)).length;
+      if (tokenCount <= MODEL_MAX_TOKENS) {
+        (mapping as any[]).push({ type: "short", flatIdx: flatTexts.length });
+        flatTexts.push(text);
+      } else {
+        const windows = tokenWindows(text, tok, MODEL_MAX_TOKENS, MERGE_WINDOW_OVERLAP);
+        const start = flatTexts.length;
+        flatTexts.push(...windows);
+        (mapping as any[]).push({ type: "oversized", flatStart: start, flatEnd: flatTexts.length });
+      }
     }
-  }
+  });
 
   // Single embedBatch call for all texts + windows
   const allEmbeddings = await embedBatch(flatTexts, threads, onProgress);
 
   // Reassemble: short texts get their embedding, oversized get merged windows
-  const result: Float32Array[] = [];
-  for (const entry of mapping as any[]) {
-    if (entry.type === "short") {
-      result.push(allEmbeddings[entry.flatIdx]);
-    } else {
-      const windowEmbs = allEmbeddings.slice(entry.flatStart, entry.flatEnd);
-      result.push(mergeEmbeddings(windowEmbs));
+  return timed("merge", () => {
+    const result: Float32Array[] = [];
+    for (const entry of mapping as any[]) {
+      if (entry.type === "short") {
+        result.push(allEmbeddings[entry.flatIdx]);
+      } else {
+        const windowEmbs = allEmbeddings.slice(entry.flatStart, entry.flatEnd);
+        result.push(mergeEmbeddings(windowEmbs));
+      }
     }
-  }
-  return result;
+    return result;
+  });
 }
 
 /** Reset the singleton — only for testing */
