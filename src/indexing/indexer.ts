@@ -635,6 +635,14 @@ async function processFileIncremental(
   const oldHashes = db.getChunkHashes(fileId);
   const newHashes = new Set(chunks.map(c => c.hash!));
 
+  // bun-chunk's hash is content-only, so two identical-text chunks share a
+  // content_hash. The incremental path keys position updates and ref rewrites
+  // by content_hash, which would then hit/keep the wrong row — fall back to a
+  // correct positional full re-index when the parse has duplicate hashes.
+  if (newHashes.size < chunks.length) {
+    return null;
+  }
+
   // Count how many chunks are new (not in old set)
   let newCount = 0;
   for (const h of newHashes) {
@@ -653,6 +661,15 @@ async function processFileIncremental(
   // parent_id. Rebuilding a parent needs every member's embedding (kept ones
   // live only in the DB), so fall back to a correct full re-index instead.
   if (detectParentGroups(chunks).length > 0) {
+    return null;
+  }
+
+  // Also defer when the INDEX already holds parent chunks for this file but the
+  // new parse no longer forms a group (class → free functions, etc.). The
+  // parent's hash isn't in newHashes, so deleteStaleChunks would drop it and
+  // leave the kept children with a dangling parent_id (FKs are off, so no
+  // cascade). A full re-index rebuilds the structure cleanly.
+  if (db.fileHasParentChunks(fileId)) {
     return null;
   }
 

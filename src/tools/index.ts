@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { resolve } from "path";
 import { existsSync } from "fs";
 import { RagDB } from "../db";
-import { loadConfig, applyEmbeddingConfig, type RagConfig } from "../config";
+import { loadConfig, applyEmbeddingConfigFromDisk, type RagConfig } from "../config";
 import { registerSearchTools } from "./search";
 import { registerIndexTools } from "./index-tools";
 import { registerGraphTools } from "./graph-tools";
@@ -34,7 +34,13 @@ export async function resolveProject(
   }
 
   const config = await loadConfig(resolved);
-  applyEmbeddingConfig(config);
+  // Configure the embedder from the SAME raw-disk read the RagDB constructor
+  // uses — not from the validated config, which on any validation failure falls
+  // back to defaults and would drop a custom embeddingDim. With a cached getDB
+  // (constructor skipped), that left the query embedder at the default dim while
+  // the index was built at the real one → wrong-dim embeds. The invariant: the
+  // query embedder always matches what the index was built with.
+  applyEmbeddingConfigFromDisk(resolved);
   return { projectDir: resolved, db: getDB(resolved), config };
 }
 

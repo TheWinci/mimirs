@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 import * as sqliteVec from "sqlite-vec";
-import { getEmbeddingDim, getModelId } from "../embeddings/embed";
+import { getEmbeddingDim, getModelId, getEmbeddingVariant } from "../embeddings/embed";
 import { identifierParts } from "../indexing/identifiers";
 import { applyEmbeddingConfigFromDisk } from "../config";
 import { log } from "../utils/log";
@@ -194,12 +194,27 @@ export class RagDB {
         `to rebuild it.`,
       );
     }
+    // Same model + dim can still differ in pooling/dtype, which changes the
+    // vector space just like a model swap. Recorded only for indexes built
+    // after this stamp landed; older indexes (no variant) are grandfathered.
+    const recordedVariant = this.getMeta("embedding_variant");
+    if (recordedVariant && recordedVariant !== getEmbeddingVariant()) {
+      throw new Error(
+        `mimirs: embedding variant mismatch — the index at "${this.ragDir}" was ` +
+        `built with pooling/dtype "${recordedVariant}", but the configured ` +
+        `embedding produces "${getEmbeddingVariant()}". This changes the vector ` +
+        `space, so search would be silently wrong. Restore the previous ` +
+        `embeddingPooling/embeddingDtype in .mimirs/config.json, or delete the ` +
+        `index to rebuild it.`,
+      );
+    }
   }
 
-  /** Record the embedding model on first creation so future opens can verify it. */
+  /** Record the embedding model + variant on first creation so future opens can verify them. */
   private recordEmbeddingModel(): void {
     if (this.getMeta("embedding_model") == null) {
       this.setMeta("embedding_model", getModelId());
+      this.setMeta("embedding_variant", getEmbeddingVariant());
     }
   }
 
@@ -803,6 +818,9 @@ export class RagDB {
   }
   getChunkIdsByHash(fileId: number) {
     return fileOps.getChunkIdsByHash(this.db, fileId);
+  }
+  fileHasParentChunks(fileId: number) {
+    return fileOps.fileHasParentChunks(this.db, fileId);
   }
   deleteStaleChunks(fileId: number, keepHashes: Set<string>) {
     return fileOps.deleteStaleChunks(this.db, fileId, keepHashes);

@@ -231,6 +231,15 @@ export function getModelId(): string {
   return currentModelId;
 }
 
+/**
+ * Current pooling + dtype as a single identity string. Two indexes can share a
+ * model id and dim yet differ here (mean vs cls pooling, q8 vs fp32), which
+ * still produces an incompatible vector space — recorded so reopen can verify.
+ */
+export function getEmbeddingVariant(): string {
+  return `${currentPooling}|${currentDtype}`;
+}
+
 // Backwards-compatible constant export (default dimension)
 const EMBEDDING_DIM = DEFAULT_EMBEDDING_DIM;
 export { EMBEDDING_DIM, DEFAULT_MODEL_ID, DEFAULT_EMBEDDING_DIM };

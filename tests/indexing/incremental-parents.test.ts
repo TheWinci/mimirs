@@ -60,6 +60,17 @@ function danglingParentRefs(d: RagDB): number {
     .get()!.n;
 }
 
+/** Number of (file_id, chunk_index) groups that have more than one row. */
+function indexCollisions(d: RagDB): number {
+  return rawDb(d)
+    .query<{ n: number }, []>(
+      `SELECT COUNT(*) AS n FROM (
+         SELECT file_id, chunk_index FROM chunks WHERE chunk_index >= 0
+         GROUP BY file_id, chunk_index HAVING COUNT(*) > 1)`,
+    )
+    .get()!.n;
+}
+
 describe("B1: incremental re-index preserves parent chunks", () => {
   test("editing one method keeps the parent chunk and leaves no dangling refs", async () => {
     await writeFixture(tempDir, "widget.ts", makeClass("ORIGINAL"));
@@ -114,5 +125,39 @@ describe("B1: incremental re-index preserves parent chunks", () => {
       .get()!.n;
     expect(hasNew).toBeGreaterThan(0);
     expect(hasOld).toBe(0);
+  });
+});
+
+describe("incremental fallback guards", () => {
+  // bun-chunk hashes by content, so identical-text chunks share a hash. The
+  // incremental position update keys by content_hash, so without a guard it
+  // assigns every duplicate the last chunk_index → collisions.
+  test("duplicate-content chunks defer to a full re-index (no chunk_index collision)", async () => {
+    const dupConfig: RagConfig = { ...config, chunkSize: 256, chunkOverlap: 20 };
+    const fn = `export function doThing(x: number): number {\n  let total = 0;\n  total += x * 2;\n  total += x * 3;\n  return total;\n}`;
+    const pad = (i: number, marker = "") => `export function uniq${i}(x: number) { return x + ${i};${marker} }`;
+    const file = (marker: string) =>
+      [fn, pad(1), fn, pad(2, marker), fn, pad(3), pad(4), pad(5)].join("\n\n") + "\n";
+
+    await writeFixture(tempDir, "dups.ts", file(""));
+    await indexDirectory(tempDir, db, dupConfig); // first index is full
+    expect(indexCollisions(db)).toBe(0);
+
+    // Small edit to one unique fn → incremental is attempted, but duplicate
+    // hashes must force a full re-index instead of corrupting chunk_index.
+    await writeFixture(tempDir, "dups.ts", file(" /* edited */"));
+    await indexDirectory(tempDir, db, dupConfig);
+    expect(indexCollisions(db)).toBe(0); // was >0 before the guard
+  });
+
+  test("fileHasParentChunks reflects whether the index holds parent rows", async () => {
+    await writeFixture(tempDir, "widget.ts", makeClass("ORIGINAL"));
+    await writeFixture(tempDir, "plain.ts", "export const a = 1;\nexport const b = 2;\n");
+    await indexDirectory(tempDir, db, config);
+
+    const widget = db.getFileByPath(`${tempDir}/widget.ts`)!;
+    const plain = db.getFileByPath(`${tempDir}/plain.ts`)!;
+    expect(db.fileHasParentChunks(widget.id)).toBe(true);
+    expect(db.fileHasParentChunks(plain.id)).toBe(false);
   });
 });

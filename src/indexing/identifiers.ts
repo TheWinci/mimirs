@@ -28,6 +28,12 @@ export function identifierParts(text: string): string {
   const out = new Set<string>();
   const tokens = text.match(/[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*/g) || [];
   for (const tok of tokens) {
+    // Skip absurdly long tokens — real identifiers are short, and a long
+    // contiguous run (base64/hex blob, all-caps constant embedded in an
+    // otherwise normal-line file that dodges the minified-file guard) makes
+    // splitIdentifier's case-boundary regex quadratic. Such a token has no
+    // useful word parts anyway.
+    if (tok.length > 80) continue;
     const parts = splitIdentifier(tok);
     if (parts.length > 1) for (const p of parts) out.add(p);
   }

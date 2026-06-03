@@ -320,6 +320,20 @@ export function getChunkHashes(db: Database, fileId: number): Set<string> {
 }
 
 /**
+ * Whether the file already has parent chunks in the index (stored with a
+ * negative chunk_index). Parent chunks span a class/function group; the
+ * incremental path can't rebuild them, so it must defer to a full re-index
+ * when any exist.
+ */
+export function fileHasParentChunks(db: Database, fileId: number): boolean {
+  return db
+    .query<{ one: number }, [number]>(
+      "SELECT 1 AS one FROM chunks WHERE file_id = ? AND chunk_index < 0 LIMIT 1"
+    )
+    .get(fileId) != null;
+}
+
+/**
  * Delete chunks (and their vec embeddings) whose content_hash is NOT in the keep set.
  * Returns the number of chunks deleted.
  */

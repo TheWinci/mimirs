@@ -1,6 +1,7 @@
 import { describe, test, expect, afterEach } from "bun:test";
 import { RagDB } from "../../src/db";
-import { configureEmbedder, DEFAULT_MODEL_ID, DEFAULT_EMBEDDING_DIM } from "../../src/embeddings/embed";
+import { configureEmbedder, getEmbeddingDim, DEFAULT_MODEL_ID, DEFAULT_EMBEDDING_DIM } from "../../src/embeddings/embed";
+import { applyEmbeddingConfigFromDisk } from "../../src/config";
 import { createTempDir, cleanupTempDir } from "../helpers";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
@@ -110,5 +111,46 @@ describe("RagDB embedding model is checked, not just dim", () => {
       const d = new RagDB(tempDir);
       d.close();
     }).not.toThrow();
+  });
+});
+
+describe("RagDB embedding variant (pooling/dtype) is checked", () => {
+  test("reopening with a different pooling at the same model+dim throws", async () => {
+    tempDir = await createTempDir();
+    writeConfig(tempDir, { embeddingModel: "test/model-A", embeddingDim: 384, embeddingPooling: "mean" });
+    new RagDB(tempDir).close();
+
+    // Same model + dim, different pooling — changes the vector space, so it must
+    // fail loudly even though the model and dim guards both pass.
+    writeConfig(tempDir, { embeddingModel: "test/model-A", embeddingDim: 384, embeddingPooling: "cls" });
+    expect(() => new RagDB(tempDir)).toThrow(/variant mismatch/i);
+  });
+
+  test("a legacy index with no recorded variant is grandfathered (no throw)", async () => {
+    tempDir = await createTempDir();
+    writeConfig(tempDir, { embeddingModel: "test/model-A", embeddingDim: 384, embeddingPooling: "mean" });
+    const db1 = new RagDB(tempDir);
+    // Simulate a pre-variant index: erase only the recorded variant.
+    rawDb(db1).run("DELETE FROM meta WHERE key = 'embedding_variant'");
+    db1.close();
+
+    writeConfig(tempDir, { embeddingModel: "test/model-A", embeddingDim: 384, embeddingPooling: "cls" });
+    expect(() => {
+      const d = new RagDB(tempDir);
+      d.close();
+    }).not.toThrow();
+  });
+});
+
+describe("query embedder follows the index dim, not the validated config", () => {
+  test("applyEmbeddingConfigFromDisk keeps a custom dim even when config validation fails", async () => {
+    tempDir = await createTempDir();
+    // Valid embeddingDim, but an invalid field (chunkOverlap >= chunkSize) makes
+    // loadConfig fall back to all defaults (dim 384). The disk read used to
+    // configure the query embedder must still honor 512 to match the index —
+    // otherwise a cached MCP getDB embeds queries at the wrong dimension.
+    writeConfig(tempDir, { embeddingModel: "test/model-512", embeddingDim: 512, chunkSize: 100, chunkOverlap: 100 });
+    applyEmbeddingConfigFromDisk(tempDir);
+    expect(getEmbeddingDim()).toBe(512);
   });
 });

@@ -17,6 +17,17 @@ describe("identifier splitting", () => {
     expect(identifierParts("function getDependsOn() {}").split(" ")).toContain("depends");
     expect(identifierParts("just plain words here")).toBe(""); // single words already in snippet
   });
+
+  test("caps absurdly long tokens (blob guard, no quadratic blowup)", () => {
+    // A long uppercase run (base64/hex blob) inside a normal-line file is one
+    // giant token. The case-boundary regex is O(n²), so without a cap this hangs.
+    const code = `const DATA = "${"A".repeat(40000)}";`;
+    const t0 = performance.now();
+    const parts = identifierParts(code);
+    const dt = performance.now() - t0;
+    expect(parts).toBe(""); // the blob token is skipped; const/DATA aren't compound
+    expect(dt).toBeLessThan(100); // unclamped this token alone is ~1s
+  });
 });
 
 const config: RagConfig = {
