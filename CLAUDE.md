@@ -1,6 +1,6 @@
 use simple language
 
-<!-- mimirs -->
+<!-- mimirs:start v=a27c932 -->
 ## Using mimirs tools
 
 This project has a local RAG index (mimirs). Use these MCP tools:
@@ -34,7 +34,7 @@ This project has a local RAG index (mimirs). Use these MCP tools:
   results — this reveals documentation gaps.
 - **`search_symbols`**: When you know a symbol name (function, class, type, etc.),
   find it directly by name instead of using semantic search.
-- **`find_usages`**: Before changing a function or type, find all its call sites.
+- **`usages`**: Before changing a function or type, find all its call sites.
   Use this to understand the blast radius of a rename or API change. Faster and
   more reliable than semantic search for finding usages.
 - **`git_context`**: At the start of a session (or any time you need orientation),
@@ -57,19 +57,25 @@ This project has a local RAG index (mimirs). Use these MCP tools:
   fixed bug, a lifted constraint, or a note on deleted code. Use
   `get_annotations` first to find the ID.
 - **`depends_on`**: List all files that a given file imports — its dependencies.
-- **`depended_on_by`**: List all files that import a given file — reverse
+- **`dependents`**: List all files that import a given file — reverse
   dependencies. Use before modifying a shared module to see who depends on it.
-- **Assessing blast radius / reviewing a diff**: there is no single
-  `impact_analysis` or `diff_context` tool — compose the ones above. Before a
-  risky change (refactor, rename, signature change) combine `find_usages` (call
-  sites), `depended_on_by` (importers), and `get_annotations` (known caveats) on
-  the symbol or file. For diff or PR review, pair `git_context` (what changed)
-  with `find_usages` on the changed symbols and `search_checkpoints` for prior
-  decisions.
+- **`impact`**: Symbol-level blast radius — the transitive *callers* of a
+  function or method as a pruned call tree, plus the test files to run. More
+  precise than `dependents` (file-level). Use before changing a signature or
+  behavior. Pass `file` to disambiguate a name defined in several places.
+- **`trace`**: Show how one symbol reaches another — the reachable call
+  sub-graph from `from` to `to`, shortest path highlighted ("how does X reach
+  Y"). Resolution is static, so a dynamic-dispatch hop (callback, interface→impl,
+  DI) can break the chain — it says so when it does.
+- **Assessing blast radius / reviewing a diff**: for a single function or
+  method, `impact` returns the transitive caller tree + tests to run in one call,
+  and `trace` shows how two symbols connect. Widen with `dependents`
+  (file-level importers) and `get_annotations` (known caveats) when a change
+  spans a whole module. For diff or PR review, pair `git_context` (what changed)
+  with `impact`/`usages` on the changed symbols and `search_checkpoints` for
+  prior decisions.
 - **`write_relevant`**: Before adding new code or docs, find the best insertion
   point — returns the most semantically appropriate file and anchor.
-- **`wiki`**: Run the wiki rebuild workflow. Start with
-  `wiki(command: "shape")`, follow the returned discovery prompt, validate
-  `wiki/_discovery.json` with `wiki(command: "validate-discovery")`, then
-  use `wiki(command: "write")` and `wiki(command: "write:page:<slug>")`
-  to split page writing by slug.
+- **`wiki`**: Rebuild the project wiki. Start with `wiki(command: "shape")` and
+  follow the prompts it returns — each step names the next.
+<!-- mimirs:end -->

@@ -189,18 +189,49 @@ bunx mimirs status           # how many files, chunks, embeddings
 bunx mimirs demo
 ```
 
+## Manual workflow (without `init`)
+
+`init` is a convenience: it wires up your editor (MCP config, agent rules, `.gitignore`, `.mimirs/config.json`). It does **not** build the index, and nothing below needs it — the index and a default config are created automatically the first time you index or query.
+
+**1. Add the MCP server by hand.** Drop the snippet for your client from the [manual reference](#3-set-up-your-editor-manual-reference) above: `command: "bunx"`, `args: ["mimirs@latest", "serve"]`, and `RAG_PROJECT_DIR` pointing at your project root. That is the entire MCP setup.
+
+> Without `init` there's no agent-rules file, so your assistant won't know the tools exist. Either mention mimirs in your prompt, or copy the tool list from [CLAUDE.md](CLAUDE.md) into your editor's rules.
+
+**2. Build the index.** The MCP server indexes lazily on the first tool call, so through an agent you can skip this step. To index up front (recommended for large repos, and required before the CLI `search`/`read` below):
+
+```bash
+bunx mimirs index                                # current directory
+bunx mimirs index /path/to/repo                  # a specific directory
+bunx mimirs index --patterns "src/**/*.ts,*.md"  # restrict to globs
+bunx mimirs status                               # files, chunks, embeddings
+```
+
+No `init` and no config file required — defaults are applied and the index is written to `<project>/.mimirs/`.
+
+**3. Query from the CLI.** Two read commands, both running against the index in the current directory (use `--dir` to point elsewhere):
+
+```bash
+# Where is it? — ranked file paths + snippet previews
+bunx mimirs search "where is auth handled" --top 10
+
+# What is it? — the actual matching code chunks (functions, classes, sections)
+bunx mimirs read "jwt validation" --top 8 --threshold 0.3
+```
+
+Scope either with `--ext .ts,.tsx`, `--in src,packages/core`, or `--exclude tests`. Note: the CLI `search`/`read` do **not** auto-index — run `mimirs index` first (only the MCP server indexes on demand).
+
 ## Search quality
 
-93–100% Recall@10, MRR 0.76–0.90. Benchmarked on four real codebases across three languages (30 queries each), re-measured 2026-06 on the current pipeline. Full methodology in [BENCHMARKS.md](BENCHMARKS.md).
+89–97% Recall@10, 97–100% Recall@20, MRR 0.69–0.77. Benchmarked on four real codebases across three languages with stratified, difficulty-mixed query sets (72–120 queries each, ~⅓ hard), re-measured 2026-06-04 on the current pipeline. Full methodology in [BENCHMARKS.md](BENCHMARKS.md).
 
-| Codebase | Language | Files | Recall@10 | MRR | Zero-miss |
-|---|---|---|---|---|---|
-| mimirs | TypeScript | 89 | 100.0% | 0.883 | 0.0% |
-| Excalidraw | TypeScript | 692 | 96.7% | 0.900 | 3.3% |
-| Django | Python | 3,113 | 96.7% | 0.903 | 3.3% |
-| Kubernetes | Go | 8,795 | 93.3% | 0.759 | 6.7% |
+| Codebase | Language | Files | Queries | Recall@10 | MRR | Zero-miss |
+|---|---|---|---|---|---|---|
+| mimirs | TypeScript | 244 | 74 | 95.3% | 0.759 | 4.1% |
+| Excalidraw | TypeScript | 693 | 72 | 90.3% | 0.773 | 9.7% |
+| Django | Python | 3,181 | 116 | 97.4% | 0.727 | 2.6% |
+| Kubernetes | Go | 8,792 | 120 | 89.2% | 0.689 | 10.8% |
 
-Kubernetes is large enough (8.8k files) that several correct files rank just past the top-10; recall climbs to 100% by top-20, so set `searchTopK: 15–20` on very large repos.
+The larger repos (Kubernetes, Excalidraw) are big enough that some correct files rank just past the top-10; recall reaches 97–100% by top-20, so set `searchTopK: 15–20` on large repos.
 
 ## How it compares
 
@@ -208,7 +239,7 @@ Kubernetes is large enough (8.8k files) that several correct files rank just pas
 |---|---|---|---|---|
 | Setup | One command | Nothing | Nothing | API keys, accounts |
 | Token cost | ~91K/prompt | ~380K/prompt | Entire codebase | Varies |
-| Search quality | 93–100% Recall@10 | Depends on keywords | N/A (everything loaded) | Varies |
+| Search quality | 89–97% Recall@10 | Depends on keywords | N/A (everything loaded) | Varies |
 | Code understanding | AST-aware (24 langs) | Line-level | None | Usually line-level |
 | Cross-session memory | Conversations + checkpoints | None | None | Some |
 | Privacy | Fully local | Local | Local | Data leaves your machine |

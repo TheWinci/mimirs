@@ -1,33 +1,35 @@
 # Benchmarks
 
-Search quality on four real codebases (three languages, 30 queries each), re-measured 2026-06-02 on the current pipeline: vector similarity + BM25 combined by reciprocal-rank fusion, identifier-aware FTS, default weight 0.5. Each codebase is indexed fresh and queried with a fixed set of queries whose expected files are known.
+Search quality on four real codebases (three languages, 72–120 stratified queries each), re-measured 2026-06-04 on the current pipeline: vector similarity + BM25 combined by reciprocal-rank fusion, identifier-aware FTS, weight 0.5. Each codebase is indexed fresh and queried with a fixed set of queries whose expected files are known.
 
 **Metrics:** Recall@K (fraction of expected files in the top K), MRR (1 / rank of the first hit), Zero-miss (queries with no expected file in the top 10).
 
 ## Results
 
-| Codebase | Language | Files | Recall@10 | MRR | Zero-miss |
-|---|---|---|---|---|---|
-| mimirs | TypeScript | 89 | **100.0%** | 0.883 | 0.0% |
-| Excalidraw | TypeScript | 692 | **96.7%** | 0.900 | 3.3% |
-| Django | Python | 3,113 | **96.7%** | 0.903 | 3.3% |
-| Kubernetes | Go | 8,795 | **93.3%** | 0.759 | 6.7% |
+| Codebase | Language | Files | Queries | Recall@10 | MRR | Zero-miss |
+|---|---|---|---|---|---|---|
+| mimirs | TypeScript | 244 | 74 | **95.3%** | 0.759 | 4.1% |
+| Excalidraw | TypeScript | 693 | 72 | **90.3%** | 0.773 | 9.7% |
+| Django | Python | 3,181 | 116 | **97.4%** | 0.727 | 2.6% |
+| Kubernetes | Go | 8,792 | 120 | **89.2%** | 0.689 | 10.8% |
 
-MRR 0.76–0.90 means the first relevant file usually lands at or very near rank 1. Recall stays high as repos grow; the one consistent effect of scale is that a few correct files slip just past the top-10 on the largest repos (see the K-sweep below).
+MRR 0.69–0.77 means the first relevant file usually lands in the top few results. Recall stays strong as repos grow — 97–100% by top-20 everywhere — with the one consistent effect of scale being that a few correct files slip just past the top-10 on the largest repos (see the K-sweep below).
 
-Corpora: mimirs is indexed on its own source (`src/` + docs); Excalidraw, Django, and Kubernetes are fresh clones (Django includes its tests + docs; Kubernetes is Go-only with tests/vendor excluded and generated files demoted).
+These query sets are deliberately non-saturated: each spreads roughly ⅓ easy / medium / hard across subsystems, so the benchmark can actually discriminate ranking changes rather than bottoming out at 100%. (The earlier 30-query-per-repo sets scored higher precisely because they were easier; the numbers here are lower and more honest.)
+
+Corpora: mimirs is indexed on its own source (TypeScript `src/`, tests, benchmarks, and Markdown docs — 244 files); Excalidraw and Django are fresh clones (Django includes its tests + docs); Kubernetes is Go-only with tests/vendor excluded and generated files demoted. Every expected path was verified to exist in the indexed revision.
 
 ### Recall by K — why top-10 is the default
 
 | K | mimirs | Excalidraw | Django | Kubernetes |
 |---|---|---|---|---|
-| 5 | 98.3% | 93.3% | 96.7% | 90.0% |
-| 7 | 98.3% | 96.7% | 96.7% | 93.3% |
-| **10** | **100%** | **96.7%** | **96.7%** | **93.3%** |
-| 15 | 100% | 96.7% | 100% | 96.7% |
-| 20 | 100% | 96.7% | 100% | 100% |
+| 5 | 91.2% | 86.1% | 87.9% | 78.3% |
+| 7 | 93.9% | 88.9% | 93.1% | 83.3% |
+| **10** | **95.3%** | **90.3%** | **97.4%** | **89.2%** |
+| 15 | 96.6% | 95.8% | 100% | 95.0% |
+| 20 | 98.6% | 97.2% | 100% | 98.3% |
 
-Top-10 captures nearly everything on small-to-mid repos. On very large repos (Kubernetes, 8.8k files) structurally similar siblings push a few targets to ranks 11–20, so `searchTopK: 15–20` is worth it there — each extra result adds ~150 tokens, negligible for an agent.
+Top-10 captures most targets on small-to-mid repos. On the largest repos (Kubernetes at 8.8k files, and Excalidraw) structurally similar siblings push some targets to ranks 11–20, so `searchTopK: 15–20` is worth it there — each extra result adds ~150 tokens, negligible for an agent.
 
 ## Embedding model
 
@@ -54,15 +56,16 @@ Oversized chunks (>256 tokens) are split into overlapping windows, embedded, and
 ## Reproduce
 
 ```bash
-# index any directory + run a query file of { query, expected[] } entries
-bun benchmarks/rebench.ts <dir> benchmarks/<name>-queries.json 10 0.5
+# index any directory + run a query file of { query, expected[] } entries,
+# searching at top-20 and reporting the full recall@K sweep + MRR
+bun benchmarks/rebench-full.ts <dir> benchmarks/<name>-queries.json 0.5
 
 # example with a fresh clone
 git clone --depth 1 https://github.com/django/django /tmp/django
-bun benchmarks/rebench.ts /tmp/django benchmarks/django-queries.json 10 0.5
+bun benchmarks/rebench-full.ts /tmp/django benchmarks/django-queries.json 0.5
 ```
 
-Kubernetes uses a Go-only config (exclude tests/vendor, demote generated):
+Kubernetes uses a Go-only config (exclude tests/vendor, demote generated), placed at `<repo>/.mimirs/config.json`:
 
 ```json
 { "include": ["**/*.go"],
@@ -70,4 +73,4 @@ Kubernetes uses a Go-only config (exclude tests/vendor, demote generated):
   "generated": ["applyconfigurations/**", "**/zz_generated*", "**/fake_*", "**/*_generated.go"] }
 ```
 
-Query files (30 each): [mimirs](benchmarks/mimirs-queries.json), [Excalidraw](benchmarks/excalidraw-queries.json), [Django](benchmarks/django-queries.json), [Kubernetes](benchmarks/kubernetes-queries.json). The full K-sweep harness is [benchmarks/rebench-full.ts](benchmarks/rebench-full.ts).
+Query files: [mimirs](benchmarks/mimirs-queries.json) (74), [Excalidraw](benchmarks/excalidraw-queries.json) (72), [Django](benchmarks/django-queries.json) (116), [Kubernetes](benchmarks/kubernetes-queries.json) (120). The full K-sweep harness is [benchmarks/rebench-full.ts](benchmarks/rebench-full.ts).

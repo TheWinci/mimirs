@@ -3,11 +3,13 @@ import { readFile, writeFile, mkdir } from "fs/promises";
 import { join, resolve } from "path";
 import { homedir } from "os";
 import { createInterface } from "readline";
+import { createHash } from "crypto";
 import { loadConfig } from "../config";
 
-const MARKER = "<!-- mimirs -->";
+// Marker the pre-fence init wrote at the top of dedicated rule files.
+const LEGACY_MARKER = "<!-- mimirs -->";
 
-const INSTRUCTIONS_BLOCK = `## Using mimirs tools
+export const INSTRUCTIONS_BLOCK = `## Using mimirs tools
 
 This project has a local RAG index (mimirs). Use these MCP tools:
 
@@ -28,10 +30,10 @@ This project has a local RAG index (mimirs). Use these MCP tools:
 - **\`search_conversation\`**: Search past conversation history to recall previous
   decisions, discussions, and tool outputs. Use this before re-investigating
   something that may have been discussed in an earlier session.
-- **\`create_checkpoint\`**: Mark important moments — decisions, milestones,
-  blockers, direction changes. Do this liberally: after completing any feature
-  or task, after adding/modifying tools, after key technical decisions, before
-  and after large refactors, or when changing direction. If in doubt, create one.
+- **\`create_checkpoint\`**: **Call this as your final step after completing any
+  user-requested task**, before responding to the user. Also call when hitting
+  a blocker or changing direction mid-task. Include what was done, which files
+  changed, and why. This is the only way future sessions know what happened.
 - **\`list_checkpoints\`** / **\`search_checkpoints\`**: Review or search past
   checkpoints to understand project history and prior decisions.
 - **\`index_files\`**: If you've created or modified files and want them searchable,
@@ -47,9 +49,16 @@ This project has a local RAG index (mimirs). Use these MCP tools:
   call this to see what files have already been modified, recent commits, and
   which changed files are in the index. Avoids redundant searches and conflicting
   edits on already-modified files.
-- **\`annotate\`**: Attach a persistent note to a file or symbol — "known race
-  condition", "don't refactor until auth rewrite lands", etc. Notes appear as
-  \`[NOTE]\` blocks inline in \`read_relevant\` results automatically.
+- **\`search_commits\`**: Semantically search git commit history — find *why* code
+  was changed, when decisions were made, or what an author worked on. Supports
+  filters for author, date range, and file path. Requires git history to be
+  indexed first (\`index_files\` or \`mimirs history index\`).
+- **\`file_history\`**: Get the commit history for a specific file. Returns commits
+  that touched it, sorted by date. Use this to understand how a file evolved.
+- **\`annotate\`**: Call this immediately when you encounter a known bug, race
+  condition, fragile code, non-obvious constraint, or workaround while reading
+  code. Notes persist across sessions and surface as \`[NOTE]\` blocks inline in
+  \`read_relevant\` results automatically.
 - **\`get_annotations\`**: Retrieve all notes for a file, or search semantically
   across all annotations to find relevant caveats before editing.
 - **\`delete_annotation\`**: Remove an annotation that is no longer relevant — a
@@ -58,37 +67,53 @@ This project has a local RAG index (mimirs). Use these MCP tools:
 - **\`depends_on\`**: List all files that a given file imports — its dependencies.
 - **\`dependents\`**: List all files that import a given file — reverse
   dependencies. Use before modifying a shared module to see who depends on it.
-- **\`impact\`**: Symbol-level blast radius — the transitive callers of a
+- **\`impact\`**: Symbol-level blast radius — the transitive *callers* of a
   function or method as a pruned call tree, plus the test files to run. More
-  precise than \`dependents\` (file-level). Use before changing a signature.
+  precise than \`dependents\` (file-level). Use before changing a signature or
+  behavior. Pass \`file\` to disambiguate a name defined in several places.
 - **\`trace\`**: Show how one symbol reaches another — the reachable call
-  sub-graph from \`from\` to \`to\` ("how does X reach Y"). Static resolution, so
-  a dynamic-dispatch hop can break the chain (it says so when it does).
+  sub-graph from \`from\` to \`to\`, shortest path highlighted ("how does X reach
+  Y"). Resolution is static, so a dynamic-dispatch hop (callback, interface→impl,
+  DI) can break the chain — it says so when it does.
+- **Assessing blast radius / reviewing a diff**: for a single function or
+  method, \`impact\` returns the transitive caller tree + tests to run in one call,
+  and \`trace\` shows how two symbols connect. Widen with \`dependents\`
+  (file-level importers) and \`get_annotations\` (known caveats) when a change
+  spans a whole module. For diff or PR review, pair \`git_context\` (what changed)
+  with \`impact\`/\`usages\` on the changed symbols and \`search_checkpoints\` for
+  prior decisions.
 - **\`write_relevant\`**: Before adding new code or docs, find the best insertion
   point — returns the most semantically appropriate file and anchor.
-- **\`wiki\`**: Run the wiki rebuild workflow. Start with
-  \`wiki(command: "shape")\`, follow the returned discovery prompt, validate
-  \`wiki/_discovery.json\` with \`wiki(command: "validate-discovery")\`, then
-  use \`wiki(command: "write")\` and \`wiki(command: "write:page:<slug>")\`
-  to split page writing by slug.`;
+- **\`wiki\`**: Rebuild the project wiki. Start with \`wiki(command: "shape")\` and
+  follow the prompts it returns — each step names the next.`;
 
-const MDC_BLOCK = `${MARKER}
----
+// A short content hash of the instructions block, stamped into the managed
+// region so a later `init` can tell a current block from an out-of-date one and
+// replace just that region. It changes only when INSTRUCTIONS_BLOCK changes —
+// not on every release — so an unchanged block is never flagged stale.
+export const BLOCK_VERSION = createHash("sha256").update(INSTRUCTIONS_BLOCK).digest("hex").slice(0, 7);
+
+const FENCE_END = "<!-- mimirs:end -->";
+const fenceStart = (v: string) => `<!-- mimirs:start v=${v} -->`;
+// Matches one managed region and captures its stamped version. No `g` flag, so
+// `.test()` / `.match()` stay stateless.
+const FENCE_RE = /<!-- mimirs:start v=([0-9a-z]+) -->[\s\S]*?<!-- mimirs:end -->/;
+// The heading the block always opens with — used to find a pre-fence block.
+const LEGACY_HEADING = "## Using mimirs tools";
+
+function fencedRegion(inner: string): string {
+  return `${fenceStart(BLOCK_VERSION)}\n${inner}\n${FENCE_END}`;
+}
+
+const MDC_FRONTMATTER = `---
 description: mimirs tool usage instructions
 alwaysApply: true
----
+---`;
 
-${INSTRUCTIONS_BLOCK}`;
-
-const WINDSURF_BLOCK = `${MARKER}
----
+const WINDSURF_FRONTMATTER = `---
 trigger: always_on
 description: mimirs tool usage instructions
----
-
-${INSTRUCTIONS_BLOCK}`;
-
-const MARKDOWN_BLOCK = INSTRUCTIONS_BLOCK;
+---`;
 
 export interface SetupResult {
   actions: string[];
@@ -117,38 +142,64 @@ export async function ensureGitignore(projectDir: string): Promise<string | null
   return "Added .mimirs/ to .gitignore";
 }
 
-async function injectMarkdown(filePath: string, block: string): Promise<string | null> {
+// Shared markdown files (CLAUDE.md, Junie guidelines, Copilot instructions): the
+// user owns the file, mimirs owns one fenced region inside it. Re-running init
+// refreshes that region in place when the block changed, and never touches the
+// user's surrounding content.
+async function injectMarkdown(filePath: string, inner: string): Promise<string | null> {
+  const region = fencedRegion(inner);
   if (existsSync(filePath)) {
     const content = await readFile(filePath, "utf-8");
-    if (content.includes(MARKER) || content.includes("## Using mimirs tools")) return null;
-    await writeFile(filePath, content.trimEnd() + "\n\n" + block + "\n");
+
+    const fence = content.match(FENCE_RE);
+    if (fence) {
+      if (fence[1] === BLOCK_VERSION) return null;            // already current
+      await writeFile(filePath, content.replace(FENCE_RE, region));
+      return `Updated mimirs block in ${filePath} (v=${BLOCK_VERSION})`;
+    }
+
+    // Pre-fence block from an older init: it was always appended last, so
+    // everything from the heading to EOF is ours to replace.
+    const idx = content.indexOf(LEGACY_HEADING);
+    if (idx !== -1) {
+      const before = content.slice(0, idx).trimEnd();
+      await writeFile(filePath, (before ? before + "\n\n" : "") + region + "\n");
+      return `Updated mimirs block in ${filePath} (v=${BLOCK_VERSION})`;
+    }
+
+    // No managed region yet — append one.
+    await writeFile(filePath, content.trimEnd() + "\n\n" + region + "\n");
     return `Updated ${filePath}`;
   }
   await mkdir(join(filePath, ".."), { recursive: true });
-  await writeFile(filePath, block + "\n");
+  await writeFile(filePath, region + "\n");
+  return `Created ${filePath}`;
+}
+
+// Dedicated rule files (Cursor .mdc, Windsurf .md): mimirs owns the whole file —
+// the editor's frontmatter first, then the fenced block. Rewritten wholesale
+// when the stamped version differs.
+async function injectDedicated(filePath: string, dir: string, frontmatter: string): Promise<string | null> {
+  if (!existsSync(dir)) return null;
+  const full = `${frontmatter}\n\n${fencedRegion(INSTRUCTIONS_BLOCK)}\n`;
+  if (existsSync(filePath)) {
+    const content = await readFile(filePath, "utf-8");
+    if (content.includes(fenceStart(BLOCK_VERSION))) return null;   // already current
+    const hadBlock = FENCE_RE.test(content) || content.includes(LEGACY_MARKER) || content.includes(LEGACY_HEADING);
+    await writeFile(filePath, full);
+    return hadBlock ? `Updated ${filePath} (v=${BLOCK_VERSION})` : `Created ${filePath}`;
+  }
+  await mkdir(join(filePath, ".."), { recursive: true });
+  await writeFile(filePath, full);
   return `Created ${filePath}`;
 }
 
 async function injectMdc(filePath: string, dir: string): Promise<string | null> {
-  if (!existsSync(dir)) return null;
-  if (existsSync(filePath)) {
-    const content = await readFile(filePath, "utf-8");
-    if (content.includes(MARKER)) return null;
-  }
-  await mkdir(join(filePath, ".."), { recursive: true });
-  await writeFile(filePath, MDC_BLOCK + "\n");
-  return `Created ${filePath}`;
+  return injectDedicated(filePath, dir, MDC_FRONTMATTER);
 }
 
 async function injectWindsurfRule(filePath: string, dir: string): Promise<string | null> {
-  if (!existsSync(dir)) return null;
-  if (existsSync(filePath)) {
-    const content = await readFile(filePath, "utf-8");
-    if (content.includes(MARKER)) return null;
-  }
-  await mkdir(join(filePath, ".."), { recursive: true });
-  await writeFile(filePath, WINDSURF_BLOCK + "\n");
-  return `Created ${filePath}`;
+  return injectDedicated(filePath, dir, WINDSURF_FRONTMATTER);
 }
 
 export type KnownIDE = "claude" | "cursor" | "windsurf" | "copilot" | "jetbrains";
@@ -170,7 +221,7 @@ export async function ensureAgentInstructions(projectDir: string, ides?: string[
   const forced = new Set(ides);
 
   // Claude Code — always create/update
-  const claudeAction = await injectMarkdown(join(projectDir, "CLAUDE.md"), MARKDOWN_BLOCK);
+  const claudeAction = await injectMarkdown(join(projectDir, "CLAUDE.md"), INSTRUCTIONS_BLOCK);
   if (claudeAction) actions.push(claudeAction);
 
   // Cursor — if .cursor/ exists or explicitly requested
@@ -200,7 +251,7 @@ export async function ensureAgentInstructions(projectDir: string, ides?: string[
   if (existsSync(join(projectDir, ".junie"))) {
     const junieAction = await injectMarkdown(
       join(projectDir, ".junie", "guidelines", "mimirs.md"),
-      MARKDOWN_BLOCK
+      INSTRUCTIONS_BLOCK
     );
     if (junieAction) actions.push(junieAction);
   }
@@ -212,7 +263,7 @@ export async function ensureAgentInstructions(projectDir: string, ides?: string[
   if (existsSync(join(projectDir, ".github"))) {
     const copilotAction = await injectMarkdown(
       join(projectDir, ".github", "copilot-instructions.md"),
-      MARKDOWN_BLOCK
+      INSTRUCTIONS_BLOCK
     );
     if (copilotAction) actions.push(copilotAction);
   }
