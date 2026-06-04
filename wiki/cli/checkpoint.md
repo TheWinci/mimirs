@@ -17,7 +17,7 @@ All three share a single entry function, `checkpointCommand`, which the top-leve
 dispatcher calls for the `checkpoint` command word (`src/cli/index.ts:155-156`).
 That function opens one `RagDB` against the resolved project directory, branches
 on the second argument, and always closes the database before returning
-(`src/cli/commands/checkpoint.ts:8-87`).
+(`src/cli/commands/checkpoint.ts:8-99`).
 
 ## How the command is wired up
 
@@ -34,9 +34,9 @@ working directory — and constructs a `RagDB` for it before looking at the
 subcommand (`src/cli/commands/checkpoint.ts:9-11`). Opening the database runs the
 full schema bootstrap, so the `conversation_checkpoints` table and its companion
 `vec_checkpoints` vector table exist even on a brand-new index
-(`src/db/index.ts:323-341`). If none of `create`, `list`, or `search` matches
+(`src/db/index.ts:414-432`). If none of `create`, `list`, or `search` matches
 `args[1]`, the handler prints a usage line to stderr and exits non-zero
-(`src/cli/commands/checkpoint.ts:81-84`).
+(`src/cli/commands/checkpoint.ts:93-95`).
 
 ## Subcommand dispatch
 
@@ -84,7 +84,7 @@ flowchart TD
    (`src/cli/commands/checkpoint.ts:9-11`).
 2. The handler switches on `args[1]`. `create`, `list`, and `search` are the
    three real branches; anything else falls through to the usage error
-   (`src/cli/commands/checkpoint.ts:13,38,57,81`).
+   (`src/cli/commands/checkpoint.ts:13,48,67,93`).
 3. `create` validates its three operands, gathers optional metadata, attributes
    the note to the current session, embeds the text, and inserts a row — the only
    branch that writes.
@@ -92,48 +92,55 @@ flowchart TD
    `search` runs a nearest-neighbour vector lookup. Both have an empty-state
    message and a per-checkpoint printing loop.
 5. Whichever branch ran (including the error branches that `process.exit`), the
-   handler ends by calling `db.close()` (`src/cli/commands/checkpoint.ts:86`).
+   handler ends by calling `db.close()` (`src/cli/commands/checkpoint.ts:98`).
    The early-exit branches never reach the close, but the process is already
    terminating.
 
 ## Flow: create
 
 The `create` subcommand takes three positional operands — `type`, `title`, and
-`summary` — read from `args[2]`, `args[3]`, and `args[4]`
-(`src/cli/commands/checkpoint.ts:14-16`). All three are required; if any is
-missing or empty, the handler prints the `create` usage string to stderr and
-calls `process.exit(1)` before any embedding or database work
-(`src/cli/commands/checkpoint.ts:17-20`). Note the command does not constrain
-`type` to a fixed set — unlike the MCP tool, which restricts it to one of five
-enum values, `decision`, `milestone`, `blocker`, `direction_change`, or
+`summary`. Rather than read fixed argument positions, the handler scans every
+argument after the subcommand and collects only the non-flag tokens: any token in
+the known value-flag set (`--dir`, `--files`, `--tags`, `--type`, `--top`) is
+skipped along with the value that follows it, and any other `--`-prefixed token is
+skipped on its own. The first three survivors become `type`, `title`, and
+`summary` (`src/cli/commands/checkpoint.ts:14-26`). This skip-the-flag-and-its-value
+step exists so a flag token can never slip into a positional slot — without it,
+something like `checkpoint create decision "title" --dir /repo` would leave
+`summary` holding the literal `--dir` and silently pass the not-empty guard. All
+three operands are required; if any is missing the handler prints the `create`
+usage string to stderr and calls `process.exit(1)` before any embedding or
+database work (`src/cli/commands/checkpoint.ts:27-30`). The command does not
+constrain `type` to a fixed set — unlike the MCP tool, which restricts it to one
+of five enum values, `decision`, `milestone`, `blocker`, `direction_change`, or
 `handoff` (`src/tools/checkpoint-tools.ts:12-14`).
 
 The optional `--files` and `--tags` flags are read as single strings and split on
 commas, with each piece trimmed. When a flag is absent the result is an empty
-array (`src/cli/commands/checkpoint.ts:22-25`).
+array (`src/cli/commands/checkpoint.ts:32-35`).
 
 The handler then attributes the note to a conversation. It scans the project's
 transcript directory for `*.jsonl` session files and picks the most recently
 modified one; `discoverSessions` already sorts newest-first by file mtime. If no
 transcript exists, the session id falls back to the literal string `"unknown"`
-(`src/cli/commands/checkpoint.ts:27-28`, `src/conversation/parser.ts:302-332`).
+(`src/cli/commands/checkpoint.ts:37-38`, `src/conversation/parser.ts:312-342`).
 It then asks the database how many turns that session has indexed and stores
 `turnCount - 1` (floored at 0) as the turn index — a best-effort pointer at
 "where in the session this happened." `getTurnCount` is a plain `COUNT(*)` over
 `conversation_turns` for that session id, so on a fresh index with no indexed
 turns it returns 0 and the turn index is 0 too
-(`src/cli/commands/checkpoint.ts:29-30`, `src/db/conversation.ts:117-124`).
+(`src/cli/commands/checkpoint.ts:39-40`, `src/db/conversation.ts:117-124`).
 
 The title and summary are joined as `` `${title}. ${summary}` `` and embedded into
 a single vector by the local model. `embed` runs the text through the model with
 the configured pooling and `normalize: true`, returning a `Float32Array`
-(`src/cli/commands/checkpoint.ts:32`, `src/embeddings/embed.ts:94-102`). The vector
+(`src/cli/commands/checkpoint.ts:42`, `src/embeddings/embed.ts:95-103`). The vector
 width matches the configured embedding dimension, 384 by default
-(`src/embeddings/embed.ts:17`, `src/db/index.ts:338-341`).
+(`src/embeddings/embed.ts:18`, `src/db/index.ts:429-432`).
 
 `db.createCheckpoint` then writes the row and its vector and returns the new id,
 which the handler prints as a one-line confirmation including the id, type, and
-title (`src/cli/commands/checkpoint.ts:33-37`). The embedding step is what makes a
+title (`src/cli/commands/checkpoint.ts:43-47`). The embedding step is what makes a
 checkpoint findable later by `search`; the text actually embedded is title and
 summary joined with a period, so the files and tags are stored as metadata but are
 not part of the vector.
@@ -142,7 +149,7 @@ not part of the vector.
 
 `list` reads back the most recent checkpoints. It reads an optional `--type`
 filter and an optional `--top` count, defaulting to 20 and rejecting anything
-below 1 (`src/cli/commands/checkpoint.ts:39-40`). The numeric parse goes through
+below 1 (`src/cli/commands/checkpoint.ts:49-50`). The numeric parse goes through
 `intFlag`, which uses strict `Number` parsing and throws a `CliFlagError` on
 garbage like `--top 5abc`; the dispatcher catches that, prints the message, and
 exits non-zero rather than crashing (`src/cli/flags.ts:40-53`,
@@ -151,7 +158,7 @@ exits non-zero rather than crashing (`src/cli/flags.ts:40-53`,
 It then calls `db.listCheckpoints(undefined, type, top)`. The first argument is
 the session filter, which the CLI deliberately leaves `undefined` so that **all**
 sessions' checkpoints are listed, not just the current one
-(`src/cli/commands/checkpoint.ts:41`). Under the hood the query starts from
+(`src/cli/commands/checkpoint.ts:51`). Under the hood the query starts from
 `WHERE 1=1`, appends `AND type = ?` only when a type is supplied, orders by
 `timestamp DESC`, and applies the limit (`src/db/checkpoints.ts:51-89`). The
 `files_involved` and `tags` columns are stored as JSON text and parsed back into
@@ -161,18 +168,20 @@ When the result set is empty the handler prints `No checkpoints found.`. Otherwi
 it prints each checkpoint as a small block: a header line with the id, type,
 title, and bracketed tags; a second line with the timestamp and turn index; the
 full summary; and, when present, a `Files:` line — separated by blank lines
-(`src/cli/commands/checkpoint.ts:43-56`).
+(`src/cli/commands/checkpoint.ts:53-65`).
 
 ## Flow: search
 
-`search` takes a free-text query at `args[2]`; a missing query prints the search
-usage string and exits non-zero (`src/cli/commands/checkpoint.ts:58-62`). It reads
-the same optional `--type` filter and a `--top` count, but here the default is 5,
-again validated by `intFlag` (`src/cli/commands/checkpoint.ts:64-65`).
+`search` takes a free-text query at `args[2]`. A missing query — or one that
+begins with `--`, which would otherwise be embedded as the literal flag text and
+silently drop the real query — prints the search usage string and exits non-zero
+(`src/cli/commands/checkpoint.ts:68-74`). It reads the same optional `--type`
+filter and a `--top` count, but here the default is 5, again validated by
+`intFlag` (`src/cli/commands/checkpoint.ts:76-77`).
 
 The query string is embedded into a vector, and `db.searchCheckpoints(queryEmb,
 top, type)` does the nearest-neighbour lookup
-(`src/cli/commands/checkpoint.ts:66-67`). The store query asks the
+(`src/cli/commands/checkpoint.ts:78-79`). The store query asks the
 `vec_checkpoints` virtual table for the closest vectors via `embedding MATCH ?`
 ordered by distance, joins back to `conversation_checkpoints` for the row data,
 and converts each raw distance into a similarity score with `1 / (1 + distance)`
@@ -187,7 +196,7 @@ rows. Second, when no `--type` is given, every candidate up to the limit is kept
 
 Empty results print `No matching checkpoints found.`. Otherwise each hit prints
 its score (four decimals), id, type, and title, then the summary, then an optional
-`Files:` line (`src/cli/commands/checkpoint.ts:69-80`).
+`Files:` line (`src/cli/commands/checkpoint.ts:81-91`).
 
 ## Inputs
 
@@ -221,7 +230,7 @@ its score (four decimals), id, type, and title, then the summary, then an option
 
 The only persistent change this command makes happens in the `create` branch.
 Before the call there is no row for this note; after it there is exactly one new
-checkpoint and its vector (`src/cli/commands/checkpoint.ts:33-37`).
+checkpoint and its vector (`src/cli/commands/checkpoint.ts:43-47`).
 
 `RagDB.createCheckpoint` delegates to the store function, which wraps both writes
 in a single transaction so the row and its embedding always land together
@@ -232,7 +241,7 @@ column. It then reads `last_insert_rowid()` to learn the new id and inserts the
 vector into the `vec_checkpoints` virtual table keyed by that id, passing the
 float buffer as raw bytes (`src/db/checkpoints.ts:18-48`). The split between a
 plain table and a vec0 virtual table mirrors how chunks and `vec_chunks` are
-stored elsewhere in the schema (`src/db/index.ts:323-341`).
+stored elsewhere in the schema (`src/db/index.ts:414-432`).
 
 The transaction matters: if the vector insert failed, the row insert would roll
 back too, so a checkpoint can never exist without its embedding — which would
@@ -243,32 +252,34 @@ itself perform no writes to the checkpoint tables.
 
 - **Unknown subcommand** — anything other than `create`, `list`, or `search`
   prints `Usage: mimirs checkpoint <create|list|search>` to stderr and exits 1
-  (`src/cli/commands/checkpoint.ts:81-84`).
-- **Missing create operands** — if `type`, `title`, or `summary` is absent, the
-  `create` usage line is printed and the process exits 1 before any embedding or
-  database write (`src/cli/commands/checkpoint.ts:17-20`).
-- **Missing search query** — a `search` with no query prints the search usage line
-  and exits 1 (`src/cli/commands/checkpoint.ts:58-62`).
+  (`src/cli/commands/checkpoint.ts:93-95`).
+- **Missing create operands** — if `type`, `title`, or `summary` is absent after
+  flag tokens are skipped, the `create` usage line is printed and the process
+  exits 1 before any embedding or database write
+  (`src/cli/commands/checkpoint.ts:27-30`).
+- **Missing or flag-shaped search query** — a `search` with no query, or one that
+  starts with `--`, prints the search usage line and exits 1
+  (`src/cli/commands/checkpoint.ts:68-74`).
 - **No transcript / fresh project** — when `discoverSessions` finds no `*.jsonl`
   files (directory missing or empty), the session id stored on the checkpoint is
   `"unknown"` and the turn index is 0; the checkpoint is still created normally
-  (`src/cli/commands/checkpoint.ts:27-30`, `src/conversation/parser.ts:302-332`).
+  (`src/cli/commands/checkpoint.ts:37-40`, `src/conversation/parser.ts:312-342`).
 - **Bad `--top`** — a non-integer or out-of-range value throws `CliFlagError`,
   which the dispatcher converts into a clear stderr message and a non-zero exit
   (`src/cli/flags.ts:40-53`, `src/cli/index.ts:96-106`).
 - **Empty `list` result** — prints `No checkpoints found.` and writes nothing
-  (`src/cli/commands/checkpoint.ts:43-44`).
+  (`src/cli/commands/checkpoint.ts:53-54`).
 - **Empty `search` result** — prints `No matching checkpoints found.`
-  (`src/cli/commands/checkpoint.ts:69-70`).
+  (`src/cli/commands/checkpoint.ts:81-82`).
 - **Narrow `--type` on search** — because the type filter is applied after the
   vector search over `topK * 2` candidates, a rare type can yield fewer than
   `--top` results even when more matching checkpoints exist further down the
   distance ranking (`src/db/checkpoints.ts:120-141`).
 - **Type not constrained on create** — the CLI accepts any string for `<type>`,
   so a typo such as `milstone` is stored verbatim and will not match a later
-  `--type milestone` filter (`src/cli/commands/checkpoint.ts:14`).
+  `--type milestone` filter (`src/cli/commands/checkpoint.ts:24`).
 - **Database always closed** — when a branch finishes normally, the handler calls
-  `db.close()` on the way out (`src/cli/commands/checkpoint.ts:86`).
+  `db.close()` on the way out (`src/cli/commands/checkpoint.ts:98`).
 
 ## Example
 

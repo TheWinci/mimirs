@@ -72,11 +72,11 @@ sequenceDiagram
 4. `searchChunks` embeds the query, runs a vector search and a BM25 text search over
    chunks, fuses the two ranked lists by reciprocal-rank fusion, rescores by path and
    importer count, groups child chunks under their parent, expands documentation
-   hits, and returns a ranked `ChunkResult[]` (`src/search/hybrid.ts:486-576`).
+   hits, and returns a ranked `ChunkResult[]` (`src/search/hybrid.ts:492-580`).
 5. As its final step, `searchChunks` records the query in the analytics log — the
    same write that powers [search_analytics](./search-analytics.md). This is the one
    persistent side effect of an otherwise read-only tool
-   (`src/search/hybrid.ts:567-573`).
+   (`src/search/hybrid.ts:571-577`).
 6. If the search returned nothing above the threshold, the handler short-circuits
    with a plain message telling the caller the index may be empty and to run
    `index_files` first (`src/tools/search.ts:314-318`).
@@ -106,21 +106,21 @@ signals (`src/search/hybrid.ts:63`, `src/config/index.ts:23`). The text side of 
 fusion is identifier-aware: the full-text index carries a companion `parts` column of
 split identifier words (camelCase / snake_case / kebab / dotted), so a query for
 `depends` can match a symbol named `getDependsOn` even though the default tokenizer
-treats the whole identifier as one opaque token (`src/db/index.ts:554-557`,
-`src/indexing/identifiers.ts:1-10`). For `write_relevant` this matters because the
+treats the whole identifier as one opaque token (`src/db/index.ts:281-286`,
+`src/indexing/identifiers.ts:1-20`). For `write_relevant` this matters because the
 content you paste in is usually full of identifiers, not prose.
 
 After fusion the scores are rescored: source paths get a `1.1` multiplier and test
 paths `0.85`, boilerplate and generated files are demoted, filename and path-segment
 matches add small multipliers, and a `0.05 * log2(importers + 1)` boost rewards files
-that many others import (`src/search/hybrid.ts:516-554`). Because these multipliers
+that many others import (`src/search/hybrid.ts:517-556`). Because these multipliers
 and the additive boost are applied on top of the compressed RRF score, a final score
 can sit above the `1.0` ceiling of a raw RRF value.
 
 ### Best-per-file selection
 
 `searchChunks` deliberately does **not** deduplicate by file — two chunks from the
-same file can both appear in its ranked output (`src/search/hybrid.ts:486-488`).
+same file can both appear in its ranked output (`src/search/hybrid.ts:488-490`).
 That is the right behaviour when you want to read several relevant snippets, but for
 placement it is noise: you only want one insertion point per file. So the handler
 does its own file-level dedup. It walks the chunk list and keeps, per path, the
@@ -145,7 +145,7 @@ Each returned candidate carries two placement hints. The first is a human-readab
 insert position. If the chunk corresponds to a named entity (a function or class),
 the line reads `after \`<entityName>\` (chunk <chunkIndex>)`; otherwise it falls
 back to `after chunk <chunkIndex>`. Both `entityName` and `chunkIndex` come straight
-off the `ChunkResult` shape (`src/search/hybrid.ts:46-56`,
+off the `ChunkResult` shape (`src/search/hybrid.ts:47-57`,
 `src/tools/search.ts:335-337`).
 
 The second hint is the **anchor**: the last 150 characters of the chunk's content,
@@ -156,7 +156,7 @@ line numbers that may have drifted.
 
 One subtlety worth knowing: when chunk search consolidates several sibling chunks
 into their parent (parent grouping), the promoted parent chunk is emitted with
-`chunkIndex: -1` (`src/search/hybrid.ts:461-471`). In that case the suggestion will
+`chunkIndex: -1` (`src/search/hybrid.ts:463-473`). In that case the suggestion will
 read `(chunk -1)`, which signals that the match is a whole parent unit (for example
 an entire file or large block) rather than a precise sub-chunk. The anchor text is
 still meaningful, but the chunk index is not a real position.
@@ -186,32 +186,36 @@ path filter, so the whole index is in scope (`src/tools/search.ts:310`).
 The scores are the post-rescoring chunk scores from `searchChunks`, formatted with
 `toFixed(2)`. They are reciprocal-rank-fusion values further adjusted by path
 multipliers and an importer-count boost, so a score can exceed `1.0`
-(`src/search/hybrid.ts:513-554`).
+(`src/search/hybrid.ts:515-558`).
 
 ## State changes
 
 | item | before | after | trigger |
 | --- | --- | --- | --- |
-| `query_log` row | no row for this call | one new row recording the query text, result count, top vector cosine, top path, and duration | `db.logQuery(...)` at the end of `searchChunks` (`src/search/hybrid.ts:567-573`) |
+| `query_log` row | no row for this call | one new row recording the query text, result count, the top vector hit's cosine similarity, top path, and duration | `db.logQuery(...)` at the end of `searchChunks` (`src/search/hybrid.ts:571-577`) |
 
 Although `write_relevant` reads the index and never writes code or chunks, it does
 leave a footprint. Every call flows through `searchChunks`, whose last action is to
 insert an analytics row before returning. The `RagDB.logQuery` wrapper delegates to
 the analytics helper, which runs a single `INSERT` into the `query_log` table
-(`src/db/index.ts:949-954`, `src/db/analytics.ts:3-8`). The row's columns are defined
-by the table schema — `query`, `result_count`, `top_score`, `top_path`,
-`duration_ms`, and an ISO `created_at` timestamp (`src/db/index.ts:343-351`).
+(`src/db/index.ts:1077-1082`, `src/db/analytics.ts:3-8`). The row's columns are
+defined by the table schema — `query`, `result_count`, `top_score`, `top_path`,
+`duration_ms`, and an ISO `created_at` timestamp (`src/db/index.ts:434-442`).
 
 Two details are worth knowing. First, the stored `top_score` is *not* the final
-fused score the tool reports — it is the raw top vector cosine
-(`vectorResults[0]?.score`), recorded as a stable relevance signal because the result
-score is now a positional rank-fusion value (`src/search/hybrid.ts:564-573`). Second,
-the `query` stored here is the *content you passed in*, not a natural-language search
-phrase, so write-placement calls show up in [search_analytics](./search-analytics.md)
-mixed with ordinary searches. The `top_path` recorded is whatever `searchChunks`
-ranked first, which may differ from the top file the tool ultimately reports after
-best-per-file dedup, since the analytics row is written before the handler's own
-reduction step.
+fused score the tool reports. The fused score is a positional rank-fusion value that
+sits near `1.0` at the top, so logging it would flatten the analytics. But the raw
+vector score is not a usable signal either: embeddings are L2-normalized and
+`vec_chunks` uses Euclidean distance, so the stored `1 / (1 + distance)` bottoms out
+near `0.333` and the low-relevance (`< 0.3`) heuristic could never fire on it. So the
+top vector hit's raw score is passed through `vectorScoreToCosine`, which recovers a
+true cosine via `cosine = 1 − distance² / 2` before logging (`src/search/hybrid.ts:571-577`,
+`src/db/search.ts:19-25`). Second, the `query` stored here is the *content you passed
+in*, not a natural-language search phrase, so write-placement calls show up in
+[search_analytics](./search-analytics.md) mixed with ordinary searches. The `top_path`
+recorded is whatever `searchChunks` ranked first, which may differ from the top file
+the tool ultimately reports after best-per-file dedup, since the analytics row is
+written before the handler's own reduction step.
 
 ## Branches and failure cases
 
@@ -231,13 +235,13 @@ reduction step.
   (`src/tools/search.ts:302-306`).
 - **Parent-grouped match.** When a candidate is a consolidated parent chunk, its
   reported chunk index is `-1`; the suggestion still names the entity and anchor but
-  the index is not a literal position (`src/search/hybrid.ts:461-471`).
+  the index is not a literal position (`src/search/hybrid.ts:463-473`).
 - **Unnamed chunk.** When a chunk has no `entityName`, the insert line drops the
   entity reference and reads `after chunk <chunkIndex>`
   (`src/tools/search.ts:335-337`).
 - **FTS failure inside search.** If the BM25 text query throws, `searchChunks` logs
   a debug line and continues vector-only; `write_relevant` is unaffected and still
-  returns vector-based candidates (`src/search/hybrid.ts:505-510`).
+  returns vector-based candidates (`src/search/hybrid.ts:507-512`).
 
 ## Example
 
@@ -281,10 +285,13 @@ with the same content shows the real surrounding lines before you write the edit
   (`src/tools/search.ts:277-348`).
 - `src/search/hybrid.ts` — `searchChunks`, the shared chunk search that does the
   embedding, reciprocal-rank fusion (`rrfFuse`), path/importer rescoring, parent
-  grouping, and the analytics write (`src/search/hybrid.ts:486-576`).
+  grouping, and the analytics write (`src/search/hybrid.ts:492-580`).
 - `src/tools/index.ts` — `resolveProject`, which resolves the directory and supplies
-  the database and config (`src/tools/index.ts:21-37`).
-- `src/db/index.ts` / `src/db/analytics.ts` — the `RagDB.logQuery` wrapper, the
-  `INSERT` into `query_log`, and that table's schema.
+  the database and config (`src/tools/index.ts:22-37`).
+- `src/db/search.ts` — `vectorScoreToCosine`, which converts the stored L2-based
+  vector score back to a true cosine for the analytics log (`src/db/search.ts:19-25`).
+- `src/db/index.ts` / `src/db/analytics.ts` — the `RagDB.logQuery` wrapper
+  (`src/db/index.ts:1077-1082`), the `INSERT` into `query_log` (`src/db/analytics.ts:3-8`),
+  and that table's schema (`src/db/index.ts:434-442`).
 - `src/config/index.ts` — defaults for `hybridWeight` (0.5) and
   `parentGroupingMinCount` (2) that feed the search.

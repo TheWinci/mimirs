@@ -26,8 +26,8 @@ Nothing in the `analytics` command writes log rows. The data comes entirely from
 the search path. When a search runs, the hybrid search function measures how
 long it took, then records one row: the query text, how many results came back,
 a relevance score, the path of the top result, and the duration in milliseconds
-— `src/search/hybrid.ts:408-414`. A second search variant records the same shape
-after parent-grouping and doc expansion — `src/search/hybrid.ts:567-573`. Both
+— `src/search/hybrid.ts:410-416`. A second search variant records the same shape
+after parent-grouping and doc expansion — `src/search/hybrid.ts:571-577`. Both
 call the database wrapper `db.logQuery(...)`, which inserts into the `query_log`
 table — `src/db/analytics.ts:3`.
 
@@ -35,21 +35,24 @@ The `top_score` that gets logged is **not** the score shown to the caller. Since
 the hybrid-search fix, the visible result score is a positional rank-fusion value
 that sits near `1.0` at the top regardless of true relevance, so logging it would
 make the average-top-score and the `< 0.3` low-relevance heuristic meaningless.
-Both call sites instead log the **raw top vector cosine** —
-`vectorResults[0]?.score ?? null`, which is `null` when there were no vector hits
-— `src/search/hybrid.ts:411`, `src/search/hybrid.ts:570`. That raw cosine is the
-relevance signal this report aggregates into `Avg top score` and the
-low-relevance list.
+Both call sites instead log the top vector hit converted back to **true cosine
+similarity** — `vectorScoreToCosine(vectorResults[0]?.score)`, which is `null`
+when there were no vector hits — `src/search/hybrid.ts:413`,
+`src/search/hybrid.ts:574`. The stored vector score is L2-distance-based and
+bottoms out near `0.33`, so this conversion is what keeps the `< 0.3`
+low-relevance heuristic from being permanently dead — `src/db/search.ts:19-25`.
+That cosine value is the relevance signal this report aggregates into `Avg top
+score` and the low-relevance list.
 
 The table is created on database open if it does not already exist —
-`src/db/index.ts:343`:
+`src/db/index.ts:434-442`:
 
 | Column | Type | Meaning |
 | --- | --- | --- |
 | `id` | INTEGER PK | Autoincrement row id |
 | `query` | TEXT | The query string that was searched |
 | `result_count` | INTEGER | How many results that search returned |
-| `top_score` | REAL (nullable) | Raw top vector cosine for the query, or NULL when there were no vector hits |
+| `top_score` | REAL (nullable) | Top vector hit's cosine similarity for the query, or NULL when there were no vector hits |
 | `top_path` | TEXT (nullable) | File path of the best result |
 | `duration_ms` | INTEGER | Search latency in milliseconds |
 | `created_at` | TEXT | ISO timestamp the row was written |
@@ -99,7 +102,7 @@ sequenceDiagram
    and rejects non-integer or sub-1 values — `src/cli/commands/analytics.ts:8`.
 4. It opens the index database for that directory by constructing a `RagDB`,
    which opens `index.db` inside the project's `.mimirs` directory and ensures the
-   schema (including `query_log`) exists — `src/db/index.ts:135`,
+   schema (including `query_log`) exists — `src/db/index.ts:144`,
    `src/cli/commands/analytics.ts:9`.
 5. It calls `getAnalytics(days)`, which runs seven aggregate SQL queries over
    rows newer than `now - days` and returns a single object —

@@ -54,20 +54,22 @@ trust in the semantic and lexical signals (`src/config/index.ts:118`,
 ### Identifier-aware keyword search
 
 A plain full-text index would never let `depends` match `getDependsOn`, because
-FTS5's default tokenizer splits on punctuation and whitespace but *not* on case
-boundaries — `getDependsOn` is one opaque token (`src/indexing/identifiers.ts:1-9`).
-To fix that, every chunk row carries a companion `parts` column, and the
-`fts_chunks` virtual table indexes both `snippet` and `parts`
-(`src/db/index.ts` schema, `CREATE VIRTUAL TABLE ... fts_chunks USING fts5(snippet, parts, ...)`).
-The `parts` value is built by `identifierParts`, which walks the chunk text, and
-for each *compound* identifier emits its lowercase word pieces via
-`splitIdentifier` — camelCase, PascalCase, snake_case, kebab, and dotted names
-all split (`src/indexing/identifiers.ts:12-35`). Single plain words already live
-in the snippet, so they are not repeated. The keyword query itself is sanitized
-by `sanitizeFTS`, which double-quotes each whitespace token and joins them with
-`OR`, so a query like `depends graph` becomes `"depends" OR "graph"` and can hit
-either the snippet or the split `parts` tokens (`src/search/usages.ts`,
-`src/db/search.ts:128`).
+FTS5's default `unicode61` tokenizer splits on punctuation and whitespace but
+*not* on case boundaries — `getDependsOn` is one opaque token
+(`src/indexing/identifiers.ts:1-9`). To fix that, every chunk row carries a
+companion `parts` column, and the `fts_chunks` virtual table indexes both
+`snippet` and `parts` (`CREATE VIRTUAL TABLE ... fts_chunks USING fts5(snippet,
+parts, content='chunks', ...)`, `src/db/index.ts:281-286`). The `parts` value is
+built by `identifierParts`, which walks the chunk text and for each *compound*
+identifier emits its lowercase word pieces (≥2 chars) via `splitIdentifier` —
+camelCase, PascalCase, snake_case, kebab, and dotted names all split
+(`src/indexing/identifiers.ts:13-41`). Single plain words already live in the
+snippet, so they are not repeated; tokens longer than 80 characters are skipped
+to avoid the case-boundary regex going quadratic on a base64/hex blob. The
+keyword query itself is sanitized by `sanitizeFTS`, which double-quotes each
+whitespace token and joins them with `OR`, so a query like `depends graph`
+becomes `"depends" OR "graph"` and can hit either the snippet or the split
+`parts` tokens (`src/search/usages.ts:39-43`, `src/db/search.ts:151`).
 
 ## How a call flows
 
@@ -93,7 +95,7 @@ flowchart TD
     Sym --> Boost["path boost, filename affinity,<br>generated demotion, graph centrality boost"]
     Boost --> Sort["sort by fused score"]
     Sort --> Docs["expandForDocs:<br>docs do not displace code"]
-    Docs --> Log["db.logQuery:<br>write a query_log row (raw top cosine)"]
+    Docs --> Log["db.logQuery:<br>write a query_log row (top hit's cosine)"]
     Log --> Empty{"results empty?"}
     Empty -- yes --> NoRes["return 'No results found'<br>+ index hint"]
     Empty -- no --> Format["build header + body + footer"]
@@ -125,7 +127,7 @@ flowchart TD
    (`src/search/hybrid.ts:378-398`).
 7. **Protect docs, then log.** Documentation hits are appended as bonus results so
    they do not push code out of the top-K, and every call writes one analytics row
-   before returning (`src/search/hybrid.ts:400-416`).
+   before returning (`src/search/hybrid.ts:400-418`).
 8. **Format or report empty.** Back in the tool, an empty list returns a plain "no
    results" message with an indexing hint; otherwise the results become a header,
    a scored body, and a footer tip (`src/tools/search.ts:72-97`).
@@ -150,7 +152,7 @@ only `query` must be supplied. The Zod schema rejects an empty query or one over
 | output | where it lands / shape / description |
 | --- | --- |
 | Ranked file paths with snippet previews | Returned as MCP text content. Each result is the fused score to four decimals, two spaces, the file path, then on the next line the first matched snippet truncated to 400 characters with a trailing `...`. A `── N results across M indexed files (Tms) ──` header sits above and a tip to call `read_relevant` below (`src/tools/search.ts:84-96`). |
-| `query_log` row | One row inserted into the `query_log` table per call, recording the query text, result count, the raw top vector cosine, the top result's path, and duration. This is a side effect, not part of the returned text (`src/search/hybrid.ts:408-414`). |
+| `query_log` row | One row inserted into the `query_log` table per call, recording the query text, result count, the top vector hit's cosine similarity, the top result's path, and duration. This is a side effect, not part of the returned text (`src/search/hybrid.ts:410-416`). |
 
 A sample of the returned text (synthetic values):
 
@@ -183,19 +185,24 @@ Every search appends a row to the `query_log` table, regardless of whether any
 results were found. After the rerank finishes, `search()` computes its own elapsed
 time and calls `db.logQuery(...)` with the query string, the final result count,
 the top result's path, the duration in milliseconds, and — deliberately — the
-**raw top vector cosine** (`vectorResults[0]?.score`) rather than the fused score
-(`src/search/hybrid.ts:403-414`). The fused score is now a positional rank value
-that sits near `1.0` at the top, so logging it would make "average top score" and
-the low-relevance (`< 0.3`) heuristic meaningless; the raw cosine keeps those
-analytics interpretable. The insert is a plain
-`INSERT INTO query_log (...)` stamped with an ISO timestamp
-(`src/db/analytics.ts:3-8`); the table is created on database open as part of the
-schema in `src/db/index.ts`.
+**top vector hit's cosine similarity** rather than the fused score
+(`src/search/hybrid.ts:410-416`). Two conversions matter here. First, the fused
+score is now a positional rank value that sits near `1.0` at the top, so logging
+it would make "average top score" and the low-relevance (`< 0.3`) heuristic
+meaningless. Second, the stored vector score is itself *not* a cosine: embeddings
+are L2-normalized and `vec_chunks` uses vec0's default Euclidean distance, so the
+stored `1 / (1 + distance)` bottoms out near `0.333` and the `< 0.3` heuristic
+could never fire on it. So `search()` passes the raw vector score through
+`vectorScoreToCosine`, which inverts the distance and applies `cosine = 1 −
+distance² / 2` to recover a true cosine in `[-1, 1]` before logging it
+(`src/db/search.ts:19-25`). The insert is a plain `INSERT INTO query_log (...)`
+stamped with an ISO timestamp (`src/db/analytics.ts:3-8`); the table is created on
+database open as part of the schema in `src/db/index.ts:434`.
 
 | | value |
 | --- | --- |
 | before | no row for this call |
-| after | one `query_log` row: `query`, `result_count`, `top_score` (raw cosine), `top_path`, `duration_ms`, `created_at` |
+| after | one `query_log` row: `query`, `result_count`, `top_score` (top hit's cosine), `top_path`, `duration_ms`, `created_at` |
 
 This matters because it is the only record of what was searched. The
 [search_analytics](search-analytics.md) tool reads this table to surface
@@ -211,11 +218,15 @@ it returns, so the two timings can differ slightly (`src/tools/search.ts:67-69`)
   or absent, `buildFilter` returns `undefined` and the search runs across the
   whole index with no path constraints (`src/tools/search.ts:19-23`).
 - **Scoped search.** When any scope array is set, the resulting `PathFilter` is
-  pushed down into the SQL as `LIKE` clauses (extensions as `%.ext`, dirs as
-  `dir/%`, excludeDirs as `NOT LIKE dir/%`), and the inner vector/FTS query
-  over-fetches five times `topK` so the filter has enough candidates to work with
-  (`src/db/search.ts:16-54`). Symbol-expanded hits that bypassed SQL are filtered
-  again in memory by `matchesFilter` (`src/search/hybrid.ts:385`).
+  pushed down into the SQL as parametrized `LIKE ? ESCAPE '\'` clauses
+  (extensions as `%.ext`, dirs as `dir/%`, excludeDirs as `NOT LIKE dir/%`), and
+  the inner vector/FTS query over-fetches five times `topK` so the filter has
+  enough candidates to work with (`src/db/search.ts:36-77`). Each user-supplied
+  extension and directory is run through `escapeLike` first, so a `%`, `_`, or `\`
+  in a name (for example a directory called `my_module`) matches literally instead
+  of acting as a SQL wildcard and silently over-matching (`src/search/usages.ts:24-26`).
+  Symbol-expanded hits that bypassed SQL are filtered again in memory by
+  `matchesFilter` (`src/search/hybrid.ts:385`).
 - **Empty results.** If nothing survives, the tool returns a single message:
   `No results found ... across <N> indexed files. Has the directory been indexed?
   Try calling index_files first.` When a filter was active, the phrase ` matching
@@ -260,7 +271,7 @@ These are heuristics tuned for "find the implementation, not the test or the
 generated stub." They are worth knowing when a result ranks higher or lower than
 its raw fusion score would suggest. The same adjustments are applied per-chunk in
 `searchChunks()` for [read_relevant](read-relevant.md), so the two tools rank
-consistently (`src/search/hybrid.ts:512-555`).
+consistently (`src/search/hybrid.ts:517-556`).
 
 ## search vs read_relevant
 

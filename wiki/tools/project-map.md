@@ -56,7 +56,7 @@ flowchart TD
 2. The handler calls `resolveProject(directory, getDB)`, which resolves the
    directory to an absolute path (falling back to `RAG_PROJECT_DIR` or the
    current working directory), confirms it exists, loads config, and opens the
-   matching database `src/tools/index.ts:22-37`. A non-existent directory throws
+   matching database `src/tools/index.ts:22-44`. A non-existent directory throws
    here before any map work begins.
 3. The handler calls `generateProjectMap` with the resolved project directory
    and the caller's options, defaulting `zoom` to `"file"` and `format` to
@@ -66,9 +66,9 @@ flowchart TD
    empty graph rather than erroring `src/graph/resolver.ts:195-201`.
 5. `getSubgraph` runs a breadth-first walk over the import edges starting at the
    focus file, up to `maxHops` (defaulted to 2 inside the resolver) in both
-   directions — importers and dependencies `src/db/graph.ts:1029-1158`.
+   directions — importers and dependencies `src/db/graph.ts:1043-1154`.
 6. With no `focus`, `getGraph` loads every file, every export, and every
-   resolved edge in three SQL queries `src/db/graph.ts:975-1027`.
+   resolved edge in three SQL queries `src/db/graph.ts:989-1041`.
 7. If the resulting graph has no nodes, the resolver short-circuits: text mode
    returns a one-line "nothing found" string, JSON mode returns an empty object
    `src/graph/resolver.ts:206-211`.
@@ -88,9 +88,9 @@ indexer calls `resolveImports`, which matches each import specifier (for example
 `../db`) to a concrete indexed file id and writes that id into
 `file_imports.resolved_file_id` via `db.resolveImport`
 `src/graph/resolver.ts:24-61`. The indexer triggers this once per index run,
-right after files are chunked `src/indexing/indexer.ts:784-786`. An edge only
+right after files are chunked `src/indexing/indexer.ts:893-901`. An edge only
 appears in the map after it has been resolved this way — every graph query
-filters on `resolved_file_id IS NOT NULL` `src/db/graph.ts:1015`.
+filters on `resolved_file_id IS NOT NULL` `src/db/graph.ts:1029`.
 
 Resolution is two-pass: first `@winci/bun-chunk`'s filesystem resolver (which
 understands tsconfig path aliases plus Python and Rust import styles), then a
@@ -109,7 +109,7 @@ though they exist in source.
 
 | name | type | required | description |
 | --- | --- | --- | --- |
-| `directory` | string | no | Project directory to map. Defaults to `RAG_PROJECT_DIR` or the current working directory. Resolved to an absolute path; must exist or the call throws `src/tools/index.ts:26-32`. |
+| `directory` | string | no | Project directory to map. Defaults to `RAG_PROJECT_DIR` or the current working directory. Resolved to an absolute path; must exist or the call throws `src/tools/index.ts:26-34`. |
 | `focus` | string | no | A file path relative to the project root. When set, the map is limited to that file's neighborhood (its importers and dependencies, up to 2 hops) instead of the whole project `src/graph/resolver.ts:195-201`. |
 | `zoom` | `"file"` \| `"directory"` | no | Granularity. `"file"` (default) lists individual files; `"directory"` groups files by folder and shows folder-to-folder dependencies `src/graph/resolver.ts:220-224`. |
 | `format` | `"text"` \| `"json"` | no | Output shape. `"text"` (default) is a human-readable outline; `"json"` is a structured object that adds fan-in/fan-out counts `src/graph/resolver.ts:213-218`. |
@@ -206,7 +206,7 @@ only reads it.
 
 - Non-existent `directory`: `resolveProject` throws
   `Directory does not exist: <abs-path>` before any map is built
-  `src/tools/index.ts:30-32`.
+  `src/tools/index.ts:32-34`.
 - `focus` names a file that is not indexed: `getFileByPath` returns nothing, the
   resolver substitutes an empty graph, and the next branch reports nothing found
   rather than throwing `src/graph/resolver.ts:196-201`.
@@ -222,12 +222,12 @@ only reads it.
   under SQLite's 999-parameter limit. The final edge-collection pass batches by
   `file_id` alone and filters the other endpoint in JS against the visited set,
   rather than reusing one batch for both endpoints of an edge (which could drop
-  edges that span batches) `src/db/graph.ts:1107-1158`.
+  edges that span batches) `src/db/graph.ts:1117-1151`.
 - `format: "json"` skips the tip footer; text output always appends it
   `src/tools/graph-tools.ts:76-86`.
 - Bare/external imports are never edges: only imports whose `resolved_file_id`
   is set appear, so third-party packages and unresolved relative imports are
-  absent `src/db/graph.ts:1015`.
+  absent `src/db/graph.ts:1029`.
 
 ## Example
 

@@ -57,7 +57,7 @@ sequenceDiagram
 
 ## What "resolved dependencies" means
 
-The list this tool returns is deliberately narrow: it is the set of imports that indexing was able to *resolve* to another file that is itself in the index. The query that produces it is `getDependsOn`, which joins `file_imports` to `files` and keeps only rows whose `resolved_file_id IS NOT NULL` `src/db/graph.ts:1161`:
+The list this tool returns is deliberately narrow: it is the set of imports that indexing was able to *resolve* to another file that is itself in the index. The query that produces it is `getDependsOn`, which joins `file_imports` to `files` and keeps only rows whose `resolved_file_id IS NOT NULL` `src/db/graph.ts:1174`:
 
 ```sql
 SELECT f.path, fi.source
@@ -77,9 +77,9 @@ So `depends_on` reports the *internal* dependency edges of the project, not the 
 
 ### Where the edges come from
 
-The data this tool reads is written earlier, during indexing, not at query time. When a file is parsed, its raw import statements are stored in `file_imports` with `resolved_file_id` left unset — see the insert in `upsertFileGraph`, which deletes the file's old import rows and re-inserts `source`, `names`, and the default/namespace flags, but never a resolved id `src/db/graph.ts:905`. A later project-wide pass, `resolveImports`, walks every unresolved import, tries to map its specifier to an indexed file — first via the filesystem resolver that understands tsconfig paths plus Python and Rust conventions, then via a fallback that probes extensions and `index` files against indexed paths — and fills in `resolved_file_id` only when it finds a match `src/graph/resolver.ts:24`. The `file_imports` table itself stores `source`, the parsed `names`, the `is_default` / `is_namespace` flags, and the eventual `resolved_file_id` `src/db/index.ts:225`.
+The data this tool reads is written earlier, during indexing, not at query time. When a file is parsed, its raw import statements are stored in `file_imports` with `resolved_file_id` left unset — see the insert in `upsertFileGraph`, which deletes the file's old import rows and re-inserts `source`, `names`, the `imported` original name, and the default/namespace flags, but never a resolved id `src/db/graph.ts:917`. A later project-wide pass, `resolveImports`, walks every unresolved import, tries to map its specifier to an indexed file — first via the bun-chunk filesystem resolver that understands tsconfig paths plus Python and Rust conventions, then via a fallback that probes extensions and `index` files against indexed paths — and fills in `resolved_file_id` only when it finds a match `src/graph/resolver.ts:24`. The `file_imports` table itself stores `source`, the parsed `names`, the `is_default` / `is_namespace` flags, and the eventual `resolved_file_id`.
 
-`depends_on` is therefore only as complete as the last resolution pass: a freshly added dependency that hasn't been re-indexed and re-resolved won't appear yet. The `RagDB.getDependsOn` method is a thin pass-through to the `graph.ts` query function, which is why the handler can stay so small `src/db/index.ts:812`.
+`depends_on` is therefore only as complete as the last resolution pass: a freshly added dependency that hasn't been re-indexed and re-resolved won't appear yet. The `RagDB.getDependsOn` method is a thin pass-through to the `graph.ts` query function, which is why the handler can stay so small.
 
 ## Inputs
 
@@ -138,6 +138,6 @@ Each line pairs the dependency's project-relative path with the import specifier
 
 - `src/tools/graph-tools.ts` — registers the `depends_on` MCP tool and holds its handler: the path lookup, the three return branches, and line formatting.
 - `src/db/graph.ts` — `getDependsOn` runs the SQL join over `file_imports` that filters to resolved internal edges; `upsertFileGraph` stores the raw import rows during indexing.
-- `src/db/index.ts` — the `RagDB.getDependsOn` pass-through method and the `file_imports` table schema.
+- `src/db/index.ts` — the `RagDB.getDependsOn` pass-through method on the database class.
 - `src/db/files.ts` — `getFileByPath`, the normalized-path lookup that decides whether a file is "in the index".
 - `src/graph/resolver.ts` — `resolveImports`, the pass that fills `resolved_file_id` so that an import becomes a reported dependency.

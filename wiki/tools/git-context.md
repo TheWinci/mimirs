@@ -86,7 +86,7 @@ sequenceDiagram
    indexed (`src/tools/git-tools.ts:59-65`).
 7. `RagDB.getFileByPath` queries the `files` table by normalized path; a row
    means the file is indexed, `null` means it is not
-   (`src/db/index.ts:655-657`, `src/db/files.ts:8-14`).
+   (`src/db/index.ts:780-782`, `src/db/files.ts:8-14`).
 8. Unless `files_only` is set, the handler appends the recent-commit log for the
    `since..HEAD` range (`src/tools/git-tools.ts:71-76`).
 9. The handler always queries the names of files changed across `since..HEAD`
@@ -178,7 +178,7 @@ directly.
 | Branch | Condition | Behavior |
 | --- | --- | --- |
 | Not a git repo | `findGitRoot` returns `null` | Returns `Not a git repository.` and stops before any section work (`src/tools/git-tools.ts:47-49`). |
-| Directory missing | Resolved `directory` does not exist | `resolveProject` throws `Directory does not exist: <path>` before the git root is even looked up (`src/tools/index.ts:30-31`). |
+| Directory missing | Resolved `directory` does not exist | `resolveProject` throws `Directory does not exist: <path>` before the git root is even looked up (`src/tools/index.ts:32-34`). |
 | Clean working tree | `git status --short` returns empty/null | The uncommitted-changes section is skipped (`src/tools/git-tools.ts:56-58`). |
 | Empty commit range | `git log` returns nothing for `since..HEAD` | The recent-commits section is omitted (`src/tools/git-tools.ts:73`). |
 | No changed files | `git diff --name-only` returns nothing | The changed-files section is omitted (`src/tools/git-tools.ts:80`). |
@@ -257,7 +257,7 @@ data.
 - `src/tools/git-tools.ts` — the `git_context` MCP tool handler plus the
   `runGit` and `findGitRoot` helpers (`src/tools/git-tools.ts:6-103`).
 - `src/tools/index.ts` — `resolveProject`, which resolves the directory and
-  database, and registers the git tools (`src/tools/index.ts:22-37`, `:52`).
+  database, and registers the git tools (`src/tools/index.ts:22-45`, `:60`).
 - `src/db/files.ts` — `getFileByPath`, the indexed-file lookup behind the
   `[indexed]`/`[not indexed]` tag (`src/db/files.ts:8-14`).
 - `src/utils/path.ts` — `normalizePath`, which makes the path comparison

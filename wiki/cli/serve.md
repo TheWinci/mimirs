@@ -66,7 +66,7 @@ When the server import throws, the catch block does best-effort reporting in thr
 
 The `.mimirs` directory is created with `mkdirSync(..., { recursive: true })` first so the writes do not fail on a fresh project (`src/cli/commands/serve.ts:22-23`). All of this disk I/O is wrapped in its own inner `try/catch` with an empty catch body: if even writing the diagnostics fails (read-only filesystem, permission denied), the handler does not throw from the reporting code — it silently moves on and still rethrows the original load error (`src/cli/commands/serve.ts:45-48`).
 
-That rethrown error bubbles up through `dispatch()` and `main()`. Because it is not a `CliFlagError`, `main`'s catch re-throws it rather than printing a flag message (`src/cli/index.ts:101-105`), so it reaches the top-level handler in `src/main.ts:5-34`. That handler writes its *own* `.mimirs/server-error.log` — this one labelled as a crash (`mimirs server crashed at ...`, `src/main.ts:19`) — prints `[mimirs] FATAL: <msg>`, and calls `process.exit(1)`. The net effect of a load failure is a non-zero exit plus an overwritten `server-error.log`; the `status` file written by the handler is what `status` and [doctor](doctor.md) read to report the failed phase.
+That rethrown error bubbles up through `dispatch()` and `main()`. Because it is not a `CliFlagError`, `main`'s catch re-throws it rather than printing a flag message (`src/cli/index.ts:101-105`), so it reaches the top-level handler in `src/main.ts:5-40`. That handler writes its *own* `.mimirs/server-error.log` — but only when the command word is `serve`, and labelled as a crash (`mimirs server crashed at ...`, `src/main.ts:14-32`) — prints `[mimirs] FATAL: <msg>`, and calls `process.exit(1)`. The net effect of a load failure is a non-zero exit plus an overwritten `server-error.log`; the `status` file written by the handler is what `status` and [doctor](doctor.md) read to report the failed phase.
 
 ## Inputs
 
@@ -82,7 +82,7 @@ The `serve` command takes no positional arguments and no flags. `dispatch()` mat
 | --- | --- |
 | stdio MCP server process | On success, control passes to `startServer()`, which connects a `StdioServerTransport` and serves tool calls over the process's stdin/stdout until shutdown (`src/cli/commands/serve.ts:51`, `src/server/index.ts:203-207`). The handler does not return while the server runs. |
 | stderr progress lines | Human-readable lines for the client log: the `Starting MCP server (stdio) for <dir>` notice at launch, a `FATAL` line on load failure, and `Server ready — listening on stdin/stdout` after `startServer()` returns (`src/cli/commands/serve.ts:6,18,52`). |
-| `.mimirs/server-error.log` | Written only on module-load failure: timestamp, error message, stack, and a `bunx mimirs doctor` hint (`src/cli/commands/serve.ts:24-35`). A second, crash-labelled copy is written by `src/main.ts:16-27` if the error reaches the top level. |
+| `.mimirs/server-error.log` | Written only on module-load failure: timestamp, error message, stack, and a `bunx mimirs doctor` hint (`src/cli/commands/serve.ts:24-35`). A second, crash-labelled copy is written by `src/main.ts:14-32` if the error reaches the top level. |
 | `.mimirs/status` | Written only on module-load failure: first line `error`, then `phase: module load failed`, a timestamp, and the message (`src/cli/commands/serve.ts:36-44`). All successful-startup status lines (`starting`, phase markers, `done`) are written later by `startServer()` itself, not by this handler (`src/server/index.ts:110,324-331`). |
 
 ## State changes
@@ -103,7 +103,7 @@ Both writes are best-effort and silently skipped if the filesystem rejects them 
 | Server module imports cleanly | `startServer` is destructured from the import and awaited; the server runs (`src/cli/commands/serve.ts:14,51`). |
 | Server module throws at load | Caught; stderr `FATAL`, `.mimirs/server-error.log`, and `.mimirs/status` are written, then the error is rethrown (`src/cli/commands/serve.ts:15-48`). |
 | Diagnostics write also fails | The inner `try/catch` swallows the write error; the original load error is still rethrown (`src/cli/commands/serve.ts:45-48`). |
-| `startServer()` itself throws | Not caught here — it propagates out of `serveCommand()` through `dispatch()` and `main()` to the top-level handler in `src/main.ts:5-34`, which writes a crash log and exits `1`. (Note: `startServer` catches most of its own startup failures internally and writes status without throwing, so reaching this branch is rare — see [Server: MCP stdio start](../server/start.md).) |
+| `startServer()` itself throws | Not caught here — it propagates out of `serveCommand()` through `dispatch()` and `main()` to the top-level handler in `src/main.ts:5-40`, which writes a crash log and exits `1`. (Note: `startServer` catches most of its own startup failures internally and writes status without throwing, so reaching this branch is rare — see [Server: MCP stdio start](../server/start.md).) |
 | Rethrown error reaches `main()` | Because it is not a `CliFlagError`, `main`'s catch re-throws it rather than printing a flag message and exiting cleanly (`src/cli/index.ts:101-105`). |
 | Normal completion | After `startServer()` returns, the `Server ready` line is written; the process stays alive serving over stdio until a shutdown signal or stdin EOF closes it (`src/cli/commands/serve.ts:52`, `src/server/index.ts:154-163`). |
 
@@ -147,7 +147,7 @@ When that happens, the recovery path is the [doctor](doctor.md) command, which i
 
 | file | role |
 | --- | --- |
-| `src/main.ts` | Binary entrypoint; calls `main()` and owns the top-level crash handler that writes a crash-labelled `server-error.log` and exits `1` (`src/main.ts:5-34`). |
+| `src/main.ts` | Binary entrypoint; calls `main()` and owns the top-level crash handler that writes a crash-labelled `server-error.log` (only for `serve`) and exits `1` (`src/main.ts:5-40`). |
 | `src/cli/index.ts` | CLI dispatcher; the `serve` case lazily imports and runs `serveCommand()` (`src/cli/index.ts:111-114`). |
 | `src/cli/commands/serve.ts` | The `serve` handler — dynamically imports the server module, writes diagnostics on load failure, and delegates to `startServer()`. |
 | `src/server/index.ts` | Defines `startServer()`, the full server lifecycle this command hands off to. |

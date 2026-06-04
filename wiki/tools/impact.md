@@ -46,7 +46,7 @@ sequenceDiagram
 
 ## Resolving the symbol and handling ambiguity
 
-A bare name is not enough — the same function name can be defined in many files, and an "impact" answer for the wrong one is worse than no answer. `resolveSymbol` calls `getCallablesByName`, which queries two sources: exported functions and methods from `file_exports`, and module-private (non-exported) functions and methods from the chunk table that have no matching export row (`src/db/graph.ts:763-817`). Only callable kinds are returned — classes, constants, and types are not tracked, which is why the not-found message says so.
+A bare name is not enough — the same function name can be defined in many files, and an "impact" answer for the wrong one is worse than no answer. `resolveSymbol` calls `getCallablesByName`, which queries two sources: exported functions and methods from `file_exports`, and module-private (non-exported) functions and methods from the chunk table that have no matching export row (`src/db/graph.ts:777-831`). Only callable kinds are returned — classes, constants, and types are not tracked, which is why the not-found message says so.
 
 When a `file` argument is given, candidates are filtered to those whose path ends with that (slash-normalized) suffix, so `impact("handle", "routes/users.ts")` keeps only the definition in that file (`src/graph/trace.ts:177-180`). An export and a same-name local in the *same* file collapse to the export, since they are the same declaration seen two ways (`src/graph/trace.ts:184-190`). After that:
 
@@ -58,7 +58,7 @@ When a `file` argument is given, candidates are filtered to those whose path end
 
 ## Walking transitive callers: the display pass
 
-The blast radius is computed over a per-walk view of the call graph, `CallGraph`, which loads every callable export and a project-wide map of inbound reference counts once, then memoizes edge lookups so repeated nodes cost no extra database hits (`src/graph/trace.ts:44-57`). A node's *callers* come from the resolved symbol-ref graph: for an exported callable, `getCallersOfExport` returns every distinct enclosing callable that references it; for a module-private one, `getCallersOfLocalSymbol` returns same-file callers only (`src/graph/trace.ts:122-150`, `src/db/graph.ts:718-745`).
+The blast radius is computed over a per-walk view of the call graph, `CallGraph`, which loads every callable export and a project-wide map of inbound reference counts once, then memoizes edge lookups so repeated nodes cost no extra database hits (`src/graph/trace.ts:44-57`). A node's *callers* come from the resolved symbol-ref graph: for an exported callable, `getCallersOfExport` returns every distinct enclosing callable that references it; for a module-private one, `getCallersOfLocalSymbol` returns same-file callers only (`src/graph/trace.ts:122-151`, `src/db/graph.ts:732-759`).
 
 The display pass is a breadth-first walk outward from the target, bounded three ways (`src/graph/trace.ts:235-273`):
 
@@ -70,7 +70,7 @@ The display pass is a breadth-first walk outward from the target, bounded three 
 
 Some callables are called from everywhere — a logger, a small string helper — and walking *into* them would explode the tree without telling you anything about the change. The walk prunes these "ambient" nodes: it shows them as a leaf marked `(ambient — not expanded)` and never walks their callers (`src/graph/trace.ts:260-265`). The threshold is `AMBIENT_FANIN = 25` (`src/graph/trace.ts:41`).
 
-The subtle part is *how* fan-in is measured. It is the inbound count for that **specific export id**, from `countInboundRefsByExport`, not a count by name (`src/graph/trace.ts:56`, `src/graph/trace.ts:72-77`, `src/db/graph.ts:827-851`). Counting by name would be wrong: a common method name like `search` would inherit a project-wide tally and get pruned even where a particular `search` has only two real callers. Locals are never ambient — their caller set is same-file only, so it is naturally small (`src/graph/trace.ts:70-73`). Each pruned node's name and inbound count is collected so the renderer can list them under an `ambient (high fan-in, not expanded)` footer (`src/graph/trace.ts:621-626`).
+The subtle part is *how* fan-in is measured. It is the inbound count for that **specific export id**, from `countInboundRefsByExport`, not a count by name (`src/graph/trace.ts:56`, `src/graph/trace.ts:72-77`, `src/db/graph.ts:841-865`). Counting by name would be wrong: a common method name like `search` would inherit a project-wide tally and get pruned even where a particular `search` has only two real callers. Locals are never ambient — their caller set is same-file only, so it is naturally small (`src/graph/trace.ts:70-73`). Each pruned node's name and inbound count is collected so the renderer can list them under an `ambient (high fan-in, not expanded)` footer (`src/graph/trace.ts:621-626`).
 
 ## The count pass: an honest headline
 
@@ -87,13 +87,13 @@ The safety cap is `COUNT_CAP = 2000` (`src/graph/trace.ts:222`). If the count wa
 | **precise** | test files that *name the symbol* — `getSymbolReferencesByName` filtered to test paths (`src/graph/trace.ts:516`) | tests that exercise this symbol by name; the highest-signal tests to run |
 | **broad** | test files in the *transitive importer closure* of the symbol's file, minus the precise ones (`src/graph/trace.ts:520-525`) | tests that don't name the symbol but reach its file through the import graph |
 
-A file counts as a test when its path matches the shared test-path patterns in `isTestPath` (a `tests/`, `__tests__/`, `spec/`, or `test_` segment, or a `.test.`/`.spec.` suffix) (`src/utils/test-paths.ts:9-18`). The broad list comes from `transitiveImporters`, the same file-level importer-closure walk the [`affected`](../cli/affected.md) CLI uses (`src/graph/trace.ts:488-504`). Both lists are made project-relative and sorted; the renderer caps each block at 25 entries and appends a `… +N more` line when there are more (`src/graph/trace.ts:636-651`).
+A file counts as a test when its path matches the shared test-path patterns in `isTestPath` (a `tests/`, `__tests__/`, `spec/`, or `test_` segment, or a `.test.`/`.spec.` suffix) (`src/utils/test-paths.ts:9-19`). The broad list comes from `transitiveImporters`, the same file-level importer-closure walk the [`affected`](../cli/affected.md) CLI uses (`src/graph/trace.ts:488-504`). Both lists are made project-relative and sorted; the renderer caps each block at 25 entries and appends a `… +N more` line when there are more (`src/graph/trace.ts:636-651`).
 
 ## Inputs
 
 | name | type | required | description |
 | --- | --- | --- | --- |
-| `symbol` | string (1–200 chars) | yes | Function or method name to analyze. Resolved to a callable via `getCallablesByName`; classes, constants, and types are not tracked (`src/tools/graph-tools.ts:216`, `src/db/graph.ts:763-817`). |
+| `symbol` | string (1–200 chars) | yes | Function or method name to analyze. Resolved to a callable via `getCallablesByName`; classes, constants, and types are not tracked (`src/tools/graph-tools.ts:216`, `src/db/graph.ts:777-831`). |
 | `file` | string | no | Project-relative path used to disambiguate when the name is defined in several places. Matched as a path suffix (`src/graph/trace.ts:177-180`). |
 | `depth` | integer 1–6 | no | Caller levels the printed tree walks. Defaults to 3 (`src/tools/graph-tools.ts:221`, `src/graph/trace.ts:229`). |
 | `directory` | string | no | Project whose index to query. Defaults to `RAG_PROJECT_DIR` or the current working directory (`src/tools/index.ts:26`). |

@@ -71,7 +71,7 @@ flowchart TD
    (`src/tools/git-history-tools.ts:58-66`).
 4. The query string is embedded once. `embed` loads the shared
    sentence-transformer model and returns a single mean-pooled, L2-normalized
-   `Float32Array` (`src/embeddings/embed.ts:94-102`).
+   `Float32Array` (`src/embeddings/embed.ts:95-103`).
 5. The vector, the requested count, and the four filters are passed to
    `searchGitCommits`, which runs a nearest-neighbor search over the
    `vec_git_commits` virtual table, joins back to the commit rows, applies the
@@ -132,12 +132,12 @@ mapping a smaller distance to a higher score (`src/db/git-history.ts:179`).
 **Full-text search.** `textSearchGitCommits` matches the query against the
 `fts_git_commits` FTS5 table — which indexes the commit `message` and
 `diff_summary` columns — and orders by FTS5's built-in `rank`
-(`src/db/git-history.ts:206-213`, `src/db/index.ts:384-389`). The query is first
+(`src/db/git-history.ts:206-213`, `src/db/index.ts:475-480`). The query is first
 run through `sanitizeFTS`, which splits on whitespace and wraps every token in
 double quotes (joining them with `OR`) so that characters FTS5 would otherwise
 treat as operators (`+`, `-`, `*`, `AND`, `OR`, `NOT`, `NEAR`, parentheses) are
 matched literally instead of throwing a syntax error
-(`src/search/usages.ts:29-33`). Its `score` is
+(`src/search/usages.ts:39-43`). Its `score` is
 `1 / (1 + abs(rank))`; FTS5 ranks are negative, so the absolute value turns the
 best (most negative) rank into the highest score (`src/db/git-history.ts:217`).
 
@@ -198,7 +198,24 @@ sliced to `top` (`src/tools/git-history-tools.ts:90-93`).
 Unlike the conversation search tool, this handler does not wrap the full-text
 search in a try/catch; the token quoting done by `sanitizeFTS` is what keeps a
 stray operator character in the query from making the FTS match throw
-(`src/search/usages.ts:29-33`).
+(`src/search/usages.ts:39-43`).
+
+## What the index contains
+
+This tool can only surface what the history indexer wrote. The indexer walks
+`git log --all` and, for each commit, records the changed files with
+`git diff-tree --numstat`. Two indexer details shape what `search_commits` and
+the `path` filter can see (`src/git/indexer.ts:84-92`):
+
+- It passes `--root` to `diff-tree`, so the very first (parentless) commit's
+  files are recorded too. Without this, a file first introduced in the root
+  commit would be invisible to history searches and to the `path` filter.
+- It runs with `-c core.quotepath=false`, so a non-ASCII path such as `café.ts`
+  is stored literally instead of octal-escaped and quoted. That keeps the stored
+  `files_changed` paths matching what callers actually pass to the `path` filter.
+
+The per-commit block's short hash is the first eight characters of the full hash,
+set at index time (`src/git/indexer.ts:345`).
 
 ## Example
 
@@ -220,11 +237,11 @@ Illustrative output text (values synthetic):
 ```
 ## Results for "why did we switch the embedding model dimension" (2 commits, 412 indexed)
 
-1. **a1b2c3d** (0.81) — 2025-02-14 — @alice
+1. **a1b2c3d4** (0.81) — 2025-02-14 — @alice
    feat: configurable embedding model + dimension
    Files: src/embeddings/embed.ts, src/config/index.ts (+96 -12)
 
-2. **9f8e7d6** (0.52) — 2025-01-20 — @alice [merge]
+2. **9f8e7d6c** (0.52) — 2025-01-20 — @alice [merge]
    Merge branch 'embed-dim-guard'
    Files: src/db/index.ts, src/embeddings/embed.ts +3 more (+44 -8)
 ```
@@ -243,6 +260,7 @@ insertion/deletion totals (`src/tools/git-history-tools.ts:14-18`).
 | `src/db/git-history.ts` | `searchGitCommits` (vector) and `textSearchGitCommits` (full-text) query the commit tables, apply the author/date/path filters, and score results; `getGitHistoryStatus` powers the empty-index guard. |
 | `src/embeddings/embed.ts` | `embed` turns the query string into a single normalized vector. |
 | `src/search/usages.ts` | `sanitizeFTS` quotes query tokens so FTS5 treats operator characters literally. |
+| `src/git/indexer.ts` | Walks `git log`, records changed files with `--root` and `core.quotepath=false`, embeds each commit, and writes the rows this tool reads. |
 | `src/db/index.ts` | Defines the `git_commits`, `vec_git_commits`, and `fts_git_commits` tables and exposes the `RagDB` wrapper methods the tool calls. |
 | `src/tools/index.ts` | `resolveProject` resolves the directory, database handle, and config used by the tool. |
 

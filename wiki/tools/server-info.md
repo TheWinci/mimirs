@@ -16,7 +16,7 @@ picked up a config edit.
 
 The tool is registered in `src/tools/server-info-tools.ts:12` by
 `registerServerInfoTools`, which the server wires up at startup through
-`registerAllTools` (`src/tools/index.ts:39-56`, `src/server/index.ts:189`).
+`registerAllTools` (`src/tools/index.ts:47-64`, `src/server/index.ts:189`).
 
 ## Inputs
 
@@ -51,7 +51,7 @@ sequenceDiagram
   Caller->>Tool: server_info({ directory? })
   Tool->>Resolve: resolveProject(directory, getDB)
   Resolve->>Resolve: resolve path, verify it exists
-  Resolve->>Resolve: loadConfig + applyEmbeddingConfig
+  Resolve->>Resolve: loadConfig + applyEmbeddingConfigFromDisk
   Resolve->>Pool: getDB(resolved)
   Pool-->>Resolve: cached or newly opened RagDB
   Resolve-->>Tool: { projectDir, db, config }
@@ -72,14 +72,14 @@ sequenceDiagram
    (`src/tools/server-info-tools.ts:27`).
 3. `resolveProject` resolves the directory to an absolute path and throws
    `Directory does not exist: <path>` when it is missing — the only way the call
-   fails before producing a report (`src/tools/index.ts:29-32`).
+   fails before producing a report (`src/tools/index.ts:31-34`).
 4. It loads the project config from `.mimirs/config.json` and immediately applies
    the embedding settings, so the model id and dimension reported later reflect
    *this* project's config, not whatever was loaded earlier
-   (`src/tools/index.ts:34-35`).
+   (`src/tools/index.ts:36-43`).
 5. It asks the connection pool for the database via `getDB(resolved)`, which
    returns the already-open `RagDB` for that directory or opens a fresh one
-   (`src/tools/index.ts:36`, `src/server/index.ts:34-51`).
+   (`src/tools/index.ts:44`, `src/server/index.ts:34-51`).
 6. Back in the handler, `db.getStatus()` runs the file/chunk count queries to read
    how much is indexed (`src/tools/server-info-tools.ts:28`).
 7. The handler reads the embedding model id and vector dimension from the embedder
@@ -109,7 +109,7 @@ The first block reports four values (`src/tools/server-info-tools.ts:30-35`):
 ## The Index section
 
 These three numbers come straight from `db.getStatus()`, a thin wrapper over the
-file-level status query (`src/db/index.ts:706-708`, `src/db/files.ts:355-373`):
+file-level status query (`src/db/index.ts:834-836`, `src/db/files.ts:385-403`):
 
 - `files` is `SELECT COUNT(*) FROM files`.
 - `chunks` is `SELECT COUNT(*) FROM chunks`.
@@ -117,7 +117,7 @@ file-level status query (`src/db/index.ts:706-708`, `src/db/files.ts:355-373`):
   (`SELECT indexed_at FROM files ORDER BY indexed_at DESC LIMIT 1`). The query
   returns `null` when no file row exists, and the handler prints the literal
   string `never` in that case
-  (`src/tools/server-info-tools.ts:40`, `src/db/files.ts:362-371`).
+  (`src/tools/server-info-tools.ts:40`, `src/db/files.ts:392-401`).
 
 A brand-new project reports `files: 0`, `chunks: 0`, `last_indexed: never`. This
 is the same status data the [index_status](../tools/index-status.md) tool
@@ -126,21 +126,25 @@ surfaces, so the two will agree for a given project.
 ## The Embedding section
 
 The model id and dimension are read from the embedder module's module-level
-singletons, not from disk. `currentModelId` and `currentDim` start at the defaults
-`Xenova/all-MiniLM-L6-v2` and `384` (`src/embeddings/embed.ts:16-17`,
-`src/embeddings/embed.ts:29-30`). `getModelId()` returns `currentModelId` and
-`getEmbeddingDim()` returns `currentDim` (`src/embeddings/embed.ts:218-225`).
+singletons, not from disk at report time. `currentModelId` and `currentDim` start
+at the defaults `Xenova/all-MiniLM-L6-v2` and `384` (`src/embeddings/embed.ts:17-18`,
+`src/embeddings/embed.ts:30-31`). `getModelId()` returns `currentModelId` and
+`getEmbeddingDim()` returns `currentDim` (`src/embeddings/embed.ts:224-232`).
 
 The report shows only the model id and dimension — it does not print the pooling
 strategy or dtype, even though the embedder tracks those internally. The values
-can differ from the defaults because step 4 calls `applyEmbeddingConfig`, which
-calls `configureEmbedder` using the project's `embeddingModel` and `embeddingDim`
-config fields when they are set, falling back to the defaults otherwise
-(`src/config/index.ts:168-172`). `configureEmbedder` only mutates the singletons
-when the model, dimension, pooling, or dtype actually changes
-(`src/embeddings/embed.ts:50-57`). So the reported model and dimension reflect the
-*current* project's configured embedder — which is why resolving the project first
-matters before reading them.
+can differ from the defaults because step 4 calls `applyEmbeddingConfigFromDisk`,
+which reads the embedding fields straight from `.mimirs/config.json` (best-effort:
+malformed JSON is ignored and falls back to the defaults) and then calls
+`configureEmbedder` (`src/config/index.ts:197-225`). `configureEmbedder` only
+mutates the singletons — and clears the cached extractor and tokenizer — when the
+model, dimension, pooling, or dtype actually changes
+(`src/embeddings/embed.ts:50-58`). So the reported model and dimension reflect the
+*current* project's configured embedder, which is why resolving the project first
+matters before reading them. Reading the embedding fields from raw disk rather
+than the validated config object is deliberate: a config that fails schema
+validation still keeps its real `embeddingDim`, so the query embedder always
+matches the dimension the index was built at (`src/tools/index.ts:37-43`).
 
 ## The Config section
 
@@ -152,11 +156,11 @@ most likely to explain surprising indexing or search behavior:
 | --- | --- | --- | --- |
 | `chunk_size` | `chunkSize` | 512 | Target chunk size in tokens (`src/config/index.ts:21`). |
 | `chunk_overlap` | `chunkOverlap` | 50 | Overlap between adjacent chunks (`src/config/index.ts:22`). |
-| `hybrid_weight` | `hybridWeight` | 0.5 | Tunes the reciprocal-rank fusion of the vector and BM25 result lists in hybrid search — it is not a linear score blend (`src/config/index.ts:23`, `src/config/index.ts:118`). |
+| `hybrid_weight` | `hybridWeight` | 0.5 | Tunes how the vector and BM25 result lists are fused in hybrid search (`src/config/index.ts:23`). |
 | `search_top_k` | `searchTopK` | 10 | Default result count for searches (`src/config/index.ts:24`). |
 | `incremental` | `incrementalChunks` | false | Whether re-indexing reuses unchanged chunks (`src/config/index.ts:27`). |
-| `include` | `include.length` | many | Reported as a *count* of include glob patterns, not the patterns themselves. |
-| `exclude` | `exclude.length` | many | Reported as a count of exclude glob patterns. |
+| `include` | `include.length` | many | Reported as a *count* of include glob patterns, not the patterns themselves (`src/tools/server-info-tools.ts:52`). |
+| `exclude` | `exclude.length` | many | Reported as a count of exclude glob patterns (`src/tools/server-info-tools.ts:53`). |
 | `index_batch` | `indexBatchSize` | optional | Only printed when set; embedding batch size (`src/tools/server-info-tools.ts:56`). |
 | `index_threads` | `indexThreads` | optional | Only printed when set; thread count for embedding (`src/tools/server-info-tools.ts:57`). |
 
@@ -176,7 +180,7 @@ source of truth, but the values printed are the parsed and validated config
 object. If `config.json` held invalid JSON or failed schema validation,
 `loadConfig` logs a warning and returns the built-in defaults, so the report would
 show defaults rather than the broken file's contents
-(`src/config/index.ts:146-159`).
+(`src/config/index.ts:152-165`).
 
 ## The Connected Databases section
 
@@ -212,21 +216,21 @@ connection yet, `getDB` opens one and records it in the pool
 | --- | --- | --- | --- | --- |
 | Connection added to pool | directory absent from `dbMap` | a `DBEntry` with fresh `openedAt`/`lastAccessed` exists, and the `## Connected Databases` section lists it | reporting on a never-before-seen project opens (and keeps) a real SQLite handle | `src/server/index.ts:47-48` |
 | `lastAccessed` refreshed | existing entry has a prior `lastAccessed` | `getDB` sets `entry.lastAccessed = new Date()` before returning | calling `server_info` resets that connection's reported idle time to roughly zero | `src/server/index.ts:42-44` |
-| Embedder reconfigured | singleton holds the previously applied model/dim | `applyEmbeddingConfig` may switch it to this project's model/dim if it differs | only updates the recorded id and dimension and clears the cached extractor — it does not load the model | `src/config/index.ts:168-172`, `src/embeddings/embed.ts:50-57` |
+| Embedder reconfigured | singleton holds the previously applied model/dim | `applyEmbeddingConfigFromDisk` may switch it to this project's model/dim if it differs | only updates the recorded id and dimension and clears the cached extractor — it does not load the model | `src/config/index.ts:197-225`, `src/embeddings/embed.ts:50-58` |
 
 ## Branches and failure cases
 
 | condition | behavior | source |
 | --- | --- | --- |
 | `directory` omitted | Falls back to `RAG_PROJECT_DIR`, then `process.cwd()`. | `src/tools/index.ts:26` |
-| Directory does not exist | `resolveProject` throws `Directory does not exist: <path>`; the tool errors before producing any report. | `src/tools/index.ts:30-32` |
+| Directory does not exist | `resolveProject` throws `Directory does not exist: <path>`; the tool errors before producing any report. | `src/tools/index.ts:31-34` |
 | `RAG_DB_DIR` set | `db_dir` shows that path; otherwise `<project_dir>/.mimirs`. | `src/tools/server-info-tools.ts:34` |
 | `LOG_LEVEL` unset | `log_level` shows `warn`. | `src/tools/server-info-tools.ts:35` |
-| Nothing indexed yet | `files`/`chunks` are `0` and `last_indexed` is `never`. | `src/tools/server-info-tools.ts:40`, `src/db/files.ts:362-371` |
-| Custom embedding model/dim in config | `model`/`dim` reflect the configured values after `applyEmbeddingConfig`. | `src/config/index.ts:168-172` |
-| `config.json` missing | `loadConfig` writes the defaults to disk and returns them, so the report shows defaults. | `src/config/index.ts:138-142` |
-| `config.json` invalid (bad JSON) | `loadConfig` logs a warning and returns built-in defaults; the report shows defaults, not the broken file. | `src/config/index.ts:146-151` |
-| `config.json` fails schema validation | `loadConfig` logs the failing fields and returns built-in defaults. | `src/config/index.ts:153-159` |
+| Nothing indexed yet | `files`/`chunks` are `0` and `last_indexed` is `never`. | `src/tools/server-info-tools.ts:40`, `src/db/files.ts:392-401` |
+| Custom embedding model/dim in config | `model`/`dim` reflect the configured values after `applyEmbeddingConfigFromDisk`. | `src/config/index.ts:197-225` |
+| `config.json` missing | `loadConfig` writes the defaults to disk and returns them, so the report shows defaults. | `src/config/index.ts:144-148` |
+| `config.json` invalid (bad JSON) | `loadConfig` logs a warning and returns built-in defaults; the report shows defaults, not the broken file. | `src/config/index.ts:152-157` |
+| `config.json` fails schema validation | `loadConfig` logs the failing fields and returns built-in defaults. | `src/config/index.ts:159-165` |
 | `indexBatchSize` / `indexThreads` unset | Those two `## Config` rows are omitted entirely. | `src/tools/server-info-tools.ts:56-57` |
 | `getConnectedDBs` callback absent | The whole `## Connected Databases` section is skipped. The MCP server always passes it, so this is the non-server / test path. | `src/tools/server-info-tools.ts:60` |
 | No databases open | Section header reads `## Connected Databases (0)` with no entries. In practice resolving the project just opened at least one. | `src/tools/server-info-tools.ts:62-63` |
@@ -249,7 +253,7 @@ A representative report (synthetic values):
 
 ```
 ## Server
-  version:     1.5.0
+  version:     1.5.1
   project_dir: /Users/example/repos/myproject
   db_dir:      /Users/example/repos/myproject/.mimirs
   log_level:   warn
@@ -291,8 +295,8 @@ A representative report (synthetic values):
   behind the `## Index` section.
 - `src/embeddings/embed.ts` — the embedder singleton plus `getModelId` and
   `getEmbeddingDim` behind the `## Embedding` section.
-- `src/config/index.ts` — `loadConfig`/`applyEmbeddingConfig` that produce the
-  config object and the embedder settings.
+- `src/config/index.ts` — `loadConfig` and `applyEmbeddingConfigFromDisk` that
+  produce the config object and the embedder settings.
 
 ## Related
 

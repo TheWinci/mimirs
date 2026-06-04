@@ -64,7 +64,7 @@ sequenceDiagram
 3. The query string is embedded once. `embed` runs the configured
    sentence-transformer model with normalization on and returns a single
    `Float32Array` whose length is the project's configured embedding dimension
-   (`src/embeddings/embed.ts:94-102`).
+   (`src/embeddings/embed.ts:95-103`).
 4. The vector goes to `searchConversation`, a nearest-neighbor search over the
    `vec_conversation` virtual table joined back to chunk and turn data
    (`src/db/conversation.ts:126-182`).
@@ -136,7 +136,7 @@ the `fts_conversation` table and orders by FTS5's built-in `rank`
 which splits on whitespace and wraps every token in double quotes joined by `OR`,
 so characters FTS5 would treat as operators (`+`, `-`, `*`, `AND`, `OR`, `NOT`,
 `NEAR`, parentheses) are matched literally instead of throwing a syntax error
-(`src/search/usages.ts:29-33`). It applies the same `topK * 10` / `topK * 3`
+(`src/search/usages.ts:39-43`). It applies the same `topK * 10` / `topK * 3`
 over-fetch, the same per-turn deduplication, and the same session filter. Its
 `score` is `1 / (1 + abs(rank))`; FTS5 ranks are negative, so the absolute value
 turns the best (most negative) rank into the highest score
@@ -170,7 +170,7 @@ A turn missing from one list contributes `0` from that side, so a strong
 keyword-only or vector-only hit can still rank (`src/search/hybrid.ts:101`).
 `hybridWeight` defaults to `0.5` — equal weight to the semantic and lexical rank
 signals — unless the project overrides it
-(`src/config/index.ts:23`, `src/config/index.ts:118`).
+(`src/config/index.ts:23`, `src/config/index.ts:124`).
 
 Deduplication happens in `rrfFuse` itself: it builds one map keyed by the value
 the handler's key function returns, here `r.turnId`
@@ -236,8 +236,8 @@ ends with up to five referenced files.
 | `src/search/hybrid.ts` | `rrfFuse` performs the reciprocal-rank fusion and turn-id dedup shared with chunk search. |
 | `src/embeddings/embed.ts` | `embed` turns the query string into a single normalized vector. |
 | `src/tools/index.ts` | `resolveProject` resolves the directory, database handle, and config used by the tool. |
-| `src/search/usages.ts` | `sanitizeFTS` quotes query tokens so FTS5 treats operator characters literally. |
-| `src/config/index.ts` | Defines `hybridWeight` (default `0.5`), the blend factor passed to `rrfFuse`. |
+| `src/search/usages.ts` | `sanitizeFTS` quotes query tokens so FTS5 treats operator characters literally (`src/search/usages.ts:39-43`). |
+| `src/config/index.ts` | Defines `hybridWeight` (default `0.5`), the blend factor passed to `rrfFuse` (`src/config/index.ts:23`, `src/config/index.ts:124`). |
 | `src/db/index.ts` | Defines the `conversation_*`, `vec_conversation`, and `fts_conversation` tables and exposes the `RagDB` wrapper methods the tool calls. |
 
 ## Related flows

@@ -65,7 +65,7 @@ sequenceDiagram
 
 | output | where it lands / shape / description |
 | --- | --- |
-| `.mimirs/config.json` | Written by `ensureConfig` the first time, which calls `loadConfig`; `loadConfig` materializes the defaults on disk when the file is missing (`src/cli/setup.ts:98-104`, `src/config/index.ts:136-139`). |
+| `.mimirs/config.json` | Written by `ensureConfig` the first time, which calls `loadConfig`; `loadConfig` materializes the defaults on disk when the file is missing (`src/cli/setup.ts:98-104`, `src/config/index.ts:140-147`). |
 | Agent instruction blocks | A `## Using mimirs tools` Markdown section written to `CLAUDE.md` (always), plus rule files for any requested or detected IDE: `.cursor/rules/mimirs.mdc`, `.windsurf/rules/mimirs.md`, `.junie/guidelines/mimirs.md`, `.github/copilot-instructions.md` (`src/cli/setup.ts:168-221`). |
 | MCP server entries | `mimirs` added under `mcpServers` in `.mcp.json` (always), and in `.cursor/mcp.json`, `.junie/mcp.json`, and the Windsurf global configs when relevant. Each entry runs `bunx mimirs@latest serve` with `RAG_PROJECT_DIR` set to the resolved project path (`src/cli/setup.ts:264-301`). |
 | `.gitignore` entry | `.mimirs/` added (or the file created with that entry) so the local index is not committed (`src/cli/setup.ts:106-118`). |
@@ -79,7 +79,7 @@ sequenceDiagram
 
 `runSetup` is a small orchestrator that runs four guarded helpers in order and concatenates whatever each reports (`src/cli/setup.ts:330-346`). Each helper checks for an existing marker or path before writing, so a second `init` produces no spurious changes.
 
-- **Config.** `ensureConfig` returns `null` (no action) if `.mimirs/config.json` already exists. Otherwise it calls `loadConfig`, which writes the default config to disk the first time it is read, and reports `Created .mimirs/config.json` (`src/cli/setup.ts:98-104`). There is no merge step: what is on disk is what runs (`src/config/index.ts:127-140`).
+- **Config.** `ensureConfig` returns `null` (no action) if `.mimirs/config.json` already exists. Otherwise it calls `loadConfig`, which writes the default config to disk the first time it is read, and reports `Created .mimirs/config.json` (`src/cli/setup.ts:98-104`). On a first read the defaults are materialized verbatim; on later reads missing top-level keys are backfilled from the defaults (`src/config/index.ts:140-172`).
 
 - **Agent instructions.** `ensureAgentInstructions` always injects the tool-usage block into `CLAUDE.md`. For the other IDEs it writes only when that IDE's directory already exists, or when the IDE was explicitly named via `--ide` (in which case the directory is created first) (`src/cli/setup.ts:168-221`). The injected text differs per IDE wrapper: plain Markdown for Claude, Junie, and Copilot; Cursor's `.mdc` adds an `alwaysApply: true` frontmatter; Windsurf adds a `trigger: always_on` frontmatter (`src/cli/setup.ts:75-89`). Injection is guarded by a `<!-- mimirs -->` marker (and the `## Using mimirs tools` heading for the Markdown case), so re-running never duplicates the block (`src/cli/setup.ts:8`, `src/cli/setup.ts:120-130`).
 
@@ -112,13 +112,13 @@ If indexing proceeds, the command constructs a `RagDB` for the directory (which 
 - It maintains a `.mimirs/status` file so other processes (for example the doctor command or a watching editor) can see progress out of band. It writes `scanning files`, then `0/N files` once the file count is known, then `processed/total (pct%)` after each completed file (`src/cli/commands/init.ts:35-69`).
 - It drives terminal output. In the default mode it builds a `createQuietProgress` renderer (a single updating line); with `-v` it forwards every message to `cliProgress` for per-file logging (`src/cli/commands/init.ts:62-76`, `src/cli/progress.ts:24-102`).
 
-`indexDirectory` walks the directory, embeds and stores file and chunk rows, prunes files that no longer exist, resolves imports, and returns an `IndexResult` with `indexed`, `skipped`, and `pruned` counts (`src/indexing/indexer.ts:695-799`, `src/indexing/indexer.ts:46-53`). On return, the command deletes the status file, prints the summary line with elapsed seconds, and closes the database (`src/cli/commands/init.ts:79-86`). The indexing portion is the same machinery the standalone [index](index.md) command uses.
+`indexDirectory` collects the project's files (preferring git's view so `.gitignore` is respected, falling back to a recursive walk for non-git directories), embeds and stores file and chunk rows, prunes files that no longer exist, resolves imports, and returns an `IndexResult` with `indexed`, `skipped`, and `pruned` counts (`src/indexing/indexer.ts:796-907`, `src/indexing/indexer.ts:47-54`). On return, the command deletes the status file, prints the summary line with elapsed seconds, and closes the database (`src/cli/commands/init.ts:79-86`). The indexing portion is the same machinery the standalone [index](index.md) command uses, including how it decides which files to scan.
 
 ## State changes
 
 - **Setup files: absent → written.** Before `init`, a fresh project has no `.mimirs/config.json`, no MCP registration, and no tool instructions. `runSetup(dir, ides)` writes the config, the agent instruction blocks, the MCP server entries, and the gitignore line, then returns the list of files it touched (`src/cli/commands/init.ts:16`, `src/cli/setup.ts:330-346`). This matters because it is what makes the mimirs tools discoverable by the agent at all. Because every writer is marker- or existence-guarded, the transition is effectively one-way: a second run leaves the state unchanged.
 
-- **Index rows: empty → indexed.** When the user accepts the index prompt, `indexDirectory` writes file and chunk rows into the SQLite index under `.mimirs` (`src/cli/commands/init.ts:49-77`, `src/indexing/indexer.ts:745-795`). This is the state that makes `search` and `read_relevant` return results. It is optional within `init`; declining the prompt leaves the index empty until [index](index.md) is run later.
+- **Index rows: empty → indexed.** When the user accepts the index prompt, `indexDirectory` writes file and chunk rows into the SQLite index under `.mimirs` (`src/cli/commands/init.ts:49-77`, `src/indexing/indexer.ts:835-872`). This is the state that makes `search` and `read_relevant` return results. It is optional within `init`; declining the prompt leaves the index empty until [index](index.md) is run later.
 
 ## Branches and failure cases
 
@@ -130,8 +130,8 @@ If indexing proceeds, the command constructs a `RagDB` for the directory (which 
 - **Invalid existing MCP JSON.** Rather than throwing, `upsertMcpJson` returns a `Skipped … (invalid JSON — fix it manually or delete it)` action so the user is told to repair the file (`src/cli/setup.ts:247-249`).
 - **IDE files when the directory is absent and not forced.** Cursor, Windsurf, Junie, and Copilot files are skipped unless their directory exists or the IDE was requested via `--ide` (`src/cli/setup.ts:173-218`, `src/cli/setup.ts:274-298`).
 - **Status-file write failures.** Writing `.mimirs/status` is wrapped in a try/catch and is best-effort; a failure there does not interrupt indexing (`src/cli/commands/init.ts:37-42`).
-- **Index lock held by another process.** `indexDirectory` funnels concurrent indexers through a process lock; if another mimirs process owns it, indexing is skipped for this run, the progress callback reports it, and the result carries `locked: true` (`src/indexing/indexer.ts:722-730`). `init` still prints its summary line using the (zero) counts in that case.
-- **Per-file indexing errors.** Errors on individual files are collected into `result.errors` and reported through progress without aborting the whole run (`src/indexing/indexer.ts:764-768`).
+- **Index lock held by another process.** `indexDirectory` funnels concurrent indexers through a process lock; if another mimirs process owns it, indexing is skipped for this run, the progress callback reports it, and the result carries `locked: true` (`src/indexing/indexer.ts:823-831`). `init` still prints its summary line using the (zero) counts in that case.
+- **Per-file indexing errors.** Errors on individual files are collected into `result.errors` and reported through progress without aborting the whole run (`src/indexing/indexer.ts:866-870`).
 
 ## Example
 
@@ -163,7 +163,7 @@ The summary field names (`indexed`, `skipped`, `pruned`) and the action-line wor
 - `src/cli/commands/init.ts` — the command handler: flag parsing, setup invocation, the index prompt, and progress wiring (`src/cli/commands/init.ts:10-88`).
 - `src/cli/setup.ts` — the guarded setup helpers: config, agent instructions, MCP registration, gitignore, IDE parsing, the snippet, and `confirm`.
 - `src/cli/progress.ts` — the quiet and verbose terminal progress renderers passed to the indexer.
-- `src/indexing/indexer.ts` — `indexDirectory`, the shared indexing routine that writes file/chunk rows and returns the summary counts (`src/indexing/indexer.ts:695-799`).
+- `src/indexing/indexer.ts` — `indexDirectory`, the shared indexing routine that writes file/chunk rows and returns the summary counts (`src/indexing/indexer.ts:796-907`).
 
 ## Related commands
 

@@ -33,8 +33,8 @@ sequenceDiagram
 ```
 
 1. The caller invokes the tool with any combination of `sessionId`, `type`, `limit`, and `directory`; all are optional, and `limit` defaults to `20` when omitted (`src/tools/checkpoint-tools.ts:89`).
-2. The handler calls `resolveProject`, which turns the optional `directory` into an absolute path, verifies it exists, loads that project's config, and returns the matching `RagDB` handle (`src/tools/index.ts:22-37`). A missing directory throws here, before any query runs.
-3. With the resolved database, the handler calls `ragDb.listCheckpoints(sessionId, type, limit)` (`src/tools/checkpoint-tools.ts:98`), a thin method that forwards straight to the store function (`src/db/index.ts:880-882`).
+2. The handler calls `resolveProject`, which turns the optional `directory` into an absolute path, verifies it exists, loads that project's config, and returns the matching `RagDB` handle (`src/tools/index.ts:22-36`). A missing directory throws here, before any query runs.
+3. With the resolved database, the handler calls `ragDb.listCheckpoints(sessionId, type, limit)` (`src/tools/checkpoint-tools.ts:98`), a thin method that forwards straight to the store function (`src/db/index.ts:1008-1010`).
 4. The store builds one SQL statement starting from `SELECT * FROM conversation_checkpoints WHERE 1=1`, then appends `AND session_id = ?` and/or `AND type = ?` only when those filters are supplied (`src/db/checkpoints.ts:57-67`).
 5. It always appends `ORDER BY timestamp DESC LIMIT ?`, so rows come back most-recent-first and are capped by the limit (`src/db/checkpoints.ts:69-70`). The `timestamp` is the ISO string recorded when the checkpoint was created, not the row id, so ordering follows wall-clock creation time.
 6. Each raw row is mapped into a `CheckpointRow`, with `files_involved` and `tags` parsed back from their stored JSON strings into arrays (`src/db/checkpoints.ts:78-88`).
@@ -66,7 +66,7 @@ This tool only reads. It issues a `SELECT`, so it never creates, updates, or del
 - **Both filters**: both clauses are appended and combined with `AND`, so a checkpoint must match the session *and* the type to appear.
 - **Empty result**: if the query returns no rows — empty project, over-narrow filters, or a `sessionId` with no saved checkpoints — the handler returns `No checkpoints found.` rather than an empty block (`src/tools/checkpoint-tools.ts:100-104`).
 - **Per-entry conditional formatting**: the tags suffix and the `Files:` line are rendered only when those arrays are non-empty, so a minimal checkpoint with no files or tags still prints cleanly (`src/tools/checkpoint-tools.ts:108-112`).
-- **Missing or bad directory**: `resolveProject` resolves the path to absolute and throws `Directory does not exist: <path>` when it is missing, so an invalid `directory` fails before the query (`src/tools/index.ts:30-32`).
+- **Missing or bad directory**: `resolveProject` resolves the path to absolute and throws `Directory does not exist: <path>` when it is missing, so an invalid `directory` fails before the query (`src/tools/index.ts:31-34`).
 - **Limit floor, no ceiling**: the schema rejects a `limit` below `1`; there is no upper bound in the schema, so a large limit is passed straight into the SQL `LIMIT`.
 
 ## Example
@@ -95,7 +95,7 @@ A representative response body (values synthetic):
 
 ## How it relates to the other checkpoint flows
 
-The three checkpoint tools share one store and one table, differing only in direction and ordering. The CLI exposes the same read through `mimirs checkpoint list`, which calls the identical `listCheckpoints` store function with no session filter (`src/cli/commands/checkpoint.ts:41`).
+The three checkpoint tools share one store and one table, differing only in direction and ordering. The CLI exposes the same read through `mimirs checkpoint list`, which calls the identical `listCheckpoints` store function with no session filter (`src/cli/commands/checkpoint.ts:51`).
 
 | Flow | What it does | Ordering |
 | --- | --- | --- |
@@ -108,6 +108,6 @@ The three checkpoint tools share one store and one table, differing only in dire
 
 - `src/tools/checkpoint-tools.ts` — registers `list_checkpoints` (and its siblings), validates inputs, runs the read, and formats the text response.
 - `src/db/checkpoints.ts` — `listCheckpoints` builds the filtered, ordered SQL query and maps rows into `CheckpointRow` objects.
-- `src/db/index.ts` — defines the `conversation_checkpoints` table and its indexes (`src/db/index.ts:323-336`) and exposes `listCheckpoints` as a method on `RagDB` (`src/db/index.ts:880-882`).
+- `src/db/index.ts` — defines the `conversation_checkpoints` table and its indexes (`src/db/index.ts:414-427`) and exposes `listCheckpoints` as a method on `RagDB` (`src/db/index.ts:1008-1010`).
 - `src/db/types.ts` — the `CheckpointRow` shape returned to the handler (`src/db/types.ts:71-81`).
 - `src/tools/index.ts` — `resolveProject` selects the project directory and database for the call.

@@ -70,11 +70,11 @@ sequenceDiagram
    falling back to `RAG_PROJECT_DIR` or the current working directory, checks it
    exists, loads the project config, applies its embedding settings, and returns
    the open `RagDB` for that project (`src/tools/checkpoint-tools.ts:35`,
-   `src/tools/index.ts:22-37`).
+   `src/tools/index.ts:22-36`).
 3. The handler discovers the project's conversation transcripts to find which
    session is current. `discoverSessions` globs the Claude Code transcript
    directory for the project and returns the sessions sorted by file
-   modification time, most recent first (`src/conversation/parser.ts:302-332`).
+   modification time, most recent first (`src/conversation/parser.ts:312-342`).
 4. The most recently modified transcript is taken as the current session; its id
    becomes the checkpoint's `session_id`. If no transcripts exist, the id falls
    back to the literal string `"unknown"` (`src/tools/checkpoint-tools.ts:38-39`).
@@ -86,7 +86,7 @@ sequenceDiagram
    (`src/tools/checkpoint-tools.ts:43`).
 7. The title and summary are joined as `"${title}. ${summary}"` and embedded
    into one normalized vector by the local embedding model
-   (`src/tools/checkpoint-tools.ts:46-47`, `src/embeddings/embed.ts:94-102`).
+   (`src/tools/checkpoint-tools.ts:46-47`, `src/embeddings/embed.ts:95-103`).
 8. `RagDB.createCheckpoint` writes the base row and its vector inside a single
    transaction and returns the new id (`src/tools/checkpoint-tools.ts:49-59`,
    `src/db/checkpoints.ts:4-49`).
@@ -105,10 +105,10 @@ the handler, not supplied by the caller.
 The session id comes from the file system, not the database. `discoverSessions`
 builds the transcript directory path with `getTranscriptsDir`, which encodes the
 absolute project path by replacing `/` with `-` and looking under
-`~/.claude/projects/<encoded-path>/` (`src/conversation/parser.ts:293-296`). It
+`~/.claude/projects/<encoded-path>/` (`src/conversation/parser.ts:303-306`). It
 globs every `*.jsonl` file there, stats each one, and sorts the results by
 `mtime` descending so the freshest transcript is first
-(`src/conversation/parser.ts:302-332`). The handler takes `sessions[0]`, which
+(`src/conversation/parser.ts:312-342`). The handler takes `sessions[0]`, which
 is the session whose transcript was written to most recently — in practice the
 live session (`src/tools/checkpoint-tools.ts:38-39`).
 
@@ -126,9 +126,9 @@ The checkpoint is made semantically searchable up front by embedding it at write
 time. The handler concatenates the title and summary into a single string and
 passes it to `embed`, which loads the configured local feature-extraction model
 and returns one mean-pooled, L2-normalized vector
-(`src/tools/checkpoint-tools.ts:46-47`, `src/embeddings/embed.ts:94-102`). With
+(`src/tools/checkpoint-tools.ts:46-47`, `src/embeddings/embed.ts:95-103`). With
 the default model (`Xenova/all-MiniLM-L6-v2`) that vector is 384 dimensions
-(`src/embeddings/embed.ts:16-17`); a project configured for a different model
+(`src/embeddings/embed.ts:17-18`); a project configured for a different model
 produces a vector of that model's dimension instead. Because the vector is
 computed here, [search_checkpoints](search-checkpoints.md) only has to embed the
 query at read time and compare it against vectors that already exist.
@@ -136,7 +136,7 @@ query at read time and compare it against vectors that already exist.
 ## Inserting the checkpoint row
 
 `RagDB.createCheckpoint` is a thin wrapper that forwards to the store function in
-`src/db/checkpoints.ts` (`src/db/index.ts:870-879`). That function performs both
+`src/db/checkpoints.ts` (`src/db/index.ts:998-1007`). That function performs both
 writes inside one transaction so the row and its vector always land together
 (`src/db/checkpoints.ts:4-49`). It first inserts into `conversation_checkpoints`
 with the session id, turn index, ISO timestamp, type, title, summary, and the
@@ -151,7 +151,7 @@ human-readable columns and the `vec0` virtual table holds the vector, mirroring
 how code chunks are stored as `chunks` plus `vec_chunks`. Both tables are created
 once in the schema: `conversation_checkpoints` has an `AUTOINCREMENT` primary key
 plus indexes on `session_id` and `type`, and `vec_checkpoints` is a `vec0` table
-sized to the configured embedding dimension (`src/db/index.ts:323-341`). The
+sized to the configured embedding dimension (`src/db/index.ts:414-432`). The
 transaction wrapper means a failure midway — for example a dimension mismatch on
 the vector insert — rolls back the base-table row too, so you never get a
 checkpoint with no vector.
@@ -195,15 +195,15 @@ row, and no annotation are created or updated by this tool.
 
 - **Project resolution fails.** If the resolved `directory` does not exist on
   disk, `resolveProject` throws `Directory does not exist: <path>` before any
-  write happens (`src/tools/index.ts:30-32`). When opening the `RagDB`, an
+  write happens (`src/tools/index.ts:31-34`). When opening the `RagDB`, an
   embedding-dimension mismatch between the project config and the existing index
   is also caught up front, before any checkpoint write — the guard inspects the
   stored `vec_chunks` table and throws if its dimension differs from the
-  configured model (`src/db/index.ts:150-167`).
+  configured model (`src/db/index.ts:228-247`).
 - **No transcripts found.** When `discoverSessions` finds no `*.jsonl` files —
   the transcript directory does not exist or is empty — it returns an empty
   array, and the handler stores the session id as the literal `"unknown"`
-  (`src/tools/checkpoint-tools.ts:38-39`, `src/conversation/parser.ts:325-327`).
+  (`src/tools/checkpoint-tools.ts:38-39`, `src/conversation/parser.ts:335-342`).
   The checkpoint is still written; it just is not tied to a real session id.
 - **Session not yet indexed.** If the current session has no indexed turns,
   `getTurnCount` returns `0` and the turn index clamps to `0` via

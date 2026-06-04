@@ -8,18 +8,18 @@ Every search the project runs is logged. `search_analytics` reads that log back,
 
 The report only has anything to show because the two main search flows record each query they run. Both the `search` MCP tool and the `read_relevant` MCP tool funnel through the hybrid search engine, and each path inserts one row per query once results are computed.
 
-- `search` (full-file ranking) logs its query at `src/search/hybrid.ts:408-414`.
-- `read_relevant` (chunk ranking) logs its query at `src/search/hybrid.ts:567-573`.
+- `search` (full-file ranking) logs its query at `src/search/hybrid.ts:410-416`.
+- `read_relevant` (chunk ranking) logs its query at `src/search/hybrid.ts:571-577`.
 
-Both call sites record the same five values: the query string, how many results came back (`results.length`), the top result's score, the top result's path (`results[0]?.path ?? null`), and how long the search took in milliseconds. The score that gets logged is **not** the score shown to the caller. Since the hybrid-search fix, the visible result score is a positional rank-fusion value that sits near `1.0` at the top regardless of true relevance, so logging it would make "avg top score" and the `< 0.3` low-relevance heuristic meaningless. Instead, both paths log the **raw top vector cosine** — `vectorResults[0]?.score ?? null` — which is `null` when there were no vector hits (`src/search/hybrid.ts:403-414`, `src/search/hybrid.ts:564-573`). That raw cosine is the relevance signal that feeds `avgTopScore` and the low-relevance list.
+Both call sites record the same five values: the query string, how many results came back (`results.length`), the top result's score, the top result's path (`results[0]?.path ?? null`), and how long the search took in milliseconds. The score that gets logged is **not** the score shown to the caller. Since the hybrid-search fix, the visible result score is a positional rank-fusion value that sits near `1.0` at the top regardless of true relevance, so logging it would make "avg top score" and the `< 0.3` low-relevance heuristic meaningless. Instead, both paths log the **raw top vector cosine**, derived by `vectorScoreToCosine(vectorResults[0]?.score)` — which converts the stored L2-based vector score back to a true cosine and yields `null` when there were no vector hits (`src/search/hybrid.ts:403-416`, `src/search/hybrid.ts:566-577`). That cosine is the relevance signal that feeds `avgTopScore` and the low-relevance list.
 
-The writer inserts those values into a row alongside an ISO-8601 `created_at` timestamp (`src/db/analytics.ts:3-8`). The columns land in the `query_log` table, whose schema is `id`, `query`, `result_count`, `top_score`, `top_path`, `duration_ms`, and `created_at` (`src/db/index.ts:343-351`). The `created_at` string is what the look-back window filters on, and `result_count = 0` plus `top_score < 0.3` are the two conditions that feed the zero-result and low-relevance lists.
+The writer inserts those values into a row alongside an ISO-8601 `created_at` timestamp (`src/db/analytics.ts:3-8`). The columns land in the `query_log` table, whose schema is `id`, `query`, `result_count`, `top_score`, `top_path`, `duration_ms`, and `created_at` (`src/db/index.ts:434-442`). The `created_at` string is what the look-back window filters on, and `result_count = 0` plus `top_score < 0.3` are the two conditions that feed the zero-result and low-relevance lists.
 
 ## What the tool does
 
 When the tool is invoked it resolves the project directory, opens that project's database, and asks for an analytics summary over the requested number of days. The summary comes back as a single structured object; the tool then turns that object into a human-readable block of text and returns it as the tool's text content (`src/tools/analytics-tools.ts:23-58`).
 
-The actual aggregation happens in the database layer. The tool calls the `getAnalytics` wrapper method on the project's database object, which delegates to the standalone analytics query function with the live SQLite connection (`src/db/index.ts:955-957`). That function computes a start timestamp `days` ago and runs a handful of SQL queries against `query_log`, all scoped to rows at or after that timestamp (`src/db/analytics.ts:19-56`):
+The actual aggregation happens in the database layer. The tool calls the `getAnalytics` wrapper method on the project's database object, which delegates to the standalone analytics query function with the live SQLite connection (`src/db/index.ts:1083-1085`). That function computes a start timestamp `days` ago and runs a handful of SQL queries against `query_log`, all scoped to rows at or after that timestamp (`src/db/analytics.ts:19-56`):
 
 - **Total queries** — a `COUNT(*)` of rows in the window.
 - **Average result count** — `AVG(result_count)`, defaulting to `0` when there are no rows.
@@ -53,9 +53,9 @@ sequenceDiagram
 ```
 
 1. An MCP client calls the tool, optionally passing a project `directory` and a `days` window.
-2. `resolveProject` turns the optional directory into an absolute path, verifies it exists, loads the project config, and returns the project's database handle (`src/tools/index.ts:22-37`).
+2. `resolveProject` turns the optional directory into an absolute path, verifies it exists, loads the project config, and returns the project's database handle (`src/tools/index.ts:22-36`).
 3. The tool calls `getAnalytics(days)` on that database handle.
-4. The wrapper method forwards to the standalone analytics query function with the live SQLite connection (`src/db/index.ts:955-957`).
+4. The wrapper method forwards to the standalone analytics query function with the live SQLite connection (`src/db/index.ts:1083-1085`).
 5. The function derives the window start as `Date.now() - days * 86400000` and converts it to an ISO string (`src/db/analytics.ts:19`).
 6. It runs the count, average, top-term, zero-result, and low-score queries — each restricted to rows whose `created_at` is at or after the window start.
 7. SQLite returns the aggregated rows.
@@ -91,7 +91,7 @@ One subtlety in the zero-result rate: it is derived from `zeroResultQueries`, wh
 
 ## Branches and failure cases
 
-- **No matching directory.** If the resolved directory does not exist, `resolveProject` throws before any query runs, and the tool call fails with `Directory does not exist: <path>` (`src/tools/index.ts:30-32`).
+- **No matching directory.** If the resolved directory does not exist, `resolveProject` throws before any query runs, and the tool call fails with `Directory does not exist: <path>` (`src/tools/index.ts:31-34`).
 - **Empty window (no queries logged).** When nothing has been searched in the window, total queries is `0`, average results is `0.0`, and average top score is `n/a`. The zero-result-rate guard prints `0%` instead of dividing by zero. All three lists are empty, so none of their sections are emitted — the report is just the header and four summary rows (`src/tools/analytics-tools.ts:29-33`).
 - **Some queries but no scored ones.** Average top score stays `null` and renders as `n/a` because the average ignores rows with a null `top_score` (`src/db/analytics.ts:29-31`).
 - **Empty list sections are skipped.** Each of "Top searches", "Zero-result queries", and "Low-relevance queries" is gated on its array being non-empty, so a healthy project with no zero-result or low-score queries simply omits those sections (`src/tools/analytics-tools.ts:35-54`).

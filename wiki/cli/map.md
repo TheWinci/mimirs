@@ -70,7 +70,7 @@ sequenceDiagram
    `src/graph/resolver.ts:195-204`.
 7. The database returns plain node and edge arrays. Nodes carry each file's id,
    path, and its exported symbols; edges carry resolved import relationships
-   `src/db/graph.ts:975-1027`.
+   `src/db/graph.ts:989-1041`.
 8. The renderer turns that graph into text — file-level by default, or
    directory-level when `--zoom directory` was given
    `src/graph/resolver.ts:220-224`.
@@ -137,13 +137,13 @@ seeded by that file id, expanded by the default two hops
 The subgraph walk is a breadth-first expansion run directly in SQL. It starts
 from the focus file and, per hop, pulls every import edge where the focus side
 appears as either importer or importee, then folds the newly seen files into
-the next frontier until two hops are done `src/db/graph.ts:1039-1067`. After the
+the next frontier until two hops are done `src/db/graph.ts:1053-1081`. After the
 walk it loads nodes and edges only for the visited file ids, batching queries to
-stay under SQLite's 999-parameter limit `src/db/graph.ts:1069-1137`. A prior version
+stay under SQLite's 999-parameter limit `src/db/graph.ts:1083-1140`. A prior version
 batched both edge endpoints with the same slice and silently dropped edges whose
 ends fell in different batches; the current code batches by `file_id` alone and
 filters the other end in JS against the visited set
-`src/db/graph.ts:1103-1137`. The resulting neighborhood is then rendered with the
+`src/db/graph.ts:1117-1142`. The resulting neighborhood is then rendered with the
 same file-level or directory-level formatter as a full graph.
 
 ## Branches and failure cases

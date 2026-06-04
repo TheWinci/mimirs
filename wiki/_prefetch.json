@@ -1,78 +1,24 @@
 {
   "metadata": {
     "projectRoot": "/Users/winci/repos/mimirs",
-    "generatedAt": "2026-06-02T21:36:10.179Z",
-    "lastCommitHash": "094fb87112e571090295b3edd40c697aabca6a06",
+    "generatedAt": "2026-06-04T09:44:31.527Z",
+    "lastCommitHash": "07715140627eed5401518c72963420d0a236d1d9",
     "mimirsVersion": "unknown",
     "index": {
-      "totalFiles": 228,
-      "totalChunks": 4135,
-      "lastIndexed": "2026-06-02T21:07:47.681Z"
+      "totalFiles": 243,
+      "totalChunks": 4428,
+      "lastIndexed": "2026-06-04T09:05:45.474Z"
     }
   },
   "map": {
     "files": [
-      {
-        "path": ".ai/smoke-test.txt",
-        "imports": [],
-        "importedBy": [],
-        "fanIn": 0,
-        "fanOut": 0,
-        "pageRank": 0.002597,
-        "exports": []
-      },
-      {
-        "path": ".claude/projects/-Users-winci-repos-claude-skills-local-rag/memory/feedback_use_bun.md",
-        "imports": [],
-        "importedBy": [],
-        "fanIn": 0,
-        "fanOut": 0,
-        "pageRank": 0.002597,
-        "exports": []
-      },
-      {
-        "path": ".claude/projects/-Users-winci-repos-claude-skills-local-rag/memory/MEMORY.md",
-        "imports": [],
-        "importedBy": [],
-        "fanIn": 0,
-        "fanOut": 0,
-        "pageRank": 0.002597,
-        "exports": []
-      },
-      {
-        "path": ".claude/projects/-Users-winci-repos-claude-skills-local-rag/memory/project_plugin_cr.md",
-        "imports": [],
-        "importedBy": [],
-        "fanIn": 0,
-        "fanOut": 0,
-        "pageRank": 0.002597,
-        "exports": []
-      },
-      {
-        "path": ".codex/config.toml",
-        "imports": [],
-        "importedBy": [],
-        "fanIn": 0,
-        "fanOut": 0,
-        "pageRank": 0.002597,
-        "exports": []
-      },
-      {
-        "path": ".junie/guidelines/mimirs.md",
-        "imports": [],
-        "importedBy": [],
-        "fanIn": 0,
-        "fanOut": 0,
-        "pageRank": 0.002597,
-        "exports": []
-      },
       {
         "path": "AGENTS.md",
         "imports": [],
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -81,7 +27,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -95,7 +41,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 4,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -104,7 +50,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -117,7 +63,22 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 3,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
+        "exports": []
+      },
+      {
+        "path": "benchmarks/embed-batch-profile.ts",
+        "imports": [
+          "src/config/index.ts",
+          "src/embeddings/embed.ts",
+          "src/indexing/chunker.ts",
+          "src/indexing/parse.ts",
+          "src/utils/profiler.ts"
+        ],
+        "importedBy": [],
+        "fanIn": 0,
+        "fanOut": 5,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -132,7 +93,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 5,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -146,7 +107,21 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 4,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
+        "exports": []
+      },
+      {
+        "path": "benchmarks/index-profile.ts",
+        "imports": [
+          "src/config/index.ts",
+          "src/db/index.ts",
+          "src/indexing/indexer.ts",
+          "src/utils/profiler.ts"
+        ],
+        "importedBy": [],
+        "fanIn": 0,
+        "fanOut": 4,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -162,7 +137,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 6,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -179,7 +154,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 7,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -194,7 +169,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 5,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -209,7 +184,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 5,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -222,7 +197,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 3,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -240,7 +215,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 8,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -249,7 +224,35 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
+        "exports": []
+      },
+      {
+        "path": "benchmarks/rebench-full.ts",
+        "imports": [
+          "src/config/index.ts",
+          "src/db/index.ts",
+          "src/indexing/indexer.ts",
+          "src/search/benchmark.ts"
+        ],
+        "importedBy": [],
+        "fanIn": 0,
+        "fanOut": 4,
+        "pageRank": 0.00220351,
+        "exports": []
+      },
+      {
+        "path": "benchmarks/rebench.ts",
+        "imports": [
+          "src/config/index.ts",
+          "src/db/index.ts",
+          "src/indexing/indexer.ts",
+          "src/search/benchmark.ts"
+        ],
+        "importedBy": [],
+        "fanIn": 0,
+        "fanOut": 4,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -261,7 +264,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 2,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -278,7 +281,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 7,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -289,7 +292,7 @@
         ],
         "fanIn": 1,
         "fanOut": 0,
-        "pageRank": 0.00370072,
+        "pageRank": 0.00314001,
         "exports": [
           {
             "name": "SweRow",
@@ -340,7 +343,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 5,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -349,16 +352,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
-        "exports": []
-      },
-      {
-        "path": "CLAUDE.md",
-        "imports": [],
-        "importedBy": [],
-        "fanIn": 0,
-        "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -367,7 +361,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -376,7 +370,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -385,7 +379,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -394,7 +388,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -403,7 +397,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -412,7 +406,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -421,7 +415,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -430,7 +424,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -441,7 +435,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 1,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -450,7 +444,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -459,7 +453,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -475,7 +469,7 @@
         ],
         "fanIn": 1,
         "fanOut": 4,
-        "pageRank": 0.00278263,
+        "pageRank": 0.00236101,
         "exports": [
           {
             "name": "affectedCommand",
@@ -496,7 +490,7 @@
         ],
         "fanIn": 1,
         "fanOut": 3,
-        "pageRank": 0.00278263,
+        "pageRank": 0.00236101,
         "exports": [
           {
             "name": "analyticsCommand",
@@ -516,7 +510,7 @@
         ],
         "fanIn": 1,
         "fanOut": 2,
-        "pageRank": 0.00278263,
+        "pageRank": 0.00236101,
         "exports": [
           {
             "name": "annotationsCommand",
@@ -541,12 +535,12 @@
         ],
         "fanIn": 1,
         "fanOut": 7,
-        "pageRank": 0.00278263,
+        "pageRank": 0.00236101,
         "exports": [
           {
             "name": "benchmarkModelsCommand",
             "kind": "function",
-            "line": 33
+            "line": 37
           }
         ]
       },
@@ -564,7 +558,7 @@
         ],
         "fanIn": 1,
         "fanOut": 5,
-        "pageRank": 0.00278263,
+        "pageRank": 0.00236101,
         "exports": [
           {
             "name": "benchmarkCommand",
@@ -587,7 +581,7 @@
         ],
         "fanIn": 1,
         "fanOut": 5,
-        "pageRank": 0.00278263,
+        "pageRank": 0.00236101,
         "exports": [
           {
             "name": "checkpointCommand",
@@ -607,7 +601,7 @@
         ],
         "fanIn": 1,
         "fanOut": 2,
-        "pageRank": 0.00278263,
+        "pageRank": 0.00236101,
         "exports": [
           {
             "name": "cleanupCommand",
@@ -633,7 +627,7 @@
         ],
         "fanIn": 1,
         "fanOut": 8,
-        "pageRank": 0.00278263,
+        "pageRank": 0.00236101,
         "exports": [
           {
             "name": "conversationCommand",
@@ -657,7 +651,7 @@
         ],
         "fanIn": 1,
         "fanOut": 6,
-        "pageRank": 0.00278263,
+        "pageRank": 0.00236101,
         "exports": [
           {
             "name": "demoCommand",
@@ -676,7 +670,7 @@
         ],
         "fanIn": 1,
         "fanOut": 1,
-        "pageRank": 0.00278263,
+        "pageRank": 0.00236101,
         "exports": [
           {
             "name": "doctorCommand",
@@ -699,7 +693,7 @@
         ],
         "fanIn": 1,
         "fanOut": 5,
-        "pageRank": 0.00278263,
+        "pageRank": 0.00236101,
         "exports": [
           {
             "name": "evalCommand",
@@ -724,7 +718,7 @@
         ],
         "fanIn": 1,
         "fanOut": 7,
-        "pageRank": 0.00278263,
+        "pageRank": 0.00236101,
         "exports": [
           {
             "name": "historyCommand",
@@ -747,7 +741,7 @@
         ],
         "fanIn": 1,
         "fanOut": 5,
-        "pageRank": 0.00278263,
+        "pageRank": 0.00236101,
         "exports": [
           {
             "name": "indexCommand",
@@ -771,7 +765,7 @@
         ],
         "fanIn": 1,
         "fanOut": 6,
-        "pageRank": 0.00278263,
+        "pageRank": 0.00236101,
         "exports": [
           {
             "name": "initCommand",
@@ -792,7 +786,7 @@
         ],
         "fanIn": 1,
         "fanOut": 3,
-        "pageRank": 0.00278263,
+        "pageRank": 0.00236101,
         "exports": [
           {
             "name": "mapCommand",
@@ -812,7 +806,7 @@
         ],
         "fanIn": 1,
         "fanOut": 2,
-        "pageRank": 0.00278263,
+        "pageRank": 0.00236101,
         "exports": [
           {
             "name": "removeCommand",
@@ -835,7 +829,7 @@
         ],
         "fanIn": 1,
         "fanOut": 5,
-        "pageRank": 0.00296825,
+        "pageRank": 0.00251852,
         "exports": [
           {
             "name": "searchCommand",
@@ -845,7 +839,7 @@
           {
             "name": "readCommand",
             "kind": "function",
-            "line": 61
+            "line": 63
           }
         ]
       },
@@ -855,7 +849,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": [
           {
             "name": "serveCommand",
@@ -875,7 +869,7 @@
         ],
         "fanIn": 1,
         "fanOut": 2,
-        "pageRank": 0.00278263,
+        "pageRank": 0.00236101,
         "exports": [
           {
             "name": "sessionContextCommand",
@@ -895,7 +889,7 @@
         ],
         "fanIn": 1,
         "fanOut": 2,
-        "pageRank": 0.00278263,
+        "pageRank": 0.00236101,
         "exports": [
           {
             "name": "statusCommand",
@@ -921,7 +915,7 @@
         ],
         "fanIn": 10,
         "fanOut": 0,
-        "pageRank": 0.00839435,
+        "pageRank": 0.00712247,
         "exports": [
           {
             "name": "CliFlagError",
@@ -970,7 +964,7 @@
         ],
         "fanIn": 1,
         "fanOut": 21,
-        "pageRank": 0.00480445,
+        "pageRank": 0.0040765,
         "exports": [
           {
             "name": "main",
@@ -992,7 +986,7 @@
         ],
         "fanIn": 4,
         "fanOut": 1,
-        "pageRank": 0.00504107,
+        "pageRank": 0.00427727,
         "exports": [
           {
             "name": "cliProgress",
@@ -1018,7 +1012,7 @@
         ],
         "fanIn": 3,
         "fanOut": 1,
-        "pageRank": 0.00492638,
+        "pageRank": 0.00417996,
         "exports": [
           {
             "name": "SetupResult",
@@ -1096,14 +1090,18 @@
         "importedBy": [
           "benchmarks/ast-truncation-analysis.ts",
           "benchmarks/count-grouping-sim.ts",
+          "benchmarks/embed-batch-profile.ts",
           "benchmarks/embed-mode-experiment.ts",
           "benchmarks/excalidraw-parent-bench.ts",
+          "benchmarks/index-profile.ts",
           "benchmarks/indexing-bench-v2.ts",
           "benchmarks/indexing-bench.ts",
           "benchmarks/large-json.bench.test.ts",
           "benchmarks/model-ab.ts",
           "benchmarks/parent-promotion-bench.ts",
           "benchmarks/quality-bench-worker.ts",
+          "benchmarks/rebench-full.ts",
+          "benchmarks/rebench.ts",
           "benchmarks/subchunk-impact.ts",
           "benchmarks/swe-localization/spike.ts",
           "src/cli/commands/benchmark-models.ts",
@@ -1121,43 +1119,51 @@
           "src/search/eval.ts",
           "src/server/index.ts",
           "src/tools/index.ts",
+          "tests/cli/affected.test.ts",
           "tests/config/config.test.ts",
+          "tests/config/embedding-dim.test.ts",
           "tests/db/fts-migration.test.ts",
           "tests/features/git-history.test.ts",
+          "tests/features/persistence-reopen.test.ts",
+          "tests/graph/graph-guards.test.ts",
           "tests/graph/remove-file-graph.test.ts",
           "tests/graph/symbol-refs.test.ts",
           "tests/graph/trace.test.ts",
+          "tests/indexing/abort-resume.test.ts",
           "tests/indexing/exclude-filter.test.ts",
+          "tests/indexing/gitignore-respect.test.ts",
+          "tests/indexing/incremental-parents.test.ts",
           "tests/indexing/indexer.test.ts",
           "tests/indexing/line-numbers.test.ts",
           "tests/indexing/vec-sync-trigger.test.ts",
           "tests/indexing/watcher.test.ts",
           "tests/search/fts-special-chars.test.ts",
-          "tests/search/identifier-tokenizer.test.ts"
+          "tests/search/identifier-tokenizer.test.ts",
+          "tests/search/usages-behavior.test.ts"
         ],
-        "fanIn": 40,
+        "fanIn": 52,
         "fanOut": 2,
-        "pageRank": 0.03032974,
+        "pageRank": 0.02913761,
         "exports": [
           {
             "name": "RagConfig",
             "kind": "type",
-            "line": 39
+            "line": 45
           },
           {
             "name": "loadConfig",
             "kind": "function",
-            "line": 133
+            "line": 139
           },
           {
             "name": "applyEmbeddingConfig",
             "kind": "function",
-            "line": 167
+            "line": 180
           },
           {
             "name": "applyEmbeddingConfigFromDisk",
             "kind": "function",
-            "line": 183
+            "line": 196
           }
         ]
       },
@@ -1176,7 +1182,7 @@
         ],
         "fanIn": 4,
         "fanOut": 3,
-        "pageRank": 0.00399996,
+        "pageRank": 0.00339391,
         "exports": [
           {
             "name": "indexConversation",
@@ -1206,11 +1212,12 @@
           "src/tools/checkpoint-tools.ts",
           "tests/conversation/conversation-index.test.ts",
           "tests/conversation/conversation.test.ts",
-          "tests/conversation/folder-watch.test.ts"
+          "tests/conversation/folder-watch.test.ts",
+          "tests/conversation/jsonl-offset.test.ts"
         ],
-        "fanIn": 8,
+        "fanIn": 9,
         "fanOut": 0,
-        "pageRank": 0.00950642,
+        "pageRank": 0.00993904,
         "exports": [
           {
             "name": "JournalEntry",
@@ -1240,27 +1247,27 @@
           {
             "name": "parseTurns",
             "kind": "function",
-            "line": 111
+            "line": 121
           },
           {
             "name": "buildTurnText",
             "kind": "function",
-            "line": 260
+            "line": 270
           },
           {
             "name": "SessionInfo",
             "kind": "interface",
-            "line": 281
+            "line": 291
           },
           {
             "name": "getTranscriptsDir",
             "kind": "function",
-            "line": 292
+            "line": 302
           },
           {
             "name": "discoverSessions",
             "kind": "function",
-            "line": 301
+            "line": 311
           }
         ]
       },
@@ -1272,7 +1279,7 @@
         ],
         "fanIn": 1,
         "fanOut": 0,
-        "pageRank": 0.0062464,
+        "pageRank": 0.00498687,
         "exports": [
           {
             "name": "logQuery",
@@ -1299,7 +1306,7 @@
         ],
         "fanIn": 1,
         "fanOut": 0,
-        "pageRank": 0.0062464,
+        "pageRank": 0.00498687,
         "exports": [
           {
             "name": "upsertAnnotation",
@@ -1336,7 +1343,7 @@
         ],
         "fanIn": 1,
         "fanOut": 0,
-        "pageRank": 0.0062464,
+        "pageRank": 0.00498687,
         "exports": [
           {
             "name": "createCheckpoint",
@@ -1370,7 +1377,7 @@
         ],
         "fanIn": 1,
         "fanOut": 1,
-        "pageRank": 0.0062464,
+        "pageRank": 0.00498687,
         "exports": [
           {
             "name": "upsertSession",
@@ -1421,7 +1428,7 @@
         ],
         "fanIn": 1,
         "fanOut": 3,
-        "pageRank": 0.0062464,
+        "pageRank": 0.00498687,
         "exports": [
           {
             "name": "getFileByPath",
@@ -1436,77 +1443,82 @@
           {
             "name": "upsertFileStart",
             "kind": "function",
-            "line": 41
+            "line": 49
           },
           {
             "name": "updateFileHash",
             "kind": "function",
-            "line": 72
+            "line": 81
           },
           {
             "name": "insertChunkBatch",
             "kind": "function",
-            "line": 80
+            "line": 89
           },
           {
             "name": "getChunkIdsByHash",
             "kind": "function",
-            "line": 112
+            "line": 121
           },
           {
             "name": "insertChunkReturningId",
             "kind": "function",
-            "line": 126
+            "line": 135
           },
           {
             "name": "getFileChunkRanges",
             "kind": "function",
-            "line": 164
+            "line": 178
           },
           {
             "name": "getChunkById",
             "kind": "function",
-            "line": 217
+            "line": 231
           },
           {
             "name": "upsertFile",
             "kind": "function",
-            "line": 242
+            "line": 256
           },
           {
             "name": "removeFile",
             "kind": "function",
-            "line": 252
+            "line": 268
           },
           {
             "name": "pruneDeleted",
             "kind": "function",
-            "line": 268
+            "line": 284
           },
           {
             "name": "getChunkHashes",
             "kind": "function",
-            "line": 296
+            "line": 312
+          },
+          {
+            "name": "fileHasParentChunks",
+            "kind": "function",
+            "line": 327
           },
           {
             "name": "deleteStaleChunks",
             "kind": "function",
-            "line": 309
+            "line": 339
           },
           {
             "name": "updateChunkPositions",
             "kind": "function",
-            "line": 332
+            "line": 362
           },
           {
             "name": "getAllFilePaths",
             "kind": "function",
-            "line": 349
+            "line": 379
           },
           {
             "name": "getStatus",
             "kind": "function",
-            "line": 355
+            "line": 385
           }
         ]
       },
@@ -1520,7 +1532,7 @@
         ],
         "fanIn": 1,
         "fanOut": 1,
-        "pageRank": 0.0062464,
+        "pageRank": 0.00498687,
         "exports": [
           {
             "name": "GitCommitInsert",
@@ -1565,28 +1577,30 @@
           {
             "name": "getAllCommitHashes",
             "kind": "function",
-            "line": 296
+            "line": 301
           },
           {
             "name": "purgeOrphanedCommits",
             "kind": "function",
-            "line": 307
+            "line": 312
           },
           {
             "name": "clearGitHistory",
             "kind": "function",
-            "line": 331
+            "line": 336
           },
           {
             "name": "getGitHistoryStatus",
             "kind": "function",
-            "line": 342
+            "line": 347
           }
         ]
       },
       {
         "path": "src/db/graph.ts",
-        "imports": [],
+        "imports": [
+          "src/search/usages.ts"
+        ],
         "importedBy": [
           "src/db/files.ts",
           "src/db/index.ts",
@@ -1594,208 +1608,208 @@
           "src/tools/graph-tools.ts"
         ],
         "fanIn": 4,
-        "fanOut": 0,
-        "pageRank": 0.01107559,
+        "fanOut": 1,
+        "pageRank": 0.00923446,
         "exports": [
           {
             "name": "upsertSymbolRefs",
             "kind": "function",
-            "line": 10
+            "line": 11
           },
           {
             "name": "resolveSymbolRefs",
             "kind": "function",
-            "line": 37
+            "line": 38
           },
           {
             "name": "CallableExport",
             "kind": "interface",
-            "line": 183
+            "line": 197
           },
           {
             "name": "CalleeRef",
             "kind": "interface",
-            "line": 206
+            "line": 220
           },
           {
             "name": "ChunkRange",
             "kind": "interface",
-            "line": 213
+            "line": 227
           },
           {
             "name": "getCalleeRefsForExport",
             "kind": "function",
-            "line": 235
+            "line": 249
           },
           {
             "name": "LocalCallable",
             "kind": "interface",
-            "line": 270
+            "line": 284
           },
           {
             "name": "getLocalCallable",
             "kind": "function",
-            "line": 289
+            "line": 303
           },
           {
             "name": "getUniqueLocalCallableBySuffix",
             "kind": "function",
-            "line": 319
+            "line": 333
           },
           {
             "name": "getCalleeRefsForLocalSymbol",
             "kind": "function",
-            "line": 400
+            "line": 414
           },
           {
             "name": "getSymbolRefsInRange",
             "kind": "function",
-            "line": 432
+            "line": 446
           },
           {
             "name": "getContainingChunk",
             "kind": "function",
-            "line": 457
+            "line": 471
           },
           {
             "name": "getProjectRefFanIn",
             "kind": "function",
-            "line": 507
+            "line": 521
           },
           {
             "name": "getCallableExports",
             "kind": "function",
-            "line": 528
+            "line": 542
           },
           {
             "name": "CallableRange",
             "kind": "interface",
-            "line": 570
+            "line": 584
           },
           {
             "name": "getCallableRange",
             "kind": "function",
-            "line": 585
+            "line": 599
           },
           {
             "name": "SymbolReferenceLocation",
             "kind": "interface",
-            "line": 625
+            "line": 639
           },
           {
             "name": "getSymbolReferencesByName",
             "kind": "function",
-            "line": 631
+            "line": 645
           },
           {
             "name": "CallerRef",
             "kind": "interface",
-            "line": 668
+            "line": 682
           },
           {
             "name": "getCallersOfExport",
             "kind": "function",
-            "line": 717
+            "line": 731
           },
           {
             "name": "getCallersOfLocalSymbol",
             "kind": "function",
-            "line": 735
+            "line": 749
           },
           {
             "name": "CallableCandidate",
             "kind": "interface",
-            "line": 752
+            "line": 766
           },
           {
             "name": "getCallablesByName",
             "kind": "function",
-            "line": 763
+            "line": 777
           },
           {
             "name": "countInboundRefsByExport",
             "kind": "function",
-            "line": 826
+            "line": 840
           },
           {
             "name": "resolveAllSymbolRefs",
             "kind": "function",
-            "line": 857
+            "line": 871
           },
           {
             "name": "upsertFileGraph",
             "kind": "function",
-            "line": 879
+            "line": 893
           },
           {
             "name": "clearFileGraph",
             "kind": "function",
-            "line": 935
+            "line": 949
           },
           {
             "name": "resolveImport",
             "kind": "function",
-            "line": 956
+            "line": 970
           },
           {
             "name": "getUnresolvedImports",
             "kind": "function",
-            "line": 963
+            "line": 977
           },
           {
             "name": "getGraph",
             "kind": "function",
-            "line": 975
+            "line": 989
           },
           {
             "name": "getSubgraph",
             "kind": "function",
-            "line": 1029
+            "line": 1043
           },
           {
             "name": "getImportsForFile",
             "kind": "function",
-            "line": 1142
+            "line": 1156
           },
           {
             "name": "getImportersOf",
             "kind": "function",
-            "line": 1151
+            "line": 1165
           },
           {
             "name": "getDependsOn",
             "kind": "function",
-            "line": 1160
+            "line": 1174
           },
           {
             "name": "getDependedOnBy",
             "kind": "function",
-            "line": 1172
+            "line": 1186
           },
           {
             "name": "getDependsOnForFiles",
             "kind": "function",
-            "line": 1189
+            "line": 1203
           },
           {
             "name": "getDependedOnByForFiles",
             "kind": "function",
-            "line": 1213
+            "line": 1227
           },
           {
             "name": "SymbolGraphData",
             "kind": "interface",
-            "line": 1237
+            "line": 1251
           },
           {
             "name": "getSymbolGraphData",
             "kind": "function",
-            "line": 1248
+            "line": 1262
           },
           {
             "name": "getProjectConstants",
             "kind": "function",
-            "line": 1312
+            "line": 1326
           }
         ]
       },
@@ -1813,18 +1827,22 @@
           "src/db/search.ts",
           "src/db/types.ts",
           "src/embeddings/embed.ts",
-          "src/indexing/identifiers.ts"
+          "src/indexing/identifiers.ts",
+          "src/utils/log.ts"
         ],
         "importedBy": [
           "benchmarks/count-grouping-sim.ts",
           "benchmarks/embed-mode-experiment.ts",
           "benchmarks/excalidraw-parent-bench.ts",
+          "benchmarks/index-profile.ts",
           "benchmarks/indexing-bench-v2.ts",
           "benchmarks/indexing-bench.ts",
           "benchmarks/large-json.bench.test.ts",
           "benchmarks/model-ab.ts",
           "benchmarks/parent-promotion-bench.ts",
           "benchmarks/quality-bench-worker.ts",
+          "benchmarks/rebench-full.ts",
+          "benchmarks/rebench.ts",
           "benchmarks/semantic-sweep.ts",
           "benchmarks/subchunk-impact.ts",
           "benchmarks/swe-localization/spike.ts",
@@ -1855,23 +1873,32 @@
           "src/server/index.ts",
           "src/tools/index.ts",
           "src/wiki/rebuild.ts",
+          "tests/cli/affected.test.ts",
+          "tests/cli/doctor.test.ts",
           "tests/config/embedding-dim.test.ts",
           "tests/conversation/conversation-index.test.ts",
           "tests/conversation/folder-watch.test.ts",
           "tests/db/db.test.ts",
           "tests/db/fts-migration.test.ts",
+          "tests/db/schema-version.test.ts",
           "tests/features/annotations.test.ts",
           "tests/features/checkpoint.test.ts",
           "tests/features/git-history.test.ts",
+          "tests/features/persistence-reopen.test.ts",
+          "tests/graph/graph-guards.test.ts",
           "tests/graph/graph.test.ts",
           "tests/graph/remove-file-graph.test.ts",
           "tests/graph/symbol-refs.test.ts",
           "tests/graph/trace.test.ts",
+          "tests/indexing/abort-resume.test.ts",
           "tests/indexing/exclude-filter.test.ts",
+          "tests/indexing/gitignore-respect.test.ts",
+          "tests/indexing/incremental-parents.test.ts",
           "tests/indexing/indexer.test.ts",
           "tests/indexing/line-numbers.test.ts",
           "tests/indexing/vec-sync-trigger.test.ts",
           "tests/indexing/watcher.test.ts",
+          "tests/search/analytics-cosine.test.ts",
           "tests/search/analytics.test.ts",
           "tests/search/benchmark.test.ts",
           "tests/search/eval.test.ts",
@@ -1883,18 +1910,25 @@
           "tests/search/scoped-search.test.ts",
           "tests/search/search-symbols.test.ts",
           "tests/search/search.test.ts",
+          "tests/search/usages-behavior.test.ts",
           "tests/wiki/changelog.test.ts",
           "tests/wiki/eject.test.ts",
+          "tests/wiki/rebuild-safety.test.ts",
           "tests/wiki/update.test.ts"
         ],
-        "fanIn": 70,
-        "fanOut": 12,
-        "pageRank": 0.05152097,
+        "fanIn": 84,
+        "fanOut": 13,
+        "pageRank": 0.04911812,
         "exports": [
+          {
+            "name": "SCHEMA_VERSION",
+            "kind": "variable",
+            "line": 13
+          },
           {
             "name": "RagDB",
             "kind": "class",
-            "line": 91
+            "line": 100
           }
         ]
       },
@@ -1905,41 +1939,48 @@
           "src/utils/log.ts"
         ],
         "importedBy": [
-          "src/db/index.ts"
+          "src/db/index.ts",
+          "src/search/hybrid.ts",
+          "tests/search/analytics-cosine.test.ts"
         ],
-        "fanIn": 1,
+        "fanIn": 3,
         "fanOut": 2,
-        "pageRank": 0.0062464,
+        "pageRank": 0.00791658,
         "exports": [
+          {
+            "name": "vectorScoreToCosine",
+            "kind": "function",
+            "line": 18
+          },
           {
             "name": "vectorSearch",
             "kind": "function",
-            "line": 56
+            "line": 79
           },
           {
             "name": "textSearch",
             "kind": "function",
-            "line": 98
+            "line": 121
           },
           {
             "name": "vectorSearchChunks",
             "kind": "function",
-            "line": 140
+            "line": 163
           },
           {
             "name": "textSearchChunks",
             "kind": "function",
-            "line": 189
+            "line": 212
           },
           {
             "name": "searchSymbols",
             "kind": "function",
-            "line": 238
+            "line": 261
           },
           {
             "name": "findUsages",
             "kind": "function",
-            "line": 426
+            "line": 455
           }
         ]
       },
@@ -1951,7 +1992,7 @@
         ],
         "fanIn": 1,
         "fanOut": 0,
-        "pageRank": 0.0062464,
+        "pageRank": 0.00498687,
         "exports": [
           {
             "name": "StoredChunk",
@@ -2017,9 +2058,12 @@
       },
       {
         "path": "src/embeddings/embed.ts",
-        "imports": [],
+        "imports": [
+          "src/utils/profiler.ts"
+        ],
         "importedBy": [
           "benchmarks/ast-truncation-analysis.ts",
+          "benchmarks/embed-batch-profile.ts",
           "benchmarks/embed-mode-experiment.ts",
           "benchmarks/indexing-bench-v2.ts",
           "benchmarks/indexing-bench.ts",
@@ -2041,6 +2085,8 @@
           "src/tools/conversation-tools.ts",
           "src/tools/git-history-tools.ts",
           "src/tools/server-info-tools.ts",
+          "tests/cli/affected.test.ts",
+          "tests/cli/doctor.test.ts",
           "tests/config/embedding-dim.test.ts",
           "tests/conversation/conversation-index.test.ts",
           "tests/conversation/folder-watch.test.ts",
@@ -2049,15 +2095,21 @@
           "tests/embeddings/embed.test.ts",
           "tests/features/annotations.test.ts",
           "tests/features/checkpoint.test.ts",
+          "tests/features/persistence-reopen.test.ts",
+          "tests/graph/graph-guards.test.ts",
           "tests/graph/graph.test.ts",
           "tests/graph/remove-file-graph.test.ts",
           "tests/graph/symbol-refs.test.ts",
           "tests/graph/trace.test.ts",
+          "tests/indexing/abort-resume.test.ts",
           "tests/indexing/exclude-filter.test.ts",
+          "tests/indexing/gitignore-respect.test.ts",
+          "tests/indexing/incremental-parents.test.ts",
           "tests/indexing/indexer.test.ts",
           "tests/indexing/line-numbers.test.ts",
           "tests/indexing/vec-sync-trigger.test.ts",
           "tests/indexing/watcher.test.ts",
+          "tests/search/analytics-cosine.test.ts",
           "tests/search/benchmark.test.ts",
           "tests/search/eval.test.ts",
           "tests/search/find-usages.test.ts",
@@ -2067,91 +2119,97 @@
           "tests/search/read-relevant.test.ts",
           "tests/search/scoped-search.test.ts",
           "tests/search/search-symbols.test.ts",
-          "tests/search/search.test.ts"
+          "tests/search/search.test.ts",
+          "tests/search/usages-behavior.test.ts"
         ],
-        "fanIn": 49,
-        "fanOut": 0,
-        "pageRank": 0.06240898,
+        "fanIn": 59,
+        "fanOut": 1,
+        "pageRank": 0.06474344,
         "exports": [
           {
             "name": "EmbeddingPooling",
             "kind": "type",
-            "line": 19
+            "line": 20
           },
           {
             "name": "DEFAULT_POOLING",
             "kind": "variable",
-            "line": 23
+            "line": 24
           },
           {
             "name": "DEFAULT_DTYPE",
             "kind": "variable",
-            "line": 24
+            "line": 25
           },
           {
             "name": "configureEmbedder",
             "kind": "function",
-            "line": 43
+            "line": 44
           },
           {
             "name": "getEmbedder",
             "kind": "function",
-            "line": 60
+            "line": 61
           },
           {
             "name": "embed",
             "kind": "function",
-            "line": 94
+            "line": 95
           },
           {
             "name": "embedBatch",
             "kind": "function",
-            "line": 104
+            "line": 105
           },
           {
             "name": "getTokenizer",
             "kind": "function",
-            "line": 122
+            "line": 125
           },
           {
             "name": "mergeEmbeddings",
             "kind": "function",
-            "line": 149
+            "line": 152
           },
           {
             "name": "embedBatchMerged",
             "kind": "function",
-            "line": 168
+            "line": 171
           },
           {
             "name": "resetEmbedder",
             "kind": "function",
-            "line": 211
+            "line": 218
           },
           {
             "name": "getEmbeddingDim",
             "kind": "function",
-            "line": 217
+            "line": 224
           },
           {
             "name": "getModelId",
             "kind": "function",
-            "line": 222
+            "line": 229
+          },
+          {
+            "name": "getEmbeddingVariant",
+            "kind": "function",
+            "line": 238
           },
           {
             "name": "EMBEDDING_DIM",
             "kind": "variable",
-            "line": 227
+            "line": 243
           },
           {
             "name": "DEFAULT_MODEL_ID",
             "kind": "variable",
-            "line": 16
+            "line": 17
           },
           {
             "name": "DEFAULT_EMBEDDING_DIM",
             "kind": "variable",
-            "line": 17
+            "line": 18
           }
         ]
       },
@@ -2167,17 +2225,17 @@
         ],
         "fanIn": 2,
         "fanOut": 2,
-        "pageRank": 0.003208,
+        "pageRank": 0.00272194,
         "exports": [
           {
             "name": "GitIndexResult",
             "kind": "interface",
-            "line": 213
+            "line": 217
           },
           {
             "name": "indexGitHistory",
             "kind": "function",
-            "line": 221
+            "line": 225
           }
         ]
       },
@@ -2200,7 +2258,7 @@
         ],
         "fanIn": 10,
         "fanOut": 1,
-        "pageRank": 0.00813909,
+        "pageRank": 0.00669387,
         "exports": [
           {
             "name": "resolveImports",
@@ -2244,11 +2302,12 @@
         "importedBy": [
           "src/cli/commands/affected.ts",
           "src/tools/graph-tools.ts",
+          "tests/graph/graph-guards.test.ts",
           "tests/graph/trace.test.ts"
         ],
-        "fanIn": 3,
+        "fanIn": 4,
         "fanOut": 3,
-        "pageRank": 0.00649178,
+        "pageRank": 0.00607007,
         "exports": [
           {
             "name": "CallNode",
@@ -2354,6 +2413,7 @@
         ],
         "importedBy": [
           "benchmarks/ast-truncation-analysis.ts",
+          "benchmarks/embed-batch-profile.ts",
           "benchmarks/indexing-bench-v2.ts",
           "benchmarks/indexing-bench.ts",
           "benchmarks/quality-bench-worker.ts",
@@ -2364,9 +2424,9 @@
           "tests/indexing/chunker.test.ts",
           "tests/search/search-symbols.test.ts"
         ],
-        "fanIn": 10,
+        "fanIn": 11,
         "fanOut": 1,
-        "pageRank": 0.01005176,
+        "pageRank": 0.00923799,
         "exports": [
           {
             "name": "ChunkReferences",
@@ -2405,7 +2465,7 @@
         ],
         "fanIn": 3,
         "fanOut": 0,
-        "pageRank": 0.00850676,
+        "pageRank": 0.00681604,
         "exports": [
           {
             "name": "splitIdentifier",
@@ -2430,14 +2490,18 @@
           "src/utils/dir-guard.ts",
           "src/utils/index-lock.ts",
           "src/utils/log.ts",
-          "src/utils/path.ts"
+          "src/utils/path.ts",
+          "src/utils/profiler.ts"
         ],
         "importedBy": [
           "benchmarks/embed-mode-experiment.ts",
           "benchmarks/excalidraw-parent-bench.ts",
+          "benchmarks/index-profile.ts",
           "benchmarks/indexing-bench.ts",
           "benchmarks/large-json.bench.test.ts",
           "benchmarks/model-ab.ts",
+          "benchmarks/rebench-full.ts",
+          "benchmarks/rebench.ts",
           "benchmarks/subchunk-impact.ts",
           "benchmarks/swe-localization/spike.ts",
           "src/cli/commands/benchmark-models.ts",
@@ -2447,46 +2511,53 @@
           "src/indexing/watcher.ts",
           "src/server/index.ts",
           "src/tools/index-tools.ts",
+          "tests/cli/affected.test.ts",
           "tests/db/fts-migration.test.ts",
+          "tests/features/persistence-reopen.test.ts",
+          "tests/graph/graph-guards.test.ts",
           "tests/graph/remove-file-graph.test.ts",
           "tests/graph/symbol-refs.test.ts",
           "tests/graph/trace.test.ts",
+          "tests/indexing/abort-resume.test.ts",
           "tests/indexing/exclude-filter.test.ts",
+          "tests/indexing/gitignore-respect.test.ts",
+          "tests/indexing/incremental-parents.test.ts",
           "tests/indexing/indexer.test.ts",
           "tests/indexing/line-numbers.test.ts",
           "tests/indexing/vec-sync-trigger.test.ts",
           "tests/indexing/watcher.test.ts",
           "tests/search/fts-special-chars.test.ts",
-          "tests/search/identifier-tokenizer.test.ts"
+          "tests/search/identifier-tokenizer.test.ts",
+          "tests/search/usages-behavior.test.ts"
         ],
-        "fanIn": 25,
-        "fanOut": 9,
-        "pageRank": 0.01230448,
+        "fanIn": 35,
+        "fanOut": 10,
+        "pageRank": 0.01315293,
         "exports": [
           {
             "name": "IndexResult",
             "kind": "interface",
-            "line": 46
+            "line": 47
           },
           {
             "name": "buildIncludeFilter",
             "kind": "function",
-            "line": 69
+            "line": 70
           },
           {
             "name": "buildExcludeFilter",
             "kind": "function",
-            "line": 120
+            "line": 121
           },
           {
             "name": "indexFile",
             "kind": "function",
-            "line": 681
+            "line": 782
           },
           {
             "name": "indexDirectory",
             "kind": "function",
-            "line": 695
+            "line": 796
           }
         ]
       },
@@ -2495,6 +2566,7 @@
         "imports": [],
         "importedBy": [
           "benchmarks/ast-truncation-analysis.ts",
+          "benchmarks/embed-batch-profile.ts",
           "benchmarks/indexing-bench-v2.ts",
           "benchmarks/indexing-bench.ts",
           "benchmarks/quality-bench-worker.ts",
@@ -2502,9 +2574,9 @@
           "src/indexing/indexer.ts",
           "tests/indexing/parse.test.ts"
         ],
-        "fanIn": 7,
+        "fanIn": 8,
         "fanOut": 0,
-        "pageRank": 0.0068078,
+        "pageRank": 0.00613092,
         "exports": [
           {
             "name": "ParsedFile",
@@ -2522,25 +2594,26 @@
         "path": "src/indexing/watcher.ts",
         "imports": [
           "src/graph/resolver.ts",
-          "src/indexing/indexer.ts"
+          "src/indexing/indexer.ts",
+          "src/utils/path.ts"
         ],
         "importedBy": [
           "src/server/index.ts",
           "tests/indexing/watcher.test.ts"
         ],
         "fanIn": 2,
-        "fanOut": 2,
-        "pageRank": 0.00307361,
+        "fanOut": 3,
+        "pageRank": 0.00260791,
         "exports": [
           {
             "name": "Watcher",
             "kind": "interface",
-            "line": 12
+            "line": 13
           },
           {
             "name": "startWatcher",
             "kind": "function",
-            "line": 16
+            "line": 17
           }
         ]
       },
@@ -2552,7 +2625,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 1,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -2566,6 +2639,8 @@
           "benchmarks/embed-mode-experiment.ts",
           "benchmarks/model-ab.ts",
           "benchmarks/quality-bench-worker.ts",
+          "benchmarks/rebench-full.ts",
+          "benchmarks/rebench.ts",
           "benchmarks/semantic-sweep.ts",
           "benchmarks/subchunk-impact.ts",
           "benchmarks/swe-localization/spike.ts",
@@ -2573,9 +2648,9 @@
           "src/cli/commands/benchmark.ts",
           "tests/search/benchmark.test.ts"
         ],
-        "fanIn": 9,
+        "fanIn": 11,
         "fanOut": 3,
-        "pageRank": 0.0087626,
+        "pageRank": 0.00893332,
         "exports": [
           {
             "name": "BenchmarkQuery",
@@ -2622,7 +2697,7 @@
         ],
         "fanIn": 2,
         "fanOut": 3,
-        "pageRank": 0.0047607,
+        "pageRank": 0.00403938,
         "exports": [
           {
             "name": "EvalTask",
@@ -2670,6 +2745,7 @@
         "path": "src/search/hybrid.ts",
         "imports": [
           "src/db/index.ts",
+          "src/db/search.ts",
           "src/embeddings/embed.ts",
           "src/utils/log.ts",
           "src/utils/test-paths.ts"
@@ -2686,25 +2762,33 @@
           "src/search/eval.ts",
           "src/tools/conversation-tools.ts",
           "src/tools/search.ts",
+          "tests/features/persistence-reopen.test.ts",
+          "tests/search/analytics-cosine.test.ts",
           "tests/search/fts-special-chars.test.ts",
           "tests/search/hybrid-search.test.ts",
           "tests/search/read-relevant.test.ts",
+          "tests/search/rrf-fusion.test.ts",
           "tests/search/scoped-search.test.ts",
           "tests/search/search.test.ts"
         ],
-        "fanIn": 16,
-        "fanOut": 4,
-        "pageRank": 0.01518758,
+        "fanIn": 19,
+        "fanOut": 5,
+        "pageRank": 0.01565964,
         "exports": [
           {
             "name": "DedupedResult",
             "kind": "interface",
-            "line": 40
+            "line": 41
           },
           {
             "name": "ChunkResult",
             "kind": "interface",
-            "line": 46
+            "line": 47
+          },
+          {
+            "name": "DEFAULT_HYBRID_WEIGHT",
+            "kind": "variable",
+            "line": 59
           },
           {
             "name": "rrfFuse",
@@ -2724,7 +2808,7 @@
           {
             "name": "searchChunks",
             "kind": "function",
-            "line": 489
+            "line": 491
           }
         ]
       },
@@ -2734,11 +2818,12 @@
         "importedBy": [
           "src/db/conversation.ts",
           "src/db/git-history.ts",
+          "src/db/graph.ts",
           "src/db/search.ts"
         ],
-        "fanIn": 3,
+        "fanIn": 4,
         "fanOut": 0,
-        "pageRank": 0.01675551,
+        "pageRank": 0.02357731,
         "exports": [
           {
             "name": "escapeRegex",
@@ -2746,9 +2831,14 @@
             "line": 14
           },
           {
+            "name": "escapeLike",
+            "kind": "function",
+            "line": 23
+          },
+          {
             "name": "sanitizeFTS",
             "kind": "function",
-            "line": 28
+            "line": 38
           }
         ]
       },
@@ -2770,7 +2860,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 11,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": [
           {
             "name": "getConnectedDBs",
@@ -2794,7 +2884,7 @@
         ],
         "fanIn": 1,
         "fanOut": 1,
-        "pageRank": 0.00388708,
+        "pageRank": 0.00329812,
         "exports": [
           {
             "name": "registerAnalyticsTools",
@@ -2814,7 +2904,7 @@
         ],
         "fanIn": 1,
         "fanOut": 2,
-        "pageRank": 0.00388708,
+        "pageRank": 0.00329812,
         "exports": [
           {
             "name": "registerAnnotationTools",
@@ -2835,7 +2925,7 @@
         ],
         "fanIn": 1,
         "fanOut": 3,
-        "pageRank": 0.00388708,
+        "pageRank": 0.00329812,
         "exports": [
           {
             "name": "registerCheckpointTools",
@@ -2857,7 +2947,7 @@
         ],
         "fanIn": 1,
         "fanOut": 4,
-        "pageRank": 0.00388708,
+        "pageRank": 0.00329812,
         "exports": [
           {
             "name": "registerConversationTools",
@@ -2877,7 +2967,7 @@
         ],
         "fanIn": 1,
         "fanOut": 2,
-        "pageRank": 0.00388708,
+        "pageRank": 0.00329812,
         "exports": [
           {
             "name": "registerGitHistoryTools",
@@ -2897,7 +2987,7 @@
         ],
         "fanIn": 2,
         "fanOut": 1,
-        "pageRank": 0.00483317,
+        "pageRank": 0.00410087,
         "exports": [
           {
             "name": "runGit",
@@ -2929,7 +3019,7 @@
         ],
         "fanIn": 1,
         "fanOut": 4,
-        "pageRank": 0.00388708,
+        "pageRank": 0.00329812,
         "exports": [
           {
             "name": "registerGraphTools",
@@ -2949,7 +3039,7 @@
         ],
         "fanIn": 1,
         "fanOut": 2,
-        "pageRank": 0.00388708,
+        "pageRank": 0.00329812,
         "exports": [
           {
             "name": "registerIndexTools",
@@ -2991,7 +3081,7 @@
         ],
         "fanIn": 12,
         "fanOut": 13,
-        "pageRank": 0.02124825,
+        "pageRank": 0.01802882,
         "exports": [
           {
             "name": "GetDB",
@@ -3011,7 +3101,7 @@
           {
             "name": "registerAllTools",
             "kind": "function",
-            "line": 39
+            "line": 47
           }
         ]
       },
@@ -3026,7 +3116,7 @@
         ],
         "fanIn": 1,
         "fanOut": 2,
-        "pageRank": 0.00388708,
+        "pageRank": 0.00329812,
         "exports": [
           {
             "name": "registerSearchTools",
@@ -3046,7 +3136,7 @@
         ],
         "fanIn": 1,
         "fanOut": 2,
-        "pageRank": 0.00388708,
+        "pageRank": 0.00329812,
         "exports": [
           {
             "name": "ConnectedDBInfo",
@@ -3071,7 +3161,7 @@
         ],
         "fanIn": 1,
         "fanOut": 2,
-        "pageRank": 0.00388708,
+        "pageRank": 0.00329812,
         "exports": [
           {
             "name": "registerWikiTools",
@@ -3086,7 +3176,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": [
           {
             "name": "EmbeddedChunk",
@@ -3100,21 +3190,22 @@
         "imports": [],
         "importedBy": [
           "src/indexing/indexer.ts",
-          "src/server/index.ts"
+          "src/server/index.ts",
+          "tests/utils/dir-guard.test.ts"
         ],
-        "fanIn": 2,
+        "fanIn": 3,
         "fanOut": 0,
-        "pageRank": 0.00366924,
+        "pageRank": 0.00385811,
         "exports": [
           {
             "name": "DirCheckResult",
             "kind": "interface",
-            "line": 18
+            "line": 28
           },
           {
             "name": "checkIndexDir",
             "kind": "function",
-            "line": 25
+            "line": 35
           }
         ]
       },
@@ -3130,7 +3221,7 @@
         ],
         "fanIn": 3,
         "fanOut": 1,
-        "pageRank": 0.00440506,
+        "pageRank": 0.00385811,
         "exports": [
           {
             "name": "IndexLock",
@@ -3170,6 +3261,7 @@
           "src/cli/index.ts",
           "src/cli/progress.ts",
           "src/config/index.ts",
+          "src/db/index.ts",
           "src/db/search.ts",
           "src/git/indexer.ts",
           "src/indexing/chunker.ts",
@@ -3179,9 +3271,9 @@
           "src/tools/conversation-tools.ts",
           "src/utils/index-lock.ts"
         ],
-        "fanIn": 30,
+        "fanIn": 31,
         "fanOut": 0,
-        "pageRank": 0.04756971,
+        "pageRank": 0.04479886,
         "exports": [
           {
             "name": "log",
@@ -3201,17 +3293,48 @@
         "importedBy": [
           "src/db/files.ts",
           "src/indexing/indexer.ts",
+          "src/indexing/watcher.ts",
           "src/wiki/rebuild.ts",
           "tests/indexing/exclude-filter.test.ts"
         ],
-        "fanIn": 4,
+        "fanIn": 5,
         "fanOut": 0,
-        "pageRank": 0.00734058,
+        "pageRank": 0.00683616,
         "exports": [
           {
             "name": "normalizePath",
             "kind": "function",
             "line": 11
+          }
+        ]
+      },
+      {
+        "path": "src/utils/profiler.ts",
+        "imports": [],
+        "importedBy": [
+          "benchmarks/embed-batch-profile.ts",
+          "benchmarks/index-profile.ts",
+          "src/embeddings/embed.ts",
+          "src/indexing/indexer.ts"
+        ],
+        "fanIn": 4,
+        "fanOut": 0,
+        "pageRank": 0.05931291,
+        "exports": [
+          {
+            "name": "timed",
+            "kind": "function",
+            "line": 36
+          },
+          {
+            "name": "profiler",
+            "kind": "variable",
+            "line": 47
+          },
+          {
+            "name": "setProfiling",
+            "kind": "function",
+            "line": 106
           }
         ]
       },
@@ -3224,7 +3347,7 @@
         ],
         "fanIn": 2,
         "fanOut": 0,
-        "pageRank": 0.00720387,
+        "pageRank": 0.00615555,
         "exports": [
           {
             "name": "TEST_PATTERNS",
@@ -3244,7 +3367,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3253,7 +3376,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3262,7 +3385,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3271,7 +3394,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3280,7 +3403,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3289,7 +3412,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3298,7 +3421,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3307,7 +3430,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3316,7 +3439,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3325,7 +3448,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3339,11 +3462,12 @@
           "tests/wiki/changelog.test.ts",
           "tests/wiki/eject.test.ts",
           "tests/wiki/instructions-parity.test.ts",
+          "tests/wiki/rebuild-safety.test.ts",
           "tests/wiki/update.test.ts"
         ],
-        "fanIn": 5,
+        "fanIn": 6,
         "fanOut": 2,
-        "pageRank": 0.0066404,
+        "pageRank": 0.00610253,
         "exports": [
           {
             "name": "WIKI_DISCOVERY_SCHEMA_VERSION",
@@ -3403,19 +3527,56 @@
           {
             "name": "buildPrefetch",
             "kind": "function",
-            "line": 383
+            "line": 388
           },
           {
             "name": "writePagePrompt",
             "kind": "function",
-            "line": 431
+            "line": 445
           },
           {
             "name": "runWikiRebuild",
             "kind": "function",
-            "line": 956
+            "line": 973
           }
         ]
+      },
+      {
+        "path": "tests/cli/affected.test.ts",
+        "imports": [
+          "src/config/index.ts",
+          "src/db/index.ts",
+          "src/embeddings/embed.ts",
+          "src/indexing/indexer.ts",
+          "tests/helpers.ts"
+        ],
+        "importedBy": [],
+        "fanIn": 0,
+        "fanOut": 5,
+        "pageRank": 0.00220351,
+        "exports": []
+      },
+      {
+        "path": "tests/cli/checkpoint.test.ts",
+        "imports": [
+          "tests/helpers.ts"
+        ],
+        "importedBy": [],
+        "fanIn": 0,
+        "fanOut": 1,
+        "pageRank": 0.00220351,
+        "exports": []
+      },
+      {
+        "path": "tests/cli/cli-hardening.test.ts",
+        "imports": [
+          "tests/helpers.ts"
+        ],
+        "importedBy": [],
+        "fanIn": 0,
+        "fanOut": 1,
+        "pageRank": 0.00220351,
+        "exports": []
       },
       {
         "path": "tests/cli/cli.test.ts",
@@ -3425,7 +3586,20 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 1,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
+        "exports": []
+      },
+      {
+        "path": "tests/cli/doctor.test.ts",
+        "imports": [
+          "src/db/index.ts",
+          "src/embeddings/embed.ts",
+          "tests/helpers.ts"
+        ],
+        "importedBy": [],
+        "fanIn": 0,
+        "fanOut": 3,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3436,7 +3610,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 1,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3448,20 +3622,21 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 2,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
         "path": "tests/config/embedding-dim.test.ts",
         "imports": [
+          "src/config/index.ts",
           "src/db/index.ts",
           "src/embeddings/embed.ts",
           "tests/helpers.ts"
         ],
         "importedBy": [],
         "fanIn": 0,
-        "fanOut": 3,
-        "pageRank": 0.002597,
+        "fanOut": 4,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3476,7 +3651,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 5,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3487,7 +3662,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 1,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3502,7 +3677,18 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 5,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
+        "exports": []
+      },
+      {
+        "path": "tests/conversation/jsonl-offset.test.ts",
+        "imports": [
+          "src/conversation/parser.ts"
+        ],
+        "importedBy": [],
+        "fanIn": 0,
+        "fanOut": 1,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3515,7 +3701,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 3,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3530,7 +3716,19 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 5,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
+        "exports": []
+      },
+      {
+        "path": "tests/db/schema-version.test.ts",
+        "imports": [
+          "src/db/index.ts",
+          "tests/helpers.ts"
+        ],
+        "importedBy": [],
+        "fanIn": 0,
+        "fanOut": 2,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3541,7 +3739,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 1,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3554,7 +3752,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 3,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3567,7 +3765,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 3,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3578,7 +3776,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 1,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3592,7 +3790,23 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 4,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
+        "exports": []
+      },
+      {
+        "path": "tests/features/persistence-reopen.test.ts",
+        "imports": [
+          "src/config/index.ts",
+          "src/db/index.ts",
+          "src/embeddings/embed.ts",
+          "src/indexing/indexer.ts",
+          "src/search/hybrid.ts",
+          "tests/helpers.ts"
+        ],
+        "importedBy": [],
+        "fanIn": 0,
+        "fanOut": 6,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3601,7 +3815,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3610,7 +3824,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3619,7 +3833,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3628,7 +3842,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3637,7 +3851,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": [
           {
             "name": "createConnection",
@@ -3657,7 +3871,23 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
+        "exports": []
+      },
+      {
+        "path": "tests/graph/graph-guards.test.ts",
+        "imports": [
+          "src/config/index.ts",
+          "src/db/index.ts",
+          "src/embeddings/embed.ts",
+          "src/graph/trace.ts",
+          "src/indexing/indexer.ts",
+          "tests/helpers.ts"
+        ],
+        "importedBy": [],
+        "fanIn": 0,
+        "fanOut": 6,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3672,7 +3902,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 5,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3687,7 +3917,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 5,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3702,7 +3932,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 5,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3718,7 +3948,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 6,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3726,27 +3956,38 @@
         "imports": [],
         "importedBy": [
           "benchmarks/large-json.bench.test.ts",
+          "tests/cli/affected.test.ts",
+          "tests/cli/checkpoint.test.ts",
+          "tests/cli/cli-hardening.test.ts",
           "tests/cli/cli.test.ts",
+          "tests/cli/doctor.test.ts",
           "tests/config/config.test.ts",
           "tests/config/embedding-dim.test.ts",
           "tests/conversation/conversation-index.test.ts",
           "tests/conversation/folder-watch.test.ts",
           "tests/db/db.test.ts",
           "tests/db/fts-migration.test.ts",
+          "tests/db/schema-version.test.ts",
           "tests/features/annotations.test.ts",
           "tests/features/checkpoint.test.ts",
           "tests/features/git-context.test.ts",
           "tests/features/git-history.test.ts",
+          "tests/features/persistence-reopen.test.ts",
+          "tests/graph/graph-guards.test.ts",
           "tests/graph/graph.test.ts",
           "tests/graph/remove-file-graph.test.ts",
           "tests/graph/symbol-refs.test.ts",
           "tests/graph/trace.test.ts",
+          "tests/indexing/abort-resume.test.ts",
           "tests/indexing/exclude-filter.test.ts",
+          "tests/indexing/gitignore-respect.test.ts",
+          "tests/indexing/incremental-parents.test.ts",
           "tests/indexing/index-lock.test.ts",
           "tests/indexing/indexer.test.ts",
           "tests/indexing/line-numbers.test.ts",
           "tests/indexing/vec-sync-trigger.test.ts",
           "tests/indexing/watcher.test.ts",
+          "tests/search/analytics-cosine.test.ts",
           "tests/search/analytics.test.ts",
           "tests/search/benchmark.test.ts",
           "tests/search/eval.test.ts",
@@ -3758,16 +3999,20 @@
           "tests/search/scoped-search.test.ts",
           "tests/search/search-symbols.test.ts",
           "tests/search/search.test.ts",
+          "tests/search/usages-behavior.test.ts",
           "tests/tools/server.test.ts",
+          "tests/tools/tool-contracts.test.ts",
           "tests/tools/wiki-tools.test.ts",
+          "tests/utils/dir-guard.test.ts",
           "tests/wiki/changelog.test.ts",
           "tests/wiki/eject.test.ts",
           "tests/wiki/instructions-parity.test.ts",
+          "tests/wiki/rebuild-safety.test.ts",
           "tests/wiki/update.test.ts"
         ],
-        "fanIn": 39,
+        "fanIn": 54,
         "fanOut": 0,
-        "pageRank": 0.04251113,
+        "pageRank": 0.05091346,
         "exports": [
           {
             "name": "createTempDir",
@@ -3787,6 +4032,21 @@
         ]
       },
       {
+        "path": "tests/indexing/abort-resume.test.ts",
+        "imports": [
+          "src/config/index.ts",
+          "src/db/index.ts",
+          "src/embeddings/embed.ts",
+          "src/indexing/indexer.ts",
+          "tests/helpers.ts"
+        ],
+        "importedBy": [],
+        "fanIn": 0,
+        "fanOut": 5,
+        "pageRank": 0.00220351,
+        "exports": []
+      },
+      {
         "path": "tests/indexing/chunker.test.ts",
         "imports": [
           "src/indexing/chunker.ts"
@@ -3794,7 +4054,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 1,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3810,7 +4070,37 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 6,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
+        "exports": []
+      },
+      {
+        "path": "tests/indexing/gitignore-respect.test.ts",
+        "imports": [
+          "src/config/index.ts",
+          "src/db/index.ts",
+          "src/embeddings/embed.ts",
+          "src/indexing/indexer.ts",
+          "tests/helpers.ts"
+        ],
+        "importedBy": [],
+        "fanIn": 0,
+        "fanOut": 5,
+        "pageRank": 0.00220351,
+        "exports": []
+      },
+      {
+        "path": "tests/indexing/incremental-parents.test.ts",
+        "imports": [
+          "src/config/index.ts",
+          "src/db/index.ts",
+          "src/embeddings/embed.ts",
+          "src/indexing/indexer.ts",
+          "tests/helpers.ts"
+        ],
+        "importedBy": [],
+        "fanIn": 0,
+        "fanOut": 5,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3822,7 +4112,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 2,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3837,7 +4127,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 5,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3852,7 +4142,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 5,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3863,7 +4153,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 1,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3878,7 +4168,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 5,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3894,7 +4184,22 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 6,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
+        "exports": []
+      },
+      {
+        "path": "tests/search/analytics-cosine.test.ts",
+        "imports": [
+          "src/db/index.ts",
+          "src/db/search.ts",
+          "src/embeddings/embed.ts",
+          "src/search/hybrid.ts",
+          "tests/helpers.ts"
+        ],
+        "importedBy": [],
+        "fanIn": 0,
+        "fanOut": 5,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3906,7 +4211,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 2,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3920,7 +4225,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 4,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3934,7 +4239,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 4,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3947,7 +4252,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 3,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3963,7 +4268,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 6,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3977,7 +4282,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 4,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -3993,7 +4298,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 6,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4007,7 +4312,18 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 4,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
+        "exports": []
+      },
+      {
+        "path": "tests/search/rrf-fusion.test.ts",
+        "imports": [
+          "src/search/hybrid.ts"
+        ],
+        "importedBy": [],
+        "fanIn": 0,
+        "fanOut": 1,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4021,7 +4337,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 4,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4036,7 +4352,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 5,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4050,7 +4366,22 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 4,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
+        "exports": []
+      },
+      {
+        "path": "tests/search/usages-behavior.test.ts",
+        "imports": [
+          "src/config/index.ts",
+          "src/db/index.ts",
+          "src/embeddings/embed.ts",
+          "src/indexing/indexer.ts",
+          "tests/helpers.ts"
+        ],
+        "importedBy": [],
+        "fanIn": 0,
+        "fanOut": 5,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4061,7 +4392,18 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 1,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
+        "exports": []
+      },
+      {
+        "path": "tests/tools/tool-contracts.test.ts",
+        "imports": [
+          "tests/helpers.ts"
+        ],
+        "importedBy": [],
+        "fanIn": 0,
+        "fanOut": 1,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4072,7 +4414,19 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 1,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
+        "exports": []
+      },
+      {
+        "path": "tests/utils/dir-guard.test.ts",
+        "imports": [
+          "src/utils/dir-guard.ts",
+          "tests/helpers.ts"
+        ],
+        "importedBy": [],
+        "fanIn": 0,
+        "fanOut": 2,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4085,7 +4439,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 3,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4098,7 +4452,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 3,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4107,7 +4461,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4116,7 +4470,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4125,7 +4479,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4134,7 +4488,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4143,7 +4497,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4152,7 +4506,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4164,7 +4518,20 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 2,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
+        "exports": []
+      },
+      {
+        "path": "tests/wiki/rebuild-safety.test.ts",
+        "imports": [
+          "src/db/index.ts",
+          "src/wiki/rebuild.ts",
+          "tests/helpers.ts"
+        ],
+        "importedBy": [],
+        "fanIn": 0,
+        "fanOut": 3,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4177,7 +4544,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 3,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4186,7 +4553,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4195,7 +4562,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4204,7 +4571,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4213,7 +4580,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4222,7 +4589,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4231,7 +4598,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4240,7 +4607,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4249,7 +4616,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4258,7 +4625,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4267,7 +4634,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4276,7 +4643,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4285,7 +4652,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4294,7 +4661,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4303,7 +4670,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4312,7 +4679,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4321,7 +4688,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4330,7 +4697,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4339,7 +4706,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4348,7 +4715,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4357,7 +4724,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4366,7 +4733,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4375,7 +4742,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4384,7 +4751,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4393,7 +4760,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4402,7 +4769,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4411,7 +4778,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4420,7 +4787,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4429,7 +4796,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4438,7 +4805,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4447,7 +4814,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4456,7 +4823,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4465,7 +4832,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4474,7 +4841,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4483,7 +4850,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4492,7 +4859,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4501,7 +4868,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4510,7 +4877,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4519,7 +4886,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4528,7 +4895,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4537,7 +4904,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4546,7 +4913,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4555,7 +4922,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4564,7 +4931,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4573,7 +4940,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4582,7 +4949,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4591,7 +4958,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4600,7 +4967,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4609,7 +4976,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4618,7 +4985,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4627,7 +4994,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4636,7 +5003,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4645,7 +5012,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4654,7 +5021,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       },
       {
@@ -4663,7 +5030,7 @@
         "importedBy": [],
         "fanIn": 0,
         "fanOut": 0,
-        "pageRank": 0.002597,
+        "pageRank": 0.00220351,
         "exports": []
       }
     ]
