@@ -29,6 +29,10 @@ After indexing with mimirs: **91K tokens, ~3 seconds** — a 76% drop on that co
   <span>Works with: Claude Code &nbsp;·&nbsp; Cursor &nbsp;·&nbsp; Windsurf &nbsp;·&nbsp; JetBrains (Junie) &nbsp;·&nbsp; GitHub Copilot &nbsp;·&nbsp; any MCP client</span>
 </div>
 
+<div align="center">
+  <img src="demo.gif" alt="mimirs: index a repo, then search, read, and find affected tests — from the terminal" width="900">
+</div>
+
 ## Quick start
 
 ### 1. Prerequisites
