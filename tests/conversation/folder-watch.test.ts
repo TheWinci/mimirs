@@ -72,7 +72,7 @@ describe("indexAllSessions", () => {
       assistantMsg("Routing is a switch in the dispatcher keyed on the command name.", "b-a1", "b-u1"),
     ]);
 
-    const total = await indexAllSessions(transcriptsDir, db);
+    const total = await indexAllSessions(transcriptsDir, db, tempDir);
 
     expect(total).toBe(2); // one user→assistant turn per session
     expect(db.getTurnCount("sess-a")).toBe(1);
@@ -85,8 +85,8 @@ describe("indexAllSessions", () => {
       assistantMsg("The parser turns JSONL journal entries into structured turns.", "a1", "u1"),
     ]);
 
-    expect(await indexAllSessions(transcriptsDir, db)).toBe(1);
-    expect(await indexAllSessions(transcriptsDir, db)).toBe(0);
+    expect(await indexAllSessions(transcriptsDir, db, tempDir)).toBe(1);
+    expect(await indexAllSessions(transcriptsDir, db, tempDir)).toBe(0);
     expect(db.getTurnCount("sess-a")).toBe(1);
   });
 
@@ -95,7 +95,7 @@ describe("indexAllSessions", () => {
       userMsg("First question about indexing", "u1"),
       assistantMsg("First answer describing the indexer pipeline.", "a1", "u1"),
     ]);
-    expect(await indexAllSessions(transcriptsDir, db)).toBe(1);
+    expect(await indexAllSessions(transcriptsDir, db, tempDir)).toBe(1);
 
     appendFileSync(
       join(transcriptsDir, "sess-a.jsonl"),
@@ -105,12 +105,12 @@ describe("indexAllSessions", () => {
       ]),
     );
 
-    expect(await indexAllSessions(transcriptsDir, db)).toBe(1);
+    expect(await indexAllSessions(transcriptsDir, db, tempDir)).toBe(1);
     expect(db.getTurnCount("sess-a")).toBe(2);
   });
 
   test("returns 0 for a folder that does not exist", async () => {
-    expect(await indexAllSessions(join(tempDir, "no-such-dir"), db)).toBe(0);
+    expect(await indexAllSessions(join(tempDir, "no-such-dir"), db, tempDir)).toBe(0);
   });
 });
 
@@ -121,7 +121,7 @@ describe("startConversationFolderWatch", () => {
       assistantMsg("Answer indexed by the folder watcher backfill pass.", "a1", "u1"),
     ]);
 
-    const watcher = startConversationFolderWatch(transcriptsDir, db);
+    const watcher = startConversationFolderWatch(transcriptsDir, db, tempDir);
     // The initial drain is async (it embeds) — poll until it lands.
     for (let i = 0; i < 100 && db.getTurnCount("sess-x") === 0; i++) {
       await new Promise((r) => setTimeout(r, 20));
@@ -129,5 +129,41 @@ describe("startConversationFolderWatch", () => {
     watcher.close();
 
     expect(db.getTurnCount("sess-x")).toBe(1);
+  });
+});
+
+describe("path-collision isolation (cwd filter)", () => {
+  const withCwd = (e: JournalEntry, cwd: string): JournalEntry => ({ ...e, cwd });
+
+  test("indexes only this project's transcripts, not a path-collided sibling's", async () => {
+    // Claude Code's "/"→"-" folder encoding is lossy, so two real projects can
+    // share one transcripts folder. Each session records its true cwd.
+    const ownDir = tempDir; // this project
+    const siblingDir = `${tempDir}-sibling`; // a DIFFERENT project, same folder
+
+    writeSession("own", [
+      withCwd(userMsg("Question from THIS project about caching", "o-u1"), ownDir),
+      withCwd(assistantMsg("Answer that belongs to this project.", "o-a1", "o-u1"), ownDir),
+    ]);
+    writeSession("foreign", [
+      withCwd(userMsg("Secret question from ANOTHER project", "f-u1"), siblingDir),
+      withCwd(assistantMsg("Answer that must NOT leak into this project.", "f-a1", "f-u1"), siblingDir),
+    ]);
+
+    const total = await indexAllSessions(transcriptsDir, db, ownDir);
+
+    expect(total).toBe(1); // only the own session's turn
+    expect(db.getTurnCount("own")).toBe(1);
+    expect(db.getTurnCount("foreign")).toBe(0); // sibling's turns skipped
+    expect(db.getSession("foreign")).toBeNull(); // not even tracked
+  });
+
+  test("a session with no recorded cwd is treated as own (legacy transcripts)", async () => {
+    writeSession("legacy", [
+      userMsg("Old transcript with no cwd field", "l-u1"),
+      assistantMsg("Should still index — can't prove it's foreign.", "l-a1", "l-u1"),
+    ]);
+    expect(await indexAllSessions(transcriptsDir, db, tempDir)).toBe(1);
+    expect(db.getTurnCount("legacy")).toBe(1);
   });
 });

@@ -30,7 +30,7 @@ export async function conversationCommand(args: string[], getFlag: (flag: string
     for (const session of sessions) {
       const existing = db.getSession(session.sessionId);
       if (!existing || existing.mtime < session.mtime) {
-        await indexConversation(session.jsonlPath, session.sessionId, db);
+        await indexConversation(session.jsonlPath, session.sessionId, db, dir);
       }
     }
 
@@ -80,7 +80,7 @@ export async function conversationCommand(args: string[], getFlag: (flag: string
       cli.log(`Found ${sessions.length} sessions, indexing...`);
       let totalTurns = 0;
       for (const session of sessions) {
-        const result = await indexConversation(session.jsonlPath, session.sessionId, db);
+        const result = await indexConversation(session.jsonlPath, session.sessionId, db, dir);
         totalTurns += result.turnsIndexed;
         if (result.turnsIndexed > 0) {
           cli.log(`  ${session.sessionId.slice(0, 8)}...: ${result.turnsIndexed} turns`);

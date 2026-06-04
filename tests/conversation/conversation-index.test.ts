@@ -93,7 +93,7 @@ describe("indexConversation", () => {
       assistantMsg("Database configuration lives in src/config.ts. It reads from environment variables.", "a2", "u2"),
     ]);
 
-    const result = await indexConversation(path, "test-session", db);
+    const result = await indexConversation(path, "test-session", db, tempDir);
 
     expect(result.turnsIndexed).toBe(2);
     expect(result.totalTokens).toBeGreaterThan(0);
@@ -112,7 +112,7 @@ describe("indexConversation", () => {
 
     // Write first batch
     const path = await writeJSONL("test.jsonl", entries1);
-    const result1 = await indexConversation(path, "test-session", db);
+    const result1 = await indexConversation(path, "test-session", db, tempDir);
     expect(result1.turnsIndexed).toBe(1);
 
     // Append second batch
@@ -121,7 +121,7 @@ describe("indexConversation", () => {
     writeFileSync(path, extraContent, { flag: "a" });
 
     // Index from offset
-    const result2 = await indexConversation(path, "test-session", db, result1.newOffset, 1);
+    const result2 = await indexConversation(path, "test-session", db, tempDir, result1.newOffset, 1);
     expect(result2.turnsIndexed).toBe(1);
     expect(db.getTurnCount("test-session")).toBe(2);
   });
@@ -134,7 +134,7 @@ describe("indexConversation", () => {
       assistantMsg("All 3 auth tests passed!", "a2", "u2"),
     ]);
 
-    const result = await indexConversation(path, "test-session", db);
+    const result = await indexConversation(path, "test-session", db, tempDir);
     expect(result.turnsIndexed).toBe(1);
   });
 
@@ -148,7 +148,7 @@ describe("indexConversation", () => {
       assistantMsg("We use Jest for unit tests and supertest for API integration tests.", "a3", "u3"),
     ]);
 
-    await indexConversation(path, "test-session", db);
+    await indexConversation(path, "test-session", db, tempDir);
 
     // Search for auth-related content
     const queryEmb = await embed("JWT authentication tokens");
@@ -167,7 +167,7 @@ describe("indexConversation", () => {
       assistantMsg("Migrations use knex.js. Run knex migrate:latest to apply pending migrations.", "a2", "u2"),
     ]);
 
-    await indexConversation(path, "test-session", db);
+    await indexConversation(path, "test-session", db, tempDir);
 
     const results = db.textSearchConversation("Docker", 5, "test-session");
     expect(results.length).toBeGreaterThan(0);
@@ -181,10 +181,10 @@ describe("indexConversation", () => {
     ]);
 
     // Index the same file twice from offset 0 — the second run should detect duplicates
-    const result1 = await indexConversation(path, "dup-session", db);
+    const result1 = await indexConversation(path, "dup-session", db, tempDir);
     expect(result1.turnsIndexed).toBe(1);
 
-    const result2 = await indexConversation(path, "dup-session", db, 0, 0);
+    const result2 = await indexConversation(path, "dup-session", db, tempDir, 0, 0);
     expect(result2.turnsIndexed).toBe(0); // duplicate — should not re-index
 
     // Verify only one turn exists
@@ -204,7 +204,7 @@ describe("indexConversation", () => {
       assistantMsg("Hi there!", "a1", "u1"),
     ]);
 
-    await indexConversation(path, "test-session", db);
+    await indexConversation(path, "test-session", db, tempDir);
 
     const session = db.getSession("test-session");
     expect(session).not.toBeNull();

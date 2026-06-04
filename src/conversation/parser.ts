@@ -9,6 +9,10 @@ export interface JournalEntry {
   parentUuid?: string | null;
   timestamp?: string;
   sessionId?: string;
+  // The absolute project dir this turn ran in. Claude Code records it on every
+  // content line. Used to keep path-collided projects' transcripts apart — see
+  // belongsToProject() and getTranscriptsDir()'s lossy "/"→"-" encoding.
+  cwd?: string;
   isSidechain?: boolean;
   requestId?: string;
   message?: {
@@ -293,6 +297,40 @@ export interface SessionInfo {
   jsonlPath: string;
   mtime: number;
   size: number;
+}
+
+/**
+ * Whether a single transcript entry belongs to `projectDir`. Entries with no
+ * recorded `cwd` (meta lines: summaries, file-history snapshots) are kept — they
+ * carry no project-specific content and are dropped later by turn parsing.
+ */
+export function belongsToProject(entry: JournalEntry, projectDir: string): boolean {
+  return !entry.cwd || entry.cwd === projectDir;
+}
+
+/**
+ * Classify a whole transcript file by the `cwd` its lines recorded.
+ *
+ * Claude Code's folder encoding ("/"→"-") is lossy, so two real project paths
+ * (e.g. `a/b` and `a-b`) can share one transcript folder. This is how we tell a
+ * sibling project's transcript apart from our own without trusting the folder
+ * name: "own" = has lines from this project, "foreign" = has lines but all from a
+ * different project, "unknown" = no cwd on any line (legacy/edge — treat as own).
+ */
+export function classifyTranscript(
+  entries: JournalEntry[],
+  projectDir: string,
+): "own" | "foreign" | "unknown" {
+  let own = false;
+  let foreign = false;
+  for (const e of entries) {
+    if (!e.cwd) continue;
+    if (e.cwd === projectDir) own = true;
+    else foreign = true;
+  }
+  if (own) return "own";
+  if (foreign) return "foreign";
+  return "unknown";
 }
 
 /**

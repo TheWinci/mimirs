@@ -1,7 +1,7 @@
 import { watch, statSync, existsSync } from "fs";
 import { join, basename } from "path";
 import { Glob } from "bun";
-import { readJSONL, parseTurns, buildTurnText, type ParsedTurn } from "./parser";
+import { readJSONL, parseTurns, buildTurnText, belongsToProject, classifyTranscript, type ParsedTurn } from "./parser";
 import { chunkText } from "../indexing/chunker";
 import { embedBatch } from "../embeddings/embed";
 import { type RagDB } from "../db";
@@ -17,6 +17,7 @@ export async function indexConversation(
   jsonlPath: string,
   sessionId: string,
   db: RagDB,
+  projectDir: string,
   fromOffset = 0,
   startTurnIndex = 0,
   onProgress?: (msg: string) => void
@@ -27,7 +28,19 @@ export async function indexConversation(
     return { turnsIndexed: 0, newOffset: fromOffset, totalTokens: 0 };
   }
 
-  const turns = parseTurns(entries, sessionId, startTurnIndex);
+  // This transcript may belong to a different project that collides into the
+  // same ~/.claude/projects/ folder (Claude Code's "/"→"-" encoding is lossy).
+  // If every line is from a sibling project, don't index or track it — leave the
+  // offset untouched so we never claim its turns. Mixed files keep only own turns.
+  if (classifyTranscript(entries, projectDir) === "foreign") {
+    return { turnsIndexed: 0, newOffset: fromOffset, totalTokens: 0 };
+  }
+
+  const turns = parseTurns(
+    entries.filter((e) => belongsToProject(e, projectDir)),
+    sessionId,
+    startTurnIndex,
+  );
 
   let turnsIndexed = 0;
   let totalTokens = 0;
@@ -97,6 +110,7 @@ async function indexTurn(turn: ParsedTurn, db: RagDB): Promise<boolean> {
 async function indexSessionFromStoredOffset(
   db: RagDB,
   jsonlPath: string,
+  projectDir: string,
   onEvent?: (msg: string) => void,
 ): Promise<number> {
   if (!existsSync(jsonlPath)) return 0;
@@ -106,6 +120,7 @@ async function indexSessionFromStoredOffset(
     jsonlPath,
     sessionId,
     db,
+    projectDir,
     session?.readOffset ?? 0,
     session?.turnCount ?? 0,
     onEvent,
@@ -124,6 +139,7 @@ async function indexSessionFromStoredOffset(
 export async function indexAllSessions(
   transcriptsDir: string,
   db: RagDB,
+  projectDir: string,
   onEvent?: (msg: string) => void,
 ): Promise<number> {
   const files: string[] = [];
@@ -138,7 +154,7 @@ export async function indexAllSessions(
   let total = 0;
   for (const jsonlPath of files) {
     try {
-      total += await indexSessionFromStoredOffset(db, jsonlPath, onEvent);
+      total += await indexSessionFromStoredOffset(db, jsonlPath, projectDir, onEvent);
     } catch (err) {
       onEvent?.(`Conversation index error (${basename(jsonlPath)}): ${(err as Error).message}`);
     }
@@ -162,6 +178,7 @@ export async function indexAllSessions(
 export function startConversationFolderWatch(
   transcriptsDir: string,
   db: RagDB,
+  projectDir: string,
   onEvent?: (msg: string) => void,
 ): Watcher {
   const pending = new Map<string, NodeJS.Timeout>();
@@ -177,7 +194,7 @@ export function startConversationFolderWatch(
         queue.clear();
         for (const jsonlPath of batch) {
           try {
-            await indexSessionFromStoredOffset(db, jsonlPath, onEvent);
+            await indexSessionFromStoredOffset(db, jsonlPath, projectDir, onEvent);
           } catch (err) {
             onEvent?.(`Conversation index error (${basename(jsonlPath)}): ${(err as Error).message}`);
           }

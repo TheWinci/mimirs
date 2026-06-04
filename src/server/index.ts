@@ -358,6 +358,7 @@ export async function startServer() {
     convWatcher = startConversationFolderWatch(
       getTranscriptsDir(startupDir),
       startupDb,
+      startupDir,
       (msg) => log.debug(msg, "conversation"),
     );
     } // end if (indexLock)
