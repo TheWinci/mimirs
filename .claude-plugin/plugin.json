@@ -20,7 +20,8 @@
     "mcp",
     "project-memory"
   ],
-  "skills": "../skills/",
+  "skills": "skills/",
+  "hooks": "hooks/hooks.json",
   "mcpServers": {
     "mimirs": {
       "command": "bunx",

@@ -224,6 +224,19 @@ bunx mimirs read "jwt validation" --top 8 --threshold 0.3
 
 Scope either with `--ext .ts,.tsx`, `--in src,packages/core`, or `--exclude tests`. Note: the CLI `search`/`read` do **not** auto-index — run `mimirs index` first (only the MCP server indexes on demand).
 
+## Claude Code plugin
+
+For deeper integration, mimirs is also available as a Claude Code plugin. In a Claude Code session:
+
+```
+/plugin marketplace add https://github.com/TheWinci/mimirs.git
+/plugin install mimirs
+```
+
+The plugin wires the MCP server, three hooks — **SessionStart** (context summary), **PostToolUse** (auto-reindex on edit), **SessionEnd** (auto-checkpoint) — and a set of **workflow skills** that orchestrate the tools for common jobs: `explore`, `review`, `debug`, `catch-up`, `recall`, `doc-gaps`, and `wiki`.
+
+**Want the skills without the plugin?** They're plain `SKILL.md` files under [skills/](skills/). Copy any you like into your project's `.claude/skills/<name>/` (shared with the repo) or `~/.claude/skills/<name>/` (all your projects) and Claude Code picks them up next session. Skills are a Claude Code feature, so they don't apply to other editors — but the MCP tools themselves work everywhere.
+
 ## Search quality
 
 89–97% Recall@10, 97–100% Recall@20, MRR 0.69–0.77. Benchmarked on four real codebases across three languages with stratified, difficulty-mixed query sets (72–120 queries each, ~⅓ hard), re-measured 2026-06-04 on the current pipeline. Full methodology in [BENCHMARKS.md](BENCHMARKS.md).
