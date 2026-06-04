@@ -134,6 +134,27 @@ Windsurf reads MCP servers from your home directory, not the project. JetBrains 
 </details>
 
 <details>
+<summary><b>GitHub Copilot</b> — <code>.vscode/mcp.json</code> in project root</summary>
+
+VS Code's Copilot uses a `servers` map (not `mcpServers`) and a `type` field.
+
+```json
+{
+  "servers": {
+    "mimirs": {
+      "type": "stdio",
+      "command": "bunx",
+      "args": ["mimirs@latest", "serve"],
+      "env": {
+        "RAG_PROJECT_DIR": "/absolute/path/to/your/project"
+      }
+    }
+  }
+}
+```
+</details>
+
+<details>
 <summary><b>Codex</b> — <code>~/.codex/config.toml</code> (global)</summary>
 
 Codex uses TOML, not JSON, and reads from `~/.codex/config.toml`. One block per project — pick a unique table name if you wire up multiple repos (`mimirs-frontend`, `mimirs-api`, etc).

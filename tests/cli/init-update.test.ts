@@ -2,7 +2,7 @@ import { describe, test, expect, afterEach } from "bun:test";
 import { mkdtemp, rm, readFile, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { ensureAgentInstructions, BLOCK_VERSION, INSTRUCTIONS_BLOCK } from "../../src/cli/setup";
+import { ensureAgentInstructions, ensureMcpJson, BLOCK_VERSION, INSTRUCTIONS_BLOCK } from "../../src/cli/setup";
 
 const dirs: string[] = [];
 async function projectDir(): Promise<string> {
@@ -115,5 +115,20 @@ describe("init: fenced + version-stamped instruction region", () => {
     expect(mdc).toContain(`v=${BLOCK_VERSION}`);
     expect(mdc).not.toContain("v=0000000");
     expect(updated.some((a) => a.includes("Updated") && a.includes("mimirs.mdc"))).toBe(true);
+  });
+
+  test("Copilot: ensureMcpJson writes .vscode/mcp.json with the servers schema", async () => {
+    const dir = await projectDir();
+    await ensureMcpJson(dir, ["copilot"]);
+
+    const vscode = JSON.parse(await readFile(join(dir, ".vscode", "mcp.json"), "utf-8"));
+    expect(vscode.servers.mimirs.type).toBe("stdio");
+    expect(vscode.servers.mimirs.command).toBe("bunx");
+    expect(vscode.servers.mimirs.args).toEqual(["mimirs@latest", "serve"]);
+    expect(vscode.mcpServers).toBeUndefined(); // VS Code uses `servers`, not the Claude schema
+
+    // Claude's .mcp.json still uses the mcpServers schema
+    const claude = JSON.parse(await readFile(join(dir, ".mcp.json"), "utf-8"));
+    expect(claude.mcpServers.mimirs.command).toBe("bunx");
   });
 });

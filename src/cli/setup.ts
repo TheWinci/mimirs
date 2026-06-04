@@ -312,6 +312,28 @@ async function upsertMcpJson(mcpPath: string, entry: object): Promise<string | n
   return `Created ${mcpPath} with mimirs`;
 }
 
+// GitHub Copilot (VS Code) reads MCP servers from .vscode/mcp.json, which uses a
+// different shape than the others: a top-level `servers` map and a `type` field.
+async function upsertVscodeMcp(mcpPath: string, entry: object): Promise<string | null> {
+  const vsEntry = { type: "stdio", ...entry };
+  if (existsSync(mcpPath)) {
+    let raw: any;
+    try {
+      raw = JSON.parse(await readFile(mcpPath, "utf-8"));
+    } catch {
+      return `Skipped ${mcpPath} (invalid JSON — fix it manually or delete it)`;
+    }
+    if (raw.servers?.["mimirs"]) return null;
+    raw.servers = raw.servers || {};
+    raw.servers["mimirs"] = vsEntry;
+    await writeFile(mcpPath, JSON.stringify(raw, null, 2) + "\n");
+    return `Added mimirs to ${mcpPath}`;
+  }
+  await mkdir(join(mcpPath, ".."), { recursive: true });
+  await writeFile(mcpPath, JSON.stringify({ servers: { "mimirs": vsEntry } }, null, 2) + "\n");
+  return `Created ${mcpPath} with mimirs`;
+}
+
 export async function ensureMcpJson(projectDir: string, ides?: string[]): Promise<string[]> {
   const actions: string[] = [];
   const entry = mcpServerEntry(projectDir);
@@ -348,6 +370,12 @@ export async function ensureMcpJson(projectDir: string, ides?: string[]): Promis
     if (pluginAction) actions.push(pluginAction);
   }
 
+  // GitHub Copilot (VS Code) — .vscode/mcp.json (servers map, type stdio)
+  if (forced.has("copilot") || existsSync(join(projectDir, ".github")) || existsSync(join(projectDir, ".vscode"))) {
+    const action = await upsertVscodeMcp(join(projectDir, ".vscode", "mcp.json"), entry);
+    if (action) actions.push(action);
+  }
+
   return actions;
 }
 
@@ -363,6 +391,8 @@ export function detectAgentHints(projectDir: string): string[] {
     hints.push("Windsurf:     add to ~/.codeium/windsurf/mcp_config.json → mcpServers");
     hints.push("Windsurf (JB): add to ~/.codeium/mcp_config.json → mcpServers");
   }
+  if (existsSync(join(projectDir, ".github")) || existsSync(join(projectDir, ".vscode")))
+    hints.push("GitHub Copilot: add to .vscode/mcp.json → servers");
   if (hints.length === 0)
     hints.push("Add to your agent's MCP config under mcpServers:");
   return hints;
