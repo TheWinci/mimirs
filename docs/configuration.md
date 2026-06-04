@@ -12,7 +12,7 @@ Create `.mimirs/config.json` in your project root, or run `bunx mimirs init` to 
 | `chunkOverlap` | `50` | Overlap tokens between chunks |
 | `hybridWeight` | `0.5` | Rank-fusion weight toward vector: 1.0 = vector only, 0.0 = BM25 only |
 | `embeddingMerge` | `true` | Merge windowed embeddings for oversized chunks (see [below](#embedding-merge)) |
-| `embeddingModel` | _(default)_ | Override the embedding model (HuggingFace model ID). Must have ONNX weights. Requires re-index |
+| `embeddingModel` | _(default)_ | Override the embedding model (HuggingFace model ID). Must have ONNX weights. Requires re-index. **Gated:** a non-default model in project config is ignored unless `MIMIRS_ALLOW_CUSTOM_MODEL=1` is set (see [environment variables](#environment-variables)) — a cloned repo's `config.json` is untrusted and could otherwise pick which model is downloaded |
 | `embeddingDim` | _(default)_ | Embedding dimension to match the model (e.g. 384 for bge-small-en-v1.5) |
 | `embeddingPooling` | `mean` | Pooling for the model: `mean` (sentence-transformers, e.g. all-MiniLM) or `cls` (BGE/GTE/ModernBERT/Arctic). Requires re-index |
 | `embeddingDtype` | `q8` | ONNX quantization (`q8`, `fp16`, `fp32`, `q4`, …); must exist for the model. Requires re-index |
@@ -91,6 +91,7 @@ Adjust `hybridWeight` to shift between semantic and keyword matching:
 |---|---|
 | `RAG_PROJECT_DIR` | Override the project directory (useful for editors like Cursor/Windsurf that don't set cwd) |
 | `RAG_DB_DIR` | Redirect the `.mimirs/` index to a different path (useful for read-only project directories) |
+| `MIMIRS_ALLOW_CUSTOM_MODEL` | Set to `1` to honor a non-default `embeddingModel` from project `config.json`. Off by default: a cloned repo's config is untrusted, and an arbitrary model ID controls what gets downloaded on first index. Set this only for repos whose config you trust |
 
 ## Embedding merge
 

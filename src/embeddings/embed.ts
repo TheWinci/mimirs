@@ -7,7 +7,8 @@ import {
 } from "@huggingface/transformers";
 import { join } from "node:path";
 import { homedir, cpus } from "node:os";
-import { rmSync } from "node:fs";
+import { rmSync, existsSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { timed } from "../utils/profiler";
 
 // Use a stable cache directory so models survive bunx temp dir cleanup
@@ -16,6 +17,17 @@ env.cacheDir = CACHE_DIR;
 
 const DEFAULT_MODEL_ID = "Xenova/all-MiniLM-L6-v2";
 const DEFAULT_EMBEDDING_DIM = 384;
+// Pin the default model to an immutable commit. Without this, transformers.js
+// fetches from the mutable `main` ref, so whatever HF serves at download time is
+// what we load. Bump deliberately (and re-pin DEFAULT_MODEL_SHA256 below) when
+// moving versions. "main" is the un-pinned fallback for opted-in custom models.
+// SHA from https://huggingface.co/Xenova/all-MiniLM-L6-v2/commits/main
+export const DEFAULT_MODEL_REVISION = "751bff37182d3f1213fa05d7196b954e230abad9";
+// sha256 of the q8 ONNX weights (onnx/model_quantized.onnx) at that revision —
+// verified against HF's upstream LFS oid. Verified after download so a tampered
+// or swapped file is rejected even if it still parses. Re-pin when the revision
+// or default dtype changes (the q4/fp16/etc. variants have different hashes).
+export const DEFAULT_MODEL_SHA256 = "afdb6f1a0e45b715d0bb9b11772f032c399babd23bfc31fed1c170afc848bdb1";
 
 // Pooling and quantization are model-dependent: sentence-transformers models
 // (all-MiniLM) want mean pooling; BGE/GTE/ModernBERT/Arctic want CLS. Configurable
@@ -31,6 +43,7 @@ let currentModelId = DEFAULT_MODEL_ID;
 let currentDim = DEFAULT_EMBEDDING_DIM;
 let currentPooling: EmbeddingPooling = DEFAULT_POOLING;
 let currentDtype: string = DEFAULT_DTYPE;
+let currentRevision: string = DEFAULT_MODEL_REVISION;
 let extractor: FeatureExtractionPipeline | null = null;
 let tokenizer: PreTrainedTokenizer | null = null;
 
@@ -47,14 +60,55 @@ export function configureEmbedder(
   dim: number,
   pooling: EmbeddingPooling = DEFAULT_POOLING,
   dtype: string = DEFAULT_DTYPE,
+  revision?: string,
 ): void {
-  if (modelId !== currentModelId || dim !== currentDim || pooling !== currentPooling || dtype !== currentDtype) {
+  // Pin the default model; any other model rides `main` unless a revision is given.
+  const effRevision = revision ?? (modelId === DEFAULT_MODEL_ID ? DEFAULT_MODEL_REVISION : "main");
+  if (
+    modelId !== currentModelId ||
+    dim !== currentDim ||
+    pooling !== currentPooling ||
+    dtype !== currentDtype ||
+    effRevision !== currentRevision
+  ) {
     extractor = null;
     tokenizer = null;
     currentModelId = modelId;
     currentDim = dim;
     currentPooling = pooling;
     currentDtype = dtype;
+    currentRevision = effRevision;
+  }
+}
+
+// transformers.js downloads the q8 weights to this file for the default model.
+function defaultModelOnnxPath(): string {
+  return join(CACHE_DIR, "Xenova", "all-MiniLM-L6-v2", "onnx", "model_quantized.onnx");
+}
+
+// Only the pinned default (model + q8 dtype + pinned revision) has a known hash.
+function isPinnedDefaultModel(): boolean {
+  return (
+    currentModelId === DEFAULT_MODEL_ID &&
+    currentDtype === "q8" &&
+    currentRevision === DEFAULT_MODEL_REVISION
+  );
+}
+
+// Reject a tampered/swapped model file that still parses. Pinning the revision
+// makes the download immutable on HF's side; this catches a compromised mirror,
+// MITM, or corrupted transfer. On mismatch, delete the cache and refuse to load.
+function verifyDefaultModelChecksum(): void {
+  const file = defaultModelOnnxPath();
+  if (!existsSync(file)) return; // pipeline() would have thrown already; nothing to check
+  const actual = createHash("sha256").update(readFileSync(file)).digest("hex");
+  if (actual !== DEFAULT_MODEL_SHA256) {
+    rmSync(join(CACHE_DIR, "Xenova", "all-MiniLM-L6-v2"), { recursive: true, force: true });
+    throw new Error(
+      `Embedding model checksum mismatch for ${DEFAULT_MODEL_ID}@${DEFAULT_MODEL_REVISION}: ` +
+        `expected ${DEFAULT_MODEL_SHA256}, got ${actual}. ` +
+        `Deleted the cached copy; refusing to load a possibly-tampered model.`,
+    );
   }
 }
 
@@ -66,6 +120,7 @@ export async function getEmbedder(
     const numThreads = threads ?? defaultThreadCount();
     const pipelineOptions = {
       dtype: currentDtype as "q8",
+      revision: currentRevision,
       session_options: {
         intraOpNumThreads: numThreads,
         interOpNumThreads: numThreads,
@@ -88,6 +143,17 @@ export async function getEmbedder(
       }
     }
     onProgress?.(`Model loaded`);
+    // Verify integrity once per process (the extractor singleton guards re-entry).
+    if (isPinnedDefaultModel()) {
+      try {
+        verifyDefaultModelChecksum();
+      } catch (err) {
+        // Don't leave the rejected model loaded for the next caller.
+        extractor = null;
+        tokenizer = null;
+        throw err;
+      }
+    }
   }
   return extractor;
 }

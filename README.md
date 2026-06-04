@@ -308,6 +308,21 @@ The larger repos (Kubernetes, Excalidraw) are big enough that some correct files
 
 8. **Analytics** — Every query is logged. Analytics surface zero-result queries, low-relevance queries, and period-over-period trends.
 
+## Data handling
+
+mimirs runs entirely on your machine. It indexes files your repo tracks plus
+untracked-but-not-gitignored files (so a `.env` you forgot to gitignore could be
+read — common secret patterns like `.env`, `*.pem`, `*.key`, and SSH keys are
+excluded by default; add your own to `exclude` in `.mimirs/config.json`). File
+content and embeddings are stored in `<project>/.mimirs/index.db`, a local
+SQLite file. Conversation indexing reads only the current project's transcripts
+under `~/.claude/projects/<this-project>/`.
+
+The only network call is a one-time download of the embedding model
+(`Xenova/all-MiniLM-L6-v2`) from huggingface.co, cached at
+`~/.cache/mimirs/models`. Your code never leaves your machine — nothing is sent
+to any server.
+
 ## Supported languages
 
 AST-aware chunking via [bun-chunk](https://github.com/TheWinci/bun-chunk) with tree-sitter grammars:

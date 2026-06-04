@@ -28,6 +28,7 @@ const RagConfigSchema = z.object({
   embeddingMerge: z.boolean().default(true),
   embeddingModel: z.string().optional(),
   embeddingDim: z.number().int().min(1).optional(),
+  embeddingRevision: z.string().optional(),
   embeddingPooling: z.enum(["mean", "cls", "none"]).optional(),
   embeddingDtype: z.string().optional(),
   parentGroupingMinCount: z.number().int().min(2).default(2),
@@ -105,8 +106,12 @@ const DEFAULT_CONFIG: RagConfig = {
     ".cache/**", ".parcel-cache/**", ".webpack/**",
     // Test & coverage output
     "coverage/**", ".nyc_output/**",
-    // Environment & secrets
-    ".env", ".env.*",
+    // Environment & secrets — `**/` so nested copies (services/api/.env) match too.
+    // Defense-in-depth only: gitignored files are already skipped at collection;
+    // this catches untracked-not-ignored secret files that would otherwise index.
+    "**/.env", "**/.env.*", "**/*.pem", "**/*.key", "**/*.pfx", "**/*.p12",
+    "**/id_rsa", "**/id_dsa", "**/id_ecdsa", "**/id_ed25519",
+    "**/.npmrc", "**/.pgpass", "**/.netrc",
     // IDE settings (config, not code)
     ".idea/**", ".vscode/**",
     // Python
@@ -175,13 +180,59 @@ export async function loadConfig(projectDir: string): Promise<RagConfig> {
 }
 
 /**
+ * A project-local `.mimirs/config.json` is attacker-controllable: a cloned repo
+ * can ship one (it isn't gitignored in the victim's checkout). Honoring an
+ * arbitrary `embeddingModel` from it lets a malicious repo choose which model
+ * mimirs downloads on first index/query. Gate any non-default model behind an
+ * explicit opt-in env flag; otherwise ignore the custom model (and the dim/
+ * pooling/dtype/revision that go with it) and fall back to the pinned default.
+ */
+function allowCustomModel(): boolean {
+  return process.env.MIMIRS_ALLOW_CUSTOM_MODEL === "1";
+}
+
+interface ResolvedModel {
+  model: string;
+  dim: number;
+  pooling?: "mean" | "cls" | "none";
+  dtype?: string;
+  revision?: string;
+}
+
+function resolveModel(c: {
+  embeddingModel?: string;
+  embeddingDim?: number;
+  embeddingPooling?: "mean" | "cls" | "none";
+  embeddingDtype?: string;
+  embeddingRevision?: string;
+}): ResolvedModel {
+  const requested = c.embeddingModel;
+  if (requested && requested !== DEFAULT_MODEL_ID && !allowCustomModel()) {
+    log.warn(
+      `Ignoring embeddingModel="${requested}" from project config (untrusted). ` +
+        `Set MIMIRS_ALLOW_CUSTOM_MODEL=1 to allow it. Using ${DEFAULT_MODEL_ID}.`,
+      "config",
+    );
+    return { model: DEFAULT_MODEL_ID, dim: DEFAULT_EMBEDDING_DIM };
+  }
+  // Default model, or a custom model the operator opted into. The custom dim/
+  // pooling/dtype/revision are only honored alongside an honored custom model.
+  return {
+    model: requested ?? DEFAULT_MODEL_ID,
+    dim: c.embeddingDim ?? DEFAULT_EMBEDDING_DIM,
+    pooling: c.embeddingPooling,
+    dtype: c.embeddingDtype,
+    revision: c.embeddingRevision,
+  };
+}
+
+/**
  * Apply embedding model settings from config.
  * Call this after loadConfig() when embeddings will be used.
  */
 export function applyEmbeddingConfig(config: RagConfig): void {
-  const model = config.embeddingModel ?? DEFAULT_MODEL_ID;
-  const dim = config.embeddingDim ?? DEFAULT_EMBEDDING_DIM;
-  configureEmbedder(model, dim, config.embeddingPooling, config.embeddingDtype);
+  const r = resolveModel(config);
+  configureEmbedder(r.model, r.dim, r.pooling, r.dtype, r.revision);
 }
 
 /**
@@ -196,10 +247,13 @@ export function applyEmbeddingConfig(config: RagConfig): void {
  */
 export function applyEmbeddingConfigFromDisk(projectDir: string): void {
   const configPath = join(projectDir, ".mimirs", "config.json");
-  let model = DEFAULT_MODEL_ID;
-  let dim = DEFAULT_EMBEDDING_DIM;
-  let pooling: "mean" | "cls" | "none" | undefined;
-  let dtype: string | undefined;
+  const fields: {
+    embeddingModel?: string;
+    embeddingDim?: number;
+    embeddingPooling?: "mean" | "cls" | "none";
+    embeddingDtype?: string;
+    embeddingRevision?: string;
+  } = {};
 
   if (existsSync(configPath)) {
     try {
@@ -208,19 +262,24 @@ export function applyEmbeddingConfigFromDisk(projectDir: string): void {
         embeddingDim?: unknown;
         embeddingPooling?: unknown;
         embeddingDtype?: unknown;
+        embeddingRevision?: unknown;
       };
-      if (typeof parsed.embeddingModel === "string") model = parsed.embeddingModel;
+      if (typeof parsed.embeddingModel === "string") fields.embeddingModel = parsed.embeddingModel;
       if (Number.isInteger(parsed.embeddingDim) && (parsed.embeddingDim as number) > 0) {
-        dim = parsed.embeddingDim as number;
+        fields.embeddingDim = parsed.embeddingDim as number;
       }
       if (parsed.embeddingPooling === "mean" || parsed.embeddingPooling === "cls" || parsed.embeddingPooling === "none") {
-        pooling = parsed.embeddingPooling;
+        fields.embeddingPooling = parsed.embeddingPooling;
       }
-      if (typeof parsed.embeddingDtype === "string") dtype = parsed.embeddingDtype;
+      if (typeof parsed.embeddingDtype === "string") fields.embeddingDtype = parsed.embeddingDtype;
+      if (typeof parsed.embeddingRevision === "string") fields.embeddingRevision = parsed.embeddingRevision;
     } catch {
       // Malformed JSON — fall back to defaults; loadConfig() surfaces the warning.
     }
   }
 
-  configureEmbedder(model, dim, pooling, dtype);
+  // Same untrusted-config gate as applyEmbeddingConfig: a non-default model is
+  // ignored unless MIMIRS_ALLOW_CUSTOM_MODEL=1.
+  const r = resolveModel(fields);
+  configureEmbedder(r.model, r.dim, r.pooling, r.dtype, r.revision);
 }

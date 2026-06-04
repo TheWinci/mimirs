@@ -1,4 +1,4 @@
-import { describe, test, expect, afterEach } from "bun:test";
+import { describe, test, expect, afterEach, beforeAll, afterAll } from "bun:test";
 import { RagDB } from "../../src/db";
 import { configureEmbedder, getEmbeddingDim, DEFAULT_MODEL_ID, DEFAULT_EMBEDDING_DIM } from "../../src/embeddings/embed";
 import { applyEmbeddingConfigFromDisk } from "../../src/config";
@@ -7,6 +7,17 @@ import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 
 let tempDir: string | undefined;
+
+// These suites all configure a custom embeddingModel in .mimirs/config.json,
+// which is now gated behind an explicit opt-in (a cloned repo's config is
+// untrusted). Opt in for the whole file — see embedding-model-gate.test.ts for
+// the gate behavior itself.
+beforeAll(() => {
+  process.env.MIMIRS_ALLOW_CUSTOM_MODEL = "1";
+});
+afterAll(() => {
+  delete process.env.MIMIRS_ALLOW_CUSTOM_MODEL;
+});
 
 afterEach(async () => {
   // Restore the global embedder so other suites see the default dim.
