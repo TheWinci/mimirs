@@ -1,4 +1,4 @@
-import { describe, test, expect, afterEach } from "bun:test";
+import { describe, test, expect, afterEach, beforeAll, afterAll } from "bun:test";
 import { join } from "path";
 import { mkdirSync, writeFileSync } from "fs";
 import { RagDB } from "../../src/db";
@@ -7,6 +7,16 @@ import { createTempDir, cleanupTempDir } from "../helpers";
 
 const CLI = join(import.meta.dir, "..", "..", "src", "main.ts");
 let tempDir: string | undefined;
+
+// These tests use custom embeddingModels to set up a dim mismatch, which is now
+// gated behind an opt-in. Enable it in-process AND for the doctor subprocess
+// (runDoctor passes process.env through). See embedding-model-gate.test.ts.
+beforeAll(() => {
+  process.env.MIMIRS_ALLOW_CUSTOM_MODEL = "1";
+});
+afterAll(() => {
+  delete process.env.MIMIRS_ALLOW_CUSTOM_MODEL;
+});
 
 afterEach(async () => {
   // Building an index in-process mutates the global embedder; restore it.
