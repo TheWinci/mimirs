@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-06-04
+
+### Changed
+- **Indexing respects `.gitignore`.** In a git repo the file list now comes from `git ls-files --cached --others --exclude-standard`, so gitignored build output, generated code, vendored deps, and secrets are skipped without duplicating every pattern into the config `exclude` — and ignored dirs like `node_modules` are never walked (faster than recurse-then-filter). Untracked-but-not-ignored files are still indexed; config `include`/`exclude` globs layer on top; non-git directories fall back to the recursive walk. Default behavior, no flag — matches ripgrep/fd conventions.
+
+### Added
+- Gated indexing profiler (`MIMIRS_PROFILE=1`, transparent when off) with per-phase timers — used to confirm embed inference is ~95% of a cold index and that batch regrouping isn't worth the churn. Plus difficulty-stratified benchmark query sets (Django 116, Kubernetes 120, Excalidraw 72, mimirs 74), every expected path verified to exist.
+
+### Fixed
+- **Data loss: a fully-gitignored scan wiped the index.** An empty `git ls-files` returned `[]`, so a full run called `pruneDeleted(∅)` and deleted every row; it now returns `null`, falls back to the walk, and skips prune on an empty scan.
+- **Data loss: conversation live-tail dropped turns.** A read landing on a partially-written final line advanced the offset past it; it now advances only to the last newline.
+- **Query/index embedding-dim mismatch.** On a config validation-failure fallback a cached `getDB` left the query embedder at the default dim while the index used a custom `embeddingDim`; the query embedder is now configured from the same raw-disk read the index uses, so query dim always matches index dim. Embedding-model compatibility also records and verifies pooling/dtype — same model+dim with different pooling (`mean`/`cls`) or dtype is a different vector space (legacy indexes grandfathered).
+- **LIKE metacharacters over-/under-matched** in the dir / excludeDir / extension, `searchSymbols`, usages-prefix, and graph suffix filters; a shared `escapeLike()` + `ESCAPE` clause fixes it, with `=` for exact symbol lookup.
+- **Single-file `indexFile` of a missing path** wrongly reported "skipped" after the hardening pass; the skip-missing behavior is now gated behind a scan-only option, so a direct index of a missing file reports "error" again.
+- **`mimirs affected` on empty `--stdin`** ignored `--json`/`--quiet` and emitted non-JSON into a JSON consumer; it now honors the output contract. `affected` also resolves files against `--dir` not cwd, and a partial config inherits the default globs for any unspecified glob list (so it no longer silently indexes nothing).
+- Incremental re-index (`incrementalChunks`, off by default) falls back to a full re-index on duplicate-content chunks or orphaned parent chunks. `identifierParts` caps token length at 80 chars so a long uppercase blob can't stall indexing. Plus robustness fixes across the git, watcher, index-lock, CLI, and wiki surfaces: wiki slug path-traversal guard, per-file watcher error isolation, `chunkOverlap >= chunkSize` clamp, `EPERM` no longer reclaims a live cross-user lock, and a transactional single-chunk insert.
+
 ## [1.5.0] - 2026-06-02
 
 ### Fixed
