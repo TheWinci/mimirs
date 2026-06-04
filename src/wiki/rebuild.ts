@@ -560,6 +560,15 @@ function validateDiscoveryPaths(discovery: DiscoveryFile, projectDir: string): s
   const errors: string[] = [];
   const paths = collectDiscoveryPaths(discovery);
   for (const [path, locations] of paths) {
+    // discovery.json is repo content (untrusted in a cloned project). Don't
+    // existsSync() a `..`/absolute path — that would probe arbitrary files on
+    // disk (an existence oracle). Treat an unsafe path as invalid instead.
+    if (path.startsWith("/") || path.includes("\\") || path.split("/").includes("..")) {
+      for (const where of locations) {
+        errors.push(`${where} has an unsafe path \`${path}\` (no \`..\` or absolute paths).`);
+      }
+      continue;
+    }
     if (existsSync(join(projectDir, path))) continue;
     for (const where of locations) {
       errors.push(`${where} references missing file \`${path}\`.`);

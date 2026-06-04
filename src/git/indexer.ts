@@ -68,6 +68,20 @@ function parseGitLog(output: string): RawCommit[] {
     .filter((c): c is RawCommit => c !== null);
 }
 
+// These functions pass commit hashes as git *revision* arguments. `--` only
+// guards path args (and would make git read the hash as a pathspec), so it can't
+// protect a revision. Instead assert each value is hash-shaped before spawning:
+// a future caller that routes a branch name or path here fails closed rather than
+// smuggling a leading-dash git option.
+const COMMIT_HASH = /^[0-9a-f]{4,64}$/i;
+function assertCommitHashes(hashes: string[]): void {
+  for (const h of hashes) {
+    if (!COMMIT_HASH.test(h)) {
+      throw new Error(`Refusing git call: non-hash revision argument ${JSON.stringify(h)}`);
+    }
+  }
+}
+
 /**
  * Get file changes (numstat) for a batch of commits.
  */
@@ -75,6 +89,7 @@ async function getFileChanges(
   hashes: string[],
   gitRoot: string
 ): Promise<Map<string, FileChange[]>> {
+  assertCommitHashes(hashes);
   const result = new Map<string, FileChange[]>();
 
   // Process in batches to avoid argument list too long
@@ -123,6 +138,7 @@ async function getParentCounts(
   hashes: string[],
   gitRoot: string
 ): Promise<Map<string, number>> {
+  assertCommitHashes(hashes);
   const result = new Map<string, number>();
 
   // Single git command for all hashes
