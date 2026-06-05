@@ -1,6 +1,6 @@
 ---
 name: recall
-description: Answer "why" and "when" questions about a project's history — why code is the way it is, when a decision was made, what was tried before. Use when asked why something exists, what was decided about X, or before reversing or redoing earlier work.
+description: Answer "why" and "when" questions about a project's decisions — the intent behind a past choice, when it was made, what was tried before and rejected. Use when asked why something was decided, what the rationale was, or before reversing or redoing earlier work. For why the code mechanically behaves a certain way use research; for why it breaks use debug.
 ---
 
 # Recall

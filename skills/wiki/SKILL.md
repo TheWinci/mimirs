@@ -3,7 +3,6 @@ name: wiki
 description: >
   Rebuild a flow-first project wiki using the mimirs wiki MCP tool. Use when
   the user asks to generate, rebuild, refresh, or write the wiki for a codebase.
-user-invocable: true
 ---
 
 # Wiki Rebuild

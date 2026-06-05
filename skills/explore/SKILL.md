@@ -1,6 +1,6 @@
 ---
 name: explore
-description: Build an accurate mental model of an unfamiliar codebase, feature, or area before changing it — where it lives, how it connects, what it does, and why. Use when asked how something works, where something is, when onboarding to a repo, or before editing code you don't know.
+description: Build an accurate mental model of an unfamiliar codebase, feature, or area before changing it — where it lives, how it connects, what it does, and why. Use when asked how something works, where something is, when onboarding to a repo, or before editing code you don't know. For a cross-cutting question that needs answering from many sources, use research instead.
 ---
 
 # Explore
