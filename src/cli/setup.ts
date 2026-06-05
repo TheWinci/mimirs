@@ -29,7 +29,14 @@ This project has a local RAG index (mimirs). Use these MCP tools:
   neighborhood. This is faster than reading import statements across many files.
 - **\`search_conversation\`**: Search past conversation history to recall previous
   decisions, discussions, and tool outputs. Use this before re-investigating
-  something that may have been discussed in an earlier session.
+  something that may have been discussed in an earlier session. Returns short
+  snippets — follow up with \`read_conversation\` to get the full text.
+- **\`read_conversation\`**: Read the full verbatim text of past turns by
+  \`sessionId\` + turn index (or a \`from\`/\`to\` range, or \`turn\` + \`context\`). The
+  read counterpart to \`search_conversation\`: it locates the turn, this hydrates
+  it. Pass \`includeToolOutput: true\` to also get tool results (re-parses the raw
+  transcript; slower). Defaults to the most recent session's tail when given no
+  selector.
 - **\`create_checkpoint\`**: **Call this as your final step after completing any
   user-requested task**, before responding to the user. Also call when hitting
   a blocker or changing direction mid-task. Include what was done, which files

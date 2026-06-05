@@ -12,6 +12,7 @@ These tools are available to any MCP client (Claude Code, Cursor, Windsurf, VS C
 | `search_analytics` | Usage analytics — query counts, zero-result queries, low-relevance queries, top terms |
 | `project_map` | Generate a dependency graph of the project — file-level or directory-level, with optional focus |
 | `search_conversation` | Search conversation history — finds past decisions, discussions, and tool outputs across sessions |
+| `read_conversation` | Read full verbatim turns by session + turn index — the read counterpart to `search_conversation`'s snippets |
 | `create_checkpoint` | Mark an important moment — decisions, milestones, blockers, direction changes, or handoffs |
 | `list_checkpoints` | List checkpoints, most recent first. Filter by session or type |
 | `search_checkpoints` | Semantic search over checkpoint titles and summaries |

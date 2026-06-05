@@ -114,6 +114,59 @@ export function insertTurn(
   return turnId;
 }
 
+export interface ConversationTurnRow {
+  turnIndex: number;
+  timestamp: string;
+  userText: string;
+  assistantText: string;
+  toolsUsed: string[];
+  filesReferenced: string[];
+  tokenCost: number;
+}
+
+/**
+ * Fetch the full stored turns for a session within an inclusive turn-index
+ * range, ordered oldest-first. Returns the complete `user_text`/`assistant_text`
+ * — not the search snippet. Tool-result bodies are not stored here (selective
+ * indexing drops most), so callers needing those re-parse the transcript.
+ */
+export function getTurnRange(
+  db: Database,
+  sessionId: string,
+  fromIdx: number,
+  toIdx: number
+): ConversationTurnRow[] {
+  const rows = db
+    .query<
+      {
+        turn_index: number;
+        timestamp: string;
+        user_text: string;
+        assistant_text: string;
+        tools_used: string;
+        files_referenced: string;
+        token_cost: number;
+      },
+      [string, number, number]
+    >(
+      `SELECT turn_index, timestamp, user_text, assistant_text, tools_used, files_referenced, token_cost
+       FROM conversation_turns
+       WHERE session_id = ? AND turn_index BETWEEN ? AND ?
+       ORDER BY turn_index`
+    )
+    .all(sessionId, fromIdx, toIdx);
+
+  return rows.map((r) => ({
+    turnIndex: r.turn_index,
+    timestamp: r.timestamp,
+    userText: r.user_text || "",
+    assistantText: r.assistant_text || "",
+    toolsUsed: JSON.parse(r.tools_used || "[]"),
+    filesReferenced: JSON.parse(r.files_referenced || "[]"),
+    tokenCost: r.token_cost,
+  }));
+}
+
 export function getTurnCount(db: Database, sessionId: string): number {
   const row = db
     .query<{ count: number }, [string]>(

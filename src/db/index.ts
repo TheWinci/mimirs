@@ -986,6 +986,9 @@ export class RagDB {
   getTurnCount(sessionId: string) {
     return conversationOps.getTurnCount(this.db, sessionId);
   }
+  getTurnRange(sessionId: string, fromIdx: number, toIdx: number) {
+    return conversationOps.getTurnRange(this.db, sessionId, fromIdx, toIdx);
+  }
   searchConversation(queryEmbedding: Float32Array, topK?: number, sessionId?: string) {
     return conversationOps.searchConversation(this.db, queryEmbedding, topK, sessionId);
   }
