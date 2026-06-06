@@ -8,12 +8,15 @@ import {
   impactWalk,
   tracePath,
   collectTests,
+  directCallees,
+  affectedTests,
   renderImpact,
   renderTrace,
   impactToJson,
   traceToJson,
   type SymbolResolution,
 } from "../graph/trace";
+import { findGitRoot, runGit } from "../git/exec";
 import { type GetDB, resolveProject } from "./index";
 
 function textResult(t: string) {
@@ -112,7 +115,12 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
     async ({ symbol, exact, directory, top }) => {
       const { projectDir, db: ragDb } = await resolveProject(directory, getDB);
 
-      const results = ragDb.findUsages(symbol, exact ?? true, top ?? 30);
+      const limit = top ?? 30;
+      // Fetch one past the limit so we can tell "exactly `limit`" from "more
+      // exist" and say so — usages runs before renames where a hidden site breaks.
+      const raw = ragDb.findUsages(symbol, exact ?? true, limit + 1);
+      const truncated = raw.length > limit;
+      const results = raw.slice(0, limit);
 
       if (results.length === 0) {
         return {
@@ -128,9 +136,12 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
       }
 
       const fileCount = byFile.size;
-      const lines: string[] = [
-        `Found ${results.length} usage${results.length !== 1 ? "s" : ""} of "${symbol}" across ${fileCount} file${fileCount !== 1 ? "s" : ""}:\n`,
-      ];
+      // Truncation must be loud: usages is used before renames, where a hidden
+      // call site breaks the build. Never present a capped set as complete.
+      const countLabel = truncated
+        ? `Showing the first ${results.length} usage${results.length !== 1 ? "s" : ""} of "${symbol}" (more exist — raise \`top\` past ${limit} to see all)`
+        : `Found ${results.length} usage${results.length !== 1 ? "s" : ""} of "${symbol}" across ${fileCount} file${fileCount !== 1 ? "s" : ""}`;
+      const lines: string[] = [`${countLabel}:\n`];
 
       for (const [path, usages] of byFile) {
         lines.push(path);
@@ -294,6 +305,92 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
         return textResult(JSON.stringify(traceToJson(res, projectDir), null, 2));
       }
       return textResult(renderTrace(res, projectDir));
+    }
+  );
+
+  server.tool(
+    "callees",
+    "List the functions/methods a symbol directly calls (one hop out), each resolved to its definition file:line. The forward complement of usages (callers, one hop in) — use it to see what a function depends on before editing it. Static resolution: dynamic dispatch (callbacks, interface→impl, DI) and calls into unindexed code won't appear. Pass 'file' to disambiguate a name defined in several places. Routing — reverse (who calls this) is usages (flat) or impact (transitive + tests); for FILE-level imports use depends_on; for the path between two symbols use trace.",
+    {
+      symbol: z.string().min(1).max(200).describe("Function or method name whose callees to list"),
+      file: z
+        .string()
+        .optional()
+        .describe("File path (relative) to disambiguate when the name is defined in multiple places"),
+      directory: z
+        .string()
+        .optional()
+        .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
+    },
+    async ({ symbol, file, directory }) => {
+      const { projectDir, db: ragDb } = await resolveProject(directory, getDB);
+
+      const resolution = resolveSymbol(ragDb, symbol, file);
+      if (resolution.status !== "ok") {
+        return textResult(resolveError("symbol", symbol, file, resolution, projectDir));
+      }
+
+      const callees = directCallees(ragDb, resolution.node!);
+      if (callees.length === 0) {
+        return textResult(
+          `"${symbol}" calls nothing resolvable — it's a leaf, or its calls are dynamic / into unindexed code.`,
+        );
+      }
+
+      const lines = [`"${symbol}" directly calls ${callees.length} symbol${callees.length !== 1 ? "s" : ""}:\n`];
+      for (const c of callees) {
+        const ln = c.startLine != null ? `:${c.startLine}` : "";
+        lines.push(`  ${c.name}  ${relative(projectDir, c.filePath)}${ln}`);
+      }
+      lines.push(`\n── Tip: call impact("${symbol}") for who calls it, or read_relevant("${symbol}") for its body. ──`);
+      return textResult(lines.join("\n"));
+    }
+  );
+
+  server.tool(
+    "affected",
+    "Given changed files (or the working-tree diff against HEAD by default), report the test files that transitively import them — what to run for this change. The interactive counterpart of the `affected` CLI; pair with impact for symbol-level blast radius. Returns changed (indexed) files, the tests to run, and any changed files not in the index.",
+    {
+      files: z
+        .array(z.string())
+        .optional()
+        .describe("Changed file paths (relative to project). Omit to use the git working-tree diff against HEAD."),
+      directory: z
+        .string()
+        .optional()
+        .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
+    },
+    async ({ files, directory }) => {
+      const { projectDir, db: ragDb } = await resolveProject(directory, getDB);
+
+      let changedAbs: string[];
+      if (files && files.length > 0) {
+        changedAbs = files.map((f) => resolve(projectDir, f));
+      } else {
+        const gitRoot = await findGitRoot(projectDir);
+        if (!gitRoot) {
+          return textResult("No files given and not a git repository. Pass `files`, or run inside a git repo.");
+        }
+        const out = await runGit(["diff", "--name-only", "HEAD"], gitRoot);
+        const changed = (out ?? "").split("\n").map((s) => s.trim()).filter(Boolean);
+        if (changed.length === 0) {
+          return textResult("No changed files (git diff against HEAD is empty).");
+        }
+        changedAbs = changed.map((f) => resolve(gitRoot, f));
+      }
+
+      const res = affectedTests(ragDb, changedAbs, projectDir);
+      const sections: string[] = [];
+      sections.push(`Changed (indexed): ${res.changed.length > 0 ? res.changed.join(", ") : "none"}`);
+      if (res.unknown.length > 0) {
+        sections.push(`Not indexed (ignored): ${res.unknown.join(", ")}`);
+      }
+      sections.push(
+        res.tests.length > 0
+          ? `Tests to run (${res.tests.length}):\n` + res.tests.map((t) => `  ${t}`).join("\n")
+          : "Tests to run: none found (nothing indexed transitively imports the changed files).",
+      );
+      return textResult(sections.join("\n\n"));
     }
   );
 }

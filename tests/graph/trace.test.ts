@@ -10,6 +10,7 @@ import {
   tracePath,
   collectTests,
   affectedTests,
+  directCallees,
   nodeKey,
 } from "../../src/graph/trace";
 import type { RagConfig } from "../../src/config";
@@ -224,6 +225,20 @@ describe("tracePath", () => {
     expect(res.forwardFrontier && res.forwardFrontier.length).toBeGreaterThan(0);
     // Direct callers of the target `persist` — processJob calls it.
     expect((res.backwardFrontier ?? []).map((n) => n.name)).toContain("processJob");
+  });
+});
+
+describe("directCallees", () => {
+  test("lists the direct callees of a function, resolved", () => {
+    const node = resolveSymbol(db, "processJob").node!;
+    const names = directCallees(db, node).map((c) => c.name).sort();
+    // processJob calls persist + flush (one hop); not writeRow (two hops).
+    expect(names).toEqual(["flush", "persist"]);
+  });
+
+  test("a leaf function has no callees", () => {
+    const node = resolveSymbol(db, "writeRow").node!;
+    expect(directCallees(db, node).length).toBe(0);
   });
 });
 

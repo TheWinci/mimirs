@@ -309,6 +309,24 @@ export function impactWalk(
   };
 }
 
+/**
+ * Direct callees of a symbol — the functions/methods it calls, one hop out, with
+ * each call resolved to its definition. The forward complement of `usages`
+ * (which is callers, one hop in). Deduped by node identity.
+ */
+export function directCallees(db: RagDB, root: CallNode): CallNode[] {
+  const g = new CallGraph(db);
+  const seen = new Set<string>();
+  const out: CallNode[] = [];
+  for (const c of g.callees(root)) {
+    const k = nodeKey(c);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(c);
+  }
+  return out;
+}
+
 // ── trace: reachable sub-graph from → to ─────────────────────────
 
 export interface TraceResult {

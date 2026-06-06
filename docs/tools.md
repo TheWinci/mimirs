@@ -17,7 +17,8 @@ These tools are available to any MCP client (Claude Code, Cursor, Windsurf, VS C
 | `list_checkpoints` | List checkpoints, most recent first. Filter by session or type |
 | `search_checkpoints` | Semantic search over checkpoint titles and summaries |
 | `search_symbols` | Find exported symbols by name — functions, classes, types, interfaces, enums. Faster than semantic search when you know the symbol name |
-| `usages` | Find every call site of a symbol across the codebase — returns file paths, line numbers (`path:line`), and the matching line. Excludes the defining file |
+| `usages` | Find every call site of a symbol across the codebase — returns file paths, line numbers (`path:line`), and the matching line. Excludes the defining file. Caps at `top` (default 30) but says so when more exist (raise `top`) — never presents a capped set as complete |
+| `callees` | List the functions/methods a symbol directly calls (one hop out), each resolved to `file:line` — the forward complement of `usages`. `file` disambiguates. Static resolution: dynamic dispatch / unindexed targets won't appear |
 | `git_context` | Show uncommitted changes (annotated `[indexed]`/`[not indexed]`), recent commits, and changed files. Optional unified diff (`include_diff`). Non-git directories return a graceful message |
 | `search_commits` | Semantically search indexed git commit history — find why code changed, when decisions were made, or what an author worked on. Supports filters: `author`, `since`, `until`, `path`, `threshold` |
 | `file_history` | Get the commit history for a specific file — returns commits that touched it, sorted by date (newest first) |
@@ -27,6 +28,7 @@ These tools are available to any MCP client (Claude Code, Cursor, Windsurf, VS C
 | `dependents` | List all files that import a given file (reverse dependencies) |
 | `impact` | Symbol-level blast radius — the transitive callers of a function/method as a pruned call tree, plus the test files to run (precise: reference the symbol; broad: import affected files). More precise than `dependents`. `file` disambiguates; `hops` (default 3, no hard cap) bounds the drawn tree depth and `maxNodes` (default 80) its size, while the headline total-caller count stays complete; `format: json` for structured output |
 | `trace` | Show how one symbol reaches another — the connecting call sub-graph from `from` to `to`, shortest path highlighted. **Reachability is complete** (whole reachable graph searched, no hop limit), so "no path" means truly unreachable. Branches that don't reach `to` are pruned; `maxNodes` (default 300) bounds only the drawn sub-graph; static resolution reports when a dynamic-dispatch hop breaks the chain. `from_file`/`to_file` disambiguate, `format: json` for structured output |
+| `affected` | Given changed files (or the working-tree diff against HEAD by default), report the test files that transitively import them — what to run for this change. The MCP counterpart of the `affected` CLI; pair with `impact` for symbol-level blast radius |
 | `write_relevant` | Find the best insertion point for new content — returns semantically appropriate files and anchors |
 | `wiki` | Run the wiki rebuild workflow. `shape` writes prefetch data and returns the discovery prompt; `validate-discovery` checks `wiki/_discovery.json`; `write` and `write:page:<slug>` coordinate page writing by slug |
 
@@ -39,13 +41,15 @@ These five overlap; pick by **granularity** (file vs symbol) × **direction**:
 | What does this **file** import? | `depends_on` | file · outward |
 | What **files** import this file? (file-level blast radius) | `dependents` | file · inward |
 | Where is this **symbol** called? (flat, 1-hop) | `usages` | symbol · inward |
+| What does this **symbol** call? (flat, 1-hop) | `callees` | symbol · outward |
 | What transitively calls this **symbol**, and which tests to run? | `impact` | symbol · inward · transitive (+ tests) |
 | How does symbol **A** reach symbol **B**? | `trace` | symbol · path between two endpoints |
 | Big-picture file relationships / fan-in-out? | `project_map` | graph overview — `zoom` file or directory, optional `focus` on one neighborhood |
 
-Rule of thumb: **file-level** = `depends_on`/`dependents`; **symbol-level** =
-`usages` (flat) or `impact` (transitive + tests); **two named endpoints** =
-`trace`. Each tool's description carries the same routing pointers inline.
+Rule of thumb: **file-level** = `depends_on`/`dependents`; **symbol-level
+inward** = `usages` (flat) or `impact` (transitive + tests); **symbol-level
+outward** = `callees`; **two named endpoints** = `trace`. Each tool's
+description carries the same routing pointers inline.
 
 ## CLI
 

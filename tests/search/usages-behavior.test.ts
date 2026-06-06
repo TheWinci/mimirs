@@ -72,6 +72,22 @@ describe("usages behavior (pinned)", () => {
     expect(db.findUsages("g", true, 30).some((r) => r.path.endsWith("alias.ts"))).toBe(true);
   });
 
+  test("caps at top, and top+1 reveals more exist (truncation signal)", async () => {
+    await seed();
+    const all = db.findUsages("getDB", true, 30);
+    expect(all.length).toBeGreaterThanOrEqual(2); // several call sites of getDB
+
+    // findUsages caps at the requested top.
+    expect(db.findUsages("getDB", true, 1).length).toBe(1);
+
+    // The usages tool's idiom: fetch limit+1 — length > limit means "more exist",
+    // which the tool surfaces instead of presenting a capped set as complete.
+    const limit = 1;
+    const raw = db.findUsages("getDB", true, limit + 1);
+    expect(raw.length).toBe(2);
+    expect(raw.length > limit).toBe(true);
+  });
+
   test("results can include a comment match (fallback is not AST-precise)", async () => {
     await seed();
     const results = db.findUsages("getDB", true, 30);

@@ -452,6 +452,9 @@ function batchIn<Row, Id extends number | string>(
   return results;
 }
 
+// Returns up to `top` matches. To detect "more exist," callers pass `top + 1`
+// and check whether the result length exceeds their real limit (see the usages
+// tool) — usages runs before renames, where a silent cap hides call sites.
 export function findUsages(db: Database, symbolName: string, exact: boolean, top: number): UsageResult[] {
   const definingFileIds = new Set(
     db
