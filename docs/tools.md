@@ -10,7 +10,7 @@ These tools are available to any MCP client (Claude Code, Cursor, Windsurf, VS C
 | `index_status` | Show file count, chunk count, last indexed time |
 | `remove_file` | Remove a specific file from the index |
 | `search_analytics` | Usage analytics — query counts, zero-result queries, low-relevance queries, top terms |
-| `project_map` | Generate a dependency graph of the project — file-level or directory-level, with optional focus |
+| `project_map` | Generate a dependency graph of the project — file-level or directory-level, with optional `focus` and `hops` (focus neighborhood radius, default 2) |
 | `search_conversation` | Search conversation history — finds past decisions, discussions, and tool outputs across sessions |
 | `read_conversation` | Read full verbatim turns by session + turn index — the read counterpart to `search_conversation`'s snippets |
 | `create_checkpoint` | Mark an important moment — decisions, milestones, blockers, direction changes, or handoffs |
@@ -25,10 +25,27 @@ These tools are available to any MCP client (Claude Code, Cursor, Windsurf, VS C
 | `get_annotations` | Retrieve notes by file path, or search semantically across all annotations |
 | `depends_on` | List all files that a given file imports (its dependencies) |
 | `dependents` | List all files that import a given file (reverse dependencies) |
-| `impact` | Symbol-level blast radius — the transitive callers of a function/method as a pruned call tree, plus the test files to run (precise: reference the symbol; broad: import affected files). More precise than `dependents`. `file` disambiguates, `depth` (default 3) bounds the walk, `format: json` for structured output |
-| `trace` | Show how one symbol reaches another — the reachable call sub-graph from `from` to `to`, shortest path highlighted. Branches that don't reach `to` are pruned; static resolution reports when a dynamic-dispatch hop breaks the chain. `from_file`/`to_file` disambiguate, `format: json` for structured output |
+| `impact` | Symbol-level blast radius — the transitive callers of a function/method as a pruned call tree, plus the test files to run (precise: reference the symbol; broad: import affected files). More precise than `dependents`. `file` disambiguates; `hops` (default 3, no hard cap) bounds the drawn tree depth and `maxNodes` (default 80) its size, while the headline total-caller count stays complete; `format: json` for structured output |
+| `trace` | Show how one symbol reaches another — the connecting call sub-graph from `from` to `to`, shortest path highlighted. **Reachability is complete** (whole reachable graph searched, no hop limit), so "no path" means truly unreachable. Branches that don't reach `to` are pruned; `maxNodes` (default 300) bounds only the drawn sub-graph; static resolution reports when a dynamic-dispatch hop breaks the chain. `from_file`/`to_file` disambiguate, `format: json` for structured output |
 | `write_relevant` | Find the best insertion point for new content — returns semantically appropriate files and anchors |
 | `wiki` | Run the wiki rebuild workflow. `shape` writes prefetch data and returns the discovery prompt; `validate-discovery` checks `wiki/_discovery.json`; `write` and `write:page:<slug>` coordinate page writing by slug |
+
+### Which graph/symbol tool?
+
+These five overlap; pick by **granularity** (file vs symbol) × **direction**:
+
+| You want to know… | Tool | Granularity / direction |
+| --- | --- | --- |
+| What does this **file** import? | `depends_on` | file · outward |
+| What **files** import this file? (file-level blast radius) | `dependents` | file · inward |
+| Where is this **symbol** called? (flat, 1-hop) | `usages` | symbol · inward |
+| What transitively calls this **symbol**, and which tests to run? | `impact` | symbol · inward · transitive (+ tests) |
+| How does symbol **A** reach symbol **B**? | `trace` | symbol · path between two endpoints |
+| Big-picture file relationships / fan-in-out? | `project_map` | graph overview — `zoom` file or directory, optional `focus` on one neighborhood |
+
+Rule of thumb: **file-level** = `depends_on`/`dependents`; **symbol-level** =
+`usages` (flat) or `impact` (transitive + tests); **two named endpoints** =
+`trace`. Each tool's description carries the same routing pointers inline.
 
 ## CLI
 

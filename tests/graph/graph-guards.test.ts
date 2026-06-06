@@ -68,7 +68,7 @@ describe("cycle and recursion termination", () => {
   test("tracePath terminates and finds a path along the cycle", () => {
     const from = resolveSymbol(db, "a").node!;
     const to = resolveSymbol(db, "c").node!;
-    const res = tracePath(db, from, to, { maxDepth: 6 });
+    const res = tracePath(db, from, to);
     expect(res.found).toBe(true);
     expect(res.spine[0].name).toBe("a");
     expect(res.spine[res.spine.length - 1].name).toBe("c");

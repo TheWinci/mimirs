@@ -315,7 +315,6 @@ export interface TraceResult {
   from: CallNode;
   to: CallNode;
   found: boolean;
-  maxDepth: number;
   spine: CallNode[]; // shortest path from→to (inclusive); [] when not found
   tree: TreeNode | null; // forward tree over the reachable sub-graph
   subgraphSize: number;
@@ -365,10 +364,14 @@ export function tracePath(
   db: RagDB,
   from: CallNode,
   to: CallNode,
-  opts: { maxDepth?: number; budget?: number } = {},
+  opts: { budget?: number } = {},
 ): TraceResult {
-  const maxDepth = opts.maxDepth ?? 6;
-  const budget = opts.budget ?? 300;
+  // Reachability is determined with an UNCAPPED search, so connectivity is never
+  // a false negative: if any path exists it is found. The visited-set in `bfs`
+  // bounds the walk to the graph size, so "uncapped" still terminates. `budget`
+  // only limits how much of the connecting sub-graph is rendered for display —
+  // it does not gate whether a connection is found.
+  const displayBudget = opts.budget ?? 300;
   const g = new CallGraph(db);
   const fromK = nodeKey(from);
   const toK = nodeKey(to);
@@ -378,7 +381,6 @@ export function tracePath(
       from,
       to,
       found: true,
-      maxDepth,
       spine: [from],
       tree: { node: from, children: [] },
       subgraphSize: 1,
@@ -387,10 +389,9 @@ export function tracePath(
   }
 
   // A node lies on some from→to path iff `from` reaches it (forward) AND it
-  // reaches `to` (i.e. it is backward-reachable from `to`). Intersect the two.
-  const fwd = bfs(g, from, "callees", maxDepth, budget);
-  const bwd = bfs(g, to, "callers", maxDepth, budget);
-  const truncated = fwd.truncated || bwd.truncated;
+  // reaches `to` (backward-reachable from `to`). Intersect the two FULL reaches.
+  const fwd = bfs(g, from, "callees", Infinity, Infinity);
+  const bwd = bfs(g, to, "callers", Infinity, Infinity);
 
   const sub = new Set<string>();
   for (const k of fwd.nodes.keys()) if (bwd.nodes.has(k)) sub.add(k);
@@ -400,11 +401,10 @@ export function tracePath(
       from,
       to,
       found: false,
-      maxDepth,
       spine: [],
       tree: null,
       subgraphSize: 0,
-      truncated,
+      truncated: false, // reachability was complete — this is a definitive no-path
       forwardFrontier: [...fwd.nodes.values()]
         .filter((v) => v.dist === fwd.maxDist && v.dist > 0)
         .map((v) => v.node)
@@ -425,8 +425,14 @@ export function tracePath(
 
   const spine = shortestPath(adj, nodeOf, fromK, toK);
 
-  // Forward tree from `from`; a node reached twice is shown once and marked.
+  // Display pass: forward tree from `from`, bounded by a node budget so a huge
+  // connecting sub-graph can't blow the output. The shortest-path spine is
+  // always kept; other nodes fill the remaining budget. `subgraphSize` still
+  // reports the TRUE connecting size even when the drawn tree is truncated.
+  const spineKeys = new Set(spine.map(nodeKey));
   const placed = new Set<string>();
+  let rendered = 0;
+  let displayTruncated = false;
   const build = (k: string): TreeNode => {
     const tn: TreeNode = { node: nodeOf.get(k)!, children: [] };
     if (placed.has(k)) {
@@ -435,12 +441,20 @@ export function tracePath(
     }
     placed.add(k);
     if (k === toK) return tn; // target is a leaf
-    for (const c of adj.get(k) ?? []) tn.children.push(build(nodeKey(c)));
+    for (const c of adj.get(k) ?? []) {
+      const ck = nodeKey(c);
+      if (!spineKeys.has(ck) && rendered >= displayBudget) {
+        displayTruncated = true;
+        continue;
+      }
+      rendered++;
+      tn.children.push(build(ck));
+    }
     return tn;
   };
   const tree = build(fromK);
 
-  return { from, to, found: true, maxDepth, spine, tree, subgraphSize: sub.size, truncated };
+  return { from, to, found: true, spine, tree, subgraphSize: sub.size, truncated: displayTruncated };
 }
 
 function shortestPath(
@@ -625,7 +639,7 @@ export function renderImpact(res: ImpactResult, projectDir: string, tests: TestI
     lines.push("", `── ambient (high fan-in, not expanded): ${parts.join(", ")} ──`);
   }
   if (partial) {
-    lines.push(`── raise \`depth\`, pass \`file\`, or run impact on a node above to expand the rest ──`);
+    lines.push(`── raise \`hops\`, pass \`file\`, or run impact on a node above to expand the rest ──`);
   }
 
   lines.push("", renderTests(tests));
@@ -657,7 +671,7 @@ export function renderTrace(res: TraceResult, projectDir: string): string {
   }
   if (!res.found) {
     const lines = [
-      `No call path from ${res.from.name} to ${res.to.name} within ${res.maxDepth} hops.`,
+      `No call path from ${res.from.name} to ${res.to.name} (searched the full reachable graph).`,
       `Resolution is static — a dynamic-dispatch hop (callback, interface→impl, DI) breaks the chain. Try read_relevant around the gap.`,
     ];
     if (res.forwardFrontier?.length) {
@@ -668,7 +682,6 @@ export function renderTrace(res: TraceResult, projectDir: string): string {
       lines.push("", `Direct callers of ${res.to.name}:`);
       for (const n of res.backwardFrontier) lines.push(`  ${n.name}  ${loc(projectDir, n)}`);
     }
-    if (res.truncated) lines.push("", `(Search hit its budget — a longer path may exist beyond ${res.maxDepth} hops.)`);
     return lines.join("\n");
   }
 
@@ -682,7 +695,7 @@ export function renderTrace(res: TraceResult, projectDir: string): string {
   renderTreeNode(res.tree!, 0, projectDir, lines, nodeKey(res.to));
   const hops = res.spine.length - 1;
   lines.push("", `spine (shortest): ${res.spine.map((n) => n.name).join(" → ")}  (${hops} hop${hops !== 1 ? "s" : ""})`);
-  if (res.truncated) lines.push(`── sub-graph capped by budget; some longer routes may be omitted ──`);
+  if (res.truncated) lines.push(`── drawn sub-graph capped at the node budget; the full connecting set is ${res.subgraphSize} nodes ──`);
   return lines.join("\n");
 }
 
@@ -721,7 +734,6 @@ export function traceToJson(res: TraceResult, projectDir: string) {
     from: nodeJson(projectDir, res.from),
     to: nodeJson(projectDir, res.to),
     found: res.found,
-    maxDepth: res.maxDepth,
     subgraphSize: res.subgraphSize,
     truncated: res.truncated,
     spine: res.spine.map((n) => nodeJson(projectDir, n)),

@@ -67,6 +67,19 @@ beforeAll(async () => {
     `import { handleRequest } from "../src/server";\n\ntest("server", () => {\n  handleRequest(1);\n});\n`,
   );
 
+  // A deep linear chain c0 → c1 → … → c15 (15 hops). Longer than the old
+  // bidirectional cap (2 × maxDepth = 12 with the former default 6), so the
+  // capped search would have falsely reported "no path". Reachability is now
+  // uncapped, so it must be found.
+  const N = 16;
+  let chain = "";
+  for (let i = 0; i < N; i++) {
+    chain += i < N - 1
+      ? `export function c${i}(x: number) {\n  return c${i + 1}(x);\n}\n`
+      : `export function c${i}(x: number) {\n  return x;\n}\n`;
+  }
+  await writeFixture(tempDir, "src/chain.ts", chain);
+
   await indexDirectory(tempDir, db, tsConfig);
 });
 
@@ -135,7 +148,7 @@ describe("tracePath", () => {
   test("finds the sub-graph and shortest spine from source to target", () => {
     const from = resolveSymbol(db, "handleRequest").node!;
     const to = resolveSymbol(db, "writeRow").node!;
-    const res = tracePath(db, from, to, { maxDepth: 6 });
+    const res = tracePath(db, from, to);
 
     expect(res.found).toBe(true);
     // handleRequest, processJob, persist, flush, writeRow — cacheWarm excluded
@@ -161,9 +174,32 @@ describe("tracePath", () => {
   test("reports no path when the target is not forward-reachable", () => {
     const from = resolveSymbol(db, "flush").node!;
     const to = resolveSymbol(db, "handleRequest").node!;
-    const res = tracePath(db, from, to, { maxDepth: 6 });
+    const res = tracePath(db, from, to);
     expect(res.found).toBe(false);
     expect(res.spine).toEqual([]);
+  });
+
+  test("finds a path longer than the old bidirectional cap (reachability is uncapped)", () => {
+    const from = resolveSymbol(db, "c0").node!;
+    const to = resolveSymbol(db, "c15").node!;
+    const res = tracePath(db, from, to);
+    expect(res.found).toBe(true);
+    // c0 → c1 → … → c15 = 15 hops. The old default (maxDepth 6, bidirectional
+    // reach 12) would have returned found:false here.
+    expect(res.spine.length - 1).toBe(15);
+    expect(res.spine[0].name).toBe("c0");
+    expect(res.spine[res.spine.length - 1].name).toBe("c15");
+  });
+
+  test("maxNodes bounds the drawn tree but subgraphSize stays the true total", () => {
+    const from = resolveSymbol(db, "c0").node!;
+    const to = resolveSymbol(db, "c15").node!;
+    const res = tracePath(db, from, to, { budget: 3 });
+    expect(res.found).toBe(true);
+    // The full connecting chain is 16 nodes regardless of the draw budget.
+    expect(res.subgraphSize).toBe(16);
+    // Spine is always kept whole even under a tight budget.
+    expect(res.spine.length).toBe(16);
   });
 
   test("source equal to target is trivially found", () => {
@@ -180,7 +216,7 @@ describe("tracePath", () => {
     // flush reaches only writeRow; persist is NOT forward-reachable from flush.
     const from = resolveSymbol(db, "flush").node!;
     const to = resolveSymbol(db, "persist").node!;
-    const res = tracePath(db, from, to, { maxDepth: 6 });
+    const res = tracePath(db, from, to);
 
     expect(res.found).toBe(false);
     expect(res.spine).toEqual([]);

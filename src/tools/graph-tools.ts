@@ -44,7 +44,7 @@ function resolveError(
 export function registerGraphTools(server: McpServer, getDB: GetDB) {
   server.tool(
     "project_map",
-    "Visualize how files relate to each other — imports, exports, and fan-in/fan-out. Faster than reading import statements across many files. Use 'focus' to zoom into a specific file's neighborhood. Use format 'json' for structured data with fan-in/fan-out metrics. Use search or read_relevant next to explore specific areas of the map.",
+    "Visualize how files relate to each other — imports, exports, and fan-in/fan-out. Faster than reading import statements across many files. Use 'focus' to zoom into a specific file's neighborhood. Use format 'json' for structured data with fan-in/fan-out metrics. Use search or read_relevant next to explore specific areas of the map. Routing — for ONE file's direct connections use depends_on/dependents; for a SYMBOL's callers use usages/impact.",
     {
       directory: z
         .string()
@@ -54,6 +54,12 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
         .string()
         .optional()
         .describe("File path (relative to project) to focus on — shows only nearby files"),
+      hops: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe("Neighborhood radius (in import hops) around 'focus' (default 2). Ignored without 'focus'."),
       zoom: z
         .enum(["file", "directory"])
         .optional()
@@ -63,12 +69,13 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
         .optional()
         .describe("Output format: 'text' (default) for readable output, 'json' for structured data with fan-in/fan-out metrics and all exports."),
     },
-    async ({ directory, focus, zoom, format }) => {
+    async ({ directory, focus, hops, zoom, format }) => {
       const { projectDir, db: ragDb } = await resolveProject(directory, getDB);
 
       const map = generateProjectMap(ragDb, {
         projectDir,
         focus,
+        maxHops: hops,
         zoom: zoom ?? "file",
         format: format ?? "text",
       });
@@ -89,7 +96,7 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
 
   server.tool(
     "usages",
-    "Find call sites and references to a symbol across indexed files — with file paths, line numbers, and matching lines. Resolves aliased imports: searching the original name finds call sites that import it under an alias (`import { getDB as g }; g()`). Primary matches come from an AST-derived reference index (real call/reference sites); for file types without reference extraction (e.g. HTML/CSS/YAML) or names not in that index it falls back to a text search, which can also surface matches inside comments or strings. Use before renaming or changing a function signature.",
+    "Find call sites and references to a symbol across indexed files — with file paths, line numbers, and matching lines. Resolves aliased imports: searching the original name finds call sites that import it under an alias (`import { getDB as g }; g()`). Primary matches come from an AST-derived reference index (real call/reference sites); for file types without reference extraction (e.g. HTML/CSS/YAML) or names not in that index it falls back to a text search, which can also surface matches inside comments or strings. Use before renaming or changing a function signature. This is the SYMBOL-level, flat, 1-hop view. Routing — for the transitive caller TREE plus tests to run use impact; for FILE-level importers use dependents; for the path between two symbols use trace.",
     {
       symbol: z.string().min(1).max(200).describe("Symbol name to search for"),
       exact: z
@@ -145,7 +152,7 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
 
   server.tool(
     "depends_on",
-    "List all files that a given file imports (its dependencies). Shows the resolved import graph — what this file actually depends on. Use dependents for the reverse direction.",
+    "List all files that a given file imports (its dependencies). Shows the resolved import graph — what this file actually depends on. This is FILE-level, outward direction. Routing — reverse (files that import this one) is dependents; for a single symbol's references use usages.",
     {
       file: z.string().describe("File path (relative to project) to query"),
       directory: z
@@ -178,7 +185,7 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
 
   server.tool(
     "dependents",
-    "List all files that import a given file (reverse dependencies). Shows the blast radius before modifying a file — every file that would be affected by a change. Use usages for symbol-level granularity.",
+    "List all files that import a given file (reverse dependencies). Shows the blast radius before modifying a file — every file that would be affected by a change. This is FILE-level, inward direction. Routing — reverse (what this file imports) is depends_on; for finer SYMBOL-level blast radius use impact (transitive callers + tests) or usages (flat refs).",
     {
       file: z.string().describe("File path (relative to project) to query"),
       directory: z
@@ -211,21 +218,22 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
 
   server.tool(
     "impact",
-    "Symbol-level blast radius: the transitive callers of a function or method as a pruned call tree, plus the test files to run for the change. More precise than dependents (which is file-level). Use before changing a signature or behavior. Pass 'file' to disambiguate a name defined in several places. Tracks functions and methods (not classes/constants).",
+    "Symbol-level blast radius: the transitive callers of a function or method as a pruned call tree, plus the test files to run for the change. More precise than dependents (which is file-level). Use before changing a signature or behavior. Pass 'file' to disambiguate a name defined in several places. Tracks functions and methods (not classes/constants). This is the SYMBOL-level, transitive (tree + tests) view. Routing — for a flat list of direct call sites use usages; for FILE-level blast radius use dependents; for how one specific symbol reaches this one use trace.",
     {
       symbol: z.string().min(1).max(200).describe("Function or method name to analyze"),
       file: z
         .string()
         .optional()
         .describe("File path (relative) to disambiguate when the name is defined in multiple places"),
-      depth: z.number().int().min(1).max(6).optional().describe("Caller levels to walk (default 3)"),
+      hops: z.number().int().min(1).optional().describe("Caller levels to walk in the displayed tree (default 3, no hard cap). The headline total-caller count stays complete regardless of this."),
+      maxNodes: z.number().int().min(1).optional().describe("Max caller nodes to draw in the tree (default 80). Bounds output only — the total count is still honest."),
       directory: z
         .string()
         .optional()
         .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
       format: z.enum(["text", "json"]).optional().describe("Output format: 'text' (default) or 'json'"),
     },
-    async ({ symbol, file, depth, directory, format }) => {
+    async ({ symbol, file, hops, maxNodes, directory, format }) => {
       const { projectDir, db: ragDb } = await resolveProject(directory, getDB);
 
       const resolution = resolveSymbol(ragDb, symbol, file);
@@ -239,7 +247,7 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
       }
 
       const root = resolution.node!;
-      const res = impactWalk(ragDb, root, { maxDepth: depth ?? 3 });
+      const res = impactWalk(ragDb, root, { maxDepth: hops ?? 3, budget: maxNodes ?? 80 });
       const tests = collectTests(ragDb, root, projectDir);
 
       if (format === "json") {
@@ -251,26 +259,25 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
 
   server.tool(
     "trace",
-    "Show how one symbol reaches another: the reachable call sub-graph from 'from' to 'to', with the shortest path highlighted. Answers 'how does X reach Y'. Branches that don't reach 'to' are pruned. Static resolution — a dynamic-dispatch hop (callback, interface→impl, DI) can break the chain, and is reported when it does. Pass 'from_file'/'to_file' to disambiguate.",
+    "Show how one symbol reaches another: the connecting call sub-graph from 'from' to 'to', with the shortest path highlighted. Answers 'how does X reach Y'. Reachability is COMPLETE — the whole reachable graph is searched (no hop limit), so a 'no path' result means truly unreachable, not 'too far'. Branches that don't reach 'to' are pruned; the DRAWN sub-graph is bounded by maxNodes (the connectivity answer is not). Static resolution — a dynamic-dispatch hop (callback, interface→impl, DI) can break the chain, and is reported when it does. Pass 'from_file'/'to_file' to disambiguate. This is the SYMBOL-to-symbol PATH view (two endpoints). Routing — for ALL callers of a single symbol use impact; for all references to a symbol use usages.",
     {
       from: z.string().min(1).max(200).describe("Source symbol (function/method) the path starts at"),
       to: z.string().min(1).max(200).describe("Target symbol the path should reach"),
       from_file: z.string().optional().describe("File path (relative) to disambiguate 'from'"),
       to_file: z.string().optional().describe("File path (relative) to disambiguate 'to'"),
-      max_depth: z
+      maxNodes: z
         .number()
         .int()
         .min(1)
-        .max(12)
         .optional()
-        .describe("Max hops to search in each direction (default 6)"),
+        .describe("Max nodes to DRAW in the connecting sub-graph (default 300). Does not limit reachability — a path is always found if one exists."),
       directory: z
         .string()
         .optional()
         .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
       format: z.enum(["text", "json"]).optional().describe("Output format: 'text' (default) or 'json'"),
     },
-    async ({ from, to, from_file, to_file, max_depth, directory, format }) => {
+    async ({ from, to, from_file, to_file, maxNodes, directory, format }) => {
       const { projectDir, db: ragDb } = await resolveProject(directory, getDB);
 
       const fromRes = resolveSymbol(ragDb, from, from_file);
@@ -282,7 +289,7 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
         return textResult(resolveError("to", to, to_file, toRes, projectDir));
       }
 
-      const res = tracePath(ragDb, fromRes.node!, toRes.node!, { maxDepth: max_depth ?? 6 });
+      const res = tracePath(ragDb, fromRes.node!, toRes.node!, { budget: maxNodes ?? 300 });
       if (format === "json") {
         return textResult(JSON.stringify(traceToJson(res, projectDir), null, 2));
       }
