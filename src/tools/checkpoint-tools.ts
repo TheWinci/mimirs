@@ -2,6 +2,8 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { embed } from "../embeddings/embed";
 import { discoverSessions } from "../conversation/parser";
+import { getHeadSha } from "../git/exec";
+import { computeFreshness, freshnessTag } from "../git/staleness";
 import { type GetDB, resolveProject } from "./index";
 
 export function registerCheckpointTools(server: McpServer, getDB: GetDB) {
@@ -46,6 +48,10 @@ export function registerCheckpointTools(server: McpServer, getDB: GetDB) {
       const embText = `${title}. ${summary}`;
       const embedding = await embed(embText);
 
+      // Stamp the code state this checkpoint was written against (null off-git),
+      // so recall can later flag whether its files have changed since.
+      const commitHash = await getHeadSha(projectDir);
+
       const id = ragDb.createCheckpoint(
         sessionId,
         turnIndex,
@@ -55,7 +61,8 @@ export function registerCheckpointTools(server: McpServer, getDB: GetDB) {
         summary,
         filesInvolved ?? [],
         tags ?? [],
-        embedding
+        embedding,
+        commitHash
       );
 
       const hints: string[] = [];
@@ -103,13 +110,17 @@ export function registerCheckpointTools(server: McpServer, getDB: GetDB) {
         };
       }
 
+      const freshness = await computeFreshness(projectDir, checkpoints);
+
       const text = checkpoints
-        .map((cp) => {
+        .map((cp, i) => {
           const files = cp.filesInvolved.length > 0
             ? `\n  Files: ${cp.filesInvolved.join(", ")}`
             : "";
           const tagStr = cp.tags.length > 0 ? ` [${cp.tags.join(", ")}]` : "";
-          return `#${cp.id} [${cp.type}] ${cp.title}${tagStr}\n  ${cp.timestamp} (turn ${cp.turnIndex})\n  ${cp.summary}${files}`;
+          const fresh = freshnessTag(freshness[i]);
+          const freshStr = fresh ? `\n  ${fresh}` : "";
+          return `#${cp.id} [${cp.type}] ${cp.title}${tagStr}\n  ${cp.timestamp} (turn ${cp.turnIndex})\n  ${cp.summary}${files}${freshStr}`;
         })
         .join("\n\n");
 
@@ -144,12 +155,16 @@ export function registerCheckpointTools(server: McpServer, getDB: GetDB) {
         };
       }
 
+      const freshness = await computeFreshness(projectDir, results);
+
       const text = results
-        .map((cp) => {
+        .map((cp, i) => {
           const files = cp.filesInvolved.length > 0
             ? `\n  Files: ${cp.filesInvolved.join(", ")}`
             : "";
-          return `${cp.score.toFixed(4)}  #${cp.id} [${cp.type}] ${cp.title}\n  ${cp.summary}${files}`;
+          const fresh = freshnessTag(freshness[i]);
+          const freshStr = fresh ? `\n  ${fresh}` : "";
+          return `${cp.score.toFixed(4)}  #${cp.id} [${cp.type}] ${cp.title}\n  ${cp.summary}${files}${freshStr}`;
         })
         .join("\n\n");
 

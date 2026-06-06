@@ -2,6 +2,7 @@ import { type RagDB } from "../db";
 import { type GitCommitInsert } from "../db/git-history";
 import { embedBatchMerged } from "../embeddings/embed";
 import { log } from "../utils/log";
+import { runGit, findGitRoot } from "./exec";
 
 const FIELD_SEP = "\x1f"; // ASCII unit separator — safe delimiter for git format
 const RECORD_SEP = "\x1e"; // ASCII record separator — delimits commits
@@ -20,21 +21,6 @@ interface FileChange {
   path: string;
   insertions: number;
   deletions: number;
-}
-
-async function runGit(args: string[], cwd: string): Promise<string | null> {
-  try {
-    const proc = Bun.spawn(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe" });
-    const output = await new Response(proc.stdout).text();
-    const exitCode = await proc.exited;
-    return exitCode === 0 ? output.trim() : null;
-  } catch {
-    return null;
-  }
-}
-
-async function findGitRoot(dir: string): Promise<string | null> {
-  return runGit(["rev-parse", "--show-toplevel"], dir);
 }
 
 /**

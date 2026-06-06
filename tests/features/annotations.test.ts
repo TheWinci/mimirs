@@ -31,6 +31,20 @@ describe("upsert and retrieval", () => {
     expect(results[0].note).toBe("RagDB constructor is not thread-safe");
     expect(results[0].symbolName).toBe("RagDB");
     expect(results[0].author).toBe("agent");
+    expect(results[0].commitHash).toBeNull(); // unstamped → null
+  });
+
+  test("commit_hash stamp round-trips through upsert and update", async () => {
+    const emb = await embed("stamped note");
+    db.upsertAnnotation("src/stamp.ts", "v1", emb, "Foo", "agent", "abc123");
+    expect(db.getAnnotations("src/stamp.ts")[0].commitHash).toBe("abc123");
+
+    // Re-annotating the same (path, symbol) refreshes the stamp.
+    db.upsertAnnotation("src/stamp.ts", "v2", emb, "Foo", "agent", "def456");
+    const after = db.getAnnotations("src/stamp.ts");
+    expect(after.length).toBe(1);
+    expect(after[0].note).toBe("v2");
+    expect(after[0].commitHash).toBe("def456");
   });
 
   test("retrieves all annotations for a file regardless of symbol", async () => {

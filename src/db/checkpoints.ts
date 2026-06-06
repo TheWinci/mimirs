@@ -11,7 +11,8 @@ export function createCheckpoint(
   summary: string,
   filesInvolved: string[],
   tags: string[],
-  embedding: Float32Array
+  embedding: Float32Array,
+  commitHash: string | null = null
 ): number {
   let checkpointId = 0;
 
@@ -20,8 +21,8 @@ export function createCheckpoint(
     // the base table has no embedding column (matching the chunks/vec_chunks split).
     db.run(
       `INSERT INTO conversation_checkpoints
-       (session_id, turn_index, timestamp, type, title, summary, files_involved, tags)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       (session_id, turn_index, timestamp, type, title, summary, files_involved, tags, commit_hash)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         sessionId,
         turnIndex,
@@ -31,6 +32,7 @@ export function createCheckpoint(
         summary,
         JSON.stringify(filesInvolved),
         JSON.stringify(tags),
+        commitHash,
       ]
     );
 
@@ -71,7 +73,7 @@ export function listCheckpoints(
 
   return db
     .query<
-      { id: number; session_id: string; turn_index: number; timestamp: string; type: string; title: string; summary: string; files_involved: string; tags: string },
+      { id: number; session_id: string; turn_index: number; timestamp: string; type: string; title: string; summary: string; files_involved: string; tags: string; commit_hash: string | null },
       (string | number)[]
     >(sql)
     .all(...params)
@@ -85,6 +87,7 @@ export function listCheckpoints(
       summary: r.summary,
       filesInvolved: JSON.parse(r.files_involved || "[]"),
       tags: JSON.parse(r.tags || "[]"),
+      commitHash: r.commit_hash ?? null,
     }));
 }
 
@@ -108,12 +111,13 @@ export function searchCheckpoints(
         summary: string;
         files_involved: string;
         tags: string;
+        commit_hash: string | null;
       },
       [Uint8Array, number]
     >(
       `SELECT v.checkpoint_id, v.distance,
               cp.id, cp.session_id, cp.turn_index, cp.timestamp, cp.type,
-              cp.title, cp.summary, cp.files_involved, cp.tags
+              cp.title, cp.summary, cp.files_involved, cp.tags, cp.commit_hash
        FROM (SELECT checkpoint_id, distance FROM vec_checkpoints WHERE embedding MATCH ? ORDER BY distance LIMIT ?) v
        JOIN conversation_checkpoints cp ON cp.id = v.checkpoint_id`
     )
@@ -134,6 +138,7 @@ export function searchCheckpoints(
       summary: row.summary,
       filesInvolved: JSON.parse(row.files_involved || "[]"),
       tags: JSON.parse(row.tags || "[]"),
+      commitHash: row.commit_hash ?? null,
       score: 1 / (1 + row.distance),
     });
 
@@ -146,10 +151,10 @@ export function searchCheckpoints(
 export function getCheckpoint(db: Database, id: number): CheckpointRow | null {
   const r = db
     .query<
-      { id: number; session_id: string; turn_index: number; timestamp: string; type: string; title: string; summary: string; files_involved: string; tags: string },
+      { id: number; session_id: string; turn_index: number; timestamp: string; type: string; title: string; summary: string; files_involved: string; tags: string; commit_hash: string | null },
       [number]
     >(
-      "SELECT id, session_id, turn_index, timestamp, type, title, summary, files_involved, tags FROM conversation_checkpoints WHERE id = ?"
+      "SELECT id, session_id, turn_index, timestamp, type, title, summary, files_involved, tags, commit_hash FROM conversation_checkpoints WHERE id = ?"
     )
     .get(id);
   if (!r) return null;
@@ -163,5 +168,6 @@ export function getCheckpoint(db: Database, id: number): CheckpointRow | null {
     summary: r.summary,
     filesInvolved: JSON.parse(r.files_involved || "[]"),
     tags: JSON.parse(r.tags || "[]"),
+    commitHash: r.commit_hash ?? null,
   };
 }

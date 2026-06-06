@@ -2,6 +2,8 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { type AnnotationRow } from "../db";
 import { embed } from "../embeddings/embed";
+import { getHeadSha } from "../git/exec";
+import { computeFreshness, freshnessTag } from "../git/staleness";
 import { type GetDB, resolveProject } from "./index";
 
 export function registerAnnotationTools(server: McpServer, getDB: GetDB) {
@@ -25,11 +27,14 @@ export function registerAnnotationTools(server: McpServer, getDB: GetDB) {
         .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
     },
     async ({ path, note, symbol, author, directory }) => {
-      const { db: ragDb } = await resolveProject(directory, getDB);
+      const { projectDir, db: ragDb } = await resolveProject(directory, getDB);
 
       const embText = symbol ? `${symbol}: ${note}` : note;
       const embedding = await embed(embText);
-      const id = ragDb.upsertAnnotation(path, note, embedding, symbol ?? null, author ?? "agent");
+      // Stamp the code state the note was written against, so recall can flag
+      // when the annotated file has changed since.
+      const commitHash = await getHeadSha(projectDir);
+      const id = ragDb.upsertAnnotation(path, note, embedding, symbol ?? null, author ?? "agent", commitHash);
 
       const target = symbol ? `${path}  •  ${symbol}` : path;
       return {
@@ -56,7 +61,7 @@ export function registerAnnotationTools(server: McpServer, getDB: GetDB) {
         .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
     },
     async ({ path, query, directory }) => {
-      const { db: ragDb } = await resolveProject(directory, getDB);
+      const { projectDir, db: ragDb } = await resolveProject(directory, getDB);
 
       let results: AnnotationRow[];
       if (query) {
@@ -75,11 +80,18 @@ export function registerAnnotationTools(server: McpServer, getDB: GetDB) {
         };
       }
 
+      const freshness = await computeFreshness(
+        projectDir,
+        results.map((r) => ({ commitHash: r.commitHash, filesInvolved: [r.path] })),
+      );
+
       const text = results
-        .map((r) => {
+        .map((r, i) => {
           const target = r.symbolName ? `${r.path}  •  ${r.symbolName}` : r.path;
           const authorStr = r.author ? ` [${r.author}]` : "";
-          return `#${r.id}  ${target}${authorStr}\n  ${r.note}\n  (${r.updatedAt})`;
+          const fresh = freshnessTag(freshness[i]);
+          const freshStr = fresh ? `\n  ${fresh}` : "";
+          return `#${r.id}  ${target}${authorStr}\n  ${r.note}\n  (${r.updatedAt})${freshStr}`;
         })
         .join("\n\n");
 

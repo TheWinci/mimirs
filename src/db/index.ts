@@ -517,9 +517,31 @@ export class RagDB {
     this.migrateParentChunkColumns();
     this.migrateGraphColumns();
     this.migrateSearchPartsColumn();
+    this.migrateMemoryStalenessColumns();
     this.dedupeChunks();
     this.backfillMissingSymbolRefs();
     this.applySchemaVersion();
+  }
+
+  // Staleness stamps for recall: the HEAD sha a checkpoint/annotation was
+  // written against. Nullable and additive — legacy rows stay NULL ("no
+  // signal"), so old DBs keep working without a rebuild.
+  private migrateMemoryStalenessColumns() {
+    const cpCols = this.db
+      .query<{ name: string }, []>("PRAGMA table_info(conversation_checkpoints)")
+      .all()
+      .map((c) => c.name);
+    if (!cpCols.includes("commit_hash")) {
+      this.db.exec("ALTER TABLE conversation_checkpoints ADD COLUMN commit_hash TEXT");
+    }
+
+    const annCols = this.db
+      .query<{ name: string }, []>("PRAGMA table_info(annotations)")
+      .all()
+      .map((c) => c.name);
+    if (!annCols.includes("commit_hash")) {
+      this.db.exec("ALTER TABLE annotations ADD COLUMN commit_hash TEXT");
+    }
   }
 
   /**
@@ -1001,11 +1023,12 @@ export class RagDB {
   createCheckpoint(
     sessionId: string, turnIndex: number, timestamp: string,
     type: string, title: string, summary: string,
-    filesInvolved: string[], tags: string[], embedding: Float32Array
+    filesInvolved: string[], tags: string[], embedding: Float32Array,
+    commitHash: string | null = null
   ) {
     return checkpointOps.createCheckpoint(
       this.db, sessionId, turnIndex, timestamp, type, title,
-      summary, filesInvolved, tags, embedding
+      summary, filesInvolved, tags, embedding, commitHash
     );
   }
   listCheckpoints(sessionId?: string, type?: string, limit?: number) {
@@ -1022,9 +1045,9 @@ export class RagDB {
 
   upsertAnnotation(
     path: string, note: string, embedding: Float32Array,
-    symbolName?: string | null, author?: string | null
+    symbolName?: string | null, author?: string | null, commitHash?: string | null
   ) {
-    return annotationOps.upsertAnnotation(this.db, path, note, embedding, symbolName, author);
+    return annotationOps.upsertAnnotation(this.db, path, note, embedding, symbolName, author, commitHash);
   }
   getAnnotationsForPaths(paths: string[]) {
     return annotationOps.getAnnotationsForPaths(this.db, paths);

@@ -3,20 +3,10 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { resolve } from "path";
 import { type GetDB, resolveProject } from "./index";
 
-export async function runGit(args: string[], cwd: string): Promise<string | null> {
-  try {
-    const proc = Bun.spawn(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe" });
-    const output = await new Response(proc.stdout).text();
-    const exitCode = await proc.exited;
-    return exitCode === 0 ? output.trim() : null;
-  } catch {
-    return null;
-  }
-}
-
-export async function findGitRoot(dir: string): Promise<string | null> {
-  return runGit(["rev-parse", "--show-toplevel"], dir);
-}
+// Canonical git helpers now live in src/git/exec.ts; imported for local use and
+// re-exported so existing importers (e.g. cli/commands/affected.ts) keep their path.
+import { runGit, findGitRoot, getHeadSha } from "../git/exec";
+export { runGit, findGitRoot, getHeadSha };
 
 export function registerGitTools(server: McpServer, getDB: GetDB) {
   server.tool(

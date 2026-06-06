@@ -7,7 +7,8 @@ export function upsertAnnotation(
   note: string,
   embedding: Float32Array,
   symbolName?: string | null,
-  author?: string | null
+  author?: string | null,
+  commitHash?: string | null
 ): number {
   let annotationId = 0;
 
@@ -35,8 +36,8 @@ export function upsertAnnotation(
         [existing.id, existing.note]
       );
       db.run(
-        "UPDATE annotations SET note = ?, author = ?, updated_at = ? WHERE id = ?",
-        [note, author ?? null, now, existing.id]
+        "UPDATE annotations SET note = ?, author = ?, updated_at = ?, commit_hash = ? WHERE id = ?",
+        [note, author ?? null, now, commitHash ?? null, existing.id]
       );
       db.run("INSERT INTO fts_annotations(rowid, note) VALUES (?, ?)", [existing.id, note]);
       db.run("DELETE FROM vec_annotations WHERE annotation_id = ?", [existing.id]);
@@ -47,8 +48,8 @@ export function upsertAnnotation(
       annotationId = existing.id;
     } else {
       db.run(
-        "INSERT INTO annotations (path, symbol_name, note, author, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-        [path, symbolName ?? null, note, author ?? null, now, now]
+        "INSERT INTO annotations (path, symbol_name, note, author, created_at, updated_at, commit_hash) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [path, symbolName ?? null, note, author ?? null, now, now, commitHash ?? null]
       );
       annotationId = Number(
         db.query<{ id: number }, []>("SELECT last_insert_rowid() as id").get()!.id
@@ -79,7 +80,7 @@ export function getAnnotationsForPaths(db: Database, paths: string[]): Annotatio
     const ph = batch.map(() => "?").join(",");
     const rows = db
       .query<
-        { id: number; path: string; symbol_name: string | null; note: string; author: string | null; created_at: string; updated_at: string },
+        { id: number; path: string; symbol_name: string | null; note: string; author: string | null; created_at: string; updated_at: string; commit_hash: string | null },
         string[]
       >(`SELECT * FROM annotations WHERE path IN (${ph}) ORDER BY updated_at DESC`)
       .all(...batch);
@@ -92,6 +93,7 @@ export function getAnnotationsForPaths(db: Database, paths: string[]): Annotatio
         author: r.author,
         createdAt: r.created_at,
         updatedAt: r.updated_at,
+        commitHash: r.commit_hash ?? null,
       });
     }
   }
@@ -119,7 +121,7 @@ export function getAnnotations(db: Database, path?: string, symbolName?: string 
 
   return db
     .query<
-      { id: number; path: string; symbol_name: string | null; note: string; author: string | null; created_at: string; updated_at: string },
+      { id: number; path: string; symbol_name: string | null; note: string; author: string | null; created_at: string; updated_at: string; commit_hash: string | null },
       (string | null)[]
     >(sql)
     .all(...params)
@@ -131,6 +133,7 @@ export function getAnnotations(db: Database, path?: string, symbolName?: string 
       author: r.author,
       createdAt: r.created_at,
       updatedAt: r.updated_at,
+      commitHash: r.commit_hash ?? null,
     }));
 }
 
@@ -151,11 +154,12 @@ export function searchAnnotations(
         author: string | null;
         created_at: string;
         updated_at: string;
+        commit_hash: string | null;
       },
       [Uint8Array, number]
     >(
       `SELECT v.annotation_id, v.distance,
-              a.id, a.path, a.symbol_name, a.note, a.author, a.created_at, a.updated_at
+              a.id, a.path, a.symbol_name, a.note, a.author, a.created_at, a.updated_at, a.commit_hash
        FROM (SELECT annotation_id, distance FROM vec_annotations WHERE embedding MATCH ? ORDER BY distance LIMIT ?) v
        JOIN annotations a ON a.id = v.annotation_id`
     )
@@ -168,6 +172,7 @@ export function searchAnnotations(
       author: row.author,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      commitHash: row.commit_hash ?? null,
       score: 1 / (1 + row.distance),
     }));
 }

@@ -52,6 +52,9 @@ export interface AnnotationRow {
   author: string | null;
   createdAt: string;
   updatedAt: string;
+  // HEAD sha when the note was written/updated; null for legacy/non-git rows.
+  // Drives the staleness signal on recall (file-level, same as checkpoints).
+  commitHash: string | null;
 }
 
 export interface SymbolResult {
@@ -78,6 +81,9 @@ export interface CheckpointRow {
   summary: string;
   filesInvolved: string[];
   tags: string[];
+  // HEAD sha when the checkpoint was written; null for legacy/non-git rows.
+  // Used to compute a staleness signal on recall.
+  commitHash: string | null;
 }
 
 export interface GitCommitRow {

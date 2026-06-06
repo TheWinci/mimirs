@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { relative, resolve } from "path";
 import { type AnnotationRow, type PathFilter } from "../db";
 import { search, searchChunks } from "../search/hybrid";
+import { computeFreshness, freshnessTag, type Freshness } from "../git/staleness";
 import { type GetDB, resolveProject } from "./index";
 
 /**
@@ -176,6 +177,17 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
         if (anns.length > 0) annotationsByPath.set(relPath, anns);
       }
 
+      // Stale notes are worse than no notes — flag freshness inline. Compute once
+      // for every surfaced annotation, keyed by id (file-level: changed since the
+      // note was written).
+      const allAnnotations = [...annotationsByPath.values()].flat();
+      const annFreshness = await computeFreshness(
+        projectDir,
+        allAnnotations.map((a) => ({ commitHash: a.commitHash, filesInvolved: [a.path] })),
+      );
+      const freshnessById = new Map<number, Freshness | null>();
+      allAnnotations.forEach((a, i) => freshnessById.set(a.id, annFreshness[i]));
+
       // Collect entity names for the follow-up suggestion
       const entityNames = results
         .map((r) => r.entityName)
@@ -197,7 +209,9 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
           const noteBlock = relevant.length > 0
             ? relevant.map((a) => {
                 const target = a.symbolName ? ` (${a.symbolName})` : "";
-                return `[NOTE${target}] ${a.note}`;
+                const fresh = freshnessTag(freshnessById.get(a.id) ?? null);
+                const staleMark = fresh && fresh.startsWith("⚠") ? ` ⚠ stale` : "";
+                return `[NOTE${target}${staleMark}] ${a.note}`;
               }).join("\n") + "\n"
             : "";
 

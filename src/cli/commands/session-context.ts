@@ -1,24 +1,14 @@
 import { resolve } from "path";
 import { RagDB } from "../../db";
 import { cli } from "../../utils/log";
-
-async function runGit(args: string[], cwd: string): Promise<string | null> {
-  try {
-    const proc = Bun.spawn(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe" });
-    const output = await new Response(proc.stdout).text();
-    const exitCode = await proc.exited;
-    return exitCode === 0 ? output.trim() : null;
-  } catch {
-    return null;
-  }
-}
+import { runGit, findGitRoot } from "../../git/exec";
 
 export async function sessionContextCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const dir = resolve(args[1] && !args[1].startsWith("--") ? args[1] : getFlag("--dir") || ".");
   const sections: string[] = [];
 
   // 1. Git context
-  const gitRoot = await runGit(["rev-parse", "--show-toplevel"], dir);
+  const gitRoot = await findGitRoot(dir);
   if (gitRoot) {
     const status = await runGit(["status", "--short"], gitRoot);
     if (status) {
