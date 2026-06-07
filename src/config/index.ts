@@ -32,6 +32,11 @@ const RagConfigSchema = z.object({
   embeddingPooling: z.enum(["mean", "cls", "none"]).optional(),
   embeddingDtype: z.string().optional(),
   parentGroupingMinCount: z.number().int().min(2).default(2),
+  // read_relevant returns tight leaf (function-level) chunks instead of promoted
+  // whole-class/file parent chunks — far lower token cost, same coverage, better
+  // line precision. Default on: it's strictly better for agent consumers (proven
+  // ~0.4x token cost at equal answer quality). Set false to restore parent chunks.
+  leafOnly: z.boolean().default(true),
   benchmarkTopK: z.number().int().min(1).default(5),
   benchmarkMinRecall: z.number().min(0).max(1).default(0.8),
   benchmarkMinMrr: z.number().min(0).max(1).default(0.6),
@@ -131,6 +136,7 @@ const DEFAULT_CONFIG: RagConfig = {
   incrementalChunks: false,
   embeddingMerge: true,
   parentGroupingMinCount: 2,
+  leafOnly: true,
   indexBatchSize: 50,
   benchmarkTopK: 5,
   benchmarkMinRecall: 0.8,

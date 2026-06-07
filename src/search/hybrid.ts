@@ -498,17 +498,26 @@ export async function searchChunks(
   generatedPatterns: string[] = [],
   filter?: PathFilter,
   parentGroupingMinCount: number = 2,
+  leafOnly: boolean = false,
 ): Promise<ChunkResult[]> {
   const start = performance.now();
   const queryEmbedding = await embed(query);
 
-  const vectorResults = db.searchChunks(queryEmbedding, topK * 4, filter);
+  let vectorResults = db.searchChunks(queryEmbedding, topK * 4, filter);
 
   let textResults: ChunkSearchResult[] = [];
   try {
     textResults = db.textSearchChunks(query, topK * 4, filter);
   } catch (err) {
     log.debug(`FTS chunk query failed, falling back to vector-only: ${err instanceof Error ? err.message : err}`, "search");
+  }
+
+  // Leaf-only: drop synthetic parent rows (chunk_index === -1, whole class/file
+  // concatenations) so retrieval returns tight function-level spans. Children
+  // carry the same lines, so coverage is preserved while context/token cost drops.
+  if (leafOnly) {
+    vectorResults = vectorResults.filter((r) => r.chunkIndex !== -1);
+    textResults = textResults.filter((r) => r.chunkIndex !== -1);
   }
 
   const isGenerated = buildGeneratedMatcher(generatedPatterns);
@@ -557,8 +566,9 @@ export async function searchChunks(
     })
     .sort((a, b) => b.score - a.score);
 
-  // Parent grouping: if ≥minCount sub-chunks from the same parent appear, consolidate
-  results = groupByParent(results, db, parentGroupingMinCount);
+  // Parent grouping: if ≥minCount sub-chunks from the same parent appear, consolidate.
+  // Skipped in leaf-only mode (we want tight child spans, not promoted parents).
+  if (!leafOnly) results = groupByParent(results, db, parentGroupingMinCount);
 
   // Doc expansion
   results = expandForDocs(results, topK);

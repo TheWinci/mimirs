@@ -141,15 +141,19 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
       const filter = buildFilter(projectDir, extensions, dirs, excludeDirs);
 
       const start = performance.now();
+      // Leaf chunks are tight (function-level), so a smaller default top still
+      // covers the answer at much lower token cost; full files needed bigger top.
+      const effTop = top ?? (config.leafOnly ? 5 : 8);
       const results = await searchChunks(
         query,
         ragDb,
-        top ?? 8,
+        effTop,
         threshold ?? 0.3,
         config.hybridWeight,
         config.generated,
         filter,
         config.parentGroupingMinCount,
+        config.leafOnly,
       );
       const durationMs = Math.round(performance.now() - start);
       const { totalFiles } = ragDb.getStatus();

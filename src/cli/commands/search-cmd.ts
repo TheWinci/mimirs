@@ -69,13 +69,17 @@ export async function readCommand(args: string[], getFlag: (flag: string) => str
 
   const dir = resolve(getFlag("--dir") || ".");
   // Validate flags before constructing RagDB (see searchCommand).
-  const top = intFlag(getFlag("--top"), "--top", 8, { min: 1 });
+  const topFlag = getFlag("--top");
   const threshold = floatFlag(getFlag("--threshold"), "--threshold", 0.3, { min: 0, max: 1 });
   const db = new RagDB(dir);
   const config = await loadConfig(dir);
   const filter = buildCliFilter(dir, getFlag);
 
-  const results = await searchChunks(query, db, top, threshold, config.hybridWeight, config.generated, filter, config.parentGroupingMinCount);
+  // Leaf chunks are tight, so a smaller default top still covers the answer cheaply.
+  const top = topFlag !== undefined
+    ? intFlag(topFlag, "--top", 8, { min: 1 })
+    : (config.leafOnly ? 5 : 8);
+  const results = await searchChunks(query, db, top, threshold, config.hybridWeight, config.generated, filter, config.parentGroupingMinCount, config.leafOnly);
 
   if (results.length === 0) {
     cli.log("No relevant chunks found. Has the directory been indexed?");

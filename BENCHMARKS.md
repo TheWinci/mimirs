@@ -74,3 +74,72 @@ Kubernetes uses a Go-only config (exclude tests/vendor, demote generated), place
 ```
 
 Query files: [mimirs](benchmarks/mimirs-queries.json) (74), [Excalidraw](benchmarks/excalidraw-queries.json) (72), [Django](benchmarks/django-queries.json) (116), [Kubernetes](benchmarks/kubernetes-queries.json) (120). The full K-sweep harness is [benchmarks/rebench-full.ts](benchmarks/rebench-full.ts).
+
+## External benchmarks (preliminary, tool-vs-agents)
+
+The numbers above are mimirs' own file-localization quality. We also ran mimirs against
+**ContextBench** and **SWE-bench-Live**, whose other entries are full coding *agents*
+(multi-step explorers), not single-call tools — so the comparison is one retrieval call
+vs entire agent trajectories.
+
+**ContextBench** (gold-context retrieval). Full leaderboards below — every other entry
+is a full coding *agent* (multi-step explorer); mimirs (★) is a single retrieval call.
+Agent scores are from the ContextBench paper (full 500-set); mimirs is leaf mode, n=15
+across 8 repos (early sample). Sorted best-first per metric.
+
+*Line coverage (recall)*
+| # | system | category | score |
+| --- | --- | --- | --- |
+| 1 | Agentless | agent — fixed pipeline | 0.318 |
+| 2 | mini-SWE | agent — minimal LLM loop | 0.301 |
+| 3 | ★ **mimirs** | **tool — 1-shot retriever** | **0.299** |
+| 4 | SWE-agent | agent — scaffolded LLM | 0.228 |
+| 5 | OpenHands | agent — scaffolded LLM | 0.203 |
+| 6 | Prometheus | agent — scaffolded LLM | 0.195 |
+
+*File coverage (recall)*
+| # | system | category | score |
+| --- | --- | --- | --- |
+| 1 | OpenHands | agent — scaffolded LLM | 0.733 |
+| 2 | SWE-agent | agent — scaffolded LLM | 0.726 |
+| 3 | Prometheus | agent — scaffolded LLM | 0.717 |
+| 4 | mini-SWE | agent — minimal LLM loop | 0.682 |
+| 5 | Agentless | agent — fixed pipeline | 0.609 |
+| 6 | ★ **mimirs** | **tool — 1-shot retriever** | **0.543** |
+
+*Line precision*
+| # | system | category | score |
+| --- | --- | --- | --- |
+| 1 | Agentless | agent — fixed pipeline | 0.376 |
+| 2 | mini-SWE | agent — minimal LLM loop | 0.312 |
+| 3 | Prometheus | agent — scaffolded LLM | 0.231 |
+| 4 | SWE-agent | agent — scaffolded LLM | 0.208 |
+| 5 | OpenHands | agent — scaffolded LLM | 0.130 |
+| 6 | ★ **mimirs** | **tool — 1-shot retriever** | **0.049** |
+
+*File precision*
+| # | system | category | score |
+| --- | --- | --- | --- |
+| 1 | mini-SWE | agent — minimal LLM loop | 0.709 |
+| 2 | SWE-agent | agent — scaffolded LLM | 0.537 |
+| 3 | OpenHands | agent — scaffolded LLM | 0.400 |
+| 4 | Agentless | agent — fixed pipeline | 0.352 |
+| 5 | Prometheus | agent — scaffolded LLM | 0.336 |
+| 6 | ★ **mimirs** | **tool — 1-shot retriever** | **0.139** |
+
+As one tool call, mimirs is competitive with whole agent trajectories on line-level
+context recall (3rd of 6) and trails on precision — expected: agents narrow to exact
+edit lines, while a retriever returns whole functions (the unit an LLM actually wants
+to read). The category column is the point — this is one retrieval call ranked against
+full agents.
+
+**Token efficiency** (controlled head-to-head, same mid-scope task + repo): an agent using
+mimirs (leaf mode) pulled **0.91×** the context a careful grep-only agent did for an
+equal-quality answer, in **half the tool calls** (12 vs 22), and **0.40×** of mimirs'
+prior whole-class-chunk default.
+
+**SWE-bench-Live** (contamination-resistant real issues, file-level, n=16): gold file in
+the **top-10 for ~75%** of issues (Recall@10 55%), with high per-repo variance.
+
+These external numbers are preliminary small samples (n=15/16) — directional, not final.
+Harnesses: [benchmarks/contextbench/](benchmarks/contextbench/), [benchmarks/swe-localization/](benchmarks/swe-localization/).
