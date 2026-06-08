@@ -1,4 +1,5 @@
 import { dirname, resolve, relative, basename, extname } from "path";
+import { existsSync, readFileSync } from "fs";
 import { resolveImport as bcResolveImport, loadTsConfig, EXTENSION_MAP } from "@winci/bun-chunk";
 import type { Language } from "@winci/bun-chunk";
 import { RagDB } from "../db";
@@ -26,34 +27,16 @@ export function resolveImports(db: RagDB, projectDir: string): number {
   const pathToId = buildPathToIdMap(db);
   const tsConfig = loadTsConfig(projectDir);
 
+  const goModule = readGoModule(projectDir);
+  const basenameIndex = buildBasenameIndex(pathToId);
   let resolvedCount = 0;
 
   for (const imp of unresolved) {
     const lang = detectLanguage(imp.filePath);
-
-    // Skip bare/external specifiers — but let Python/Rust through since
-    // their relative imports don't always start with ./ (e.g. crate::, from .x)
-    if (!imp.source.startsWith(".") && !imp.source.startsWith("/")) {
-      if (lang !== "rust" && lang !== "python") continue;
-    }
-
-    // Pass 1: bun-chunk filesystem resolution
-    const resolvedPath = bcResolveImport(imp.source, imp.filePath, projectDir, lang, tsConfig);
-    if (resolvedPath && pathToId.has(resolvedPath)) {
-      db.resolveImport(imp.id, pathToId.get(resolvedPath)!);
+    const target = resolveSpecifier(imp.source, lang, imp.filePath, projectDir, pathToId, tsConfig, goModule, basenameIndex);
+    if (target !== null) {
+      db.resolveImport(imp.id, target);
       resolvedCount++;
-      continue;
-    }
-
-    // Pass 2: DB-based resolution (extension probing against indexed paths)
-    if (imp.source.startsWith(".") || imp.source.startsWith("/")) {
-      const importerDir = dirname(imp.filePath);
-      const basePath = resolve(importerDir, imp.source);
-      const dbResolved = tryResolvePath(basePath, pathToId);
-      if (dbResolved !== null) {
-        db.resolveImport(imp.id, dbResolved);
-        resolvedCount++;
-      }
     }
   }
 
@@ -85,31 +68,13 @@ export function resolveImportsForFile(
 
   const lang = detectLanguage(filePath);
   const tsConfig = loadTsConfig(projectDir);
+  const goModule = readGoModule(projectDir);
+  const basenameIndex = buildBasenameIndex(pathToId);
 
   for (const imp of imports) {
     if (imp.resolvedFileId !== null) continue;
-
-    // Skip bare/external specifiers — but let Python/Rust through
-    if (!imp.source.startsWith(".") && !imp.source.startsWith("/")) {
-      if (lang !== "rust" && lang !== "python") continue;
-    }
-
-    // Pass 1: bun-chunk filesystem resolution
-    const resolvedPath = bcResolveImport(imp.source, filePath, projectDir, lang, tsConfig);
-    if (resolvedPath && pathToId.has(resolvedPath)) {
-      db.resolveImport(imp.id, pathToId.get(resolvedPath)!);
-      continue;
-    }
-
-    // Pass 2: DB-based resolution
-    if (imp.source.startsWith(".") || imp.source.startsWith("/")) {
-      const importerDir = dirname(filePath);
-      const basePath = resolve(importerDir, imp.source);
-      const resolved = tryResolvePath(basePath, pathToId);
-      if (resolved !== null) {
-        db.resolveImport(imp.id, resolved);
-      }
-    }
+    const target = resolveSpecifier(imp.source, lang, filePath, projectDir, pathToId, tsConfig, goModule, basenameIndex);
+    if (target !== null) db.resolveImport(imp.id, target);
   }
 }
 
@@ -147,6 +112,210 @@ function tryResolvePath(basePath: string, pathToId: Map<string, number>): number
     if (pathToId.has(withIndex)) return pathToId.get(withIndex)!;
   }
 
+  return null;
+}
+
+/**
+ * Resolve an ABSOLUTE dotted intra-project module import (e.g. Python's
+ * `pylint.config.argument` or `matplotlib.cbook`) to an indexed file. The dotted
+ * path maps onto directories under the project root; probe `<root>/a/b/c.py` and
+ * the package form `<root>/a/b/c/__init__.py`. External modules (`os`, `numpy`)
+ * map to paths that aren't indexed, so they simply return null — no false edges.
+ *
+ * This is the fix for graph completeness on projects that use absolute imports
+ * exclusively (pylint, matplotlib): without it, only relative `.`-imports built
+ * edges, leaving those repos' dependency graphs empty.
+ */
+// Languages whose intra-project imports are ABSOLUTE dotted module paths that map
+// onto the directory tree (`a.b.C` → `a/b/C.<ext>`). bun-chunk's Pass-1 resolver
+// only handles relative imports (`./`, `.`-prefixed, rust `crate::`), so these
+// absolute forms otherwise never become graph edges. Each entry lists the source
+// extensions, the package-init filename (Python only), and the package roots to
+// probe (flat layout + common src layouts). Adding a language is one entry here.
+//
+// Not covered (different import models, separate gaps): Go (package=directory),
+// C/C++ (`#include "x.h"` is file-relative), Rust (`crate::`/`super::` already
+// handled by bun-chunk Pass 1).
+const DOTTED_IMPORT_LANGS: Record<string, { exts: string[]; pkgInit?: string; roots: string[] }> = {
+  python: { exts: [".py"], pkgInit: "__init__.py", roots: ["", "src", "lib"] },
+  java:   { exts: [".java"],  roots: ["", "src", "src/main/java"] },
+  kotlin: { exts: [".kt"],    roots: ["", "src", "src/main/kotlin"] },
+  scala:  { exts: [".scala"], roots: ["", "src", "src/main/scala"] },
+};
+
+/**
+ * Resolve an ABSOLUTE dotted intra-project module import (Python `pylint.config.x`,
+ * Java `com.foo.Bar`, …) to an indexed file. Maps the dotted path onto the dir
+ * tree and probes each package root with the language's extensions (and package
+ * init). External modules (`os`, `java.util.List`) map to unindexed paths and
+ * return null — no false edges.
+ */
+function tryResolveDotted(
+  source: string,
+  lang: string | null,
+  projectDir: string,
+  filePath: string,
+  pathToId: Map<string, number>,
+  basenameIndex: Map<string, string[]>,
+): number | null {
+  const cfg = lang ? DOTTED_IMPORT_LANGS[lang] : undefined;
+  if (!cfg) return null;
+  const relPath = source.replace(/\./g, "/");
+  // Fast path: probe the configured package roots (flat + src layouts).
+  for (const root of cfg.roots) {
+    const base = resolve(projectDir, root, relPath);
+    for (const ext of cfg.exts) {
+      if (pathToId.has(base + ext)) return pathToId.get(base + ext)!;
+    }
+    if (cfg.pkgInit && pathToId.has(base + "/" + cfg.pkgInit)) {
+      return pathToId.get(base + "/" + cfg.pkgInit)!;
+    }
+  }
+  // Generic fallback: suffix-match the dotted path against the indexed tree, so
+  // unconventional layouts (monorepos, `packages/foo/...`) resolve too.
+  for (const ext of cfg.exts) {
+    const hit = resolveBySuffix(relPath + ext, filePath, pathToId, basenameIndex);
+    if (hit !== null) return hit;
+  }
+  if (cfg.pkgInit) {
+    const hit = resolveBySuffix(relPath + "/" + cfg.pkgInit, filePath, pathToId, basenameIndex);
+    if (hit !== null) return hit;
+  }
+  return null;
+}
+
+/** Count leading path segments two directories share (proximity metric). */
+function sharedDirDepth(a: string, b: string): number {
+  const as = a.split("/"), bs = b.split("/");
+  let i = 0;
+  while (i < as.length && i < bs.length && as[i] === bs[i]) i++;
+  return i;
+}
+
+/** basename → indexed paths, built once so suffix matching is O(matches). */
+function buildBasenameIndex(pathToId: Map<string, number>): Map<string, string[]> {
+  const m = new Map<string, string[]>();
+  for (const p of pathToId.keys()) {
+    const base = p.slice(p.lastIndexOf("/") + 1);
+    const arr = m.get(base);
+    if (arr) arr.push(p); else m.set(base, [p]);
+  }
+  return m;
+}
+
+/**
+ * Resolve `relPath` (e.g. `inc/helper.h`) by matching it against the actual
+ * indexed tree by path SUFFIX — no guessing of include/src roots, so it works for
+ * any project layout. Unique suffix match wins; on a basename collision the
+ * candidate sharing the longest directory prefix with the importer wins; a true
+ * tie resolves to nothing (never a false edge).
+ */
+function resolveBySuffix(
+  relPath: string,
+  filePath: string,
+  pathToId: Map<string, number>,
+  basenameIndex: Map<string, string[]>,
+): number | null {
+  const base = relPath.slice(relPath.lastIndexOf("/") + 1);
+  const needle = "/" + relPath;
+  const cands = (basenameIndex.get(base) ?? []).filter((p) => p.endsWith(needle));
+  if (cands.length === 0) return null;
+  if (cands.length === 1) return pathToId.get(cands[0])!;
+  const fileDir = dirname(filePath);
+  let best: string | null = null, bestDepth = -1, tie = false;
+  for (const p of cands) {
+    const d = sharedDirDepth(fileDir, dirname(p));
+    if (d > bestDepth) { best = p; bestDepth = d; tie = false; }
+    else if (d === bestDepth) tie = true;
+  }
+  return best && !tie ? pathToId.get(best)! : null;
+}
+
+/**
+ * C/C++ quoted includes (`#include "util.h"`, `#include "inc/helper.h"`): resolve
+ * relative to the including file's directory first (authoritative), then by
+ * matching the include against the indexed tree (handles arbitrary `-I` layouts).
+ * Angle includes (<stdio.h>) are system headers — not indexed, so they return null.
+ */
+function tryResolveInclude(
+  source: string,
+  filePath: string,
+  pathToId: Map<string, number>,
+  basenameIndex: Map<string, string[]>,
+): number | null {
+  const local = resolve(dirname(filePath), source);
+  if (pathToId.has(local)) return pathToId.get(local)!;
+  return resolveBySuffix(source, filePath, pathToId, basenameIndex);
+}
+
+/** Read the module path from go.mod (`module example.com/proj`), or null. */
+function readGoModule(projectDir: string): string | null {
+  const p = resolve(projectDir, "go.mod");
+  if (!existsSync(p)) return null;
+  try {
+    const m = readFileSync(p, "utf8").match(/^\s*module\s+(\S+)/m);
+    return m ? m[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+// Go imports are full module paths (`example.com/proj/internal/foo`). Strip the
+// go.mod module prefix to get the package directory, then link to a representative
+// `.go` file in it. A Go package is a directory of files; the file-level graph
+// links one (the lexically-first non-test source) so the edge exists — full
+// package fan-out is a separate enhancement.
+function tryResolveGoPackage(
+  source: string,
+  projectDir: string,
+  pathToId: Map<string, number>,
+  goModule: string | null,
+): number | null {
+  if (!goModule || (source !== goModule && !source.startsWith(goModule + "/"))) return null;
+  const sub = source === goModule ? "" : source.slice(goModule.length + 1);
+  const pkgPrefix = resolve(projectDir, sub) + "/";
+  let bestPath: string | null = null;
+  let bestId = -1;
+  for (const [p, id] of pathToId) {
+    if (!p.startsWith(pkgPrefix)) continue;
+    const rest = p.slice(pkgPrefix.length);
+    if (rest.includes("/")) continue;                       // nested → different package
+    if (!rest.endsWith(".go") || rest.endsWith("_test.go")) continue;
+    if (bestPath === null || p < bestPath) { bestPath = p; bestId = id; }
+  }
+  return bestPath === null ? null : bestId;
+}
+
+/**
+ * Resolve one import specifier to an indexed file id, trying each strategy in
+ * order: bun-chunk filesystem resolution (relative ts/js/python/rust), explicit
+ * relative DB probing, then per-language intra-project strategies for non-relative
+ * specifiers (dotted modules, C includes, Go packages). Returns null for bare
+ * external specifiers (`react`, `fmt`, `<stdio.h>`) — they map to no indexed file.
+ */
+function resolveSpecifier(
+  source: string,
+  lang: Language | null,
+  filePath: string,
+  projectDir: string,
+  pathToId: Map<string, number>,
+  tsConfig: ReturnType<typeof loadTsConfig>,
+  goModule: string | null,
+  basenameIndex: Map<string, string[]>,
+): number | null {
+  // Pass 1: bun-chunk filesystem resolution.
+  const p1 = bcResolveImport(source, filePath, projectDir, lang, tsConfig);
+  if (p1 && pathToId.has(p1)) return pathToId.get(p1)!;
+
+  // Pass 2: explicit relative ("./x", "/abs", python ".x") against importer dir.
+  if (source.startsWith(".") || source.startsWith("/")) {
+    return tryResolvePath(resolve(dirname(filePath), source), pathToId);
+  }
+
+  // Pass 2 language strategies for non-relative intra-project specifiers.
+  if (lang && DOTTED_IMPORT_LANGS[lang]) return tryResolveDotted(source, lang, projectDir, filePath, pathToId, basenameIndex);
+  if (lang === "c" || lang === "cpp") return tryResolveInclude(source, filePath, pathToId, basenameIndex);
+  if (lang === "go") return tryResolveGoPackage(source, projectDir, pathToId, goModule);
   return null;
 }
 
