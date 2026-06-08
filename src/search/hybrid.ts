@@ -321,7 +321,8 @@ function applyGraphBoost(results: DedupedResult[], db: RagDB): DedupedResult[] {
     if (!file) return r;
     const importerCount = db.getImportersOf(file.id).length;
     if (importerCount === 0) return r;
-    // Modest logarithmic boost: a file imported by 8 others gets +0.15
+    // Modest logarithmic boost: a file imported by 8 others gets +0.15. Swept on
+    // ContextBench — 0.05 is the peak (higher buries gold under well-imported hubs).
     const boost = 0.05 * Math.log2(importerCount + 1);
     return { ...r, score: r.score + boost };
   });

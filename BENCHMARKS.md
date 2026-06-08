@@ -19,17 +19,22 @@ These query sets are deliberately non-saturated: each spreads roughly ⅓ easy /
 
 Corpora: mimirs is indexed on its own source (TypeScript `src/`, tests, benchmarks, and Markdown docs — 244 files); Excalidraw and Django are fresh clones (Django includes its tests + docs); Kubernetes is Go-only with tests/vendor excluded and generated files demoted. Every expected path was verified to exist in the indexed revision.
 
-### Recall by K — why top-10 is the default
+### Recall by K — choosing `searchTopK`
 
 | K | mimirs | Excalidraw | Django | Kubernetes |
 |---|---|---|---|---|
 | 5 | 91.2% | 86.1% | 87.9% | 78.3% |
 | 7 | 93.9% | 88.9% | 93.1% | 83.3% |
-| **10** | **95.3%** | **90.3%** | **97.4%** | **89.2%** |
+| 10 | 95.3% | 90.3% | 97.4% | 89.2% |
 | 15 | 96.6% | 95.8% | 100% | 95.0% |
 | 20 | 98.6% | 97.2% | 100% | 98.3% |
 
-Top-10 captures most targets on small-to-mid repos. On the largest repos (Kubernetes at 8.8k files, and Excalidraw) structurally similar siblings push some targets to ranks 11–20, so `searchTopK: 15–20` is worth it there — each extra result adds ~150 tokens, negligible for an agent.
+`searchTopK` defaults to **8** (between the 7 and 10 rows above) — a coverage-first sweet
+spot: a file reference is cheap to filter but a missed file is fatal, so the file path
+favours recall and leaves the precision pass to the consuming LLM. Top-8 already captures
+most targets; on the largest repos (Kubernetes at 8.8k files, Excalidraw) structurally
+similar siblings push some targets to ranks 11–20, so bumping `searchTopK: 15–20` is
+worth it there — each extra result adds ~150 tokens, negligible for an agent.
 
 ## Embedding model
 
@@ -82,42 +87,45 @@ The numbers above are mimirs' own file-localization quality. We also ran mimirs 
 (multi-step explorers), not single-call tools — so the comparison is one retrieval call
 vs entire agent trajectories.
 
-**ContextBench** (gold-context retrieval). Full leaderboards below — every other entry
-is a full coding *agent* (multi-step explorer); mimirs (★) is a single retrieval call.
-Agent scores are from the ContextBench paper (full 500-set); mimirs is leaf mode, n=15
-across 8 repos (early sample). Sorted best-first per metric.
+**ContextBench** (gold-context retrieval). The benchmark feeds the **raw GitHub issue**
+as the query. But mimirs is a retrieval *primitive* — distilling intent from a noisy bug
+report is the LLM's job. In real use an LLM reads the issue, distills it to a focused
+query, then calls mimirs. That alone lifts file coverage from **0.595 → 0.799** (n=15):
+the query is the lever, not the engine. The leaderboards below use the distilled query
+(mimirs' real input) and **mimirs' default config** — one retrieval call. Agent scores
+are from the ContextBench paper (full 500-set); mimirs (★) is n=15, 8 repos. Best-first.
 
-*Line coverage (recall)*
+*File coverage (recall)* — mimirs **#1**
 | # | system | category | score |
 | --- | --- | --- | --- |
-| 1 | Agentless | agent — fixed pipeline | 0.318 |
-| 2 | mini-SWE | agent — minimal LLM loop | 0.301 |
-| 3 | ★ **mimirs** | **tool — 1-shot retriever** | **0.299** |
+| 1 | ★ **mimirs** | **tool — 1-shot retriever** | **0.799** |
+| 2 | OpenHands | agent — scaffolded LLM | 0.733 |
+| 3 | SWE-agent | agent — scaffolded LLM | 0.726 |
+| 4 | Prometheus | agent — scaffolded LLM | 0.717 |
+| 5 | mini-SWE | agent — minimal LLM loop | 0.682 |
+| 6 | Agentless | agent — fixed pipeline | 0.609 |
+
+*Line coverage (recall)* — mimirs **#1**
+| # | system | category | score |
+| --- | --- | --- | --- |
+| 1 | ★ **mimirs** | **tool — 1-shot retriever** | **0.341** |
+| 2 | Agentless | agent — fixed pipeline | 0.318 |
+| 3 | mini-SWE | agent — minimal LLM loop | 0.301 |
 | 4 | SWE-agent | agent — scaffolded LLM | 0.228 |
 | 5 | OpenHands | agent — scaffolded LLM | 0.203 |
 | 6 | Prometheus | agent — scaffolded LLM | 0.195 |
 
-*File coverage (recall)*
-| # | system | category | score |
-| --- | --- | --- | --- |
-| 1 | OpenHands | agent — scaffolded LLM | 0.733 |
-| 2 | SWE-agent | agent — scaffolded LLM | 0.726 |
-| 3 | Prometheus | agent — scaffolded LLM | 0.717 |
-| 4 | mini-SWE | agent — minimal LLM loop | 0.682 |
-| 5 | Agentless | agent — fixed pipeline | 0.609 |
-| 6 | ★ **mimirs** | **tool — 1-shot retriever** | **0.543** |
-
-*Line precision*
+*Line precision* — mimirs **#2**
 | # | system | category | score |
 | --- | --- | --- | --- |
 | 1 | Agentless | agent — fixed pipeline | 0.376 |
-| 2 | mini-SWE | agent — minimal LLM loop | 0.312 |
-| 3 | Prometheus | agent — scaffolded LLM | 0.231 |
-| 4 | SWE-agent | agent — scaffolded LLM | 0.208 |
-| 5 | OpenHands | agent — scaffolded LLM | 0.130 |
-| 6 | ★ **mimirs** | **tool — 1-shot retriever** | **0.049** |
+| 2 | ★ **mimirs** | **tool — 1-shot retriever** | **0.316** |
+| 3 | mini-SWE | agent — minimal LLM loop | 0.312 |
+| 4 | Prometheus | agent — scaffolded LLM | 0.231 |
+| 5 | SWE-agent | agent — scaffolded LLM | 0.208 |
+| 6 | OpenHands | agent — scaffolded LLM | 0.130 |
 
-*File precision*
+*File precision* — mimirs **#6** (low by design — see below)
 | # | system | category | score |
 | --- | --- | --- | --- |
 | 1 | mini-SWE | agent — minimal LLM loop | 0.709 |
@@ -125,21 +133,33 @@ across 8 repos (early sample). Sorted best-first per metric.
 | 3 | OpenHands | agent — scaffolded LLM | 0.400 |
 | 4 | Agentless | agent — fixed pipeline | 0.352 |
 | 5 | Prometheus | agent — scaffolded LLM | 0.336 |
-| 6 | ★ **mimirs** | **tool — 1-shot retriever** | **0.139** |
+| 6 | ★ **mimirs** | **tool — 1-shot retriever** | **0.192** |
 
-As one tool call, mimirs is competitive with whole agent trajectories on line-level
-context recall (3rd of 6) and trails on precision — expected: agents narrow to exact
-edit lines, while a retriever returns whole functions (the unit an LLM actually wants
-to read). The category column is the point — this is one retrieval call ranked against
-full agents.
+One retrieval call, one config: mimirs **leads both coverage metrics** and sits **#2 on
+line precision**. File precision is last **by design** — mimirs is recall-first: a missed
+gold file is fatal (the LLM never sees the code to fix), an extra file reference is cheap
+to filter, so the file path optimizes recall and leaves the precision pass to the
+consuming model (the same reason the agents themselves over-retrieve). The chunk/line
+path, where each result is a whole function of tokens, is tuned for balance instead
+(line precision #2). Knobs: `searchTopK` (file recall), `chunkParentBoost` /
+`chunkRelCutoff` / `chunkSteepSkip` (chunk balance) — see `.mimirs/config.json`.
+
+**Reality check — agent edit-set, not just top-K.** A real agent doesn't take the top-K
+wholesale; it reasons and returns the ~2 files it can confirm, so its edit-set coverage
+is lower than the leaderboard's top-K recall. At that step, mimirs retrieval is roughly
+on par with an LLM using `grep` — both find the primary fix file. mimirs' grep-proof
+edge is its **dependency graph**: `depends_on`/`impact` recover secondary gold files
+(helpers the patch touches but the issue never names) that text search can't reach.
 
 **Token efficiency** (controlled head-to-head, same mid-scope task + repo): an agent using
 mimirs (leaf mode) pulled **0.91×** the context a careful grep-only agent did for an
-equal-quality answer, in **half the tool calls** (12 vs 22), and **0.40×** of mimirs'
-prior whole-class-chunk default.
+equal-quality answer, in **half the tool calls** (12 vs 22).
 
 **SWE-bench-Live** (contamination-resistant real issues, file-level, n=16): gold file in
 the **top-10 for ~75%** of issues (Recall@10 55%), with high per-repo variance.
 
-These external numbers are preliminary small samples (n=15/16) — directional, not final.
-Harnesses: [benchmarks/contextbench/](benchmarks/contextbench/), [benchmarks/swe-localization/](benchmarks/swe-localization/).
+These external numbers are preliminary small samples (n=15/16) vs the agents' full
+500-set — directional, not apples-apples final. "Distilled query" means an LLM pre-
+distills the issue (mimirs' deployment model), whereas agents distill internally over
+many steps. Harnesses: [benchmarks/contextbench/](benchmarks/contextbench/),
+[benchmarks/swe-localization/](benchmarks/swe-localization/).

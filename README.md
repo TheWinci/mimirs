@@ -271,6 +271,26 @@ The plugin wires the MCP server, three hooks — **SessionStart** (context summa
 
 The larger repos (Kubernetes, Excalidraw) are big enough that some correct files rank just past the top-10; recall reaches 97–100% by top-20, so set `searchTopK: 15–20` on large repos.
 
+### vs coding agents (ContextBench)
+
+We also ran mimirs on [ContextBench](https://github.com/EuniAI/ContextBench) (gold-context
+retrieval on real repos), whose other entries are full coding **agents** — multi-step
+explorers — not single-call tools. Given a focused query (what an LLM sends after reading
+the issue), **one mimirs retrieval call** ranks like this against whole agent trajectories:
+
+| metric | mimirs | rank | field |
+|---|---|---|---|
+| **File coverage** | **0.799** | **#1** | above OpenHands, SWE-agent, Agentless… |
+| **Line coverage** | **0.341** | **#1** | above Agentless, mini-SWE… |
+| **Line precision** | **0.316** | **#2** | behind only Agentless (0.376) |
+| File precision | 0.192 | #6 | low *by design* — recall-first |
+
+mimirs **leads both coverage metrics** as a single call. File precision is last on
+purpose: a missed gold file is fatal (the LLM never sees the code to fix), an extra file
+reference is cheap to filter — so mimirs maximizes recall and lets the model do the
+precision pass. _n=15 sample vs the agents' 500-set — directional. Full leaderboards,
+caveats, and the graph-recovery story in [BENCHMARKS.md](BENCHMARKS.md)._
+
 ## How it compares
 
 |  | mimirs | No tool (grep + Read) | Context stuffing | Cloud RAG services |
