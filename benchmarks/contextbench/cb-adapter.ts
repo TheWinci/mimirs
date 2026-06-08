@@ -22,7 +22,7 @@ import { tmpdir } from "os";
 import { RagDB } from "../../src/db";
 import { loadConfig } from "../../src/config";
 import { indexDirectory } from "../../src/indexing/indexer";
-import { searchChunks } from "../../src/search/hybrid";
+import { searchChunks, search } from "../../src/search/hybrid";
 import { shallowFetchCheckout } from "../swe-localization/lib";
 
 // Broad multi-language include (ContextBench spans 8 languages); skip tests/vendor
@@ -58,7 +58,9 @@ function toRepoRel(absPath: string, repoDir: string): string {
   return absPath.startsWith(prefix) ? absPath.slice(prefix.length) : absPath;
 }
 
-async function rankTask(task: Task, topK: number, weight: number, parentMinCount: number, maxSpanLines: number): Promise<PredLine | null> {
+interface Variants { fixed8: PredLine; fixed12: PredLine; wall: PredLine; pool: { f: string; s: number; b: boolean }[]; id: string }
+
+async function rankTask(task: Task, topK: number, weight: number, parentMinCount: number, maxSpanLines: number): Promise<Variants | null> {
   const dir = resolve(tmpdir(), `cb-repo-${task.instance_id}`);
   rmSync(dir, { recursive: true, force: true });
   if (!shallowFetchCheckout(task.repo, task.base_commit, dir)) {
@@ -78,7 +80,7 @@ async function rankTask(task: Task, topK: number, weight: number, parentMinCount
       // spans instead of whole-parent (class/file) spans. Default 2 = whole-parent
       // when ≥2 siblings hit, which tanks line precision on ContextBench.
       const leafOnly = process.env.LEAF === "1";
-      const chunks = await searchChunks(task.problem_statement, db, topK, 0.3, weight, [], undefined, parentMinCount, leafOnly);
+      const chunks = await searchChunks(task.problem_statement, db, topK, 0.3, weight, [], undefined, parentMinCount, leafOnly, process.env.SYMEXPAND==="1");
       const pred_spans: Record<string, PredSpan[]> = {};
       const pred_files: string[] = [];
       const addSpan = (absPath: string, start: number, end: number) => {
@@ -115,7 +117,37 @@ async function rankTask(task: Task, topK: number, weight: number, parentMinCount
           addSpan(`${dir}/${f}`, ranges[0].startLine!, ranges[0].endLine!);
         }
       }
-      return { instance_id: task.instance_id, traj_data: { pred_files, pred_spans } };
+      // FILE_SRC=search: take pred_files from the file-level search() (file dedup +
+      // symbol expansion + graph boost) instead of from chunk files. ContextBench
+      // scores file metrics from pred_files and line/span from pred_spans
+      // independently, so this lifts file coverage/precision while keeping spans.
+      // MULTI mode: compute the file-level search() pool ONCE and derive three
+      // variants (fixed-8, fixed-12, wall-cutoff adaptive) so we don't clone+index
+      // the repo three times. Returns one PredLine per variant.
+      const pool = await search(task.problem_statement, db, 60, 0, weight, []);
+      const isBarrel = (p: string) => ["__init__.py", "index.ts", "index.js", "mod.rs"].includes((p.split("/").pop() ?? ""));
+      const Tp = parseFloat(process.env.ADAPT_TP ?? "0.15");
+      const Tr = parseFloat(process.env.ADAPT_TR ?? "1.0");
+      const nb = pool.filter((r) => !isBarrel(r.path));
+      const s = nb.map((r) => r.score);
+      let lastWall = 1;
+      for (let i = 1; i < s.length; i++) {
+        const raw = s[i - 1] - s[i];
+        const pct = s[i - 1] > 0 ? raw / s[i - 1] : 0;
+        if (pct >= Tp && raw >= Tr) lastWall = i;
+      }
+      const threshold = s.length ? s[Math.min(lastWall, s.length - 1)] : 0;
+      const filesFixed8 = pool.slice(0, 8).map((r) => toRepoRel(r.path, dir));
+      const filesFixed12 = pool.slice(0, 12).map((r) => toRepoRel(r.path, dir));
+      // Option B (corrected): barrels are excluded from the WALL calc (their
+      // affinity-inflated scores must not fake the cutoff) but ride the SAME
+      // threshold — kept iff they score above it, not force-added from the tail.
+      const filesB = pool.filter((r) => r.score >= threshold).map((r) => toRepoRel(r.path, dir));
+      const mk = (files: string[]): PredLine => ({ instance_id: task.instance_id, traj_data: { pred_files: files, pred_spans } });
+      // Dump the full ranked pool (score + barrel flag) so any future cutoff
+      // variant can be computed offline with no re-clone.
+      const poolDump = pool.map((r) => ({ f: toRepoRel(r.path, dir), s: r.score, b: isBarrel(r.path) }));
+      return { fixed8: mk(filesFixed8), fixed12: mk(filesFixed12), wall: mk(filesB), pool: poolDump, id: task.instance_id };
     } finally {
       db.close();
     }
@@ -143,29 +175,35 @@ async function main() {
     .map((l) => JSON.parse(l) as Task).slice(0, limit);
   console.log(`Producing trajectories for ${tasks.length} tasks (topK=${topK}, weight=${weight}, parentMinCount=${parentMinCount}, maxSpanLines=${maxSpanLines})...`);
 
-  // Stream results to disk so a crash/timeout mid-run keeps completed instances.
-  writeFileSync(outPath, "");
+  // Three variants share one clone+index pass; write one pred file per variant.
+  // outPath "x.jsonl" -> x.fixed8.jsonl / x.fixed12.jsonl / x.wall.jsonl
+  const variantPath = (v: string) => outPath.replace(/\.jsonl$/, `.${v}.jsonl`);
+  const vnames = ["fixed8", "fixed12", "wall"] as const;
+  for (const v of vnames) writeFileSync(variantPath(v), "");
+  const poolPath = outPath.replace(/\.jsonl$/, ".pools.jsonl");
+  writeFileSync(poolPath, "");
   let done = 0, ok = 0, failed = 0;
   for (const task of tasks) {
     process.stdout.write(`  ${task.instance_id} (${task.repo}@${task.base_commit.slice(0, 8)}) `);
-    let pred: PredLine | null = null;
+    let pred: Variants | null = null;
     try {
       pred = await rankTask(task, topK, weight, parentMinCount, maxSpanLines);
     } catch (e) {
       console.log(`ERROR ${e instanceof Error ? e.message : e}`);
     }
     if (pred) {
-      appendFileSync(outPath, JSON.stringify(pred) + "\n");
+      for (const v of vnames) appendFileSync(variantPath(v), JSON.stringify(pred[v]) + "\n");
+      appendFileSync(poolPath, JSON.stringify({ id: pred.id, pool: pred.pool }) + "\n");
       ok++;
-      console.log(`-> ${pred.traj_data.pred_files.length} files`);
+      console.log(`-> f8=${pred.fixed8.traj_data.pred_files.length} f12=${pred.fixed12.traj_data.pred_files.length} B=${pred.wall.traj_data.pred_files.length} files`);
     } else {
       failed++;
-      if (existsSync(outPath)) console.log("(skipped: clone/index failed)");
+      console.log("(skipped: clone/index failed)");
     }
     done++;
     if (done % 5 === 0) console.log(`  [${done}/${tasks.length}] ok=${ok} failed=${failed}`);
   }
-  console.log(`Done. ${ok} trajectories -> ${outPath} (${failed} failed)`);
+  console.log(`Done. ${ok}×3 trajectories -> ${vnames.map(variantPath).join(", ")} (${failed} failed)`);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
