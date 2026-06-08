@@ -37,6 +37,13 @@ const RagConfigSchema = z.object({
   // line precision. Default on: it's strictly better for agent consumers (proven
   // ~0.4x token cost at equal answer quality). Set false to restore parent chunks.
   leafOnly: z.boolean().default(true),
+  // Leaf-chunk re-rank tuning (read_relevant). Defaults are the measured ContextBench
+  // line-metric peak: whole-class boost 0.3 (lift a leaf by its file's parent-blob
+  // match), adaptive tail cut keeping chunks >= settled-anchor*0.85 (skip steep head
+  // steps >15% so an inflated top doesn't set the bar too high). 0 disables a knob.
+  chunkParentBoost: z.number().min(0).default(0.3),
+  chunkRelCutoff: z.number().min(0).max(1).default(0.85),
+  chunkSteepSkip: z.number().min(0).max(1).default(0.15),
   benchmarkTopK: z.number().int().min(1).default(5),
   benchmarkMinRecall: z.number().min(0).max(1).default(0.8),
   benchmarkMinMrr: z.number().min(0).max(1).default(0.6),
@@ -137,6 +144,9 @@ const DEFAULT_CONFIG: RagConfig = {
   embeddingMerge: true,
   parentGroupingMinCount: 2,
   leafOnly: true,
+  chunkParentBoost: 0.3,
+  chunkRelCutoff: 0.85,
+  chunkSteepSkip: 0.15,
   indexBatchSize: 50,
   benchmarkTopK: 5,
   benchmarkMinRecall: 0.8,

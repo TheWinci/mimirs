@@ -499,6 +499,16 @@ export async function searchChunks(
   filter?: PathFilter,
   parentGroupingMinCount: number = 2,
   leafOnly: boolean = false,
+  symbolExpand: boolean = false,
+  // Whole-class boost: lift each leaf by its file's parent-blob match score × this.
+  // A chunk whose enclosing class/file matched as a whole is more likely relevant.
+  parentBoost: number = 0,
+  // Adaptive tail cut: after ranking, keep only chunks scoring >= anchor*relCutoff,
+  // where the anchor is the score the curve SETTLES at — found by skipping steep
+  // head steps (Δ% > steepSkip) so a single inflated top result can't set the bar
+  // too high. relCutoff=0 disables. Trims the weak tail for precision.
+  relCutoff: number = 0,
+  steepSkip: number = 0.15,
 ): Promise<ChunkResult[]> {
   const start = performance.now();
   const queryEmbedding = await embed(query);
@@ -510,6 +520,18 @@ export async function searchChunks(
     textResults = db.textSearchChunks(query, topK * 4, filter);
   } catch (err) {
     log.debug(`FTS chunk query failed, falling back to vector-only: ${err instanceof Error ? err.message : err}`, "search");
+  }
+
+  // Whole-class boost (parentBoost): instead of just discarding the whole-class/file
+  // parent blobs, use how well the blob matched as a per-file signal.
+  let parentScoreByPath: Map<string, number> | undefined;
+  if (parentBoost > 0) {
+    const vP = vectorResults.filter((r) => r.chunkIndex === -1);
+    const tP = textResults.filter((r) => r.chunkIndex === -1);
+    parentScoreByPath = new Map<string, number>();
+    for (const p of mergeHybridScores(vP, tP, hybridWeight)) {
+      parentScoreByPath.set(p.path, Math.max(parentScoreByPath.get(p.path) ?? 0, p.score));
+    }
   }
 
   // Leaf-only: drop synthetic parent rows (chunk_index === -1, whole class/file
@@ -524,12 +546,13 @@ export async function searchChunks(
   let results = mergeHybridScores(vectorResults, textResults, hybridWeight)
     .filter((r) => r.score >= threshold)
     .map((r) => {
-      // Path-based score adjustment for chunks
+      // Path-based score adjustment for chunks: demote tests. (We deliberately do
+      // NOT bump a hardcoded src/lib/... whitelist — it's not generic and measured
+      // as adding nothing; cross-helper agreement is already captured by the RRF
+      // fusion, so re-boosting it double-counts.)
       const isTest = TEST_PATTERNS.some((p) => p.test(r.path));
-      const isSource = SOURCE_PATTERNS.some((p) => p.test(r.path));
       let multiplier = 1.0;
       if (isTest) multiplier = 0.85;
-      else if (isSource) multiplier = 1.1;
 
       // Filename affinity + boilerplate/generated demotion for chunks
       const base = basename(r.path);
@@ -562,9 +585,44 @@ export async function searchChunks(
         if (importerCount > 0) boost = 0.05 * Math.log2(importerCount + 1);
       }
 
-      return { ...r, score: r.score * multiplier + boost };
+      const pBoost = parentScoreByPath ? (parentScoreByPath.get(r.path) ?? 0) * parentBoost : 0;
+      return { ...r, score: r.score * multiplier + boost + pBoost };
     })
     .sort((a, b) => b.score - a.score);
+
+  // Symbol expansion (port of search()'s file-level symbol injection to the chunk
+  // path): when the query names code identifiers, inject the defining symbol's
+  // chunk. Surfaces named helpers (e.g. rotation_matrix -> matrix_utilities) that
+  // pure semantic chunk search misses — high-signal exact-name hits.
+  if (symbolExpand) {
+    const identifiers = extractIdentifiers(query);
+    const seen = new Set(results.map((r) => `${r.path}:${r.chunkIndex}`));
+    const injected: ChunkResult[] = [];
+    for (const id of identifiers) {
+      for (const s of db.searchSymbols(id, true, undefined, 3)) {
+        if (!matchesFilter(s.path, filter)) continue;
+        const ci = s.chunkIndex ?? 0;
+        if (leafOnly && ci === -1) continue;
+        const key = `${s.path}:${ci}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const f = db.getFileByPath(s.path);
+        const range = f ? db.getCallableRange(f.id, s.symbolName) : null;
+        injected.push({
+          path: s.path,
+          score: 0.75, // exact name hit — high base, like search()'s symbol-only score
+          content: s.snippet ?? "",
+          chunkIndex: ci,
+          entityName: s.symbolName,
+          chunkType: s.symbolType,
+          startLine: range?.startLine ?? null,
+          endLine: range?.endLine ?? null,
+          parentId: null,
+        });
+      }
+    }
+    if (injected.length) results = [...results, ...injected].sort((a, b) => b.score - a.score);
+  }
 
   // Parent grouping: if ≥minCount sub-chunks from the same parent appear, consolidate.
   // Skipped in leaf-only mode (we want tight child spans, not promoted parents).
@@ -572,6 +630,20 @@ export async function searchChunks(
 
   // Doc expansion
   results = expandForDocs(results, topK);
+
+  // Adaptive tail cut: drop chunks below anchor*relCutoff, where the anchor is the
+  // score the curve SETTLES at — skip steep head steps (Δ% > steepSkip) so a lone
+  // inflated top result doesn't set the bar too high. Trims the weak tail (fewer,
+  // tighter spans → higher precision) while keeping the confident head.
+  if (relCutoff > 0 && results.length > 1) {
+    let anchor = results[0].score;
+    for (let i = 1; i < results.length; i++) {
+      const dp = results[i - 1].score > 0 ? (results[i - 1].score - results[i].score) / results[i - 1].score : 0;
+      if (dp > steepSkip) anchor = results[i].score; else break;
+    }
+    const floor = anchor * relCutoff;
+    results = results.filter((r) => r.score >= floor);
+  }
 
   // Log query for analytics — log the top vector hit's cosine similarity as the
   // relevance signal (the result score is now a positional rank-fusion value).

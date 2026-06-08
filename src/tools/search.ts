@@ -154,6 +154,10 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
         filter,
         config.parentGroupingMinCount,
         config.leafOnly,
+        false,
+        config.chunkParentBoost,
+        config.chunkRelCutoff,
+        config.chunkSteepSkip,
       );
       const durationMs = Math.round(performance.now() - start);
       const { totalFiles } = ragDb.getStatus();

@@ -79,7 +79,7 @@ export async function readCommand(args: string[], getFlag: (flag: string) => str
   const top = topFlag !== undefined
     ? intFlag(topFlag, "--top", 8, { min: 1 })
     : (config.leafOnly ? 5 : 8);
-  const results = await searchChunks(query, db, top, threshold, config.hybridWeight, config.generated, filter, config.parentGroupingMinCount, config.leafOnly);
+  const results = await searchChunks(query, db, top, threshold, config.hybridWeight, config.generated, filter, config.parentGroupingMinCount, config.leafOnly, false, config.chunkParentBoost, config.chunkRelCutoff, config.chunkSteepSkip);
 
   if (results.length === 0) {
     cli.log("No relevant chunks found. Has the directory been indexed?");
