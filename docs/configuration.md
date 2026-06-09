@@ -92,6 +92,8 @@ Adjust `hybridWeight` to shift between semantic and keyword matching:
 | `RAG_PROJECT_DIR` | Override the project directory (useful for editors like Cursor/Windsurf that don't set cwd) |
 | `RAG_DB_DIR` | Redirect the `.mimirs/` index to a different path (useful for read-only project directories) |
 | `MIMIRS_ALLOW_CUSTOM_MODEL` | Set to `1` to honor a non-default `embeddingModel` from project `config.json`. Off by default: a cloned repo's config is untrusted, and an arbitrary model ID controls what gets downloaded on first index. Set this only for repos whose config you trust |
+| `MIMIRS_INSECURE_TLS` | Set to `1` to disable TLS certificate verification **for the one-time model download only** (restored immediately after). For machines behind a TLS-intercepting proxy whose root CA can't be added to `NODE_EXTRA_CA_CERTS`. Transport trust is dropped but content is still verified — the pinned default model is sha256-checked after download, so a tampered or proxy-mangled file is rejected. Prefer `NODE_EXTRA_CA_CERTS=/path/to/corp-ca.pem`, which keeps verification on |
+| `NODE_EXTRA_CA_CERTS` | Standard Node option — point at your corporate/proxy root CA (PEM) so model downloads through a TLS-intercepting proxy succeed *with* verification intact. The recommended fix for `self signed certificate in certificate chain` errors |
 
 ## Embedding merge
 

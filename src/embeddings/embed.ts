@@ -15,6 +15,38 @@ import { timed } from "../utils/profiler";
 const CACHE_DIR = join(homedir(), ".cache", "mimirs", "models");
 env.cacheDir = CACHE_DIR;
 
+// Escape hatch for machines behind a TLS-intercepting proxy whose root CA can't
+// be added to NODE_EXTRA_CA_CERTS. Disables certificate verification *only* for
+// the model-download window (pipeline + tokenizer fetch), then restores it.
+// Transport trust is dropped, but content integrity still holds: the pinned
+// default model is sha256-verified after download (verifyDefaultModelChecksum),
+// so a tampered or proxy-mangled file is still rejected. Prefer NODE_EXTRA_CA_CERTS.
+const INSECURE_TLS = process.env.MIMIRS_INSECURE_TLS === "1";
+let warnedInsecure = false;
+
+// Run an async download with TLS verification disabled, scoped to this call.
+// NODE_TLS_REJECT_UNAUTHORIZED is read per-connection, so saving/restoring it
+// around the await covers the fetch window. Concurrent TLS in the same window
+// would also be affected — model loads run at startup, so this is acceptable.
+async function withInsecureTLS<T>(fn: () => Promise<T>): Promise<T> {
+  if (!INSECURE_TLS) return fn();
+  if (!warnedInsecure) {
+    warnedInsecure = true;
+    console.warn(
+      "[mimirs] MIMIRS_INSECURE_TLS=1 — TLS verification DISABLED for model download. " +
+        "Integrity still enforced by the pinned sha256 checksum. Prefer NODE_EXTRA_CA_CERTS.",
+    );
+  }
+  const prev = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+  try {
+    return await fn();
+  } finally {
+    if (prev === undefined) delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+    else process.env.NODE_TLS_REJECT_UNAUTHORIZED = prev;
+  }
+}
+
 const DEFAULT_MODEL_ID = "Xenova/all-MiniLM-L6-v2";
 const DEFAULT_EMBEDDING_DIM = 384;
 // Pin the default model to an immutable commit. Without this, transformers.js
@@ -95,13 +127,35 @@ function isPinnedDefaultModel(): boolean {
   );
 }
 
+// sha256 of the cached default-model weights, or null if not yet downloaded.
+function cachedDefaultModelHash(): string | null {
+  const file = defaultModelOnnxPath();
+  if (!existsSync(file)) return null;
+  return createHash("sha256").update(readFileSync(file)).digest("hex");
+}
+
+// Delete a corrupt cached default model BEFORE handing it to ORT, so a
+// proxy-mangled or truncated download fails as a clear checksum miss instead of
+// a cryptic "Protobuf parsing failed" — which otherwise drops into the retry
+// branch and, behind a cert-blocked proxy, re-downloads the same junk in a loop.
+// Returns true if it removed a bad cache (caller should expect a re-download).
+function purgeCorruptDefaultModel(): boolean {
+  const actual = cachedDefaultModelHash();
+  if (actual === null || actual === DEFAULT_MODEL_SHA256) return false;
+  rmSync(join(CACHE_DIR, "Xenova", "all-MiniLM-L6-v2"), { recursive: true, force: true });
+  console.warn(
+    `[mimirs] Cached embedding model failed checksum (expected ${DEFAULT_MODEL_SHA256}, ` +
+      `got ${actual}) — deleted, will re-download.`,
+  );
+  return true;
+}
+
 // Reject a tampered/swapped model file that still parses. Pinning the revision
 // makes the download immutable on HF's side; this catches a compromised mirror,
 // MITM, or corrupted transfer. On mismatch, delete the cache and refuse to load.
 function verifyDefaultModelChecksum(): void {
-  const file = defaultModelOnnxPath();
-  if (!existsSync(file)) return; // pipeline() would have thrown already; nothing to check
-  const actual = createHash("sha256").update(readFileSync(file)).digest("hex");
+  const actual = cachedDefaultModelHash();
+  if (actual === null) return; // pipeline() would have thrown already; nothing to check
   if (actual !== DEFAULT_MODEL_SHA256) {
     rmSync(join(CACHE_DIR, "Xenova", "all-MiniLM-L6-v2"), { recursive: true, force: true });
     throw new Error(
@@ -126,10 +180,13 @@ export async function getEmbedder(
         interOpNumThreads: numThreads,
       },
     };
+    // Catch a corrupt cached default model before ORT chokes on it: hash-check
+    // and purge up front so we re-download cleanly instead of crashing on parse.
+    if (isPinnedDefaultModel()) purgeCorruptDefaultModel();
     onProgress?.(`Loading embedding model ${currentModelId}...`);
     try {
       // @ts-expect-error — pipeline() overload union is too complex for tsc
-      extractor = await pipeline("feature-extraction", currentModelId, pipelineOptions);
+      extractor = await withInsecureTLS(() => pipeline("feature-extraction", currentModelId, pipelineOptions));
     } catch (err) {
       // If the cached model is corrupted, delete it and retry once
       const msg = (err as Error).message || "";
@@ -137,7 +194,7 @@ export async function getEmbedder(
         const modelDir = join(CACHE_DIR, ...currentModelId.split("/"));
         rmSync(modelDir, { recursive: true, force: true });
         onProgress?.(`Retrying model load (cache was corrupted)...`);
-        extractor = await pipeline("feature-extraction", currentModelId, pipelineOptions) as FeatureExtractionPipeline;
+        extractor = await withInsecureTLS(() => pipeline("feature-extraction", currentModelId, pipelineOptions)) as FeatureExtractionPipeline;
       } else {
         throw err;
       }
@@ -190,7 +247,7 @@ export async function embedBatch(
 
 export async function getTokenizer(): Promise<PreTrainedTokenizer> {
   if (!tokenizer) {
-    tokenizer = await AutoTokenizer.from_pretrained(currentModelId);
+    tokenizer = await withInsecureTLS(() => AutoTokenizer.from_pretrained(currentModelId));
   }
   return tokenizer;
 }
