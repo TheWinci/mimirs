@@ -8,8 +8,8 @@ to follow up with `read_relevant`. It is the locate-first half of the workflow:
 `search` tells you which files matter; [read_relevant](read-relevant.md) then
 returns the actual function or class body with exact line ranges.
 
-The tool is registered in `src/tools/search.ts:31` and hands the real work to the
-`search()` function in `src/search/hybrid.ts:330`, which runs a hybrid query —
+The tool is registered in `src/tools/search.ts:33` and hands the real work to the
+`search()` function in `src/search/hybrid.ts:342`, which runs a hybrid query —
 semantic plus keyword — against the SQLite index, fuses the two result lists by
 rank, dedupes to one row per file, and reranks the survivors through several
 scoring stages before returning them.
@@ -48,7 +48,7 @@ compressed near the top so the downstream boosts can still reorder them, and
 dedups across the two lists by key. `mergeHybridScores` is a thin wrapper that
 calls `rrfFuse` with the chunk key `path:chunkIndex`
 (`src/search/hybrid.ts:109-115`). The default `hybridWeight` is `0.5` — equal
-trust in the semantic and lexical signals (`src/config/index.ts:118`,
+trust in the semantic and lexical signals (`src/config/index.ts:23`,
 `src/search/hybrid.ts:63`).
 
 ### Identifier-aware keyword search
@@ -59,7 +59,7 @@ FTS5's default `unicode61` tokenizer splits on punctuation and whitespace but
 (`src/indexing/identifiers.ts:1-9`). To fix that, every chunk row carries a
 companion `parts` column, and the `fts_chunks` virtual table indexes both
 `snippet` and `parts` (`CREATE VIRTUAL TABLE ... fts_chunks USING fts5(snippet,
-parts, content='chunks', ...)`, `src/db/index.ts:281-286`). The `parts` value is
+parts, content='chunks', ...)`, `src/db/index.ts:324-329`). The `parts` value is
 built by `identifierParts`, which walks the chunk text and for each *compound*
 identifier emits its lowercase word pieces (≥2 chars) via `splitIdentifier` —
 camelCase, PascalCase, snake_case, kebab, and dotted names all split
@@ -69,7 +69,7 @@ to avoid the case-boundary regex going quadratic on a base64/hex blob. The
 keyword query itself is sanitized by `sanitizeFTS`, which double-quotes each
 whitespace token and joins them with `OR`, so a query like `depends graph`
 becomes `"depends" OR "graph"` and can hit either the snippet or the split
-`parts` tokens (`src/search/usages.ts:39-43`, `src/db/search.ts:151`).
+`parts` tokens (`src/search/usages.ts:39-43`, `src/db/search.ts:184`).
 
 ## How a call flows
 
@@ -116,43 +116,43 @@ flowchart TD
 4. **Embed and dual-search.** `search()` embeds the query, then runs the vector
    k-nearest-neighbour search and the BM25 keyword search, each over-fetching four
    times `topK` to leave room for deduplication and reranking
-   (`src/search/hybrid.ts:340-351`).
+   (`src/search/hybrid.ts:352-363`).
 5. **Fuse and dedupe.** The vector and keyword lists are combined by
    `mergeHybridScores` → `rrfFuse` (reciprocal-rank fusion) and then collapsed to
    one row per file path, keeping the best fused score and accumulating distinct
-   snippets (`src/search/hybrid.ts:353-376`).
+   snippets (`src/search/hybrid.ts:365-388`).
 6. **Symbol expansion, then rerank.** Exact symbol-name matches for code-like
    words in the query are merged in, then the path, filename, generated-file, and
    dependency-graph adjustments rewrite the scores and the list is re-sorted
-   (`src/search/hybrid.ts:378-398`).
+   (`src/search/hybrid.ts:390-410`).
 7. **Protect docs, then log.** Documentation hits are appended as bonus results so
    they do not push code out of the top-K, and every call writes one analytics row
-   before returning (`src/search/hybrid.ts:400-418`).
+   before returning (`src/search/hybrid.ts:412-428`).
 8. **Format or report empty.** Back in the tool, an empty list returns a plain "no
    results" message with an indexing hint; otherwise the results become a header,
-   a scored body, and a footer tip (`src/tools/search.ts:72-97`).
+   a scored body, and a footer tip (`src/tools/search.ts:74-102`).
 
 ## Inputs
 
 | name | type | required | description |
 | --- | --- | --- | --- |
-| `query` | string (1–2000 chars) | yes | Natural-language question or symbol name. Embedded for the vector search and passed (after `sanitizeFTS`) to the keyword search (`src/tools/search.ts:36`). |
-| `top` | integer 1–1000 | no | Number of results to return. Defaults to `config.searchTopK`, which is 10 unless overridden (`src/config/index.ts:119`). |
-| `extensions` | string[] | no | Restrict to these file extensions, e.g. `[".ts", ".tsx"]`. A leading dot is optional; it is added if missing (`src/db/search.ts:28`). |
-| `dirs` | string[] | no | Restrict to these directories, relative to the project root or absolute. Resolved to absolute paths before matching (`src/tools/search.ts:26`). |
-| `excludeDirs` | string[] | no | Exclude these directories. Also resolved to absolute paths (`src/tools/search.ts:27`). |
-| `directory` | string | no | Project directory to search. Defaults to the `RAG_PROJECT_DIR` env var or the current working directory (`src/tools/index.ts:26`). |
+| `query` | string (1–2000 chars) | yes | Natural-language question or symbol name. Embedded for the vector search and passed (after `sanitizeFTS`) to the keyword search (`src/tools/search.ts:38`). |
+| `top` | integer 1–1000 | no | Number of results to return. Defaults to `config.searchTopK`, which is 8 unless overridden (`src/config/index.ts:24`, `src/tools/search.ts:70`). |
+| `extensions` | string[] | no | Restrict to these file extensions, e.g. `[".ts", ".tsx"]`. A leading dot is optional; it is added if missing (`src/db/search.ts:52`). |
+| `dirs` | string[] | no | Restrict to these directories, relative to the project root or absolute. Resolved to absolute paths before matching (`src/tools/search.ts:28`). |
+| `excludeDirs` | string[] | no | Exclude these directories. Also resolved to absolute paths (`src/tools/search.ts:29`). |
+| `directory` | string | no | Project directory to search. Defaults to the `RAG_PROJECT_DIR` env var or the current working directory (`src/tools/index.ts`). |
 
 The `top`, `extensions`, `dirs`, and `excludeDirs` arguments are all optional;
 only `query` must be supplied. The Zod schema rejects an empty query or one over
-2000 characters before the handler runs (`src/tools/search.ts:36`).
+2000 characters before the handler runs (`src/tools/search.ts:38`).
 
 ## Outputs
 
 | output | where it lands / shape / description |
 | --- | --- |
-| Ranked file paths with snippet previews | Returned as MCP text content. Each result is the fused score to four decimals, two spaces, the file path, then on the next line the first matched snippet truncated to 400 characters with a trailing `...`. A `── N results across M indexed files (Tms) ──` header sits above and a tip to call `read_relevant` below (`src/tools/search.ts:84-96`). |
-| `query_log` row | One row inserted into the `query_log` table per call, recording the query text, result count, the top vector hit's cosine similarity, the top result's path, and duration. This is a side effect, not part of the returned text (`src/search/hybrid.ts:410-416`). |
+| Ranked file paths with snippet previews | Returned as MCP text content. Each result is the fused score to four decimals, two spaces, the file path, then on the next line the first matched snippet truncated to 400 characters with a trailing `…` ellipsis. A `── N results across M indexed files (Tms) ──` header sits above and a tip to call `read_relevant` below (`src/tools/search.ts:86-98`). |
+| `query_log` row | One row inserted into the `query_log` table per call, recording the query text, result count, the top vector hit's cosine similarity, the top result's path, and duration. This is a side effect, not part of the returned text (`src/search/hybrid.ts:422-428`). |
 
 A sample of the returned text (synthetic values):
 
@@ -186,7 +186,7 @@ results were found. After the rerank finishes, `search()` computes its own elaps
 time and calls `db.logQuery(...)` with the query string, the final result count,
 the top result's path, the duration in milliseconds, and — deliberately — the
 **top vector hit's cosine similarity** rather than the fused score
-(`src/search/hybrid.ts:410-416`). Two conversions matter here. First, the fused
+(`src/search/hybrid.ts:422-428`). Two conversions matter here. First, the fused
 score is now a positional rank value that sits near `1.0` at the top, so logging
 it would make "average top score" and the low-relevance (`< 0.3`) heuristic
 meaningless. Second, the stored vector score is itself *not* a cosine: embeddings
@@ -195,9 +195,9 @@ stored `1 / (1 + distance)` bottoms out near `0.333` and the `< 0.3` heuristic
 could never fire on it. So `search()` passes the raw vector score through
 `vectorScoreToCosine`, which inverts the distance and applies `cosine = 1 −
 distance² / 2` to recover a true cosine in `[-1, 1]` before logging it
-(`src/db/search.ts:19-25`). The insert is a plain `INSERT INTO query_log (...)`
+(`src/db/search.ts:20-26`). The insert is a plain `INSERT INTO query_log (...)`
 stamped with an ISO timestamp (`src/db/analytics.ts:3-8`); the table is created on
-database open as part of the schema in `src/db/index.ts:434`.
+database open as part of the schema in `src/db/index.ts:482`.
 
 | | value |
 | --- | --- |
@@ -207,54 +207,54 @@ database open as part of the schema in `src/db/index.ts:434`.
 This matters because it is the only record of what was searched. The
 [search_analytics](search-analytics.md) tool reads this table to surface
 zero-result queries, low-scoring queries, top terms, and per-day volume — the
-signal that reveals documentation or indexing gaps (`src/db/analytics.ts:10-67`).
+signal that reveals documentation or indexing gaps (`src/db/analytics.ts:10-77`).
 Note the duration logged here is measured inside `search()` and covers only the
 embed-search-rerank work; the tool computes a separate `durationMs` for the header
-it returns, so the two timings can differ slightly (`src/tools/search.ts:67-69`).
+it returns, so the two timings can differ slightly (`src/tools/search.ts:69-71`).
 
 ## Branches and failure cases
 
 - **No scope filter.** When `extensions`, `dirs`, and `excludeDirs` are all empty
   or absent, `buildFilter` returns `undefined` and the search runs across the
-  whole index with no path constraints (`src/tools/search.ts:19-23`).
+  whole index with no path constraints (`src/tools/search.ts:21-25`).
 - **Scoped search.** When any scope array is set, the resulting `PathFilter` is
   pushed down into the SQL as parametrized `LIKE ? ESCAPE '\'` clauses
   (extensions as `%.ext`, dirs as `dir/%`, excludeDirs as `NOT LIKE dir/%`), and
   the inner vector/FTS query over-fetches five times `topK` so the filter has
-  enough candidates to work with (`src/db/search.ts:36-77`). Each user-supplied
+  enough candidates to work with (`src/db/search.ts:37-78`). Each user-supplied
   extension and directory is run through `escapeLike` first, so a `%`, `_`, or `\`
   in a name (for example a directory called `my_module`) matches literally instead
   of acting as a SQL wildcard and silently over-matching (`src/search/usages.ts:24-26`).
   Symbol-expanded hits that bypassed SQL are filtered again in memory by
-  `matchesFilter` (`src/search/hybrid.ts:385`).
+  `matchesFilter` (`src/search/hybrid.ts:397`).
 - **Empty results.** If nothing survives, the tool returns a single message:
   `No results found ... across <N> indexed files. Has the directory been indexed?
   Try calling index_files first.` When a filter was active, the phrase ` matching
   the given scope` is inserted, hinting the scope may be too narrow rather than the
-  index being empty (`src/tools/search.ts:72-82`).
+  index being empty (`src/tools/search.ts:74-84`).
 - **Keyword-search failure.** The BM25 query is wrapped in a try/catch. If the
   full-text query throws (for example on input the FTS tokenizer rejects), it is
   logged at debug level and the search continues vector-only instead of failing
   the whole call — the fusion then runs with an empty secondary list
-  (`src/search/hybrid.ts:346-351`).
+  (`src/search/hybrid.ts:358-363`).
 - **Symbol expansion.** If the query contains code-like identifiers (mixed case,
   underscore, or dot, three or more characters, not a stop word), each is looked
   up by exact name via `db.searchSymbols`. A file that also matched semantically
   has its score raised toward `score * 1.3`; a file found only by symbol name is
-  added with a high base score of `0.75` (`src/search/hybrid.ts:268-296`,
-  `src/search/hybrid.ts:378-391`).
+  added with a high base score of `0.75` (`src/search/hybrid.ts:278-296`,
+  `src/search/hybrid.ts:390-403`).
 - **Documentation expansion.** When the top-K mixes docs (`.md`/`.mdx`) with code,
-  `expandForDocs` returns extra slots equal to the doc count so docs ride along
-  without evicting code; if every result is a doc, or none is, no expansion
-  happens (`src/search/hybrid.ts:304-315`).
-- **Missing directory.** `resolveProject` throws `Directory does not exist: ...`
-  if the resolved path is absent, surfacing as a tool error before any search runs
-  (`src/tools/index.ts:30-32`).
+  `expandForDocs` extends the result window until the original code-slot count is
+  restored (capped at twice `topK`) so docs ride along without evicting code; if
+  every result is a doc, or none is, no expansion happens
+  (`src/search/hybrid.ts:304-326`).
+- **Missing directory.** `resolveProject` throws if the resolved path is absent,
+  surfacing as a tool error before any search runs (`src/tools/index.ts`).
 
 ## Ranking heuristics
 
 After the rank fusion, dedupe, and symbol expansion, three score transforms are
-composed and the result is re-sorted (`src/search/hybrid.ts:393-398`). They run in
+composed and the result is re-sorted (`src/search/hybrid.ts:405-410`). They run in
 this nesting order: path boost first, then filename affinity (which also carries
 the boilerplate and generated demotions as early-return branches), then the
 dependency-graph boost.
@@ -265,13 +265,13 @@ dependency-graph boost.
 | Filename / path affinity | +0.1 per query word found in the filename stem, +0.05 per word found in a directory segment | `src/search/hybrid.ts:242-244` |
 | Boilerplate demotion | A fixed set of low-signal basenames (`types.ts`, `index.d.ts`, `doc.go`, …) multiplied by 0.8 | `src/search/hybrid.ts:219-221` |
 | Generated demotion | Files matching the configured `generated` glob patterns multiplied by 0.75 | `src/search/hybrid.ts:223-225` |
-| Dependency-graph boost | Widely imported files get a small additive boost, `0.05 * log2(importers + 1)` | `src/search/hybrid.ts:318-327` |
+| Dependency-graph boost | Widely imported files get a small additive boost, `0.05 * log2(importers + 1)` | `src/search/hybrid.ts:329-340` |
 
 These are heuristics tuned for "find the implementation, not the test or the
 generated stub." They are worth knowing when a result ranks higher or lower than
 its raw fusion score would suggest. The same adjustments are applied per-chunk in
 `searchChunks()` for [read_relevant](read-relevant.md), so the two tools rank
-consistently (`src/search/hybrid.ts:517-556`).
+consistently (`src/search/hybrid.ts:579-627`).
 
 ## search vs read_relevant
 
@@ -284,7 +284,7 @@ different needs.
 | Unit returned | one entry per file (deduped) | individual chunks; same file can repeat |
 | Body content | first snippet, truncated to 400 chars | full chunk content |
 | Line ranges | no | yes (`path:start-end`) |
-| Default count | `searchTopK` (10) | 8 |
+| Default count | `searchTopK` (8) | 8 (5 in leaf-only mode) |
 | Annotations surfaced | no | yes (`[NOTE]` blocks) |
 | Use it to | find *where* a topic lives | read the actual code |
 
@@ -317,5 +317,5 @@ under `tests`, and asks for the five best-ranked files.
   populate the `parts` FTS column so split identifier words are searchable.
 - `src/db/analytics.ts` — `logQuery`, the insert into `query_log` that
   [search_analytics](search-analytics.md) later reads.
-- `src/config/index.ts` — defaults for `searchTopK` (10), `hybridWeight` (0.5),
+- `src/config/index.ts` — defaults for `searchTopK` (8), `hybridWeight` (0.5),
   and the `generated` patterns (empty) used when the caller omits them.

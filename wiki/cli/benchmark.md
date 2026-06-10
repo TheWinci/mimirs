@@ -18,7 +18,7 @@ mutate any stored state.
 The command is dispatched from the CLI router. When the first argument is
 `benchmark`, the router calls `benchmarkCommand` with the raw argument list and
 a `getFlag` helper that reads `--flag value` pairs out of `args`
-(`src/cli/index.ts:143-145`).
+(`src/cli/index.ts:147-148`).
 
 ```mermaid
 sequenceDiagram
@@ -51,7 +51,7 @@ sequenceDiagram
 
 1. The user runs `mimirs benchmark <file>` with an optional `--dir` and `--top`.
    The router matches the `benchmark` case and invokes the handler
-   `benchmarkCommand` (`src/cli/index.ts:143-145`).
+   `benchmarkCommand` (`src/cli/index.ts:147-148`).
 2. The handler reads the query file path from `args[1]`. If it is absent it
    prints a usage line and exits with code `1`
    (`src/cli/commands/benchmark.ts:9-13`).
@@ -113,7 +113,7 @@ For each query it calls `search(q.query, db, topK, 0, weight, config.generated)`
 matching and deduplicates by file path (`src/search/benchmark.ts:65`). The
 fourth argument is the score threshold, passed as `0`, so no results are
 filtered out by score. The returned `DedupedResult[]` carries one entry per file
-path with its best score and matching snippets (`src/search/hybrid.ts:40-44`),
+path with its best score and matching snippets (`src/search/hybrid.ts:41-45`),
 which is exactly the granularity the benchmark needs because expectations are
 expressed as file paths.
 
@@ -121,7 +121,7 @@ Path matching is deliberately lenient. Expected paths are normalized: absolute
 paths (those starting with `/`) are kept as-is, and relative ones are resolved
 against the project directory (`src/search/benchmark.ts:46-50`). A result counts
 as a match if the result path equals the expected path, or either one ends with
-the other (`src/search/benchmark.ts:71-73`). The suffix check means
+the other (`src/search/benchmark.ts:73-74`). The suffix check means
 `src/search/hybrid.ts` matches a fully-resolved absolute path ending in that
 suffix, so you can write short relative paths in the query file without worrying
 about the absolute form stored in the index.
@@ -131,12 +131,12 @@ Two per-query metrics are computed, recorded as a `BenchmarkResult` per query
 
 | Metric | Meaning | How it is computed |
 | --- | --- | --- |
-| `recall` | Fraction of the expected files that appeared in the top-K results | `found.length / expectedNormalized.length` (`src/search/benchmark.ts:71-74`) |
-| `reciprocalRank` | `1 / rank` of the *first* expected file in the ranked results, `0` if none appear | Scans results in order, stops at the first expected match (`src/search/benchmark.ts:77-86`) |
-| `hit` | Whether at least one expected file was found | `found.length > 0` (`src/search/benchmark.ts:94`) |
+| `recall` | Fraction of the expected files that appeared in the top-K results | `found.length / expectedNormalized.length` (`src/search/benchmark.ts:77-78`) |
+| `reciprocalRank` | `1 / rank` of the *first* expected file in the ranked results, `0` if none appear | Scans results in order, stops at the first expected match (`src/search/benchmark.ts:81-87`) |
+| `hit` | Whether at least one expected file was found | `found.length > 0` (`src/search/benchmark.ts:95`) |
 
 After all queries run, the per-query numbers are aggregated into a
-`BenchmarkSummary` (`src/search/benchmark.ts:98-104`):
+`BenchmarkSummary` (`src/search/benchmark.ts:99-105`):
 
 - `recallAtK` is the mean of every query's `recall`.
 - `mrr` is the mean of every query's `reciprocalRank`.
@@ -147,25 +147,25 @@ After all queries run, the per-query numbers are aggregated into a
 
 All three averages guard against an empty query set by returning `0` when
 `total` is `0`, so a zero-length (but still valid) array does not divide by zero
-(`src/search/benchmark.ts:99-102`).
+(`src/search/benchmark.ts:100-103`).
 
 ## The report
 
 `formatBenchmarkReport` turns the summary into the printed text
-(`src/search/benchmark.ts:107-139`). The header reports the query count and
+(`src/search/benchmark.ts:108-140`). The header reports the query count and
 top-K, followed by `Recall@K` as a percentage, `MRR` to three decimals, and the
 zero-miss rate as a percentage with the absolute miss count in parentheses
-(`src/search/benchmark.ts:110-113`).
+(`src/search/benchmark.ts:111-114`).
 
 The report then drills into problems so you can see *why* a number is low,
 rather than just the aggregate:
 
 - **Missed queries** — every query with `hit === false` is listed with its
   expected files and what actually came back (or `(no results)` when the search
-  returned nothing) (`src/search/benchmark.ts:116-127`).
+  returned nothing) (`src/search/benchmark.ts:117-128`).
 - **Partial matches** — queries that found *some* but not all expected files
   (`hit` true, `recall < 1`) are listed with their recall percentage
-  (`src/search/benchmark.ts:130-136`).
+  (`src/search/benchmark.ts:131-137`).
 
 A clean run with no misses and no partials prints only the four summary lines.
 
@@ -192,7 +192,7 @@ fail the run.
 
 The default thresholds are `benchmarkMinRecall = 0.8` and `benchmarkMinMrr =
 0.6`, both configurable in the project config and validated to the `0..1` range
-by the schema (`src/config/index.ts:35-36`). A run that meets or exceeds both
+by the schema (`src/config/index.ts:48-49`). A run that meets or exceeds both
 thresholds falls through to a normal exit (code `0`).
 
 | Outcome | Exit code | Cause |
@@ -219,7 +219,7 @@ and its `expected` file-path list, validated by `loadBenchmarkQueries`.
 | Output | Where it lands / shape / description |
 | --- | --- |
 | Status line | Printed to stdout before scoring: how many queries run against which directory (`src/cli/commands/benchmark.ts:21`). |
-| Benchmark report | Printed to stdout: recall@K, MRR, zero-miss rate, plus per-query miss and partial-match detail (`src/search/benchmark.ts:107-139`). |
+| Benchmark report | Printed to stdout: recall@K, MRR, zero-miss rate, plus per-query miss and partial-match detail (`src/search/benchmark.ts:108-140`). |
 | Exit code | `0` when both thresholds pass, `1` when recall or MRR falls below the configured minimum, also `1` on missing argument or bad flag (`src/cli/commands/benchmark.ts:29-31`). |
 
 ## State changes
@@ -245,20 +245,20 @@ re-indexed, and the query file is read but never modified.
   (`src/search/benchmark.ts:33-41`).
 - **Query that returns no results** — recorded as a miss; the report lists it
   under missed queries with `got: (no results)`
-  (`src/search/benchmark.ts:122-125`).
+  (`src/search/benchmark.ts:123-126`).
 - **Partial recall** — a query that finds some but not all expected files has
   `recall` between `0` and `1` and `hit === true`; it appears in the partial
-  matches section (`src/search/benchmark.ts:130-136`).
+  matches section (`src/search/benchmark.ts:131-137`).
 - **Empty query array** — a valid empty array passes validation; the aggregates
   guard against division by zero and return `0` for recall and MRR, which then
   fails both default thresholds and exits `1`
-  (`src/search/benchmark.ts:99-102`).
+  (`src/search/benchmark.ts:100-103`).
 - **Below-threshold quality** — either `recallAtK < benchmarkMinRecall` or
   `mrr < benchmarkMinMrr` triggers exit `1`
   (`src/cli/commands/benchmark.ts:29-31`).
 - **FTS unavailable** — inside the hybrid search, if the BM25 text query fails it
   logs at debug level and falls back to vector-only results, so the benchmark
-  still completes (`src/search/hybrid.ts:349-350`).
+  still completes (`src/search/hybrid.ts:359-363`).
 
 ## Example
 

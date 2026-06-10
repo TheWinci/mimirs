@@ -4,6 +4,18 @@ Notable changes to the generated wiki, newest first, by wiki version. The format
 follows [Keep a Changelog](https://keepachangelog.com/); each version is stamped
 with the source commit the wiki was generated from.
 
+## [7f07c5a] - 2026-06-10
+
+### Added
+- New page documenting tools/callees — the forward complement of usages (one hop out: what a symbol calls)
+- New page documenting tools/affected — the MCP-tool counterpart of the affected CLI (tests transitively importing changed files)
+- New page documenting tools/read-conversation — verbatim turn reads by session + turn selector, the read counterpart to search_conversation
+
+### Changed
+- Regenerated all 56 pages from current source. Citations were re-pinned to current line numbers throughout, and several drifted facts were corrected: the default `searchTopK`/CLI `--top` is now 8, `read_relevant` defaults to 5 under leaf-only mode (on by default), search fuses by reciprocal-rank fusion, checkpoints/annotations carry a `commit_hash` staleness stamp, the DB connection cache is now a bounded LRU, and `loadConfig` does field-level salvage rather than wholesale-default fallback.
+
+_Pages updated: all 56 pages_
+
 ## [0771514] - 2026-06-04
 
 ### Changed

@@ -38,58 +38,58 @@ sequenceDiagram
 ```
 
 1. The user runs `mimirs annotations`, optionally with a positional directory, a `--path` filter, or a `--dir` flag. `process.argv` is sliced into `args` and the first element becomes the command name (`src/cli/index.ts:26-27`).
-2. The dispatcher matches the `annotations` case and calls the handler, passing the raw `args` array and a `getFlag` helper that returns the element following a given flag (`src/cli/index.ts:161-162`, `src/cli/index.ts:85-88`).
-3. The handler picks the target directory. If the second argument exists and does not start with `--`, it is treated as the directory; otherwise it falls back to the `--dir` flag, and finally to `"."`. The result is passed through `resolve` so a relative path becomes absolute (`src/cli/commands/annotations.ts:6`).
-4. It reads the optional `--path` value into `filterPath`. When absent this is `undefined`, which the query treats as "no filter" (`src/cli/commands/annotations.ts:7`).
-5. It constructs `RagDB` for the resolved directory. The constructor resolves the index folder (`<dir>/.mimirs` unless `RAG_DB_DIR` is set), creates it if missing, opens `index.db`, enables WAL journaling with a 5 s busy timeout, loads the sqlite-vec extension, and ensures the `annotations` table (plus its companion full-text and vector tables) exists (`src/db/index.ts:104-150`, `src/db/index.ts:493-512`). If the index directory is unwritable it throws a clear `RAG_DB_DIR` error here, before any read.
-6. The handler calls `db.getAnnotations(filterPath)`. The `RagDB` method forwards straight to the annotation store function (`src/db/index.ts:1029-1031`).
-7. The store builds `SELECT * FROM annotations WHERE 1=1`, appends `AND path = ?` only when a path was supplied, always orders by `updated_at DESC`, runs the query, and maps each snake_case database row into a camelCase `AnnotationRow` (`src/db/annotations.ts:101-135`).
-8. If the result array is empty, the handler prints one message — naming the path when filtered, or a generic "No annotations found." otherwise — closes the database, and returns (`src/cli/commands/annotations.ts:11-15`).
-9. Otherwise it loops the rows and prints each as three lines plus a blank separator (`src/cli/commands/annotations.ts:17-24`).
-10. Either way the database is closed before the function returns (`src/cli/commands/annotations.ts:13`, `src/cli/commands/annotations.ts:26`).
+2. The dispatcher matches the `annotations` case and calls the handler, passing the raw `args` array and a `getFlag` helper that returns the element following a given flag (`src/cli/index.ts:165-166`, `src/cli/index.ts:89-92`).
+3. The handler picks the target directory. If the second argument exists and does not start with `--`, it is treated as the directory; otherwise it falls back to the `--dir` flag, and finally to `"."`. The result is passed through `resolve` so a relative path becomes absolute (`src/cli/commands/annotations.ts:7`).
+4. It reads the optional `--path` value into `filterPath`. When absent this is `undefined`, which the query treats as "no filter" (`src/cli/commands/annotations.ts:8`).
+5. It constructs `RagDB` for the resolved directory. The constructor resolves the index folder (`<dir>/.mimirs` unless `RAG_DB_DIR` is set), creates it if missing, opens `index.db`, enables WAL journaling with a 5 s busy timeout, loads the sqlite-vec extension, and runs `initSchema()` so the `annotations` table (plus its companion full-text and vector tables) exists (`src/db/index.ts:106-156`). If the index directory is unwritable it throws a clear `RAG_DB_DIR` error here, before any read (`src/db/index.ts:121-136`).
+6. The handler calls `db.getAnnotations(filterPath)`. The `RagDB` method canonicalizes the path to project-relative form and forwards to the annotation store function (`src/db/index.ts:1189-1191`).
+7. The store builds `SELECT * FROM annotations WHERE 1=1`, appends `AND path = ?` only when a path was supplied, always orders by `updated_at DESC`, runs the query, and maps each snake_case database row into a camelCase `AnnotationRow` (`src/db/annotations.ts:104-139`).
+8. If the result array is empty, the handler prints one message — naming the path when filtered, or a generic "No annotations found." otherwise — closes the database, and returns (`src/cli/commands/annotations.ts:12-16`).
+9. Otherwise it loops the rows and prints each as three lines plus a blank separator (`src/cli/commands/annotations.ts:18-25`).
+10. Either way the database is closed before the function returns (`src/cli/commands/annotations.ts:14`, `src/cli/commands/annotations.ts:27`).
 
 ## Inputs
 
 | Name | Type | Required | Description |
 | --- | --- | --- | --- |
-| `[dir]` positional | string | No | Project directory whose index is read. Taken from the second CLI argument only when it does not start with `--`. Resolved to an absolute path (`src/cli/commands/annotations.ts:6`). |
-| `--path P` | string | No | Restricts output to annotations whose stored `path` equals `P` exactly. Omitted means list every annotation in the index (`src/cli/commands/annotations.ts:7`). |
-| `--dir D` | string | No | Alternate way to set the project directory. Used only when no bare positional directory was given; the positional argument wins when both are present (`src/cli/commands/annotations.ts:6`). |
+| `[dir]` positional | string | No | Project directory whose index is read. Taken from the second CLI argument only when it does not start with `--`. Resolved to an absolute path (`src/cli/commands/annotations.ts:7`). |
+| `--path P` | string | No | Restricts output to annotations whose stored `path` equals `P` after both are canonicalized to project-relative form. Omitted means list every annotation in the index (`src/cli/commands/annotations.ts:8`, `src/db/index.ts:1189-1191`). |
+| `--dir D` | string | No | Alternate way to set the project directory. Used only when no bare positional directory was given; the positional argument wins when both are present (`src/cli/commands/annotations.ts:7`). |
 
-The directory ultimately tells `RagDB` where to find `index.db` — under `<dir>/.mimirs`, unless `RAG_DB_DIR` overrides it (`src/db/index.ts:111-115`). If that directory has no index yet, the constructor still creates an empty schema, so the command reports no annotations rather than failing.
+The directory ultimately tells `RagDB` where to find `index.db` — under `<dir>/.mimirs`, unless `RAG_DB_DIR` overrides it (`src/db/index.ts:114-118`). If that directory has no index yet, the constructor still creates an empty schema, so the command reports no annotations rather than failing.
 
 ## Outputs
 
 | Output | Where it lands / shape / description |
 | --- | --- |
-| Annotation listing | Printed to stdout via the CLI logger. One block per annotation: a header line `#<id>  <target>[ <author>]`, an indented note line, an indented `(<updatedAt>)` line, then a blank line (`src/cli/commands/annotations.ts:17-24`). |
-| Empty-state message | A single stdout line when there are no matching rows: `No annotations for <path>.` when filtered, else `No annotations found.` (`src/cli/commands/annotations.ts:11-12`). |
+| Annotation listing | Printed to stdout via the CLI logger. One block per annotation: a header line `#<id>  <target>[ <author>]`, an indented note line, an indented `(<updatedAt>)` line, then a blank line (`src/cli/commands/annotations.ts:18-25`). |
+| Empty-state message | A single stdout line when there are no matching rows: `No annotations for <path>.` when filtered, else `No annotations found.` (`src/cli/commands/annotations.ts:12-13`). |
 
-Output goes through `cli.log`, which writes to stdout with `console.log`; called with no argument it prints a blank line. This is distinct from the `log` channel used by the MCP server, which writes diagnostics to stderr (`src/utils/log.ts:49-53`).
+Output goes through `cli.log`, which writes to stdout with `console.log`; called with no argument it prints a blank line. This is distinct from the `log` channel used by the MCP server, which writes diagnostics to stderr (`src/utils/log.ts:51-55`).
 
 ### Block fields
 
-Each printed annotation maps directly onto an `AnnotationRow` (`src/db/types.ts:47-55`):
+Each printed annotation maps directly onto an `AnnotationRow` (`src/db/types.ts:47-58`):
 
 | Printed field | Source | Notes |
 | --- | --- | --- |
 | `#<id>` | `a.id` | The autoincrement primary key from the `annotations` table; this is the value you pass to `delete_annotation`. |
-| target | `a.path`, optionally `a.symbolName` | When a symbol name is stored, the target reads `<path>  •  <symbolName>`; otherwise just the path (`src/cli/commands/annotations.ts:18`). |
-| `[author]` | `a.author` | Appended only when an author was recorded; bracketed and space-prefixed. Absent for anonymous notes (`src/cli/commands/annotations.ts:19`). |
-| note | `a.note` | The annotation text, printed indented on its own line (`src/cli/commands/annotations.ts:21`). |
+| target | `a.path`, optionally `a.symbolName` | When a symbol name is stored, the target reads `<path>  •  <symbolName>`; otherwise just the path (`src/cli/commands/annotations.ts:19`). |
+| `[author]` | `a.author` | Appended only when an author was recorded; bracketed and space-prefixed. Absent for anonymous notes (`src/cli/commands/annotations.ts:20`). |
+| note | `a.note` | The annotation text, printed indented on its own line (`src/cli/commands/annotations.ts:22`). |
 | `(<updatedAt>)` | `a.updatedAt` | The ISO-8601 timestamp of the last write, printed indented in parentheses. Rows are ordered newest-first by this column. |
 
-The query selects all columns, so `createdAt` is fetched into the row too, but the listing only prints `updatedAt` (`src/db/annotations.ts:126-134`).
+The query selects all columns, so `createdAt` and `commitHash` are fetched into the row too, but the listing only prints `updatedAt` (`src/db/annotations.ts:129-138`).
 
 ## Branches and failure cases
 
-- **No `--path` (list all).** `filterPath` is `undefined`, so the store skips the `AND path = ?` clause and returns every annotation, newest-updated first (`src/db/annotations.ts:105-108`).
-- **`--path` given, matches exist.** The query adds an exact-match `path = ?` predicate. The match is exact and case-sensitive — there is no prefix or glob handling — so the supplied path must equal what was stored (`src/db/annotations.ts:106-107`).
-- **`--path` given, no match.** The store returns an empty array and the handler prints `No annotations for <path>.` (`src/cli/commands/annotations.ts:11-12`).
-- **Empty index / no annotations at all.** Same empty-array path, but the message is the generic `No annotations found.` (`src/cli/commands/annotations.ts:12`).
-- **Directory resolution precedence.** A positional argument that starts with `--` is not treated as a directory, so `mimirs annotations --path foo.ts` correctly uses the current directory rather than mistaking `--path` for a directory (`src/cli/commands/annotations.ts:6`).
-- **Read-only or unwritable index directory.** The `RagDB` constructor calls `mkdirSync` on the index directory and, on `EROFS`/`EACCES`, throws a message pointing the user at `RAG_DB_DIR`. This happens before any annotation read (`src/db/index.ts:118-133`). The error is not a `CliFlagError`, so the top-level `dispatch` wrapper rethrows it rather than printing a one-line flag message (`src/cli/index.ts:96-106`).
-- **Symbol-scoped notes.** A note can be pinned to a symbol within a file. The listing renders these with the `path • symbol` target form, but `--path` filters on the file path only — there is no symbol filter at the CLI level (`src/cli/commands/annotations.ts:18`). The store's `getAnnotations` does accept an optional `symbolName` argument, but the CLI handler never passes one (`src/db/annotations.ts:101`).
+- **No `--path` (list all).** `filterPath` is `undefined`, so the store skips the `AND path = ?` clause and returns every annotation, newest-updated first (`src/db/annotations.ts:108-111`).
+- **`--path` given, matches exist.** The wrapper canonicalizes the supplied path to project-relative form, then the store adds a `path = ?` predicate. The match is exact and case-sensitive — there is no prefix or glob handling — so once canonicalized the path must equal what was stored (`src/db/index.ts:1189-1191`, `src/db/annotations.ts:108-111`).
+- **`--path` given, no match.** The store returns an empty array and the handler prints `No annotations for <path>.` (`src/cli/commands/annotations.ts:12-13`).
+- **Empty index / no annotations at all.** Same empty-array path, but the message is the generic `No annotations found.` (`src/cli/commands/annotations.ts:13`).
+- **Directory resolution precedence.** A positional argument that starts with `--` is not treated as a directory, so `mimirs annotations --path foo.ts` correctly uses the current directory rather than mistaking `--path` for a directory (`src/cli/commands/annotations.ts:7`).
+- **Read-only or unwritable index directory.** The `RagDB` constructor calls `mkdirSync` on the index directory and, on `EROFS`/`EACCES`, throws a message pointing the user at `RAG_DB_DIR`. This happens before any annotation read (`src/db/index.ts:121-136`). The error is not a `CliFlagError`, so the top-level `dispatch` wrapper rethrows it rather than printing a one-line flag message (`src/cli/index.ts:100-110`).
+- **Symbol-scoped notes.** A note can be pinned to a symbol within a file. The listing renders these with the `path • symbol` target form, but `--path` filters on the file path only — there is no symbol filter at the CLI level (`src/cli/commands/annotations.ts:19`). The store's `getAnnotations` does accept an optional `symbolName` argument, but the CLI handler never passes one (`src/db/annotations.ts:104`).
 - **No numeric flag validation.** This command takes only string flags, so the `CliFlagError` path that guards numeric options on other commands never fires here.
 
 ## Example
@@ -120,7 +120,7 @@ Illustrative output (ids, timestamps, and text are synthetic):
 
 ## State changes
 
-This command makes no logical state change to the annotations data. It opens the index, reads, and closes. The only filesystem effects come from opening a WAL database: the constructor runs `PRAGMA journal_mode=WAL` (`src/db/index.ts:145`), which may create `-wal`/`-shm` sidecar files, and `mkdirSync` may create an empty `.mimirs` schema if none exists yet (`src/db/index.ts:119`). Writing, updating, and deleting annotations happen elsewhere — through the `upsertAnnotation` and `deleteAnnotation` store functions invoked by the MCP tools, not by this listing command (`src/db/annotations.ts:4-66`, `src/db/annotations.ts:175-194`).
+This command makes no logical state change to the annotations data. It opens the index, reads, and closes. The only filesystem effects come from opening a WAL database: the constructor runs `PRAGMA journal_mode=WAL` (`src/db/index.ts:148`), which may create `-wal`/`-shm` sidecar files, and `mkdirSync` may create an empty `.mimirs` schema if none exists yet (`src/db/index.ts:122`). One legacy-repair write can also fire on open: `normalizeAnnotationPaths()` rewrites any stored annotation paths that are still absolute back to project-relative form, but it only touches rows that predate path canonicalization and is unrelated to this listing (`src/db/index.ts:155`, `src/db/index.ts:164-177`). Writing, updating, and deleting annotations otherwise happen elsewhere — through the `upsertAnnotation` and `deleteAnnotation` store functions invoked by the MCP tools, not by this listing command (`src/db/annotations.ts:5-68`, `src/db/annotations.ts:181-200`).
 
 ## Key source files
 

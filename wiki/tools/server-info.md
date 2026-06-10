@@ -16,7 +16,7 @@ picked up a config edit.
 
 The tool is registered in `src/tools/server-info-tools.ts:12` by
 `registerServerInfoTools`, which the server wires up at startup through
-`registerAllTools` (`src/tools/index.ts:47-64`, `src/server/index.ts:189`).
+`registerAllTools` (`src/tools/index.ts:130-148`, `src/server/index.ts:246`).
 
 ## Inputs
 
@@ -24,7 +24,7 @@ The tool takes a single optional argument.
 
 | name | type | required | description |
 | --- | --- | --- | --- |
-| `directory` | string | no | Project directory to report on. When omitted it falls back to the `RAG_PROJECT_DIR` environment variable, then to the process working directory (`src/tools/index.ts:26`). |
+| `directory` | string | no | Project directory to report on. When omitted it falls back to the `RAG_PROJECT_DIR` environment variable, then to the process working directory (`src/tools/index.ts:38-39`). |
 
 ## Outputs
 
@@ -71,15 +71,15 @@ sequenceDiagram
    tool uses to turn a directory argument into a concrete project
    (`src/tools/server-info-tools.ts:27`).
 3. `resolveProject` resolves the directory to an absolute path and throws
-   `Directory does not exist: <path>` when it is missing — the only way the call
-   fails before producing a report (`src/tools/index.ts:31-34`).
+   `Directory does not exist: <path>` when it is missing — one of the ways the
+   call fails before producing a report (`src/tools/index.ts:44-47`).
 4. It loads the project config from `.mimirs/config.json` and immediately applies
    the embedding settings, so the model id and dimension reported later reflect
    *this* project's config, not whatever was loaded earlier
-   (`src/tools/index.ts:36-43`).
+   (`src/tools/index.ts:74-82`).
 5. It asks the connection pool for the database via `getDB(resolved)`, which
    returns the already-open `RagDB` for that directory or opens a fresh one
-   (`src/tools/index.ts:44`, `src/server/index.ts:34-51`).
+   (`src/tools/index.ts:82`, `src/server/index.ts:43-82`).
 6. Back in the handler, `db.getStatus()` runs the file/chunk count queries to read
    how much is indexed (`src/tools/server-info-tools.ts:28`).
 7. The handler reads the embedding model id and vector dimension from the embedder
@@ -102,14 +102,15 @@ The first block reports four values (`src/tools/server-info-tools.ts:30-35`):
 - `db_dir` is `RAG_DB_DIR` when that environment variable is set, otherwise
   `<project_dir>/.mimirs`. This is the only place the report shows where the
   SQLite database actually lives, which matters when an override has moved it off
-  the default location.
+  the default location (`src/tools/server-info-tools.ts:34`).
 - `log_level` is the `LOG_LEVEL` environment variable, defaulting to `warn` when
-  unset. It reports the configured level; it does not change logging.
+  unset. It reports the configured level; it does not change logging
+  (`src/tools/server-info-tools.ts:35`).
 
 ## The Index section
 
 These three numbers come straight from `db.getStatus()`, a thin wrapper over the
-file-level status query (`src/db/index.ts:834-836`, `src/db/files.ts:385-403`):
+file-level status query (`src/db/index.ts:940-941`, `src/db/files.ts:418-436`):
 
 - `files` is `SELECT COUNT(*) FROM files`.
 - `chunks` is `SELECT COUNT(*) FROM chunks`.
@@ -117,7 +118,7 @@ file-level status query (`src/db/index.ts:834-836`, `src/db/files.ts:385-403`):
   (`SELECT indexed_at FROM files ORDER BY indexed_at DESC LIMIT 1`). The query
   returns `null` when no file row exists, and the handler prints the literal
   string `never` in that case
-  (`src/tools/server-info-tools.ts:40`, `src/db/files.ts:392-401`).
+  (`src/tools/server-info-tools.ts:40`, `src/db/files.ts:425-434`).
 
 A brand-new project reports `files: 0`, `chunks: 0`, `last_indexed: never`. This
 is the same status data the [index_status](../tools/index-status.md) tool
@@ -127,24 +128,31 @@ surfaces, so the two will agree for a given project.
 
 The model id and dimension are read from the embedder module's module-level
 singletons, not from disk at report time. `currentModelId` and `currentDim` start
-at the defaults `Xenova/all-MiniLM-L6-v2` and `384` (`src/embeddings/embed.ts:17-18`,
-`src/embeddings/embed.ts:30-31`). `getModelId()` returns `currentModelId` and
-`getEmbeddingDim()` returns `currentDim` (`src/embeddings/embed.ts:224-232`).
+at the defaults `Xenova/all-MiniLM-L6-v2` and `384`
+(`src/embeddings/embed.ts:53-54`, `src/embeddings/embed.ts:81-82`). `getModelId()`
+returns `currentModelId` and `getEmbeddingDim()` returns `currentDim`
+(`src/embeddings/embed.ts:422-430`).
 
 The report shows only the model id and dimension — it does not print the pooling
 strategy or dtype, even though the embedder tracks those internally. The values
 can differ from the defaults because step 4 calls `applyEmbeddingConfigFromDisk`,
 which reads the embedding fields straight from `.mimirs/config.json` (best-effort:
 malformed JSON is ignored and falls back to the defaults) and then calls
-`configureEmbedder` (`src/config/index.ts:197-225`). `configureEmbedder` only
+`configureEmbedder` (`src/config/index.ts:297-334`). `configureEmbedder` only
 mutates the singletons — and clears the cached extractor and tokenizer — when the
-model, dimension, pooling, or dtype actually changes
-(`src/embeddings/embed.ts:50-58`). So the reported model and dimension reflect the
-*current* project's configured embedder, which is why resolving the project first
-matters before reading them. Reading the embedding fields from raw disk rather
-than the validated config object is deliberate: a config that fails schema
+model, dimension, pooling, dtype, or revision actually changes
+(`src/embeddings/embed.ts:114-128`). So the reported model and dimension reflect
+the *current* project's configured embedder, which is why resolving the project
+first matters before reading them. Reading the embedding fields from raw disk
+rather than the validated config object is deliberate: a config that fails schema
 validation still keeps its real `embeddingDim`, so the query embedder always
-matches the dimension the index was built at (`src/tools/index.ts:37-43`).
+matches the dimension the index was built at (`src/tools/index.ts:74-82`).
+
+A non-default model from `config.json` is not honored blindly. `applyEmbeddingConfigFromDisk`
+runs the disk fields through `resolveModel`, which ignores a custom
+`embeddingModel` unless `MIMIRS_ALLOW_CUSTOM_MODEL=1` is set, because a cloned
+repo could otherwise choose which model mimirs downloads
+(`src/config/index.ts:235-251`, `src/config/index.ts:330-333`).
 
 ## The Config section
 
@@ -157,7 +165,7 @@ most likely to explain surprising indexing or search behavior:
 | `chunk_size` | `chunkSize` | 512 | Target chunk size in tokens (`src/config/index.ts:21`). |
 | `chunk_overlap` | `chunkOverlap` | 50 | Overlap between adjacent chunks (`src/config/index.ts:22`). |
 | `hybrid_weight` | `hybridWeight` | 0.5 | Tunes how the vector and BM25 result lists are fused in hybrid search (`src/config/index.ts:23`). |
-| `search_top_k` | `searchTopK` | 10 | Default result count for searches (`src/config/index.ts:24`). |
+| `search_top_k` | `searchTopK` | 8 | Default result count for searches (`src/config/index.ts:24`). |
 | `incremental` | `incrementalChunks` | false | Whether re-indexing reuses unchanged chunks (`src/config/index.ts:27`). |
 | `include` | `include.length` | many | Reported as a *count* of include glob patterns, not the patterns themselves (`src/tools/server-info-tools.ts:52`). |
 | `exclude` | `exclude.length` | many | Reported as a count of exclude glob patterns (`src/tools/server-info-tools.ts:53`). |
@@ -177,10 +185,12 @@ two optional lines are appended conditionally, so a config that never sets
 
 The section is labeled `## Config (.mimirs/config.json)` because that file is the
 source of truth, but the values printed are the parsed and validated config
-object. If `config.json` held invalid JSON or failed schema validation,
-`loadConfig` logs a warning and returns the built-in defaults, so the report would
-show defaults rather than the broken file's contents
-(`src/config/index.ts:152-165`).
+object. `loadConfig` does not discard the whole file on a bad field: when schema
+validation fails, it drops only the offending top-level keys and re-parses, so a
+config that just sets one bad value keeps its other valid fields and the rest of
+the report shows those rather than all defaults. Only if even the salvaged config
+fails — or the file is unparseable JSON — does it log a warning and fall back to
+the built-in defaults (`src/config/index.ts:180-213`).
 
 ## The Connected Databases section
 
@@ -188,15 +198,19 @@ This section is what distinguishes `server_info` from a static config dump: it
 reports the *live* connection pool of the running process. It is only emitted when
 the server supplied a `getConnectedDBs` callback
 (`src/tools/server-info-tools.ts:60`). The MCP server always supplies one, so in
-normal operation the section is present (`src/server/index.ts:189`).
+normal operation the section is present (`src/server/index.ts:246`).
 
 The pool is a `Map` keyed by resolved project directory. Each entry records the
 `RagDB`, the `openedAt` timestamp from when the connection was first created, and a
 `lastAccessed` timestamp refreshed on every `getDB` hit
-(`src/server/index.ts:23-51`). A single server process can hold several open
-databases at once — one per project directory it has been asked about — because
-connections are kept open so background work like the file watcher and auto-index
-never use a closed handle (`src/server/index.ts:20-22`).
+(`src/server/index.ts:23-28`, `src/server/index.ts:49-53`). A single server
+process can hold several open databases at once — one per project directory it has
+been asked about — because connections are kept open so background work like the
+file watcher and auto-index never use a closed handle
+(`src/server/index.ts:20-22`). The pool is capped at eight entries: once full,
+`getDB` evicts the least-recently-used idle connection that is not the primary
+project, rather than closing a handle that may be mid-operation
+(`src/server/index.ts:40-76`).
 
 For each connection the handler prints the project directory, then an age and an
 idle duration computed against `Date.now()` and formatted by `formatDuration`
@@ -210,27 +224,28 @@ hint that the process is holding a database it has not touched recently.
 `server_info` itself writes nothing. The one indirect effect comes from
 `resolveProject`, shared by every tool: if the requested project has no open
 connection yet, `getDB` opens one and records it in the pool
-(`src/server/index.ts:47-48`).
+(`src/server/index.ts:78-79`).
 
 | name | before | after | why it matters | evidence |
 | --- | --- | --- | --- | --- |
-| Connection added to pool | directory absent from `dbMap` | a `DBEntry` with fresh `openedAt`/`lastAccessed` exists, and the `## Connected Databases` section lists it | reporting on a never-before-seen project opens (and keeps) a real SQLite handle | `src/server/index.ts:47-48` |
-| `lastAccessed` refreshed | existing entry has a prior `lastAccessed` | `getDB` sets `entry.lastAccessed = new Date()` before returning | calling `server_info` resets that connection's reported idle time to roughly zero | `src/server/index.ts:42-44` |
-| Embedder reconfigured | singleton holds the previously applied model/dim | `applyEmbeddingConfigFromDisk` may switch it to this project's model/dim if it differs | only updates the recorded id and dimension and clears the cached extractor — it does not load the model | `src/config/index.ts:197-225`, `src/embeddings/embed.ts:50-58` |
+| Connection added to pool | directory absent from `dbMap` | a `DBEntry` with fresh `openedAt`/`lastAccessed` exists, and the `## Connected Databases` section lists it | reporting on a never-before-seen project opens (and keeps) a real SQLite handle | `src/server/index.ts:78-79` |
+| `lastAccessed` refreshed | existing entry has a prior `lastAccessed` | `getDB` sets `entry.lastAccessed = new Date()` before returning | calling `server_info` resets that connection's reported idle time to roughly zero | `src/server/index.ts:51-53` |
+| Embedder reconfigured | singleton holds the previously applied model/dim | `applyEmbeddingConfigFromDisk` may switch it to this project's model/dim if it differs | only updates the recorded id and dimension and clears the cached extractor — it does not load the model | `src/config/index.ts:297-334`, `src/embeddings/embed.ts:114-128` |
 
 ## Branches and failure cases
 
 | condition | behavior | source |
 | --- | --- | --- |
-| `directory` omitted | Falls back to `RAG_PROJECT_DIR`, then `process.cwd()`. | `src/tools/index.ts:26` |
-| Directory does not exist | `resolveProject` throws `Directory does not exist: <path>`; the tool errors before producing any report. | `src/tools/index.ts:31-34` |
+| `directory` omitted | Falls back to `RAG_PROJECT_DIR`, then `process.cwd()`. | `src/tools/index.ts:38-39` |
+| Directory does not exist | `resolveProject` throws `Directory does not exist: <path>`; the tool errors before producing any report. | `src/tools/index.ts:44-47` |
+| `directory` points at a non-configured, non-indexed dir | A read tool refuses to scaffold a database there: it throws either a `RAG_DB_DIR is set` error or a `No mimirs index at <path>` error rather than silently creating `.mimirs/` and an empty index. | `src/tools/index.ts:59-72` |
 | `RAG_DB_DIR` set | `db_dir` shows that path; otherwise `<project_dir>/.mimirs`. | `src/tools/server-info-tools.ts:34` |
 | `LOG_LEVEL` unset | `log_level` shows `warn`. | `src/tools/server-info-tools.ts:35` |
-| Nothing indexed yet | `files`/`chunks` are `0` and `last_indexed` is `never`. | `src/tools/server-info-tools.ts:40`, `src/db/files.ts:392-401` |
-| Custom embedding model/dim in config | `model`/`dim` reflect the configured values after `applyEmbeddingConfigFromDisk`. | `src/config/index.ts:197-225` |
-| `config.json` missing | `loadConfig` writes the defaults to disk and returns them, so the report shows defaults. | `src/config/index.ts:144-148` |
-| `config.json` invalid (bad JSON) | `loadConfig` logs a warning and returns built-in defaults; the report shows defaults, not the broken file. | `src/config/index.ts:152-157` |
-| `config.json` fails schema validation | `loadConfig` logs the failing fields and returns built-in defaults. | `src/config/index.ts:159-165` |
+| Nothing indexed yet | `files`/`chunks` are `0` and `last_indexed` is `never`. | `src/tools/server-info-tools.ts:40`, `src/db/files.ts:425-434` |
+| Custom embedding model/dim in config | `model`/`dim` reflect the configured values after `applyEmbeddingConfigFromDisk`; a non-default *model* is ignored unless `MIMIRS_ALLOW_CUSTOM_MODEL=1`. | `src/config/index.ts:297-334` |
+| `config.json` missing | `loadConfig` writes the defaults to disk and returns them, so the report shows defaults. | `src/config/index.ts:165-169` |
+| `config.json` invalid (bad JSON) | `loadConfig` logs a warning and returns built-in defaults; the report shows defaults, not the broken file. | `src/config/index.ts:173-178` |
+| `config.json` fails schema validation | `loadConfig` drops only the offending top-level keys, keeps the rest, and reports defaults only if even the salvaged config is unusable. | `src/config/index.ts:180-203` |
 | `indexBatchSize` / `indexThreads` unset | Those two `## Config` rows are omitted entirely. | `src/tools/server-info-tools.ts:56-57` |
 | `getConnectedDBs` callback absent | The whole `## Connected Databases` section is skipped. The MCP server always passes it, so this is the non-server / test path. | `src/tools/server-info-tools.ts:60` |
 | No databases open | Section header reads `## Connected Databases (0)` with no entries. In practice resolving the project just opened at least one. | `src/tools/server-info-tools.ts:62-63` |
@@ -253,7 +268,7 @@ A representative report (synthetic values):
 
 ```
 ## Server
-  version:     1.5.1
+  version:     1.6.3
   project_dir: /Users/example/repos/myproject
   db_dir:      /Users/example/repos/myproject/.mimirs
   log_level:   warn
@@ -271,7 +286,7 @@ A representative report (synthetic values):
   chunk_size:      512
   chunk_overlap:   50
   hybrid_weight:   0.5
-  search_top_k:    10
+  search_top_k:    8
   incremental:     false
   include:         67 patterns
   exclude:         33 patterns

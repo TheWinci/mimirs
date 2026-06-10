@@ -8,7 +8,7 @@ Reach for it when you want a fast, exact answer to "if I'm in this file, what am
 
 ## How it works
 
-The tool is registered inside `registerGraphTools`, alongside `project_map`, `usages`, `dependents`, `impact`, and `trace`, against the shared MCP server `src/tools/graph-tools.ts:146`. The handler is small because the heavy work — parsing imports and resolving each specifier to a concrete file — already happened during indexing. At request time the handler does only a project lookup, a path lookup, and one query.
+The tool is registered inside `registerGraphTools`, alongside `project_map`, `usages`, `dependents`, `impact`, and `trace`, against the shared MCP server `src/tools/graph-tools.ts:47`. The handler is small because the heavy work — parsing imports and resolving each specifier to a concrete file — already happened during indexing. At request time the handler does only a project lookup, a path lookup, and one query.
 
 The flow is:
 
@@ -46,18 +46,18 @@ sequenceDiagram
   end
 ```
 
-1. The MCP client invokes the tool with a `file` path and an optional `directory` `src/tools/graph-tools.ts:150`.
-2. `resolveProject` picks the working directory (the `directory` argument, else the `RAG_PROJECT_DIR` env var, else the current process directory), resolves it to an absolute path, verifies it exists on disk, loads config, and hands back the absolute project directory plus the `RagDB` handle `src/tools/index.ts:22`.
-3. The handler joins the caller's `file` onto the absolute project directory with `resolve(projectDir, file)`, so a relative input like `src/db/graph.ts` becomes a full absolute path `src/tools/graph-tools.ts:159`.
-4. `getFileByPath` looks up that absolute path in the `files` table. The lookup runs the path through `normalizePath` first, which rewrites every backslash to a forward slash, so a Windows-style input still matches the stored POSIX-style path `src/db/files.ts:13`.
-5. If no row matches, the tool returns `File "<file>" not found in index.` and stops — see the failure cases below `src/tools/graph-tools.ts:161`.
-6. With a matching row, the handler calls `getDependsOn(fileRecord.id)` to fetch the resolved outgoing edges `src/tools/graph-tools.ts:165`.
-7. If the file imports nothing that resolved to another indexed file, the tool returns `<file> has no indexed dependencies.` `src/tools/graph-tools.ts:166`.
-8. Otherwise it builds a header with the dependency count, then one indented line per dependency, converting each stored absolute path back to a project-relative path with `relative(projectDir, dep.path)` and appending the original import specifier `src/tools/graph-tools.ts:170`.
+1. The MCP client invokes the tool with a `file` path and an optional `directory` `src/tools/graph-tools.ts:166`.
+2. `resolveProject` picks the working directory (the `directory` argument, else the `RAG_PROJECT_DIR` env var, else the current process directory), resolves it to an absolute path, verifies it exists on disk, loads config, and hands back the absolute project directory plus the `RagDB` handle `src/tools/index.ts:33`.
+3. The handler joins the caller's `file` onto the absolute project directory with `resolve(projectDir, file)`, so a relative input like `src/db/graph.ts` becomes a full absolute path `src/tools/graph-tools.ts:179`.
+4. `getFileByPath` looks up that absolute path in the `files` table. The lookup runs the path through `normalizePath` first, which rewrites every backslash to a forward slash, so a Windows-style input still matches the stored POSIX-style path `src/db/files.ts:14`.
+5. If no row matches, the tool returns `File "<file>" not found in index.` and stops — see the failure cases below `src/tools/graph-tools.ts:181`.
+6. With a matching row, the handler calls `getDependsOn(fileRecord.id)` to fetch the resolved outgoing edges `src/tools/graph-tools.ts:185`.
+7. If the file imports nothing that resolved to another indexed file, the tool returns `<file> has no indexed dependencies.` `src/tools/graph-tools.ts:186`.
+8. Otherwise it builds a header with the dependency count, then one indented line per dependency, converting each stored absolute path back to a project-relative path with `relative(projectDir, dep.path)` and appending the original import specifier `src/tools/graph-tools.ts:190`.
 
 ## What "resolved dependencies" means
 
-The list this tool returns is deliberately narrow: it is the set of imports that indexing was able to *resolve* to another file that is itself in the index. The query that produces it is `getDependsOn`, which joins `file_imports` to `files` and keeps only rows whose `resolved_file_id IS NOT NULL` `src/db/graph.ts:1174`:
+The list this tool returns is deliberately narrow: it is the set of imports that indexing was able to *resolve* to another file that is itself in the index. The query that produces it is `getDependsOn`, which joins `file_imports` to `files` and keeps only rows whose `resolved_file_id IS NOT NULL` `src/db/graph.ts:1188`:
 
 ```sql
 SELECT f.path, fi.source
@@ -70,16 +70,16 @@ Each row carries two columns: `f.path` is the dependency's stored absolute path,
 
 Two kinds of imports are intentionally absent from the result:
 
-- **External / bare specifiers** such as `zod` or `@modelcontextprotocol/sdk/...`. The resolver skips bare specifiers (those not starting with `.` or `/`) for most languages, so they never receive a `resolved_file_id` and the `IS NOT NULL` filter drops them. Rust and Python relative imports are an exception and are still attempted, since their syntax does not always start with `./` `src/graph/resolver.ts:36`.
-- **Imports of files that aren't indexed.** Even a relative import only resolves if the target file actually exists in the `files` table; the fallback pass probes candidate paths against the set of indexed paths, and a miss leaves `resolved_file_id` as `NULL` `src/graph/resolver.ts:48`.
+- **External / bare specifiers** such as `zod` or `@modelcontextprotocol/sdk/...`. `resolveSpecifier` returns `null` for bare external specifiers — they map to no indexed file — so they never receive a `resolved_file_id` and the `IS NOT NULL` filter drops them `src/graph/resolver.ts:313`.
+- **Imports of files that aren't indexed.** Even a relative import only resolves if the target file actually exists in the index. The relative-path branch probes candidate paths (extensions, `/index` files) against the `pathToId` map of indexed paths, and a miss leaves `resolved_file_id` as `NULL` `src/graph/resolver.ts:331`.
 
 So `depends_on` reports the *internal* dependency edges of the project, not the package manifest. A file that imports only third-party packages comes back as having no indexed dependencies even though it clearly imports things.
 
 ### Where the edges come from
 
-The data this tool reads is written earlier, during indexing, not at query time. When a file is parsed, its raw import statements are stored in `file_imports` with `resolved_file_id` left unset — see the insert in `upsertFileGraph`, which deletes the file's old import rows and re-inserts `source`, `names`, the `imported` original name, and the default/namespace flags, but never a resolved id `src/db/graph.ts:917`. A later project-wide pass, `resolveImports`, walks every unresolved import, tries to map its specifier to an indexed file — first via the bun-chunk filesystem resolver that understands tsconfig paths plus Python and Rust conventions, then via a fallback that probes extensions and `index` files against indexed paths — and fills in `resolved_file_id` only when it finds a match `src/graph/resolver.ts:24`. The `file_imports` table itself stores `source`, the parsed `names`, the `is_default` / `is_namespace` flags, and the eventual `resolved_file_id`.
+The data this tool reads is written earlier, during indexing, not at query time. When a file is parsed, its raw import statements are stored in `file_imports` with `resolved_file_id` left unset — see the insert in `upsertFileGraph`, which deletes the file's old import rows and re-inserts `source`, `names`, the `imported` original name, and the default/namespace flags, but never a resolved id `src/db/graph.ts:906`. A later project-wide pass, `resolveImports`, walks every unresolved import, tries to map its specifier to an indexed file — first via the bun-chunk filesystem resolver that understands tsconfig paths plus Python and Rust conventions, then via a fallback that probes extensions and `index` files against indexed paths — and fills in `resolved_file_id` only when it finds a match `src/graph/resolver.ts:25`. The `file_imports` table itself stores `source`, the parsed `names`, the `is_default` / `is_namespace` flags, and the eventual `resolved_file_id`.
 
-`depends_on` is therefore only as complete as the last resolution pass: a freshly added dependency that hasn't been re-indexed and re-resolved won't appear yet. The `RagDB.getDependsOn` method is a thin pass-through to the `graph.ts` query function, which is why the handler can stay so small.
+`depends_on` is therefore only as complete as the last resolution pass: a freshly added dependency that hasn't been re-indexed and re-resolved won't appear yet. The `RagDB.getDependsOn` method is a thin pass-through to the `graph.ts` query function `src/db/index.ts:1071`, which is why the handler can stay so small.
 
 ## Inputs
 
@@ -102,16 +102,16 @@ The handler has exactly three terminal outcomes, decided by two checks:
 
 | Condition | What the tool returns | Source |
 | --- | --- | --- |
-| The resolved path has no row in `files` | `File "<file>" not found in index.` | `src/tools/graph-tools.ts:161` |
-| The file is indexed but `getDependsOn` returns zero rows | `<file> has no indexed dependencies.` | `src/tools/graph-tools.ts:166` |
-| The file is indexed and has at least one resolved import | Count header plus one line per dependency | `src/tools/graph-tools.ts:170` |
+| The resolved path has no row in `files` | `File "<file>" not found in index.` | `src/tools/graph-tools.ts:181` |
+| The file is indexed but `getDependsOn` returns zero rows | `<file> has no indexed dependencies.` | `src/tools/graph-tools.ts:186` |
+| The file is indexed and has at least one resolved import | Count header plus one line per dependency | `src/tools/graph-tools.ts:190` |
 
 Additional notes on edges and errors:
 
-- **File-not-in-index handling.** This is the most common surprise. A path that is real on disk but was never indexed — or excluded by config — returns the not-found message rather than an error. The lookup key is the absolute, separator-normalized path, so an input that points outside the project, or a typo, lands here too `src/tools/graph-tools.ts:159`.
+- **File-not-in-index handling.** This is the most common surprise. A path that is real on disk but was never indexed — or excluded by config — returns the not-found message rather than an error. The lookup key is the absolute, separator-normalized path, so an input that points outside the project, or a typo, lands here too `src/tools/graph-tools.ts:179`.
 - **Empty vs. external-only.** "No indexed dependencies" does not mean the file imports nothing. It means none of its imports resolved to another indexed file. A file whose imports are all third-party packages, or all point at files that aren't in the index, hits this branch.
-- **Pluralization.** The header says `1 file` versus `N files` based on the count, a cosmetic branch only `src/tools/graph-tools.ts:170`.
-- **Directory resolution can throw.** If `directory` is supplied but doesn't exist on disk, `resolveProject` raises `Directory does not exist: <path>` before any lookup runs `src/tools/index.ts:30`.
+- **Pluralization.** The header says `1 file` versus `N files` based on the count, a cosmetic branch only `src/tools/graph-tools.ts:190`.
+- **Directory resolution can throw.** If `directory` is supplied but doesn't exist on disk, `resolveProject` raises `Directory does not exist: <path>` before any lookup runs `src/tools/index.ts:46`.
 
 ## Example
 
@@ -140,4 +140,4 @@ Each line pairs the dependency's project-relative path with the import specifier
 - `src/db/graph.ts` — `getDependsOn` runs the SQL join over `file_imports` that filters to resolved internal edges; `upsertFileGraph` stores the raw import rows during indexing.
 - `src/db/index.ts` — the `RagDB.getDependsOn` pass-through method on the database class.
 - `src/db/files.ts` — `getFileByPath`, the normalized-path lookup that decides whether a file is "in the index".
-- `src/graph/resolver.ts` — `resolveImports`, the pass that fills `resolved_file_id` so that an import becomes a reported dependency.
+- `src/graph/resolver.ts` — `resolveImports` / `resolveSpecifier`, the pass that fills `resolved_file_id` so that an import becomes a reported dependency.

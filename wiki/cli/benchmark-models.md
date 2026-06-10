@@ -4,7 +4,7 @@
 
 This is a maintainer/evaluation tool, not part of normal indexing or serving. You reach for it when you are considering changing the default embedding model and want hard recall numbers on real queries before touching `embeddingModel` in config. It never touches your real index: every model gets its own temporary index directory that is deleted as soon as its turn is over.
 
-The command is registered in the CLI dispatcher at `src/cli/index.ts:146-148`, which routes `benchmark-models` to `benchmarkModelsCommand` in `src/cli/commands/benchmark-models.ts:37`.
+The command is registered in the CLI dispatcher at `src/cli/index.ts:150-151`, which routes `benchmark-models` to `benchmarkModelsCommand` in `src/cli/commands/benchmark-models.ts:37`.
 
 ## How it works
 
@@ -44,7 +44,7 @@ sequenceDiagram
 5. For each model, `configureEmbedder(model.id, model.dim)` records the new model and dimension on the singleton, and `resetEmbedder()` clears the cached pipeline and tokenizer so the next embed call reloads the candidate model — `src/cli/commands/benchmark-models.ts:68-69`.
 6. A temporary index directory `.rag-eval-<model>` is created inside the project dir (any stale copy is deleted first), and a `RagDB` is opened against it with `autoEmbeddingConfig: false` so the constructor does not overwrite the dimension the command just set — `src/cli/commands/benchmark-models.ts:72-81`.
 7. `indexDirectory` walks the project and embeds every chunk into the temp DB at the current model's dimension. The handler times this with `performance.now()` and prints how many files were indexed — `src/cli/commands/benchmark-models.ts:85-91`.
-8. `runBenchmark` runs each query through the normal hybrid search against the temp index (passing `config.hybridWeight`, default 0.5) and computes recall@K, mean reciprocal rank, and zero-miss rate — `src/cli/commands/benchmark-models.ts:95-101`, `src/search/benchmark.ts:52-105`.
+8. `runBenchmark` runs each query through the normal hybrid search against the temp index (passing `config.hybridWeight`, default 0.5) and computes recall@K, mean reciprocal rank, and zero-miss rate — `src/cli/commands/benchmark-models.ts:95-101`, `src/search/benchmark.ts:52-106`.
 9. In a `finally` block the DB is closed and the temp directory is removed with `rmSync(..., { recursive: true, force: true })`, so the temp index never survives the model's turn even if indexing or benchmarking threw — `src/cli/commands/benchmark-models.ts:102-106`.
 10. After all models are done, the embedder is restored to the project default (`configureEmbedder(DEFAULT_MODEL_ID, DEFAULT_EMBEDDING_DIM)` + `resetEmbedder()`) so the process is left in a clean state — `src/cli/commands/benchmark-models.ts:110-111`.
 11. The handler prints a Markdown comparison table and, when more than one model ran, a per-candidate verdict comparing each model against the first — `src/cli/commands/benchmark-models.ts:114-145`.
@@ -77,7 +77,7 @@ The four built-in known models are defined in `KNOWN_MODELS` at `src/cli/command
 | `Xenova/jina-embeddings-v2-small-en` | 512 |
 | `jinaai/jina-embeddings-v2-base-code` | 768 |
 
-`Xenova/all-MiniLM-L6-v2` at 384 dimensions is also the project default model (`DEFAULT_MODEL_ID` / `DEFAULT_EMBEDDING_DIM` in `src/embeddings/embed.ts:17-18`), so putting it first in `--models` makes the comparison a "candidate vs current default" test.
+`Xenova/all-MiniLM-L6-v2` at 384 dimensions is also the project default model (`DEFAULT_MODEL_ID` / `DEFAULT_EMBEDDING_DIM` in `src/embeddings/embed.ts:53-54`), so putting it first in `--models` makes the comparison a "candidate vs current default" test.
 
 ## Outputs
 
@@ -88,13 +88,13 @@ The four built-in known models are defined in `KNOWN_MODELS` at `src/cli/command
 | Recall verdict | When more than one model ran, a per-candidate block showing the recall (in percentage points) and MRR difference versus the first model, plus a recommendation line — `src/cli/commands/benchmark-models.ts:128-145`. |
 | Temp index directories | One `.rag-eval-<model>` directory created per model inside the project dir, then deleted after that model's run. Not a persistent output — see *State changes* — `src/cli/commands/benchmark-models.ts:72-106`. |
 
-The three quality numbers come straight from `runBenchmark`'s `BenchmarkSummary` (`src/search/benchmark.ts:21-27`, computed at `src/search/benchmark.ts:98-104`):
+The three quality numbers come straight from `runBenchmark`'s `BenchmarkSummary` (`src/search/benchmark.ts:21-27`, computed at `src/search/benchmark.ts:99-105`):
 
 - **Recall@K** — average over queries of the fraction of a query's expected files that appeared in the top-K results.
 - **MRR** — mean reciprocal rank; `1/rank` of the first expected file found, averaged over queries (0 for a query that found none).
 - **Zero-miss** — fraction of queries where *no* expected file showed up at all.
 
-A file counts as found when the result path and an expected path match exactly, or one ends with the other. Expected paths are first normalized: relative ones are resolved against the project dir, absolute ones kept as-is. This suffix match lets relative `expected` paths line up with the absolute paths search returns — `src/search/benchmark.ts:46-50,71-74`.
+A file counts as found when the result path and an expected path match exactly, or one ends with the other. Expected paths are first normalized: relative ones are resolved against the project dir, absolute ones kept as-is. This suffix match lets relative `expected` paths line up with the absolute paths search returns — `src/search/benchmark.ts:46-50,73-74`.
 
 ## State changes
 
@@ -110,7 +110,7 @@ For each model the handler computes `tmpDir = join(dir, ".rag-eval-<model-id-wit
 
 This matters for two reasons. First, **isolation**: different models produce vectors of different sizes (384, 512, 768…), and the vector table is built at a fixed dimension, so each model needs its own index — reusing one index across dimensions would trip the dimension guard. Second, **safety**: your real `.mimirs` index is never opened, so running this benchmark cannot corrupt or invalidate the index your editor or MCP server is using.
 
-The `autoEmbeddingConfig: false` option is directly tied to this. Normally the `RagDB` constructor reads the project's stored embedding config and applies it *before* creating the vector tables, so the index is built at the configured dimension regardless of call ordering. But here the command has *already* set the embedder to the candidate model, and the default behaviour would reset the dimension back to the project default. Opting out lets the command stay in control of which model is active — `src/db/index.ts:140-142`.
+The `autoEmbeddingConfig: false` option is directly tied to this. Normally the `RagDB` constructor reads the project's stored embedding config and applies it *before* creating the vector tables, so the index is built at the configured dimension regardless of call ordering. But here the command has *already* set the embedder to the candidate model, and the default behaviour would reset the dimension back to the project default. Opting out lets the command stay in control of which model is active — `src/db/index.ts:143-145`.
 
 ### Embedder singleton model/dim
 
@@ -120,7 +120,7 @@ The `autoEmbeddingConfig: false` option is directly tied to this. Normally the `
 | During | The candidate model id and dimension. |
 | After the run | Restored to the project default model and dimension. |
 
-`configureEmbedder` only swaps the singleton's recorded model and clears the cached pipeline and tokenizer when the id, dimension, pooling, or dtype actually changed; `resetEmbedder` then unconditionally clears the cached extractor and tokenizer so the next embed call reloads — `src/embeddings/embed.ts:51-58`, `src/embeddings/embed.ts:219-222`. Because this state is process-wide, the handler deliberately restores the default at the end so a long-lived process is not left configured for the last candidate — `src/cli/commands/benchmark-models.ts:110-111`.
+`configureEmbedder` only swaps the singleton's recorded model and clears the cached pipeline and tokenizer when the id, dimension, pooling, dtype, or revision actually changed; `resetEmbedder` then unconditionally clears the cached extractor and tokenizer so the next embed call reloads — `src/embeddings/embed.ts:114-128`, `src/embeddings/embed.ts:417-420`. Because this state is process-wide, the handler deliberately restores the default at the end so a long-lived process is not left configured for the last candidate — `src/cli/commands/benchmark-models.ts:110-111`.
 
 ## Branches and failure cases
 
