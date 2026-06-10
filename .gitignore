@@ -14,7 +14,6 @@ node_modules/
 *.db
 
 plans/
-plans2/
 old/
 wiki_*
 

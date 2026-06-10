@@ -254,7 +254,7 @@ For deeper integration, mimirs is also available as a Claude Code plugin. In a C
 /plugin install mimirs
 ```
 
-The plugin wires the MCP server, three hooks — **SessionStart** (context summary), **PostToolUse** (auto-reindex on edit), **SessionEnd** (auto-checkpoint) — and a set of **workflow skills** that orchestrate the tools for common jobs: `explore`, `review`, `debug`, `catch-up`, `recall`, `doc-gaps`, and `wiki`.
+The plugin wires the MCP server, three hooks — **SessionStart** (context summary), **PostToolUse** (auto-reindex on edit), **SessionEnd** (auto-checkpoint) — and a set of **workflow skills** that orchestrate the tools for common jobs: `explore`, `plan`, `review`, `debug`, `research`, `recall`, `catch-up`, `handoff`, `doc-gaps`, `scout`, and `wiki`.
 
 **Want the skills without the plugin?** They're plain `SKILL.md` files under [skills/](skills/). Copy any you like into your project's `.claude/skills/<name>/` (shared with the repo) or `~/.claude/skills/<name>/` (all your projects) and Claude Code picks them up next session. Skills are a Claude Code feature, so they don't apply to other editors — but the MCP tools themselves work everywhere.
 
@@ -347,7 +347,7 @@ to any server.
 
 AST-aware chunking via [bun-chunk](https://github.com/TheWinci/bun-chunk) with tree-sitter grammars:
 
-TypeScript/JavaScript, Python, Go, Rust, Java, C, C++, C#, Ruby, PHP, Scala, Kotlin, Lua, Zig, Elixir, Haskell, OCaml, Dart, Bash/Zsh, TOML, YAML, HTML, CSS/SCSS/LESS
+TypeScript, JavaScript, Python, Go, Rust, Java, C, C++, C#, Ruby, PHP, Scala, Kotlin, Lua, Zig, Elixir, Haskell, OCaml, Dart, Bash/Zsh, TOML, YAML, HTML, CSS/SCSS/LESS
 
 Also indexes: Markdown, JSON, XML, SQL, GraphQL, Protobuf, Terraform, Dockerfiles, Makefiles, and more. Files without a known extension fall back to paragraph splitting.
 
