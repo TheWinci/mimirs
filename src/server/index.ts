@@ -149,6 +149,8 @@ export async function startServer() {
   let watcher: Watcher | null = null;
   let convWatcher: Watcher | null = null;
   let indexLock: IndexLock | null = null;
+  let lockRetryTimer: ReturnType<typeof setInterval> | null = null;
+  let ppidWatchdog: ReturnType<typeof setInterval> | null = null;
 
   function writeExitStatus(reason: string) {
     if (!statusPath) return;
@@ -174,6 +176,8 @@ export async function startServer() {
 
   function cleanup(reason: string = "shutdown", exitCode = 0) {
     shuttingDown = true;
+    if (lockRetryTimer) clearInterval(lockRetryTimer);
+    if (ppidWatchdog) clearInterval(ppidWatchdog);
     writeExitStatus(reason);
     log.debug("Shutting down...", "shutdown");
     if (watcher) watcher.close();
@@ -208,6 +212,22 @@ export async function startServer() {
     log.error(`Unhandled rejection: ${msg}`, "uncaught");
     cleanup(`unhandled rejection: ${msg}\n${stack}`, 1);
   });
+
+  // Parent-death watchdog. The IDE/MCP client that spawned us normally closes
+  // our stdin on shutdown, firing the "end" handler above. But a hard IDE
+  // restart can reparent us to init (ppid -> 1) WITHOUT closing stdin, leaving
+  // an orphaned server that keeps holding the index lock — which then blocks
+  // the freshly-spawned server from ever indexing. Detect the reparent (our
+  // original parent's PID changed) and exit so the lock is released.
+  const initialPpid = process.ppid;
+  ppidWatchdog = setInterval(() => {
+    if (shuttingDown) return;
+    if (process.ppid !== initialPpid) {
+      log.debug(`Parent exited (ppid ${initialPpid} -> ${process.ppid}) — shutting down orphan`, "shutdown");
+      cleanup("parent exited");
+    }
+  }, 5_000);
+  if (typeof ppidWatchdog.unref === "function") ppidWatchdog.unref();
 
   if (isHomeDirTrap) {
     log.warn(`${dirCheck.reason} — skipping auto-index and file watcher`, "dir-guard");
@@ -295,20 +315,9 @@ export async function startServer() {
   const startupConfig = await loadConfig(startupDir);
 
   if (!isHomeDirTrap) {
-    // Process-level lock: only one mimirs server per project directory
-    // performs indexing/watching. Other instances (e.g. extra IDE windows)
-    // share the DB read-only — concurrent indexers double-insert chunks.
-    indexLock = tryAcquireIndexLock(startupDir);
-    if (!indexLock) {
-      log.debug("Another mimirs process is indexing this project — running in query-only mode", "index-lock");
-      writeStatus([
-        `done`,
-        `version: ${version}`,
-        `mode: query-only (another mimirs process owns indexing)`,
-      ].join("\n"));
-    }
-
-    if (indexLock) {
+    // All indexing/watching work, gated behind the lock. Extracted so the
+    // query-only retry path can invoke it the moment it wins the lock.
+    const startIndexingWork = () => {
 
     // Ensure .mimirs/ is gitignored — only the lock holder writes it, so two
     // instances starting together don't both append (duplicate .gitignore lines).
@@ -401,7 +410,38 @@ export async function startServer() {
       startupDir,
       (msg) => log.debug(msg, "conversation"),
     );
-    } // end if (indexLock)
+    }; // end startIndexingWork
+
+    // Process-level lock: only one mimirs server per project directory
+    // performs indexing/watching. Other instances (e.g. extra IDE windows)
+    // share the DB read-only — concurrent indexers double-insert chunks.
+    indexLock = tryAcquireIndexLock(startupDir);
+    if (indexLock) {
+      startIndexingWork();
+    } else {
+      log.debug("Another mimirs process owns the index lock — query-only, will retry", "index-lock");
+      const dbStatus = startupDb.getStatus();
+      writeStatus([
+        `done`,
+        `version: ${version}`,
+        `total files: ${dbStatus.totalFiles}, total chunks: ${dbStatus.totalChunks}`,
+      ].join("\n"));
+      // Don't give up permanently. The lock owner may be an orphaned server
+      // that exits shortly (the ppid watchdog kills such orphans), or any
+      // process that dies later. Retry so we take over indexing instead of
+      // serving stale results forever.
+      lockRetryTimer = setInterval(() => {
+        if (shuttingDown) return;
+        indexLock = tryAcquireIndexLock(startupDir);
+        if (indexLock) {
+          if (lockRetryTimer) clearInterval(lockRetryTimer);
+          lockRetryTimer = null;
+          log.debug("Acquired index lock on retry — taking over indexing", "index-lock");
+          startIndexingWork();
+        }
+      }, 30_000);
+      if (typeof lockRetryTimer.unref === "function") lockRetryTimer.unref();
+    }
   }
 
 }

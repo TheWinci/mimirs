@@ -55,13 +55,11 @@ export function registerIndexTools(server: McpServer, getDB: GetDB, writeStatus?
 
       if (writeStatus) {
         const dbStatus = ragDb.getStatus();
-        const lines = [
+        writeStatus([
           `done`,
           `indexed: ${result.indexed}, skipped: ${result.skipped}, pruned: ${result.pruned}`,
           `total files: ${dbStatus.totalFiles}, total chunks: ${dbStatus.totalChunks}`,
-        ];
-        if (result.locked) lines.splice(1, 0, "mode: query-only (another mimirs process owns indexing)");
-        writeStatus(lines.join("\n"));
+        ].join("\n"));
       }
 
       const dbStatus = ragDb.getStatus();
