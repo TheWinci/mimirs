@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { resolve, relative } from "path";
+import { resolve, relative, isAbsolute } from "path";
 import { generateProjectMap } from "../graph/resolver";
 import type { CallableCandidate } from "../db/graph";
 import {
@@ -143,8 +143,10 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
         : `Found ${results.length} usage${results.length !== 1 ? "s" : ""} of "${symbol}" across ${fileCount} file${fileCount !== 1 ? "s" : ""}`;
       const lines: string[] = [`${countLabel}:\n`];
 
+      // Project-relative paths — every sibling graph tool prints relative and
+      // accepts relative as input, so absolute output broke the copy-back loop.
       for (const [path, usages] of byFile) {
-        lines.push(path);
+        lines.push(isAbsolute(path) ? relative(projectDir, path) : path);
         for (const u of usages) {
           const lineStr = u.line != null ? `:${u.line}` : "";
           lines.push(`  ${lineStr}  ${u.snippet}`);
@@ -371,8 +373,10 @@ export function registerGraphTools(server: McpServer, getDB: GetDB) {
         if (!gitRoot) {
           return textResult("No files given and not a git repository. Pass `files`, or run inside a git repo.");
         }
-        const out = await runGit(["diff", "--name-only", "HEAD"], gitRoot);
-        const changed = (out ?? "").split("\n").map((s) => s.trim()).filter(Boolean);
+        // -z: NUL-separated, unquoted — newline parsing breaks on paths with
+        // spaces/special chars (git C-quotes those) and they never match the index.
+        const out = await runGit(["diff", "--name-only", "-z", "HEAD"], gitRoot);
+        const changed = (out ?? "").split("\0").filter(Boolean);
         if (changed.length === 0) {
           return textResult("No changed files (git diff against HEAD is empty).");
         }

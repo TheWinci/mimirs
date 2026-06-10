@@ -40,9 +40,10 @@ export function registerCheckpointTools(server: McpServer, getDB: GetDB) {
       const sessions = discoverSessions(projectDir);
       const sessionId = sessions.length > 0 ? sessions[0].sessionId : "unknown";
 
-      // Determine turn index from DB
-      const turnCount = ragDb.getTurnCount(sessionId);
-      const turnIndex = Math.max(0, turnCount - 1);
+      // Determine turn index from DB. MAX(turn_index), not COUNT: stored
+      // indices can have gaps, and COUNT-1 pointed the checkpoint at an
+      // older turn on gapped sessions.
+      const turnIndex = ragDb.getMaxTurnIndex(sessionId) ?? 0;
 
       // Embed title + summary for semantic search
       const embText = `${title}. ${summary}`;

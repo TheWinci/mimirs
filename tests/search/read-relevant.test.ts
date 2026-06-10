@@ -138,17 +138,25 @@ describe("searchChunks (read_relevant)", () => {
     expect(results[0].chunkType).toBeNull();
   });
 
-  test("threshold filters low-scoring chunks", async () => {
+  test("threshold filters low-scoring vector-only chunks, keyword hits bypass", async () => {
     await seedWithEntities();
 
-    // Fused scores are rank-based (≤1.0 before boosts), so no threshold returns
-    // results while a threshold above that range filters them all. (Asserts the
-    // threshold mechanism, not a scale-specific cutoff.)
     const all = await searchChunks("markdown splitting", db, 5, 0);
     expect(all.length).toBeGreaterThan(0);
 
-    const filtered = await searchChunks("markdown splitting", db, 5, 5);
+    // Threshold compares the vector match's cosine, but ONLY for rows the
+    // keyword search didn't also find — an exact term match is its own
+    // relevance signal and must survive any threshold. Use a query with no
+    // literal term overlap with the fixtures so every hit is vector-only:
+    // an impossible threshold (cosine ≤ 1 < 5) then filters everything.
+    const vectorOnly = await searchChunks("document partitioning technique", db, 5, 0);
+    const filtered = await searchChunks("document partitioning technique", db, 5, 5);
+    expect(vectorOnly.length).toBeGreaterThan(0);
     expect(filtered.length).toBe(0);
+
+    // And the keyword bypass itself: literal terms survive an impossible threshold.
+    const keywordSurvives = await searchChunks("markdown splitting", db, 5, 5);
+    expect(keywordSurvives.length).toBeGreaterThan(0);
   });
 
   test("respects topK limit", async () => {

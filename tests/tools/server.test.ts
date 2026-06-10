@@ -3,6 +3,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { createTempDir, cleanupTempDir, writeFixture } from "../helpers";
 import { join } from "path";
+import { mkdir } from "fs/promises";
+import { existsSync } from "fs";
 
 let client: Client;
 let tempDir: string;
@@ -86,6 +88,9 @@ describe("MCP Server", () => {
 
   test("search returns message when nothing indexed", async () => {
     const emptyDir = await createTempDir();
+    // The dir is a real (empty) mimirs project — read tools no longer scaffold
+    // a DB in arbitrary directories, only open existing ones.
+    await mkdir(join(emptyDir, ".mimirs"), { recursive: true });
     const result = await client.callTool({
       name: "search",
       arguments: { query: "anything", directory: emptyDir },
@@ -94,6 +99,35 @@ describe("MCP Server", () => {
     const text = (result.content as Array<{ type: string; text: string }>)[0].text;
     expect(text).toContain("No results found");
     await cleanupTempDir(emptyDir);
+  });
+
+  test("read tools refuse to scaffold a DB in an un-indexed directory", async () => {
+    const emptyDir = await createTempDir();
+    const result = await client.callTool({
+      name: "search",
+      arguments: { query: "anything", directory: emptyDir },
+    });
+
+    const text = (result.content as Array<{ type: string; text: string }>)[0].text;
+    expect(text).toContain("No mimirs index at");
+    // The side effect this guards against: no .mimirs/ created by a read.
+    expect(existsSync(join(emptyDir, ".mimirs"))).toBe(false);
+    await cleanupTempDir(emptyDir);
+  });
+
+  test("thrown errors come back as readable text with tool name and hint", async () => {
+    const result = await client.callTool({
+      name: "search",
+      arguments: { query: "anything", directory: "/nonexistent/dir/xyz" },
+    });
+
+    // The shared wrapper formats failures as "<tool> failed: <message>" plus
+    // an actionable hint when one matches — not the SDK's bare error wrap.
+    expect(result.isError).toBe(true);
+    const text = (result.content as Array<{ type: string; text: string }>)[0].text;
+    expect(text).toContain("search failed:");
+    expect(text).toContain("Directory does not exist");
+    expect(text).toContain("Check the `directory` argument");
   });
 
   test("index_status returns correct counts", async () => {

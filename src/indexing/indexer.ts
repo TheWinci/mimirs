@@ -1,4 +1,5 @@
 import { relative, resolve, extname, basename } from "path";
+import { Glob } from "bun";
 import { createHash } from "crypto";
 import { readFile, stat, readdir } from "fs/promises";
 import { parseFile } from "./parse";
@@ -74,6 +75,11 @@ export function buildIncludeFilter(patterns: string[]): (rel: string) => boolean
   const basenamePrefixes: string[] = [];
   const exactPaths = new Set<string>();
   const rootedExtensions: { prefix: string; extension: string }[] = [];
+  const anchoredDirPrefixes: string[] = [];
+  // Any pattern shape the fast paths don't recognize falls back to a real
+  // Glob. Silently dropping it made e.g. `include: ["src/**"]` produce an
+  // empty index with no error.
+  const fallbackGlobs: Glob[] = [];
 
   for (const p of patterns) {
     const normalized = normalizePath(p);
@@ -93,10 +99,16 @@ export function buildIncludeFilter(patterns: string[]): (rel: string) => boolean
     const prefixMatch = normalized.match(/^\*\*\/([A-Za-z]\w*)\.\*$/);
     if (prefixMatch) { basenamePrefixes.push(prefixMatch[1] + "."); continue; }
 
+    // "src/**" → everything under a root-anchored directory
+    const dirMatch = normalized.match(/^([^*?]+?)\/?\*\*$/);
+    if (dirMatch) { anchoredDirPrefixes.push(dirMatch[1].replace(/\/+$/, "")); continue; }
+
     if (!normalized.includes("*") && !normalized.includes("?")) {
       exactPaths.add(normalized);
       continue;
     }
+
+    fallbackGlobs.push(new Glob(normalized));
   }
 
   return (rel: string) => {
@@ -107,9 +119,11 @@ export function buildIncludeFilter(patterns: string[]): (rel: string) => boolean
       || extensions.has(ext)
       || basenames.has(base)
       || basenamePrefixes.some((p) => base.startsWith(p))
+      || anchoredDirPrefixes.some((prefix) => rel.startsWith(prefix + "/"))
       || rootedExtensions.some(({ prefix, extension }) =>
         rel.startsWith(prefix + "/") && ext === extension
-      );
+      )
+      || fallbackGlobs.some((g) => g.match(rel));
   };
 }
 
@@ -129,6 +143,10 @@ export function buildExcludeFilter(patterns: string[]): (rel: string) => boolean
   const basenameSuffixes: string[] = [];
   // Filename suffixes like "_test.go" matched at any depth
   const filenameSuffixes: string[] = [];
+  // Unrecognized shapes fall back to a real Glob instead of being silently
+  // dropped — the default secret excludes ("**/.env", "**/id_rsa") were no-ops
+  // because no fast path matched them.
+  const fallbackGlobs: Glob[] = [];
 
   for (const p of patterns) {
     // "**/dir/**" → explicit any-depth directory match
@@ -150,8 +168,12 @@ export function buildExcludeFilter(patterns: string[]): (rel: string) => boolean
       exactBasenames.add(p); continue;
     }
 
-    // ".env.*" or ".pnp.*" → basename starts with prefix
-    const prefixMatch = p.match(/^([^*?/]+)\.\*$/);
+    // "**/.env", "**/id_rsa" → exact basename at any depth
+    const anyDepthBaseMatch = p.match(/^\*\*\/([^*?/]+)$/);
+    if (anyDepthBaseMatch) { exactBasenames.add(anyDepthBaseMatch[1]); continue; }
+
+    // ".env.*" or "**/.env.*" → basename starts with prefix
+    const prefixMatch = p.match(/^(?:\*\*\/)?([^*?/]+)\.\*$/);
     if (prefixMatch) { basenamePrefixes.push(prefixMatch[1] + "."); continue; }
 
     // "**/*_test.go" or "**/*_generated.go" → filename ends with suffix
@@ -165,6 +187,8 @@ export function buildExcludeFilter(patterns: string[]): (rel: string) => boolean
     // "*.min.js", "*.bundle.js" → filename ends with suffix (any depth)
     const suffixMatch = p.match(/^\*([^*?/]+)$/);
     if (suffixMatch) { filenameSuffixes.push(suffixMatch[1]); continue; }
+
+    fallbackGlobs.push(new Glob(normalizePath(p)));
   }
 
   return (rel: string) => {
@@ -202,6 +226,10 @@ export function buildExcludeFilter(patterns: string[]): (rel: string) => boolean
           if (seg.endsWith(suffix)) return true;
         }
       }
+    }
+
+    for (const g of fallbackGlobs) {
+      if (g.match(rel)) return true;
     }
 
     return false;
@@ -455,6 +483,9 @@ async function processFile(
   if (fileStat.size > MAX_FILE_SIZE) {
     const relPath = baseDir ? relative(baseDir, filePath) : filePath;
     const sizeMB = (fileStat.size / 1024 / 1024).toFixed(1);
+    // If a previously-indexed file grew past the cap, drop its old chunks —
+    // a terminal skip must not leave stale content matching searches forever.
+    if (db.getFileByPath(filePath)) db.removeFile(filePath);
     onProgress?.(`Skipped (too large, ${sizeMB} MB): ${relPath}`);
     return "skipped";
   }
@@ -478,6 +509,8 @@ async function processFile(
   const lineCount = raw.split("\n").length || 1;
   const avgLineLen = raw.length / lineCount;
   if (avgLineLen > MAX_AVG_LINE_LEN) {
+    // Terminal skip on a previously-indexed file: drop the stale chunks.
+    if (existing) db.removeFile(filePath);
     onProgress?.(`Skipped (minified/obfuscated, avg line ${Math.round(avgLineLen)} chars): ${relPath}`);
     return "skipped";
   }
@@ -485,25 +518,32 @@ async function processFile(
   onProgress?.(`Indexing ${relPath}`);
 
   const parsed = timed("parse", () => parseFile(filePath, raw!));
-  raw = null; // free before the expensive embed loop
 
   if (!KNOWN_EXTENSIONS.has(parsed.extension)) {
+    if (existing) db.removeFile(filePath);
     onProgress?.(`Skipped (unsupported extension "${parsed.extension}"): ${relPath}`);
     return "skipped";
   }
 
   if (!parsed.content.trim()) {
+    // A previously-indexed file that became empty must lose its old chunks.
+    if (existing) db.removeFile(filePath);
     onProgress?.(`Skipped (empty): ${relPath}`);
     return "skipped";
   }
 
+  // Pass the raw file content as the line-number source: parsed.content is
+  // the embedding text (trimmed / frontmatter-weighted) and its offsets don't
+  // match the file on disk.
   const chunkResult = await timed("chunk", () => chunkText(
     parsed.content,
     parsed.extension,
     config.chunkSize,
     config.chunkOverlap,
-    filePath
+    filePath,
+    raw!
   ));
+  raw = null; // free before the expensive embed loop
   const chunks = chunkResult.chunks;
 
   if (chunks.length > 10000) {
@@ -523,10 +563,12 @@ async function processFile(
     // Otherwise it was a real fallback (>50% changed / parent groups) — full re-index.
   }
 
-  // Full re-index: delete all chunks, re-embed, re-insert. The file hash is
-  // committed last (see upsertFileStart) so an abort mid-index doesn't strand
-  // the file with a matching hash but zero chunks.
-  const fileId = db.upsertFileStart(filePath);
+  // Full re-index: re-embed, then delete-and-replace chunks in the write
+  // phase. Deleting up front made the file invisible to search for the whole
+  // embed loop (minutes for a large file); deferring shrinks that window to
+  // the DB writes. The file hash is committed last (see upsertFileStart) so an
+  // abort mid-write doesn't strand the file with a matching hash but missing
+  // chunks — and an abort during embedding leaves the old index untouched.
   const allEmbedded: EmbeddedChunk[] = [];
 
   for (let i = 0; i < chunks.length; i += batchSize) {
@@ -549,6 +591,9 @@ async function processFile(
   }
 
   if (signal?.aborted) return "skipped";
+
+  // Write phase starts here: clear old chunks + mark in-progress (empty hash).
+  const fileId = db.upsertFileStart(filePath);
 
   // Detect parent groups and create parent chunks before writing children
   const parentGroups = timed("parent-group", () => detectParentGroups(chunks));
@@ -673,7 +718,22 @@ async function processFileIncremental(
     return null;
   }
 
+  // Legacy racing-writer rows: the DB can hold the same content_hash at two
+  // different chunk indices (dedupeChunks only collapses same-index dupes).
+  // updateChunkPositions keys by content_hash and would set BOTH rows to one
+  // index — search then returns the chunk twice. Full re-index rebuilds clean.
+  if (db.fileHasDuplicateChunkHashes(fileId)) {
+    return null;
+  }
+
   onProgress?.(`Incremental update: ${newCount} new, ${chunks.length - newCount} kept for ${relPath}`);
+
+  // Mark in-progress BEFORE the first mutation (mirror upsertFileStart's
+  // empty-hash invariant). Without this, an abort after deleteStaleChunks
+  // leaves old-hash + mutated chunks; if the file then reverts to that exact
+  // content (undo, git checkout), the next run sees hash-match and skips
+  // forever with chunks missing.
+  db.updateFileHash(fileId, "");
 
   // 1. Delete stale chunks (old hashes not in new set). The file hash is
   //    committed last (step 5) so a crash mid-update retries instead of leaving
@@ -700,7 +760,11 @@ async function processFileIncremental(
     db.updateChunkPositions(fileId, positionUpdates);
   }
 
-  // 3. Embed and insert only new chunks
+  // 3. Embed and insert only new chunks. Hashes are unique here (guarded
+  // above), so a hash → position map replaces the old O(n²) chunks.indexOf.
+  const indexByHash = new Map<string, number>();
+  for (let i = 0; i < chunks.length; i++) indexByHash.set(chunks[i].hash!, i);
+
   const newChunks = chunks.filter(c => !oldHashes.has(c.hash!));
   for (let i = 0; i < newChunks.length; i += batchSize) {
     if (signal?.aborted) return null;
@@ -713,21 +777,12 @@ async function processFileIncremental(
       onProgress ? (msg: string) => onProgress(msg) : undefined,
     );
 
-    const embeddedBatch: EmbeddedChunk[] = batch.map((chunk, j) =>
-      buildEmbeddedChunk(chunk, embeddings[j])
-    );
-
-    // Find the correct chunk_index for each new chunk
-    const indexedBatch = embeddedBatch.map((ec, j) => {
-      const originalChunk = batch[j];
-      const chunkIndex = chunks.indexOf(originalChunk);
-      return { ...ec, chunkIndex };
-    });
-
-    // Insert with correct indices
-    for (const item of indexedBatch) {
-      db.insertChunkBatch(fileId, [item], item.chunkIndex);
-    }
+    // One transaction per batch instead of one per chunk.
+    const indexedBatch = batch.map((chunk, j) => ({
+      chunk: buildEmbeddedChunk(chunk, embeddings[j]),
+      chunkIndex: indexByHash.get(chunk.hash!)!,
+    }));
+    db.insertChunksAt(fileId, indexedBatch);
 
     onProgress?.(`Embedded ${Math.min(i + batchSize, newChunks.length)}/${newChunks.length} new chunks for ${relPath}`, { transient: true });
   }
@@ -793,7 +848,36 @@ export async function indexFile(
   }
 }
 
+// In-process serialization of indexDirectory per directory. The file lock is
+// REENTRANT within a process (the server holds it for its lifetime), so it
+// cannot stop the server's un-awaited startup index and a concurrent
+// index_files tool call from racing each other inside one process — the exact
+// duplicate-chunk corruption the lock exists to prevent, just in-process.
+// A promise chain per directory makes the second caller wait its turn.
+const indexQueues = new Map<string, Promise<unknown>>();
+
 export async function indexDirectory(
+  directory: string,
+  db: RagDB,
+  config: RagConfig,
+  onProgress?: (msg: string, opts?: { transient?: boolean }) => void,
+  signal?: AbortSignal,
+  options?: { prune?: boolean }
+): Promise<IndexResult> {
+  const queueKey = normalizePath(resolve(directory));
+  const prev = indexQueues.get(queueKey) ?? Promise.resolve();
+  const run = prev
+    .catch(() => {}) // a failed predecessor must not poison the queue
+    .then(() => indexDirectoryInner(directory, db, config, onProgress, signal, options));
+  indexQueues.set(queueKey, run);
+  try {
+    return await run;
+  } finally {
+    if (indexQueues.get(queueKey) === run) indexQueues.delete(queueKey);
+  }
+}
+
+async function indexDirectoryInner(
   directory: string,
   db: RagDB,
   config: RagConfig,
@@ -843,6 +927,7 @@ export async function indexDirectory(
     await timed("model-load", () => getEmbedder(config.indexThreads, onProgress));
   }
 
+  const indexedPaths: string[] = [];
   for (const filePath of matchedFiles) {
     if (signal?.aborted) break;
 
@@ -860,6 +945,7 @@ export async function indexDirectory(
 
       if (status === "indexed") {
         result.indexed++;
+        indexedPaths.push(filePath);
       } else {
         result.skipped++;
       }
@@ -897,7 +983,22 @@ export async function indexDirectory(
     }
     // Symbol-level resolution must follow file-level import resolution —
     // cross-file ref edges depend on `file_imports.resolved_file_id`.
-    timed("resolve-symbol-refs", () => db.resolveAllSymbolRefs());
+    //
+    // Scope: indexed files ∪ their importers. A file's resolution only
+    // changes when it was re-indexed or an import target's exports changed;
+    // re-running every file with refs made post-index latency scale with
+    // repo size instead of change size. Importers are gathered AFTER
+    // resolveImports so freshly-resolved imports into new files count.
+    timed("resolve-symbol-refs", () => {
+      const scope = new Set<number>();
+      for (const p of indexedPaths) {
+        const f = db.getFileByPath(p);
+        if (!f) continue;
+        scope.add(f.id);
+        for (const importerId of db.getImportersOf(f.id)) scope.add(importerId);
+      }
+      db.resolveSymbolRefsForFiles(scope);
+    });
   }
 
   return result;

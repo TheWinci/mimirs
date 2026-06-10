@@ -58,10 +58,9 @@ export async function computeFreshness(
       out.push(null); // unstamped or nothing to anchor on
       continue;
     }
-    if (r.commitHash === head) {
-      out.push({ state: "current", changedFiles: [] });
-      continue;
-    }
+    // No HEAD shortcut: the contract is working-tree-vs-commit, so a memory
+    // stamped at HEAD whose files have uncommitted edits is stale too. The
+    // diff for HEAD is one cached `git diff --name-only HEAD` call.
 
     let changed = diffCache.get(r.commitHash);
     if (changed === undefined) {

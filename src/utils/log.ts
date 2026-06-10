@@ -21,8 +21,10 @@ function currentLevel(): number {
   return LEVELS[env] ?? LEVELS.warn;
 }
 
-// Prevent EPIPE on stderr from crashing the process when the parent disconnects
+// Prevent EPIPE on stderr/stdout from crashing the process when the parent
+// disconnects or a pipe closes early (`mimirs search ... | head`)
 process.stderr.on("error", () => {});
+process.stdout.on("error", () => {});
 
 function write(level: Level, prefix: string, msg: string, context?: string) {
   if (LEVELS[level] < currentLevel()) return;

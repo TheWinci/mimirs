@@ -1,15 +1,17 @@
 import { resolve } from "path";
 import { RagDB } from "../../db";
 import { cli } from "../../utils/log";
-import { intFlag } from "../flags";
+import { intFlag, positionalArg } from "../flags";
 
 export async function analyticsCommand(args: string[], getFlag: (flag: string) => string | undefined) {
-  const dir = resolve(args[1] && !args[1].startsWith("--") ? args[1] : ".");
+  const dir = resolve(positionalArg(args[1], "."));
   const days = intFlag(getFlag("--days"), "--days", 30, { min: 1 });
   const db = new RagDB(dir);
   const analytics = db.getAnalytics(days);
 
-  const zeroCount = analytics.zeroResultQueries.reduce((s, q) => s + q.count, 0);
+  // True count, NOT a sum over zeroResultQueries — that's a LIMIT-10 display
+  // list and understates the rate (the same bug the MCP path was cured of).
+  const zeroCount = analytics.zeroResultCount;
   const zeroRate = analytics.totalQueries > 0
     ? ((zeroCount / analytics.totalQueries) * 100).toFixed(0)
     : "0";

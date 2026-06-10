@@ -151,6 +151,20 @@ class CallGraph {
   }
 }
 
+// Every impact/trace/callees call used to build a fresh CallGraph (all
+// callable exports + a full inbound-count scan). Cache per RagDB, invalidated
+// by a cheap version signature over the graph tables.
+const graphCache = new WeakMap<RagDB, { sig: string; g: CallGraph }>();
+
+function getCallGraph(db: RagDB): CallGraph {
+  const sig = db.getGraphVersionSignature();
+  const cached = graphCache.get(db);
+  if (cached && cached.sig === sig) return cached.g;
+  const g = new CallGraph(db);
+  graphCache.set(db, { sig, g });
+  return g;
+}
+
 // ── Symbol resolution ────────────────────────────────────────────
 
 export interface SymbolResolution {
@@ -175,8 +189,14 @@ function candToNode(c: CallableCandidate): CallNode {
 export function resolveSymbol(db: RagDB, name: string, file?: string): SymbolResolution {
   let candidates = db.getCallablesByName(name);
   if (file) {
-    const norm = file.replace(/\\/g, "/");
-    candidates = candidates.filter((c) => c.filePath.replace(/\\/g, "/").endsWith(norm));
+    // Match on a path-segment boundary: a raw suffix match let `file: "db.ts"`
+    // also match "indexed-db.ts", and when exactly one WRONG candidate
+    // survived, impact/trace ran on it with status "ok" and no warning.
+    const norm = file.replace(/\\/g, "/").replace(/^\.\//, "");
+    candidates = candidates.filter((c) => {
+      const p = c.filePath.replace(/\\/g, "/");
+      return p === norm || p.endsWith("/" + norm);
+    });
   }
   if (candidates.length === 0) return { status: "not_found" };
 
@@ -228,7 +248,7 @@ export function impactWalk(
 ): ImpactResult {
   const maxDepth = opts.maxDepth ?? 3;
   const budget = opts.budget ?? 80;
-  const g = new CallGraph(db);
+  const g = getCallGraph(db);
 
   // ── Display pass: a bounded tree (depth + budget + ambient-prune). What an
   //    agent reads. The most direct callers survive when the budget runs out. ──
@@ -315,7 +335,7 @@ export function impactWalk(
  * (which is callers, one hop in). Deduped by node identity.
  */
 export function directCallees(db: RagDB, root: CallNode): CallNode[] {
-  const g = new CallGraph(db);
+  const g = getCallGraph(db);
   const seen = new Set<string>();
   const out: CallNode[] = [];
   for (const c of g.callees(root)) {
@@ -390,7 +410,7 @@ export function tracePath(
   // only limits how much of the connecting sub-graph is rendered for display —
   // it does not gate whether a connection is found.
   const displayBudget = opts.budget ?? 300;
-  const g = new CallGraph(db);
+  const g = getCallGraph(db);
   const fromK = nodeKey(from);
   const toK = nodeKey(to);
 

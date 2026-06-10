@@ -1,11 +1,12 @@
 import { resolve } from "path";
 import { RagDB } from "../../db";
 import { loadConfig } from "../../config";
+import { rrfFuse } from "../../search/hybrid";
 import { indexGitHistory } from "../../git/indexer";
 import { embed } from "../../embeddings/embed";
 import { cliProgress, createQuietProgress } from "../progress";
 import { cli } from "../../utils/log";
-import { intFlag } from "../flags";
+import { intFlag, positionalArg } from "../flags";
 
 export async function historyCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const subcommand = args[1];
@@ -35,7 +36,7 @@ export async function historyCommand(args: string[], getFlag: (flag: string) => 
 }
 
 async function historyIndexCommand(args: string[], getFlag: (flag: string) => string | undefined) {
-  const dir = resolve(args[2] && !args[2].startsWith("--") ? args[2] : ".");
+  const dir = resolve(positionalArg(args[2], "."));
   const verbose = args.includes("--verbose") || args.includes("-v");
   const since = getFlag("--since");
   const db = new RagDB(dir);
@@ -85,22 +86,12 @@ async function historySearchCommand(args: string[], getFlag: (flag: string) => s
 
   const queryEmbedding = await embed(query);
 
-  // Hybrid search
+  // Hybrid search — shared rank fusion, same as the MCP tool and chunk search.
+  const config = await loadConfig(dir);
   const vectorResults = db.searchGitCommits(queryEmbedding, top, author, since);
   const textResults = db.textSearchGitCommits(query, top, author, since);
 
-  const seen = new Map<string, typeof vectorResults[0]>();
-  for (const r of vectorResults) seen.set(r.hash, r);
-  for (const r of textResults) {
-    const existing = seen.get(r.hash);
-    if (existing) {
-      existing.score = 0.7 * existing.score + 0.3 * r.score;
-    } else {
-      seen.set(r.hash, { ...r, score: 0.3 * r.score });
-    }
-  }
-
-  const results = [...seen.values()]
+  const results = rrfFuse(vectorResults, textResults, config.hybridWeight, (r) => r.hash)
     .sort((a, b) => b.score - a.score)
     .slice(0, top);
 
@@ -125,7 +116,7 @@ async function historySearchCommand(args: string[], getFlag: (flag: string) => s
 }
 
 async function historyStatusCommand(args: string[]) {
-  const dir = resolve(args[2] && !args[2].startsWith("--") ? args[2] : ".");
+  const dir = resolve(positionalArg(args[2], "."));
   const db = new RagDB(dir);
 
   const status = db.getGitHistoryStatus();

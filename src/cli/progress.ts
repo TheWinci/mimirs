@@ -8,6 +8,10 @@ import { cli } from "../utils/log";
 let lastWasTransient = false;
 
 function writeTransient(msg: string): void {
+  // No carriage-return animation into pipes — `mimirs index | tee` got
+  // control-char junk. Transient lines are progress-only; drop them when
+  // stdout isn't a TTY (persistent lines still print normally).
+  if (!process.stdout.isTTY) return;
   const cols = process.stdout.columns || 80;
   const truncated = msg.length > cols - 1 ? msg.slice(0, cols - 4) + "..." : msg;
   process.stdout.write(`\r${truncated.padEnd(cols - 1)}`);

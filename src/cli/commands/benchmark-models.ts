@@ -1,7 +1,7 @@
 import { resolve, join } from "path";
 import { mkdirSync, rmSync, existsSync } from "fs";
 import { RagDB } from "../../db";
-import { loadConfig, applyEmbeddingConfig } from "../../config";
+import { loadConfig } from "../../config";
 import { intFlag } from "../flags";
 import { indexDirectory } from "../../indexing/indexer";
 import { loadBenchmarkQueries, runBenchmark, type BenchmarkSummary } from "../../search/benchmark";
@@ -55,7 +55,7 @@ export async function benchmarkModelsCommand(args: string[], getFlag: (flag: str
     process.exit(1);
   }
 
-  const models = modelsArg.split(",").map(parseModelArg);
+  const models = modelsArg.split(",").map((s) => s.trim()).filter(Boolean).map(parseModelArg);
   const queries = await loadBenchmarkQueries(resolve(file));
   const results: { model: ModelSpec; summary: BenchmarkSummary; indexTimeMs: number }[] = [];
 

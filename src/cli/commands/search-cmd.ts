@@ -3,7 +3,7 @@ import { RagDB, type PathFilter } from "../../db";
 import { loadConfig } from "../../config";
 import { search, searchChunks } from "../../search/hybrid";
 import { cli } from "../../utils/log";
-import { intFlag, floatFlag } from "../flags";
+import { intFlag, floatFlag, queryArg } from "../flags";
 
 function parseListFlag(getFlag: (flag: string) => string | undefined, ...names: string[]): string[] | undefined {
   for (const name of names) {
@@ -31,11 +31,8 @@ function buildCliFilter(
 }
 
 export async function searchCommand(args: string[], getFlag: (flag: string) => string | undefined) {
-  const query = args[1];
-  if (!query) {
-    cli.error("Usage: mimirs search <query> [--top N] [--ext .ts,.tsx] [--in src,packages/core] [--exclude tests]");
-    process.exit(1);
-  }
+  // queryArg rejects a flag token (`mimirs search --top 5`) being searched literally.
+  const query = queryArg(args[1], "Usage: mimirs search <query> [--top N] [--ext .ts,.tsx] [--in src,packages/core] [--exclude tests]");
 
   const dir = resolve(getFlag("--dir") || ".");
   const config = await loadConfig(dir);
@@ -61,24 +58,19 @@ export async function searchCommand(args: string[], getFlag: (flag: string) => s
 }
 
 export async function readCommand(args: string[], getFlag: (flag: string) => string | undefined) {
-  const query = args[1];
-  if (!query) {
-    cli.error("Usage: mimirs read <query> [--top N] [--threshold T] [--dir D] [--ext ...] [--in ...] [--exclude ...]");
-    process.exit(1);
-  }
+  const query = queryArg(args[1], "Usage: mimirs read <query> [--top N] [--threshold T] [--dir D] [--ext ...] [--in ...] [--exclude ...]");
 
   const dir = resolve(getFlag("--dir") || ".");
   // Validate flags before constructing RagDB (see searchCommand).
   const topFlag = getFlag("--top");
+  const top0 = topFlag !== undefined ? intFlag(topFlag, "--top", 8, { min: 1 }) : undefined;
   const threshold = floatFlag(getFlag("--threshold"), "--threshold", 0.3, { min: 0, max: 1 });
   const db = new RagDB(dir);
   const config = await loadConfig(dir);
   const filter = buildCliFilter(dir, getFlag);
 
   // Leaf chunks are tight, so a smaller default top still covers the answer cheaply.
-  const top = topFlag !== undefined
-    ? intFlag(topFlag, "--top", 8, { min: 1 })
-    : (config.leafOnly ? 5 : 8);
+  const top = top0 ?? (config.leafOnly ? 5 : 8);
   const results = await searchChunks(query, db, top, threshold, config.hybridWeight, config.generated, filter, config.parentGroupingMinCount, config.leafOnly, false, config.chunkParentBoost, config.chunkRelCutoff, config.chunkSteepSkip);
 
   if (results.length === 0) {

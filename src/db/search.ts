@@ -1,3 +1,4 @@
+import { embeddingBytes } from "../utils/vec";
 import { Database } from "bun:sqlite";
 import { dirname, basename } from "path";
 import { type SearchResult, type ChunkSearchResult, type SymbolResult, type UsageResult, type PathFilter } from "./types";
@@ -76,6 +77,35 @@ function buildPathFilter(filter?: PathFilter): { clauses: string[]; params: stri
 /** How much to over-fetch from the inner vec/FTS query when a filter is active. */
 const FILTER_OVERFETCH = 5;
 
+/**
+ * Run a filtered KNN query, widening the inner vec0 candidate limit until the
+ * post-filter result fills topK (or the whole index has been considered).
+ *
+ * The KNN runs BEFORE the path filter, so a fixed overfetch collapses recall
+ * under selective filters: with `dirs` matching ~1% of a 10k-chunk index, the
+ * top topK*5 nearest neighbors often contain zero in-scope rows and the search
+ * reports "no results" while plenty exist further down the ranking.
+ */
+function widenUntilFilled<T>(
+  db: Database,
+  topK: number,
+  filterActive: boolean,
+  run: (innerLimit: number) => T[],
+): T[] {
+  let innerLimit = filterActive ? topK * FILTER_OVERFETCH : topK;
+  let rows = run(innerLimit);
+  if (!filterActive) return rows;
+
+  const totalChunks = db
+    .query<{ n: number }, []>("SELECT COUNT(*) AS n FROM vec_chunks")
+    .get()!.n;
+  while (rows.length < topK && innerLimit < totalChunks) {
+    innerLimit = Math.min(innerLimit * 8, totalChunks);
+    rows = run(innerLimit);
+  }
+  return rows;
+}
+
 export function vectorSearch(
   db: Database,
   queryEmbedding: Float32Array,
@@ -84,7 +114,6 @@ export function vectorSearch(
 ): SearchResult[] {
   const { clauses, params: filterParams, active } = buildPathFilter(filter);
   const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
-  const innerLimit = active ? topK * FILTER_OVERFETCH : topK;
 
   const sql = `SELECT v.chunk_id, v.distance, c.snippet, c.chunk_index, c.entity_name, c.chunk_type, f.path
      FROM (SELECT chunk_id, distance FROM vec_chunks WHERE embedding MATCH ? ORDER BY distance LIMIT ?) v
@@ -94,28 +123,30 @@ export function vectorSearch(
      ORDER BY v.distance
      LIMIT ?`;
 
-  return db
-    .query<
-      {
-        chunk_id: number;
-        distance: number;
-        snippet: string;
-        chunk_index: number;
-        entity_name: string | null;
-        chunk_type: string | null;
-        path: string;
-      },
-      (Uint8Array | number | string)[]
-    >(sql)
-    .all(new Uint8Array(queryEmbedding.buffer), innerLimit, ...filterParams, topK)
-    .map((row) => ({
-      path: row.path,
-      score: 1 / (1 + row.distance),
-      snippet: row.snippet,
-      chunkIndex: row.chunk_index,
-      entityName: row.entity_name,
-      chunkType: row.chunk_type,
-    }));
+  return widenUntilFilled(db, topK, active, (innerLimit) =>
+    db
+      .query<
+        {
+          chunk_id: number;
+          distance: number;
+          snippet: string;
+          chunk_index: number;
+          entity_name: string | null;
+          chunk_type: string | null;
+          path: string;
+        },
+        (Uint8Array | number | string)[]
+      >(sql)
+      .all(embeddingBytes(queryEmbedding), innerLimit, ...filterParams, topK)
+      .map((row) => ({
+        path: row.path,
+        score: 1 / (1 + row.distance),
+        snippet: row.snippet,
+        chunkIndex: row.chunk_index,
+        entityName: row.entity_name,
+        chunkType: row.chunk_type,
+      }))
+  );
 }
 
 export function textSearch(
@@ -124,9 +155,11 @@ export function textSearch(
   topK: number = 5,
   filter?: PathFilter,
 ): SearchResult[] {
-  const { clauses, params: filterParams, active } = buildPathFilter(filter);
+  const { clauses, params: filterParams } = buildPathFilter(filter);
   const extraWhere = clauses.length > 0 ? ` AND ${clauses.join(" AND ")}` : "";
-  const fetchLimit = active ? topK * FILTER_OVERFETCH : topK;
+  // Unlike the vec0 KNN, the path filter here is applied INSIDE the same SQL
+  // query, so LIMIT topK already returns the right rows — no overfetch needed.
+  const fetchLimit = topK;
 
   const sql = `SELECT c.snippet, c.chunk_index, c.entity_name, c.chunk_type, f.path, rank
      FROM fts_chunks fts
@@ -168,7 +201,6 @@ export function vectorSearchChunks(
 ): ChunkSearchResult[] {
   const { clauses, params: filterParams, active } = buildPathFilter(filter);
   const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
-  const innerLimit = active ? topK * FILTER_OVERFETCH : topK;
 
   const sql = `SELECT v.chunk_id, v.distance, c.snippet, c.chunk_index, c.entity_name, c.chunk_type,
             c.start_line, c.end_line, c.parent_id, f.path
@@ -179,34 +211,36 @@ export function vectorSearchChunks(
      ORDER BY v.distance
      LIMIT ?`;
 
-  return db
-    .query<
-      {
-        chunk_id: number;
-        distance: number;
-        snippet: string;
-        chunk_index: number;
-        entity_name: string | null;
-        chunk_type: string | null;
-        start_line: number | null;
-        end_line: number | null;
-        parent_id: number | null;
-        path: string;
-      },
-      (Uint8Array | number | string)[]
-    >(sql)
-    .all(new Uint8Array(queryEmbedding.buffer), innerLimit, ...filterParams, topK)
-    .map((row) => ({
-      path: row.path,
-      score: 1 / (1 + row.distance),
-      content: row.snippet,
-      chunkIndex: row.chunk_index,
-      entityName: row.entity_name,
-      chunkType: row.chunk_type,
-      startLine: row.start_line,
-      endLine: row.end_line,
-      parentId: row.parent_id,
-    }));
+  return widenUntilFilled(db, topK, active, (innerLimit) =>
+    db
+      .query<
+        {
+          chunk_id: number;
+          distance: number;
+          snippet: string;
+          chunk_index: number;
+          entity_name: string | null;
+          chunk_type: string | null;
+          start_line: number | null;
+          end_line: number | null;
+          parent_id: number | null;
+          path: string;
+        },
+        (Uint8Array | number | string)[]
+      >(sql)
+      .all(embeddingBytes(queryEmbedding), innerLimit, ...filterParams, topK)
+      .map((row) => ({
+        path: row.path,
+        score: 1 / (1 + row.distance),
+        content: row.snippet,
+        chunkIndex: row.chunk_index,
+        entityName: row.entity_name,
+        chunkType: row.chunk_type,
+        startLine: row.start_line,
+        endLine: row.end_line,
+        parentId: row.parent_id,
+      }))
+  );
 }
 
 export function textSearchChunks(
@@ -215,9 +249,11 @@ export function textSearchChunks(
   topK: number = 8,
   filter?: PathFilter,
 ): ChunkSearchResult[] {
-  const { clauses, params: filterParams, active } = buildPathFilter(filter);
+  const { clauses, params: filterParams } = buildPathFilter(filter);
   const extraWhere = clauses.length > 0 ? ` AND ${clauses.join(" AND ")}` : "";
-  const fetchLimit = active ? topK * FILTER_OVERFETCH : topK;
+  // Path filter is applied inside the same SQL query (unlike the vec0 KNN), so
+  // LIMIT topK is already correct — no overfetch needed.
+  const fetchLimit = topK;
 
   const sql = `SELECT c.snippet, c.chunk_index, c.entity_name, c.chunk_type, c.start_line, c.end_line,
             c.parent_id, f.path, rank
@@ -474,11 +510,15 @@ export function findUsages(db: Database, symbolName: string, exact: boolean, top
   // Also match aliased call sites: a ref whose resolved_export_id points at an
   // export of this name (e.g. `import { getDB as g }; g()` → the `g` ref
   // resolves to getDB's export, so searching "getDB" finds it).
+  // LIMIT with dedup/defining-file headroom: a high-fan-in name ("get", "run")
+  // has thousands of ref rows; without a SQL cap they're all materialized with
+  // joined snippets before the JS loop truncates at `top`.
+  const refLimit = top * 10;
   const refRows = exact
     ? db
         .query<
           { snippet: string; file_id: number; start_line: number | null; ref_line: number; path: string },
-          [string, string]
+          [string, string, number]
         >(
           `SELECT c.snippet, c.file_id, c.start_line, sr.line AS ref_line, f.path
            FROM symbol_refs sr
@@ -487,13 +527,14 @@ export function findUsages(db: Database, symbolName: string, exact: boolean, top
            WHERE LOWER(sr.name) = LOWER(?)
               OR sr.resolved_export_id IN (
                 SELECT id FROM file_exports WHERE LOWER(name) = LOWER(?)
-              )`
+              )
+           LIMIT ?`
         )
-        .all(symbolName, symbolName)
+        .all(symbolName, symbolName, refLimit)
     : db
         .query<
           { snippet: string; file_id: number; start_line: number | null; ref_line: number; path: string },
-          [string, string]
+          [string, string, number]
         >(
           `SELECT c.snippet, c.file_id, c.start_line, sr.line AS ref_line, f.path
            FROM symbol_refs sr
@@ -502,11 +543,12 @@ export function findUsages(db: Database, symbolName: string, exact: boolean, top
            WHERE LOWER(sr.name) LIKE LOWER(?) || '%' ESCAPE '\\'
               OR sr.resolved_export_id IN (
                 SELECT id FROM file_exports WHERE LOWER(name) LIKE LOWER(?) || '%' ESCAPE '\\'
-              )`
+              )
+           LIMIT ?`
         )
         // Escape %/_/\ so a name like `do_thing` prefix-matches literally; the
         // trailing `|| '%'` is the intended prefix wildcard.
-        .all(escapeLike(symbolName), escapeLike(symbolName));
+        .all(escapeLike(symbolName), escapeLike(symbolName), refLimit);
 
   for (const row of refRows) {
     if (definingFileIds.has(row.file_id)) continue;

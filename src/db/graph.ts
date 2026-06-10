@@ -870,10 +870,27 @@ export function countInboundRefsByExport(
  * populated for the first time.
  */
 export function resolveAllSymbolRefs(db: Database) {
-  // One-time cleanup for DBs indexed before the upsertFileGraph stale-id
-  // fix shipped: clear resolved_export_id pointing at exports that no
-  // longer exist (left over from re-index churn before FK enforcement).
-  // Cheap; runs every pass but only does work if orphans exist.
+  const fileIds = db
+    .query<{ id: number }, []>("SELECT DISTINCT file_id AS id FROM symbol_refs")
+    .all()
+    .map((r) => r.id);
+  resolveSymbolRefsForFiles(db, fileIds);
+}
+
+/**
+ * Resolve symbol refs for a specific set of files, plus the global orphan
+ * cleanup (cheap, and it must always run — pruned files leave refs pointing
+ * at deleted exports anywhere in the index).
+ *
+ * A file's resolution only changes when the file itself was re-indexed or one
+ * of its import targets changed exports, so an incremental run needs just
+ * {indexed files ∪ their importers} — not every file with refs. The full pass
+ * after a small change was most of the post-index latency on large repos.
+ */
+export function resolveSymbolRefsForFiles(db: Database, fileIds: Iterable<number>) {
+  // Clear resolved_export_id pointing at exports that no longer exist
+  // (re-index churn before FK enforcement, pruned files). Only does work if
+  // orphans exist.
   db.run(
     `UPDATE symbol_refs
      SET resolved_export_id = NULL
@@ -881,10 +898,6 @@ export function resolveAllSymbolRefs(db: Database) {
        AND resolved_export_id NOT IN (SELECT id FROM file_exports)`,
   );
 
-  const fileIds = db
-    .query<{ id: number }, []>("SELECT DISTINCT file_id AS id FROM symbol_refs")
-    .all()
-    .map((r) => r.id);
   for (const id of fileIds) {
     resolveSymbolRefs(db, id);
   }

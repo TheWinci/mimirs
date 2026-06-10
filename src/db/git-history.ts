@@ -1,3 +1,4 @@
+import { embeddingBytes } from "../utils/vec";
 import { Database } from "bun:sqlite";
 import { type GitCommitRow, type GitCommitSearchResult } from "./types";
 import { escapeLike, sanitizeFTS } from "../search/usages";
@@ -53,7 +54,7 @@ export function insertCommitBatch(db: Database, commits: GitCommitInsert[]) {
       // Insert vector embedding
       db.run(
         "INSERT INTO vec_git_commits (commit_id, embedding) VALUES (?, ?)",
-        [commitId, new Uint8Array(c.embedding.buffer)]
+        [commitId, embeddingBytes(c.embedding)]
       );
 
       // Insert per-file stats
@@ -172,7 +173,7 @@ export function searchGitCommits(
        FROM (SELECT commit_id, distance FROM vec_git_commits WHERE embedding MATCH ? ORDER BY distance LIMIT ?) v
        JOIN git_commits gc ON gc.id = v.commit_id`
     )
-    .all(new Uint8Array(queryEmbedding.buffer), fetchLimit);
+    .all(embeddingBytes(queryEmbedding), fetchLimit);
 
   let results: GitCommitSearchResult[] = rows.map((row) => ({
     ...parseRow(row),

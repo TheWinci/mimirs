@@ -2,7 +2,20 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { type GetDB, resolveProject } from "./index";
 import { embed } from "../embeddings/embed";
+import { rrfFuse } from "../search/hybrid";
+import { vectorScoreToCosine } from "../db/search";
 import { type GitCommitSearchResult } from "../db/types";
+
+// since/until are compared LEXICALLY against ISO timestamps in SQL — a
+// non-ISO value ("yesterday", "01/02/2025") silently filters everything out.
+// Validate the shape at the boundary and fail loudly instead.
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?)?/;
+function validateIsoDate(value: string | undefined, name: string): string | null {
+  if (value !== undefined && !ISO_DATE_RE.test(value)) {
+    return `Invalid ${name}: "${value}" — expected an ISO date like 2025-01-31 (optionally with time).`;
+  }
+  return null;
+}
 
 function formatCommitResult(r: GitCommitSearchResult, rank: number): string {
   const mergeTag = r.isMerge ? " [merge]" : "";
@@ -53,7 +66,12 @@ export function registerGitHistoryTools(server: McpServer, getDB: GetDB) {
         .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
     },
     async ({ query, top, author, since, until, path, threshold, directory }) => {
-      const { db: ragDb } = await resolveProject(directory, getDB);
+      const { db: ragDb, config } = await resolveProject(directory, getDB);
+
+      const dateErr = validateIsoDate(since, "since") ?? validateIsoDate(until, "until");
+      if (dateErr) {
+        return { content: [{ type: "text" as const, text: dateErr }] };
+      }
 
       const status = ragDb.getGitHistoryStatus();
       if (status.totalCommits === 0) {
@@ -67,28 +85,27 @@ export function registerGitHistoryTools(server: McpServer, getDB: GetDB) {
 
       const queryEmbedding = await embed(query);
 
-      // Hybrid search: vector + FTS
+      // Hybrid search: vector + FTS, fused by rank like every other hybrid
+      // search. The old hand-rolled blend scaled text-only hits by 0.3 (a
+      // strong exact-keyword match ranked BELOW weak vector matches) and could
+      // score a both-list hit lower than its vector-only score.
       const vectorResults = ragDb.searchGitCommits(queryEmbedding, top, author, since, until, path);
       const textResults = ragDb.textSearchGitCommits(query, top, author, since, until, path);
 
-      // Merge and deduplicate
-      const seen = new Map<string, GitCommitSearchResult>();
-      const HYBRID_WEIGHT = 0.7;
+      // `threshold` compares the true cosine of the vector match (fused scores
+      // are positional). Applied only to VECTOR-ONLY rows above threshold 0:
+      // keyword hits are their own signal, and the default threshold of 0 must
+      // not drop vector hits with a (legitimately) negative derived cosine.
+      const cosineByHash = new Map<string, number | null>();
+      for (const v of vectorResults) cosineByHash.set(v.hash, vectorScoreToCosine(v.score));
+      const textHashes = new Set(textResults.map((t) => t.hash));
 
-      for (const r of vectorResults) {
-        seen.set(r.hash, r);
-      }
-      for (const r of textResults) {
-        const existing = seen.get(r.hash);
-        if (existing) {
-          existing.score = HYBRID_WEIGHT * existing.score + (1 - HYBRID_WEIGHT) * r.score;
-        } else {
-          seen.set(r.hash, { ...r, score: (1 - HYBRID_WEIGHT) * r.score });
-        }
-      }
-
-      let results = [...seen.values()]
-        .filter((r) => r.score >= threshold)
+      let results = rrfFuse(vectorResults, textResults, config.hybridWeight, (r) => r.hash)
+        .filter((r) => {
+          if (threshold <= 0 || textHashes.has(r.hash)) return true;
+          const cos = cosineByHash.get(r.hash);
+          return cos == null || cos >= threshold;
+        })
         .sort((a, b) => b.score - a.score)
         .slice(0, top);
 
@@ -122,6 +139,11 @@ export function registerGitHistoryTools(server: McpServer, getDB: GetDB) {
     },
     async ({ path, top, since, directory }) => {
       const { db: ragDb } = await resolveProject(directory, getDB);
+
+      const dateErr = validateIsoDate(since, "since");
+      if (dateErr) {
+        return { content: [{ type: "text" as const, text: dateErr }] };
+      }
 
       const results = ragDb.getFileHistory(path, top, since);
 

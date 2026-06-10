@@ -31,6 +31,15 @@ const dbMap = new Map<string, DBEntry>();
 // so the next tool call can retry.
 let permanentError: string | null = null;
 
+// Cap on simultaneously open project DBs. Entries were never evicted, so every
+// distinct `directory` a tool was called with kept a SQLite handle for the
+// process lifetime. Eviction rules: never the primary project, and never an
+// entry accessed within IDLE_MS — `lastAccessed` only updates on getDB() hits,
+// so a long-running operation (a minutes-long index_files on a secondary dir)
+// would otherwise look LRU and have its handle closed mid-use.
+const DB_MAP_MAX = 8;
+const DB_IDLE_MS = 10 * 60 * 1000;
+
 function getDB(projectDir: string): RagDB {
   if (permanentError) {
     throw new Error(permanentError);
@@ -42,6 +51,28 @@ function getDB(projectDir: string): RagDB {
   if (entry) {
     entry.lastAccessed = new Date();
     return entry.db;
+  }
+
+  if (dbMap.size >= DB_MAP_MAX) {
+    const primary = resolve(process.env.RAG_PROJECT_DIR || process.cwd());
+    const now = Date.now();
+    let lruKey: string | null = null;
+    let lruTime = Infinity;
+    for (const [dir, e] of dbMap) {
+      if (dir === primary) continue;
+      const last = e.lastAccessed.getTime();
+      if (now - last < DB_IDLE_MS) continue; // possibly mid-operation
+      if (last < lruTime) {
+        lruTime = last;
+        lruKey = dir;
+      }
+    }
+    if (lruKey) {
+      try { dbMap.get(lruKey)!.db.close(); } catch { /* already closed */ }
+      dbMap.delete(lruKey);
+      log.debug(`Evicted idle DB handle for ${lruKey}`, "server");
+    }
+    // No evictable entry → exceed the soft cap rather than close a busy DB.
   }
 
   const db = new RagDB(resolved);
@@ -88,7 +119,10 @@ function writeStartupError(err: unknown) {
 export async function startServer() {
   // Write "starting" status as the very first thing — overwrites any stale
   // "interrupted" from a previous instance before we do anything else.
-  const startupDir = process.env.RAG_PROJECT_DIR || process.cwd();
+  // resolve(): an unresolved RAG_PROJECT_DIR (trailing slash, relative,
+  // symlink alias) flowed into belongsToProject's exact-string cwd comparison
+  // and silently classified every transcript "foreign".
+  const startupDir = resolve(process.env.RAG_PROJECT_DIR || process.cwd());
   const dirCheck = checkIndexDir(startupDir);
   const isHomeDirTrap = !dirCheck.safe;
   const ragDir = join(startupDir, ".mimirs");
@@ -120,10 +154,11 @@ export async function startServer() {
     if (!statusPath) return;
     try {
       const current = readFileSync(statusPath, "utf8");
-      // Only overwrite if this instance owns the status file.
+      // Only overwrite if this instance owns the status file (exact line
+      // match — a substring test let "pid:123" claim "pid:1234"'s file).
       // Another instance may have started and written its own status —
       // clobbering it with "interrupted" would be incorrect.
-      if (!current.includes(instanceId)) return;
+      if (!current.split("\n").some((l) => l.trim() === instanceId)) return;
       if (current.startsWith("done") || current.startsWith("error")) return;
       writeFileSync(statusPath, [
         `interrupted`,
@@ -137,7 +172,7 @@ export async function startServer() {
     }
   }
 
-  function cleanup(reason: string = "shutdown") {
+  function cleanup(reason: string = "shutdown", exitCode = 0) {
     shuttingDown = true;
     writeExitStatus(reason);
     log.debug("Shutting down...", "shutdown");
@@ -146,7 +181,7 @@ export async function startServer() {
     if (indexLock) indexLock.release();
     for (const entry of dbMap.values()) entry.db.close();
     dbMap.clear();
-    process.exit(0);
+    process.exit(exitCode);
   }
 
   // Register signal/stdin handlers immediately so crashes during startup
@@ -161,15 +196,17 @@ export async function startServer() {
   process.on("SIGINT", () => cleanup("SIGINT"));
   process.on("SIGTERM", () => cleanup("SIGTERM"));
   process.on("SIGHUP", () => cleanup("SIGHUP"));
+  // Crashes exit non-zero so the supervising MCP client sees a failure, not a
+  // clean shutdown (exit 0 here masked every crash from process monitors).
   process.on("uncaughtException", (err) => {
     log.error(`Uncaught exception: ${err.message}`, "uncaught");
-    cleanup(`uncaught exception: ${err.message}\n${err.stack ?? "(no stack)"}`);
+    cleanup(`uncaught exception: ${err.message}\n${err.stack ?? "(no stack)"}`, 1);
   });
   process.on("unhandledRejection", (err) => {
     const msg = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack : "(no stack)";
     log.error(`Unhandled rejection: ${msg}`, "uncaught");
-    cleanup(`unhandled rejection: ${msg}\n${stack}`);
+    cleanup(`unhandled rejection: ${msg}\n${stack}`, 1);
   });
 
   if (isHomeDirTrap) {
@@ -331,8 +368,14 @@ export async function startServer() {
       ].join("\n");
       writeStatus(doneStatus);
       log.debug(`Startup index: ${result.indexed} indexed, ${result.skipped} skipped, ${result.pruned} pruned`, "indexer");
-
-      // Start watching after initial index completes
+    }).catch((err) => {
+      writeStatus(`error\nversion: ${version}\nfailed: ${new Date().toISOString()}\n${err instanceof Error ? err.message : err}`);
+      log.warn(`Startup indexing failed: ${err instanceof Error ? err.message : err}`, "indexer");
+    }).finally(() => {
+      // Start the watcher whether or not the initial index succeeded — a
+      // transient startup failure (model download, SQLITE_BUSY) used to leave
+      // the server watch-less for its whole lifetime, silently dropping every
+      // subsequent edit until restart.
       watcher = startWatcher(startupDir, startupDb, startupConfig, (msg) => {
         log.debug(msg, "watcher");
         // Update status file so IDE/client sees watcher activity
@@ -345,9 +388,6 @@ export async function startServer() {
           `watcher: ${msg}`,
         ].join("\n"));
       });
-    }).catch((err) => {
-      writeStatus(`error\nversion: ${version}\nfailed: ${new Date().toISOString()}\n${err instanceof Error ? err.message : err}`);
-      log.warn(`Startup indexing failed: ${err instanceof Error ? err.message : err}`, "indexer");
     });
     // Watch the whole conversations folder and index every transcript from its
     // stored offset — the live session plus any other session that changes or

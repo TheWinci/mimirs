@@ -11,6 +11,9 @@ export function getAnalytics(db: Database, days: number = 30): {
   totalQueries: number;
   avgResultCount: number;
   avgTopScore: number | null;
+  /** TRUE count of zero-result queries — zeroResultQueries below is a LIMIT 10
+   *  display list and must not be summed for the rate (it understates it). */
+  zeroResultCount: number;
   zeroResultQueries: { query: string; count: number }[];
   lowScoreQueries: { query: string; topScore: number; timestamp: string }[];
   topSearchedTerms: { query: string; count: number }[];
@@ -36,6 +39,12 @@ export function getAnalytics(db: Database, days: number = 30): {
     )
     .all(since);
 
+  const zeroTotal = db
+    .query<{ count: number }, [string]>(
+      "SELECT COUNT(*) as count FROM query_log WHERE result_count = 0 AND created_at >= ?"
+    )
+    .get(since)!;
+
   const lowScore = db
     .query<{ query: string; top_score: number; created_at: string }, [string]>(
       "SELECT query, top_score, created_at FROM query_log WHERE top_score IS NOT NULL AND top_score < 0.3 AND created_at >= ? ORDER BY top_score ASC LIMIT 10"
@@ -59,6 +68,7 @@ export function getAnalytics(db: Database, days: number = 30): {
     totalQueries: total.count,
     avgResultCount: avgResult.avg ?? 0,
     avgTopScore: avgScore.avg,
+    zeroResultCount: zeroTotal.count,
     zeroResultQueries: zeroResult,
     lowScoreQueries: lowScore,
     topSearchedTerms: topTerms,

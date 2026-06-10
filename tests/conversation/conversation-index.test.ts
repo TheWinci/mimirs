@@ -120,10 +120,16 @@ describe("indexConversation", () => {
     const extraContent = entries2.map((e) => JSON.stringify(e)).join("\n") + "\n";
     writeFileSync(path, extraContent, { flag: "a" });
 
-    // Index from offset
-    const result2 = await indexConversation(path, "test-session", db, tempDir, result1.newOffset, 1);
-    expect(result2.turnsIndexed).toBe(1);
+    // Index from the persisted offset. The cursor is held at the last stored
+    // turn's start (it may still have been open), so the resume index is
+    // derived internally from MAX(turn_index) — not passed by the caller.
+    const result2 = await indexConversation(path, "test-session", db, tempDir, result1.newOffset);
+    expect(result2.turnsIndexed).toBe(1); // turn 0 unchanged (skipped), turn 1 new
     expect(db.getTurnCount("test-session")).toBe(2);
+
+    // The re-parsed first turn must not have been duplicated at a new index.
+    const rows = db.getTurnRange("test-session", 0, 10);
+    expect(rows.map((r) => r.turnIndex)).toEqual([0, 1]);
   });
 
   test("indexes Bash tool results", async () => {
@@ -198,6 +204,114 @@ describe("indexConversation", () => {
     expect(turnIds.size).toBeLessThanOrEqual(1);
   });
 
+  // Class invariant for the cursor fix: a turn whose continuation arrives in a
+  // LATER read must end up stored whole. The old cursor advanced to the last
+  // complete JSONL line (routinely mid-turn) and the continuation was dropped
+  // — measured at 46% of turns missing assistant text in a real index.
+  test("a turn split across two incremental reads keeps its tail", async () => {
+    // Read 1: user question + first assistant message (turn still open —
+    // a tool call is in flight).
+    const path = await writeJSONL("split.jsonl", [
+      userMsg("Please refactor the auth module", "u1"),
+      assistantMsg("Starting the refactor now.", "a1", "u1"),
+      assistantToolUse("Bash", "tool-1", "a2", "a1"),
+    ]);
+    const r1 = await indexConversation(path, "test-session", db, tempDir);
+    expect(r1.turnsIndexed).toBe(1);
+
+    // Read 2: the tool result + the rest of the assistant's answer arrive.
+    const { writeFileSync } = await import("fs");
+    const tail = [
+      userToolResult("tool-1", "3 files changed", "u2", "a2"),
+      assistantMsg("Refactor complete: extracted the token check into middleware.", "a3", "u2"),
+    ].map((e) => JSON.stringify(e)).join("\n") + "\n";
+    writeFileSync(path, tail, { flag: "a" });
+
+    await indexConversation(path, "test-session", db, tempDir, r1.newOffset);
+
+    // Reconciliation: stored turn must equal a clean one-shot parse.
+    expect(db.getTurnCount("test-session")).toBe(1);
+    const [stored] = db.getTurnRange("test-session", 0, 0);
+    expect(stored.assistantText).toContain("Starting the refactor now.");
+    expect(stored.assistantText).toContain("Refactor complete");
+    expect(stored.toolsUsed).toContain("Bash");
+  });
+
+  // Upgrade safety: sessions indexed before the cursor fix persisted offsets
+  // with OLD semantics (end of last complete line). Resuming from such an
+  // offset must NOT replace the stored last turn with the next new turn.
+  test("legacy end-of-file cursor does not destroy the last stored turn", async () => {
+    const path = await writeJSONL("legacy.jsonl", [
+      userMsg("first question", "u1"),
+      assistantMsg("first answer", "a1", "u1"),
+      userMsg("second question", "u2", "a1"),
+      assistantMsg("second answer", "a2", "u2"),
+    ]);
+    await indexConversation(path, "test-session", db, tempDir);
+
+    // Simulate a legacy session row: cursor at END of file (old semantics),
+    // as every pre-fix DB has.
+    const { statSync } = await import("fs");
+    const eof = statSync(path).size;
+    db.upsertSession("test-session", path, "2026-01-01T00:00:00Z", statSync(path).mtimeMs, eof);
+
+    // A third turn arrives; the watcher resumes from the legacy EOF cursor.
+    const { writeFileSync } = await import("fs");
+    const more = [
+      userMsg("third question", "u3", "a2"),
+      assistantMsg("third answer", "a3", "u3"),
+    ].map((e) => JSON.stringify(e)).join("\n") + "\n";
+    writeFileSync(path, more, { flag: "a" });
+
+    await indexConversation(path, "test-session", db, tempDir, eof);
+
+    const rows = db.getTurnRange("test-session", 0, 10);
+    expect(rows.map((r) => r.userText)).toEqual([
+      "first question",
+      "second question", // the old bug replaced this with "third question"
+      "third question",
+    ]);
+  });
+
+  // The rewind check must use strong identity, not just userText: repeated
+  // identical user messages ("continue") + a legacy EOF cursor made a NEW
+  // turn look like a rewind of the stored one and replaced it.
+  test("repeated identical user messages survive a legacy EOF cursor", async () => {
+    const t = (n: number) => `2026-01-01T00:0${n}:00Z`;
+    const mkUser = (uuid: string, parent: string | null, ts: string): JournalEntry => ({
+      ...userMsg("continue", uuid, parent), timestamp: ts,
+    });
+    const mkAsst = (text: string, uuid: string, parent: string, ts: string): JournalEntry => ({
+      ...assistantMsg(text, uuid, parent), timestamp: ts,
+    });
+
+    const path = await writeJSONL("repeat.jsonl", [
+      mkUser("u1", null, t(0)), mkAsst("did part one", "a1", "u1", t(0)),
+      mkUser("u2", "a1", t(1)), mkAsst("did part two", "a2", "u2", t(1)),
+    ]);
+    await indexConversation(path, "test-session", db, tempDir);
+
+    // Legacy cursor: end of file (old semantics).
+    const { statSync, writeFileSync } = await import("fs");
+    const eof = statSync(path).size;
+    db.upsertSession("test-session", path, t(0), statSync(path).mtimeMs, eof);
+
+    // Another identical "continue" turn arrives.
+    const more = [
+      mkUser("u3", "a2", t(2)), mkAsst("did part three", "a3", "u3", t(2)),
+    ].map((e) => JSON.stringify(e)).join("\n") + "\n";
+    writeFileSync(path, more, { flag: "a" });
+
+    await indexConversation(path, "test-session", db, tempDir, eof);
+
+    const rows = db.getTurnRange("test-session", 0, 10);
+    expect(rows.map((r) => r.assistantText)).toEqual([
+      "did part one",
+      "did part two", // old bug: replaced by "did part three"
+      "did part three",
+    ]);
+  });
+
   test("tracks session metadata", async () => {
     const path = await writeJSONL("test.jsonl", [
       userMsg("Hello", "u1"),
@@ -209,6 +323,22 @@ describe("indexConversation", () => {
     const session = db.getSession("test-session");
     expect(session).not.toBeNull();
     expect(session!.turnCount).toBe(1);
-    expect(session!.readOffset).toBeGreaterThan(0);
+    // The cursor holds at the LAST turn's start so an open turn is re-parsed
+    // whole next pass — for a single-turn file that is byte 0.
+    expect(session!.readOffset).toBe(0);
+
+    // Append a second turn: the cursor advances past the (now closed) first
+    // turn to the second turn's start.
+    const { writeFileSync } = await import("fs");
+    const more = [
+      userMsg("Another question", "u2", "a1"),
+      assistantMsg("Another answer!", "a2", "u2"),
+    ].map((e) => JSON.stringify(e)).join("\n") + "\n";
+    writeFileSync(path, more, { flag: "a" });
+
+    await indexConversation(path, "test-session", db, tempDir, session!.readOffset);
+    const updated = db.getSession("test-session");
+    expect(updated!.turnCount).toBe(2);
+    expect(updated!.readOffset).toBeGreaterThan(0);
   });
 });

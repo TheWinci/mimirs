@@ -103,10 +103,11 @@ export const BLOCK_VERSION = createHash("sha256").update(INSTRUCTIONS_BLOCK).dig
 const FENCE_END = "<!-- mimirs:end -->";
 const fenceStart = (v: string) => `<!-- mimirs:start v=${v} -->`;
 // Matches one managed region and captures its stamped version. No `g` flag, so
-// `.test()` / `.match()` stay stateless.
-const FENCE_RE = /<!-- mimirs:start v=([0-9a-z]+) -->[\s\S]*?<!-- mimirs:end -->/;
+// `.test()` / `.match()` stay stateless. Exported so cleanup removes the same
+// region init writes — the two must never drift on the block format again.
+export const FENCE_RE = /<!-- mimirs:start v=([0-9a-z]+) -->[\s\S]*?<!-- mimirs:end -->/;
 // The heading the block always opens with — used to find a pre-fence block.
-const LEGACY_HEADING = "## Using mimirs tools";
+export const LEGACY_HEADING = "## Using mimirs tools";
 
 function fencedRegion(inner: string): string {
   return `${fenceStart(BLOCK_VERSION)}\n${inner}\n${FENCE_END}`;
@@ -165,12 +166,19 @@ async function injectMarkdown(filePath: string, inner: string): Promise<string |
       return `Updated mimirs block in ${filePath} (v=${BLOCK_VERSION})`;
     }
 
-    // Pre-fence block from an older init: it was always appended last, so
-    // everything from the heading to EOF is ours to replace.
+    // Pre-fence block from an older init. It was appended last at write time,
+    // but the user may have added their own sections below it since — so claim
+    // only up to the next h1/h2 heading, not to EOF.
     const idx = content.indexOf(LEGACY_HEADING);
     if (idx !== -1) {
       const before = content.slice(0, idx).trimEnd();
-      await writeFile(filePath, (before ? before + "\n\n" : "") + region + "\n");
+      const afterHeading = content.slice(idx + LEGACY_HEADING.length);
+      const nextHeading = afterHeading.search(/^#{1,2} /m);
+      const after = nextHeading === -1 ? "" : afterHeading.slice(nextHeading).trimEnd();
+      await writeFile(
+        filePath,
+        (before ? before + "\n\n" : "") + region + "\n" + (after ? "\n" + after + "\n" : ""),
+      );
       return `Updated mimirs block in ${filePath} (v=${BLOCK_VERSION})`;
     }
 
@@ -405,12 +413,20 @@ export function detectAgentHints(projectDir: string): string[] {
   return hints;
 }
 
-export function confirm(question: string): Promise<boolean> {
+/**
+ * Ask a yes/no question. `defaultYes` controls what Enter (or any unrecognized
+ * answer) means — it must match the prompt's [Y/n]/[y/N] convention. Destructive
+ * prompts MUST use defaultYes=false: only an explicit y/yes proceeds.
+ */
+export function confirm(question: string, defaultYes = false): Promise<boolean> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((res) => {
     rl.question(question, (answer) => {
       rl.close();
-      res(answer.trim().toLowerCase() !== "n");
+      const a = answer.trim().toLowerCase();
+      if (a === "y" || a === "yes") return res(true);
+      if (a === "n" || a === "no") return res(false);
+      res(defaultYes);
     });
   });
 }

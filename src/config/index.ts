@@ -177,12 +177,29 @@ export async function loadConfig(projectDir: string): Promise<RagConfig> {
     return { ...DEFAULT_CONFIG };
   }
 
-  const result = RagConfigSchema.safeParse(parsed);
+  let result = RagConfigSchema.safeParse(parsed);
 
   if (!result.success) {
+    // Salvage the valid fields: drop only the offending top-level keys and
+    // re-parse. Discarding the whole file for one bad field silently changes
+    // what gets indexed (custom include/exclude lost) — worse than the error.
     const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join(", ");
-    log.warn(`Config validation: ${issues}. Using defaults for invalid fields.`, "config");
-    return { ...DEFAULT_CONFIG };
+    const badKeys = new Set(
+      result.error.issues.map((i) => String(i.path[0] ?? "")).filter((k) => k.length > 0),
+    );
+    const salvaged = Object.fromEntries(
+      Object.entries(parsed as Record<string, unknown>).filter(([k]) => !badKeys.has(k)),
+    );
+    result = RagConfigSchema.safeParse(salvaged);
+    if (!result.success) {
+      log.warn(`Config validation: ${issues}. Config unusable — using ALL defaults.`, "config");
+      return { ...DEFAULT_CONFIG };
+    }
+    log.warn(
+      `Config validation: ${issues}. Ignoring invalid field(s) ${[...badKeys].join(", ")}; keeping the rest.`,
+      "config",
+    );
+    parsed = salvaged;
   }
 
   // The glob lists default to [] when omitted, which would index nothing. A
@@ -223,7 +240,8 @@ function resolveModel(c: {
   embeddingRevision?: string;
 }): ResolvedModel {
   const requested = c.embeddingModel;
-  if (requested && requested !== DEFAULT_MODEL_ID && !allowCustomModel()) {
+  const isCustom = !!requested && requested !== DEFAULT_MODEL_ID;
+  if (isCustom && !allowCustomModel()) {
     log.warn(
       `Ignoring embeddingModel="${requested}" from project config (untrusted). ` +
         `Set MIMIRS_ALLOW_CUSTOM_MODEL=1 to allow it. Using ${DEFAULT_MODEL_ID}.`,
@@ -231,8 +249,23 @@ function resolveModel(c: {
     );
     return { model: DEFAULT_MODEL_ID, dim: DEFAULT_EMBEDDING_DIM };
   }
-  // Default model, or a custom model the operator opted into. The custom dim/
-  // pooling/dtype/revision are only honored alongside an honored custom model.
+  // Custom dim/pooling/dtype/revision are honored ONLY alongside an opted-in
+  // custom model. For the default model they come from the same untrusted
+  // config.json: a custom embeddingRevision would un-pin the model (skipping
+  // the sha256 check), and a custom embeddingDim would create wrong-dimension
+  // vec tables — both without MIMIRS_ALLOW_CUSTOM_MODEL.
+  if (!isCustom) {
+    const overrides = (["embeddingDim", "embeddingPooling", "embeddingDtype", "embeddingRevision"] as const)
+      .filter((k) => c[k] !== undefined);
+    if (overrides.length > 0 && !allowCustomModel()) {
+      log.warn(
+        `Ignoring ${overrides.join(", ")} from project config (untrusted) for the default model. ` +
+          `Set MIMIRS_ALLOW_CUSTOM_MODEL=1 to allow embedding overrides.`,
+        "config",
+      );
+      return { model: DEFAULT_MODEL_ID, dim: DEFAULT_EMBEDDING_DIM };
+    }
+  }
   return {
     model: requested ?? DEFAULT_MODEL_ID,
     dim: c.embeddingDim ?? DEFAULT_EMBEDDING_DIM,

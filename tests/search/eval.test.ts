@@ -69,16 +69,18 @@ describe("runEvalTask", () => {
     expect(trace.searchCount).toBe(1);
   });
 
-  test("without-rag returns empty results", async () => {
+  test("without-rag uses the filename-keyword baseline", async () => {
     await seedDB();
 
-    const task: EvalTask = { task: "authentication", grading: "must reference auth" };
-    const trace = await runEvalTask(task, db, tempDir, "without-rag");
+    // "authentication" doesn't substring-match "auth.ts", so the baseline can
+    // miss what semantic search finds — that gap is exactly what the A/B
+    // measures. "auth" as a literal word DOES match by filename.
+    const literal: EvalTask = { task: "auth middleware", grading: "must reference auth" };
+    const trace = await runEvalTask(literal, db, tempDir, "without-rag");
 
     expect(trace.condition).toBe("without-rag");
-    expect(trace.searchResults).toHaveLength(0);
-    expect(trace.filesReferenced).toHaveLength(0);
-    expect(trace.searchCount).toBe(0);
+    expect(trace.searchCount).toBe(1); // a real baseline ran, not a no-op
+    expect(trace.filesReferenced.some((f) => f.includes("auth"))).toBe(true);
   });
 });
 
@@ -96,9 +98,10 @@ describe("runEval", () => {
     expect(summary.totalTasks).toBe(2);
     expect(summary.traces).toHaveLength(4); // 2 tasks × 2 conditions
     expect(summary.withRag.avgSearchResults).toBeGreaterThan(0);
-    expect(summary.withoutRag.avgSearchResults).toBe(0);
     expect(summary.withRag.fileHitRate).toBeGreaterThan(0);
-    expect(summary.withoutRag.fileHitRate).toBe(0);
+    // The baseline arm is a real filename-keyword strategy now (the empty arm
+    // made the comparison unloseable). RAG must do at least as well.
+    expect(summary.withoutRag.fileHitRate).toBeLessThanOrEqual(summary.withRag.fileHitRate);
   });
 });
 

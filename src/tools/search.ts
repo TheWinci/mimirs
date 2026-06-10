@@ -4,6 +4,7 @@ import { relative, resolve } from "path";
 import { type AnnotationRow, type PathFilter } from "../db";
 import { search, searchChunks } from "../search/hybrid";
 import { computeFreshness, freshnessTag, type Freshness } from "../git/staleness";
+import { normalizePath } from "../utils/path";
 import { type GetDB, resolveProject } from "./index";
 
 /**
@@ -85,10 +86,13 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
       const header = `── ${results.length} results across ${totalFiles} indexed files (${durationMs}ms) ──`;
 
       const body = results
-        .map(
-          (r) =>
-            `${r.score.toFixed(4)}  ${r.path}\n  ${r.snippets[0]?.slice(0, 400)}...`
-        )
+        .map((r) => {
+          const snip = r.snippets[0];
+          const preview = snip
+            ? snip.slice(0, 400) + (snip.length > 400 ? "…" : "")
+            : "(no preview)";
+          return `${r.score.toFixed(4)}  ${r.path}\n  ${preview}`;
+        })
         .join("\n\n");
 
       const footer = `\n── Tip: call read_relevant with the same query to get full function/class content with exact line ranges. ──`;
@@ -122,7 +126,7 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
         .min(0)
         .max(1)
         .optional()
-        .describe("Min relevance score to include (default: 0.3)"),
+        .describe("Min cosine relevance of the semantic match, 0-1 (default: 0.3). Keyword-only matches are kept regardless."),
       extensions: z
         .array(z.string())
         .optional()
@@ -177,12 +181,16 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
       const uniqueFiles = new Set(results.map((r) => r.path));
       const header = `── ${results.length} chunks from ${uniqueFiles.size} files (searched ${totalFiles} files in ${durationMs}ms) ──`;
 
-      // Batch-fetch annotations for all unique paths (avoids N+1 queries)
-      const uniqueRelPaths = [...new Set(results.map((r) => relative(projectDir, r.path)))];
+      // Batch-fetch annotations for all unique paths in ONE query (the old
+      // loop was the N+1 its own comment claimed to avoid). normalizePath:
+      // stored annotation paths are forward-slash, but `relative()` emits
+      // backslashes on Windows — un-normalized keys never matched there.
+      const uniqueRelPaths = [...new Set(results.map((r) => normalizePath(relative(projectDir, r.path))))];
       const annotationsByPath = new Map<string, AnnotationRow[]>();
-      for (const relPath of uniqueRelPaths) {
-        const anns = ragDb.getAnnotations(relPath);
-        if (anns.length > 0) annotationsByPath.set(relPath, anns);
+      for (const ann of ragDb.getAnnotationsForPaths(uniqueRelPaths)) {
+        const list = annotationsByPath.get(ann.path);
+        if (list) list.push(ann);
+        else annotationsByPath.set(ann.path, [ann]);
       }
 
       // Stale notes are worse than no notes — flag freshness inline. Compute once
@@ -209,7 +217,7 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
           const resultHeader = `[${r.score.toFixed(2)}] ${r.path}${lineRange}${entity}`;
 
           // Surface annotations for this file (and matching entity if applicable)
-          const relPath = relative(projectDir, r.path);
+          const relPath = normalizePath(relative(projectDir, r.path));
           const fileAnnotations = annotationsByPath.get(relPath) ?? [];
           const relevant = fileAnnotations.filter(
             (a) => a.symbolName == null || a.symbolName === r.entityName

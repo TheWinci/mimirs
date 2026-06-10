@@ -4,6 +4,7 @@ import { getEmbeddingDim, getModelId, getEmbeddingVariant } from "../embeddings/
 import { identifierParts } from "../indexing/identifiers";
 import { applyEmbeddingConfigFromDisk } from "../config";
 import { log } from "../utils/log";
+import { toProjectRelative } from "../utils/path";
 
 /**
  * Schema version stamped into `PRAGMA user_version`. Bump when the schema shape
@@ -100,6 +101,7 @@ function loadCustomSQLite() {
 export class RagDB {
   private db: Database;
   private ragDir: string;
+  private projectDirAbs: string;
 
   constructor(
     projectDir: string,
@@ -107,6 +109,7 @@ export class RagDB {
     opts?: { autoEmbeddingConfig?: boolean },
   ) {
     loadCustomSQLite();
+    this.projectDirAbs = resolve(projectDir);
 
     const ragDir = customRagDir
       ? resolve(customRagDir)
@@ -149,6 +152,28 @@ export class RagDB {
     this.assertEmbeddingModelCompatible();
     this.initSchema();
     this.recordEmbeddingModel();
+    this.normalizeAnnotationPaths();
+  }
+
+  /**
+   * One-time repair: annotations written before path canonicalization carry
+   * absolute paths that never match the project-relative lookups, so the
+   * notes exist but never surface. Rewrite rows inside the project to the
+   * relative form.
+   */
+  private normalizeAnnotationPaths(): void {
+    if (!this.tableExists("annotations")) return;
+    const rows = this.db
+      .query<{ id: number; path: string }, []>(
+        "SELECT id, path FROM annotations WHERE path LIKE '/%' OR path LIKE '_:%' OR path LIKE './%'",
+      )
+      .all();
+    for (const r of rows) {
+      const rel = toProjectRelative(this.projectDirAbs, r.path);
+      if (rel !== r.path) {
+        this.db.run("UPDATE annotations SET path = ? WHERE id = ?", [rel, r.id]);
+      }
+    }
   }
 
   private tableExists(name: string): boolean {
@@ -170,6 +195,24 @@ export class RagDB {
       "INSERT INTO meta(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
       [key, value],
     );
+  }
+
+  /**
+   * Explicit git-history resume point: the repo HEAD recorded when the last
+   * index run completed. Inferring it from MAX(author date) picked rebased /
+   * clock-skewed side-branch tips that aren't ancestors of HEAD, sending every
+   * incremental run down the force-push recovery path.
+   */
+  getGitResumePoint(): string | null {
+    return this.getMeta("git_resume_head");
+  }
+  setGitResumePoint(hash: string): void {
+    this.setMeta("git_resume_head", hash);
+  }
+  clearGitResumePoint(): void {
+    if (this.tableExists("meta")) {
+      this.db.run("DELETE FROM meta WHERE key = ?", ["git_resume_head"]);
+    }
   }
 
   /**
@@ -345,6 +388,11 @@ export class RagDB {
       CREATE INDEX IF NOT EXISTS idx_symbol_refs_file ON symbol_refs(file_id);
       CREATE INDEX IF NOT EXISTS idx_symbol_refs_name ON symbol_refs(name);
       CREATE INDEX IF NOT EXISTS idx_symbol_refs_resolved ON symbol_refs(resolved_export_id);
+      -- The namespace-member resolution pass correlates refs by (file_id, line)
+      -- to co-locate "ns" and "member" refs of "ns.member"; without this index
+      -- that pass is O(refs²) per file (~400ms/file measured) and dominated
+      -- the entire post-index resolution phase.
+      CREATE INDEX IF NOT EXISTS idx_symbol_refs_file_line ON symbol_refs(file_id, line);
 
       CREATE TABLE IF NOT EXISTS conversation_sessions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -663,6 +711,25 @@ export class RagDB {
     })();
   }
 
+  /**
+   * True when a file's stored chunks contain the same content_hash at more
+   * than one chunk_index. dedupeChunks misses this shape (its grouping
+   * includes chunk_index), and the incremental path's content_hash-keyed
+   * position updates would collapse both rows onto one index. Note this can
+   * also be a LEGITIMATE state (a file with two identical chunks always takes
+   * the full path) — so the check lives here and the incremental path uses it
+   * to bail to a clean full re-index, rather than startup deleting rows.
+   */
+  fileHasDuplicateChunkHashes(fileId: number): boolean {
+    const row = this.db
+      .query<{ dup: number }, [number]>(
+        `SELECT (COUNT(*) > COUNT(DISTINCT content_hash)) AS dup FROM chunks
+         WHERE file_id = ? AND content_hash IS NOT NULL AND chunk_index >= 0`,
+      )
+      .get(fileId);
+    return !!row && row.dup === 1;
+  }
+
   private migrateChunksEntityColumns() {
     const cols = this.db
       .query<{ name: string }, []>("PRAGMA table_info(chunks)")
@@ -703,6 +770,14 @@ export class RagDB {
       this.db.query<{ sql: string | null }, []>("SELECT sql FROM sqlite_master WHERE name = 'fts_chunks'").get()?.sql ?? "";
     if (ftsSql.includes("parts")) return; // already migrated (or fresh DB created with the new schema)
 
+    // The whole drop→backfill→recreate→rebuild sequence runs in ONE
+    // transaction (SQLite DDL is transactional): a crash after the DROP used
+    // to leave no fts_chunks, initSchema then recreated it EMPTY with the
+    // `parts` column, the sniff above said "migrated", and text search
+    // silently returned nothing for every pre-existing chunk, forever.
+    this.db.exec("BEGIN");
+    try {
+
     // Drop the old FTS + triggers FIRST, so backfilling `parts` doesn't fire a
     // trigger that issues a 'delete' against a half-built external-content index
     // (which raises SQLITE_CORRUPT_VTAB).
@@ -740,6 +815,12 @@ export class RagDB {
       END;
       INSERT INTO fts_chunks(fts_chunks) VALUES('rebuild');
     `);
+
+    this.db.exec("COMMIT");
+    } catch (err) {
+      try { this.db.exec("ROLLBACK"); } catch { /* not in a tx */ }
+      throw err;
+    }
   }
 
   private migrateParentChunkColumns() {
@@ -813,6 +894,9 @@ export class RagDB {
   }
   insertChunkBatch(fileId: number, chunks: EmbeddedChunk[], startIndex: number) {
     return fileOps.insertChunkBatch(this.db, fileId, chunks, startIndex);
+  }
+  insertChunksAt(fileId: number, items: { chunk: EmbeddedChunk; chunkIndex: number }[]) {
+    return fileOps.insertChunksAt(this.db, fileId, items);
   }
   insertChunkReturningId(fileId: number, chunk: EmbeddedChunk, chunkIndex: number) {
     return fileOps.insertChunkReturningId(this.db, fileId, chunk, chunkIndex);
@@ -899,6 +983,9 @@ export class RagDB {
   resolveAllSymbolRefs() {
     graphOps.resolveAllSymbolRefs(this.db);
   }
+  resolveSymbolRefsForFiles(fileIds: Iterable<number>) {
+    graphOps.resolveSymbolRefsForFiles(this.db, fileIds);
+  }
   getCallableExports() {
     return graphOps.getCallableExports(this.db);
   }
@@ -947,6 +1034,28 @@ export class RagDB {
   getUnresolvedImports() {
     return graphOps.getUnresolvedImports(this.db);
   }
+
+  /**
+   * Cheap signature of the call-graph-relevant tables, used to cache the
+   * in-memory CallGraph across impact/trace/callees calls and invalidate it
+   * when the index changes.
+   */
+  getGraphVersionSignature(): string {
+    // Counts of files + refs catch PURE DELETIONS (remove_file of an
+    // export-less file changed neither MAX(id) nor MAX(indexed_at), so the
+    // cached CallGraph kept reporting the deleted file as a caller).
+    const row = this.db
+      .query<{ ec: number; em: number; rc: number; rm: number; fc: number; fi: string | null }, []>(
+        `SELECT (SELECT COUNT(*) FROM file_exports) AS ec,
+                (SELECT COALESCE(MAX(id), 0) FROM file_exports) AS em,
+                (SELECT COUNT(*) FROM symbol_refs) AS rc,
+                (SELECT COALESCE(MAX(id), 0) FROM symbol_refs) AS rm,
+                (SELECT COUNT(*) FROM files) AS fc,
+                (SELECT MAX(indexed_at) FROM files) AS fi`,
+      )
+      .get()!;
+    return `${row.ec}:${row.em}:${row.rc}:${row.rm}:${row.fc}:${row.fi ?? ""}`;
+  }
   getGraph() {
     return graphOps.getGraph(this.db);
   }
@@ -994,19 +1103,37 @@ export class RagDB {
   ) {
     conversationOps.updateSessionStats(this.db, sessionId, turnCount, totalTokens, readOffset);
   }
-  insertTurn(
+  upsertTurn(
     sessionId: string, turnIndex: number, timestamp: string,
     userText: string, assistantText: string, toolsUsed: string[],
     filesReferenced: string[], tokenCost: number, summary: string,
     chunks: { snippet: string; embedding: Float32Array }[]
   ) {
-    return conversationOps.insertTurn(
+    return conversationOps.upsertTurn(
       this.db, sessionId, turnIndex, timestamp, userText,
       assistantText, toolsUsed, filesReferenced, tokenCost, summary, chunks
     );
   }
   getTurnCount(sessionId: string) {
     return conversationOps.getTurnCount(this.db, sessionId);
+  }
+  getMaxTurnIndex(sessionId: string) {
+    return conversationOps.getMaxTurnIndex(this.db, sessionId);
+  }
+  deleteSessionTurns(sessionId: string) {
+    conversationOps.deleteSessionTurns(this.db, sessionId);
+  }
+  deleteTurnsAbove(sessionId: string, maxKeep: number) {
+    conversationOps.deleteTurnsAbove(this.db, sessionId, maxKeep);
+  }
+  sumSessionTokens(sessionId: string) {
+    return conversationOps.sumSessionTokens(this.db, sessionId);
+  }
+  getTurnByIndex(sessionId: string, turnIndex: number) {
+    return conversationOps.getTurnByIndex(this.db, sessionId, turnIndex);
+  }
+  getTurnChunkText(sessionId: string, turnIndex: number) {
+    return conversationOps.getTurnChunkText(this.db, sessionId, turnIndex);
   }
   getTurnRange(sessionId: string, fromIdx: number, toIdx: number) {
     return conversationOps.getTurnRange(this.db, sessionId, fromIdx, toIdx);
@@ -1042,18 +1169,26 @@ export class RagDB {
   }
 
   // ── Annotation operations ─────────────────────────────────────
+  // Paths are canonicalized to project-relative at this boundary too (not just
+  // the tool layer): annotations are keyed by exact string match, and an
+  // absolute path stored here never matches read_relevant's relative lookup.
 
   upsertAnnotation(
     path: string, note: string, embedding: Float32Array,
     symbolName?: string | null, author?: string | null, commitHash?: string | null
   ) {
-    return annotationOps.upsertAnnotation(this.db, path, note, embedding, symbolName, author, commitHash);
+    const rel = toProjectRelative(this.projectDirAbs, path);
+    return annotationOps.upsertAnnotation(this.db, rel, note, embedding, symbolName, author, commitHash);
   }
   getAnnotationsForPaths(paths: string[]) {
-    return annotationOps.getAnnotationsForPaths(this.db, paths);
+    return annotationOps.getAnnotationsForPaths(
+      this.db,
+      paths.map((p) => toProjectRelative(this.projectDirAbs, p)),
+    );
   }
   getAnnotations(path?: string, symbolName?: string | null) {
-    return annotationOps.getAnnotations(this.db, path, symbolName);
+    const rel = path !== undefined ? toProjectRelative(this.projectDirAbs, path) : undefined;
+    return annotationOps.getAnnotations(this.db, rel, symbolName);
   }
   searchAnnotations(queryEmbedding: Float32Array, topK?: number) {
     return annotationOps.searchAnnotations(this.db, queryEmbedding, topK);

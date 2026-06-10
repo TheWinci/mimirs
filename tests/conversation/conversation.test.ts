@@ -92,7 +92,9 @@ describe("parseTurns", () => {
     expect(turns[0].turnIndex).toBe(0);
     expect(turns[0].userText).toBe("Hello, how does auth work?");
     expect(turns[0].assistantText).toBe("Auth uses JWT tokens stored in httpOnly cookies.");
-    expect(turns[0].tokenCost).toBe(150);
+    // Output tokens only — input_tokens carries the full context per message
+    // and summing it overcounted a turn's cost by ~message count.
+    expect(turns[0].tokenCost).toBe(50);
     expect(turns[0].sessionId).toBe("test-session");
   });
 
@@ -195,8 +197,9 @@ describe("parseTurns", () => {
     ];
 
     const turns = parseTurns(entries);
-    // tool_use: 10+5=15, text: 100+50=150 → total 165
-    expect(turns[0].tokenCost).toBe(165);
+    // Output tokens only: tool_use msg 5 + text msg 50 = 55 (input tokens are
+    // full-context repeats, deliberately excluded).
+    expect(turns[0].tokenCost).toBe(55);
   });
 
   test("captures file references from toolUseResult", () => {

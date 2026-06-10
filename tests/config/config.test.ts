@@ -33,9 +33,26 @@ describe("loadConfig", () => {
     await writeFile(join(tempDir, ".mimirs", "config.json"), JSON.stringify({ chunkSize: 100, chunkOverlap: 100 }));
 
     const config = await loadConfig(tempDir);
-    // Invalid relation fails validation → fall back to defaults, not the dangerous values.
-    expect(config.chunkSize).toBe(512);
+    // Field-level salvage: the offending chunkOverlap is dropped (default 50),
+    // the valid chunkSize is kept, and the surviving combination re-validates.
+    // The dangerous pair must never come back.
+    expect(config.chunkSize).toBe(100);
     expect(config.chunkOverlap).toBe(50);
+    expect(config.chunkOverlap).toBeLessThan(config.chunkSize);
+  });
+
+  test("one invalid field does not discard the rest of the config", async () => {
+    await mkdir(join(tempDir, ".mimirs"), { recursive: true });
+    // chunkSize below min is invalid; the custom include must survive — losing
+    // it silently changed what got indexed.
+    await writeFile(
+      join(tempDir, ".mimirs", "config.json"),
+      JSON.stringify({ chunkSize: 1, include: ["src/**"] }),
+    );
+
+    const config = await loadConfig(tempDir);
+    expect(config.chunkSize).toBe(512); // invalid field → default
+    expect(config.include).toEqual(["src/**"]); // valid field kept
   });
 
   test("an explicit empty include is respected (not overridden)", async () => {

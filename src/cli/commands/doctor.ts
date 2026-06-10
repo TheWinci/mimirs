@@ -1,3 +1,4 @@
+import { positionalArg } from "../flags";
 import { existsSync, readFileSync } from "fs";
 import { join, resolve } from "path";
 import { platform } from "os";
@@ -9,7 +10,8 @@ interface Check {
 }
 
 export async function doctorCommand(args: string[]) {
-  const projectDir = resolve(args[1] || process.env.RAG_PROJECT_DIR || process.cwd());
+  // positionalArg: a flag token (`mimirs doctor -v`) must not become the dir.
+  const projectDir = resolve(positionalArg(args[1], process.env.RAG_PROJECT_DIR || process.cwd()));
   const results: { name: string; ok: boolean; detail: string }[] = [];
 
   const checks: Check[] = [
@@ -70,7 +72,7 @@ export async function doctorCommand(args: string[]) {
       },
     },
     {
-      name: ".rag directory writable",
+      name: ".mimirs directory writable",
       run: () => {
         const ragDir = process.env.RAG_DB_DIR
           ? resolve(process.env.RAG_DB_DIR)

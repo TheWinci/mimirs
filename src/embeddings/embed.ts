@@ -32,9 +32,12 @@ async function withInsecureTLS<T>(fn: () => Promise<T>): Promise<T> {
   if (!INSECURE_TLS) return fn();
   if (!warnedInsecure) {
     warnedInsecure = true;
+    const integrity = isPinnedDefaultModel()
+      ? "Integrity still enforced by the pinned sha256 checksum."
+      : "NO integrity verification for this model (only the pinned default has a known checksum).";
     console.warn(
-      "[mimirs] MIMIRS_INSECURE_TLS=1 — TLS verification DISABLED for model download. " +
-        "Integrity still enforced by the pinned sha256 checksum. Prefer NODE_EXTRA_CA_CERTS.",
+      `[mimirs] MIMIRS_INSECURE_TLS=1 — TLS verification DISABLED for model download. ` +
+        `${integrity} Prefer NODE_EXTRA_CA_CERTS.`,
     );
   }
   const prev = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
@@ -60,6 +63,10 @@ export const DEFAULT_MODEL_REVISION = "751bff37182d3f1213fa05d7196b954e230abad9"
 // or swapped file is rejected even if it still parses. Re-pin when the revision
 // or default dtype changes (the q4/fp16/etc. variants have different hashes).
 export const DEFAULT_MODEL_SHA256 = "afdb6f1a0e45b715d0bb9b11772f032c399babd23bfc31fed1c170afc848bdb1";
+// sha256 of tokenizer.json at that revision, verified against HF upstream.
+// The tokenizer shapes every embedding (and windowing decisions), so it needs
+// the same integrity guarantee as the weights under MIMIRS_INSECURE_TLS.
+export const DEFAULT_TOKENIZER_SHA256 = "da0e79933b9ed51798a3ae27893d3c5fa4a201126cef75586296df9b4d2c62a0";
 
 // Pooling and quantization are model-dependent: sentence-transformers models
 // (all-MiniLM) want mean pooling; BGE/GTE/ModernBERT/Arctic want CLS. Configurable
@@ -80,6 +87,14 @@ let extractor: FeatureExtractionPipeline | null = null;
 let tokenizer: PreTrainedTokenizer | null = null;
 
 function defaultThreadCount(): number {
+  // DELIBERATELY conservative — do not raise this default. The project
+  // originally shipped cores/2 and users complained that indexing made their
+  // machines unusable; mimirs indexes in the background while people work.
+  // Raw throughput says more threads win (measured, 10-core M-series, 200
+  // real chunks: 2t=19.4ms/chunk · 4t=11.5 · 6t=9.4 · 8t=9.0 · 12t=10.5,
+  // embedding is ~95% of index time), but day-to-day machine impact beats
+  // index speed for a default. Users who want a faster foreground index set
+  // config.indexThreads explicitly.
   return Math.max(2, Math.floor(cpus().length / 3));
 }
 
@@ -113,9 +128,20 @@ export function configureEmbedder(
   }
 }
 
-// transformers.js downloads the q8 weights to this file for the default model.
+// transformers.js keys its cache by revision when the revision isn't "main"
+// (hub.js: pathJoin(repo_id, revision, filename)), so the pinned default lives
+// under <cache>/<repo>/<revision>/. Hashing any other path verifies a file the
+// loader never reads.
+function defaultModelDir(): string {
+  return join(CACHE_DIR, ...DEFAULT_MODEL_ID.split("/"), DEFAULT_MODEL_REVISION);
+}
+
 function defaultModelOnnxPath(): string {
-  return join(CACHE_DIR, "Xenova", "all-MiniLM-L6-v2", "onnx", "model_quantized.onnx");
+  return join(defaultModelDir(), "onnx", "model_quantized.onnx");
+}
+
+function defaultTokenizerPath(): string {
+  return join(defaultModelDir(), "tokenizer.json");
 }
 
 // Only the pinned default (model + q8 dtype + pinned revision) has a known hash.
@@ -142,7 +168,7 @@ function cachedDefaultModelHash(): string | null {
 function purgeCorruptDefaultModel(): boolean {
   const actual = cachedDefaultModelHash();
   if (actual === null || actual === DEFAULT_MODEL_SHA256) return false;
-  rmSync(join(CACHE_DIR, "Xenova", "all-MiniLM-L6-v2"), { recursive: true, force: true });
+  rmSync(join(CACHE_DIR, ...DEFAULT_MODEL_ID.split("/")), { recursive: true, force: true });
   console.warn(
     `[mimirs] Cached embedding model failed checksum (expected ${DEFAULT_MODEL_SHA256}, ` +
       `got ${actual}) — deleted, will re-download.`,
@@ -153,15 +179,45 @@ function purgeCorruptDefaultModel(): boolean {
 // Reject a tampered/swapped model file that still parses. Pinning the revision
 // makes the download immutable on HF's side; this catches a compromised mirror,
 // MITM, or corrupted transfer. On mismatch, delete the cache and refuse to load.
+// Fails CLOSED: this runs only after pipeline() successfully loaded the pinned
+// default, so the file must exist at the revision-keyed path — absence means
+// the cache-layout assumption broke and we'd otherwise be verifying nothing.
 function verifyDefaultModelChecksum(): void {
   const actual = cachedDefaultModelHash();
-  if (actual === null) return; // pipeline() would have thrown already; nothing to check
+  if (actual === null) {
+    throw new Error(
+      `Embedding model loaded but ${defaultModelOnnxPath()} is missing — ` +
+        `cache layout changed and the checksum can't be verified. Refusing to proceed unverified.`,
+    );
+  }
   if (actual !== DEFAULT_MODEL_SHA256) {
-    rmSync(join(CACHE_DIR, "Xenova", "all-MiniLM-L6-v2"), { recursive: true, force: true });
+    rmSync(join(CACHE_DIR, ...DEFAULT_MODEL_ID.split("/")), { recursive: true, force: true });
     throw new Error(
       `Embedding model checksum mismatch for ${DEFAULT_MODEL_ID}@${DEFAULT_MODEL_REVISION}: ` +
         `expected ${DEFAULT_MODEL_SHA256}, got ${actual}. ` +
         `Deleted the cached copy; refusing to load a possibly-tampered model.`,
+    );
+  }
+}
+
+// Same contract for tokenizer.json: it shapes every embedding, so it gets the
+// same pin + verify treatment as the weights. Only the pinned default has a
+// known hash; custom models skip this (and the insecure-TLS warning says so).
+function verifyDefaultTokenizerChecksum(): void {
+  const file = defaultTokenizerPath();
+  if (!existsSync(file)) {
+    throw new Error(
+      `Tokenizer loaded but ${file} is missing — cache layout changed and the ` +
+        `checksum can't be verified. Refusing to proceed unverified.`,
+    );
+  }
+  const actual = createHash("sha256").update(readFileSync(file)).digest("hex");
+  if (actual !== DEFAULT_TOKENIZER_SHA256) {
+    rmSync(join(CACHE_DIR, ...DEFAULT_MODEL_ID.split("/")), { recursive: true, force: true });
+    throw new Error(
+      `Tokenizer checksum mismatch for ${DEFAULT_MODEL_ID}@${DEFAULT_MODEL_REVISION}: ` +
+        `expected ${DEFAULT_TOKENIZER_SHA256}, got ${actual}. ` +
+        `Deleted the cached copy; refusing to use a possibly-tampered tokenizer.`,
     );
   }
 }
@@ -235,6 +291,16 @@ export async function embedBatch(
   const output = await timed("embed-inference", () =>
     model(texts, { pooling: currentPooling, normalize: true })
   );
+  // Slice by the model's actual output dim, not the configured one: if they
+  // disagree, slicing by currentDim shifts every vector after the first into
+  // misaligned garbage with no error. Fail loudly instead.
+  const actualDim = output.dims?.at(-1);
+  if (typeof actualDim === "number" && actualDim !== currentDim) {
+    throw new Error(
+      `Embedding dim mismatch: model ${currentModelId} outputs ${actualDim}, ` +
+        `but embeddingDim is configured as ${currentDim}. Fix embeddingDim in config.`,
+    );
+  }
   const flat = new Float32Array(output.data as Float64Array);
   const result: Float32Array[] = [];
   for (let i = 0; i < texts.length; i++) {
@@ -247,7 +313,16 @@ export async function embedBatch(
 
 export async function getTokenizer(): Promise<PreTrainedTokenizer> {
   if (!tokenizer) {
-    tokenizer = await withInsecureTLS(() => AutoTokenizer.from_pretrained(currentModelId));
+    // Same revision as the model: an unpinned tokenizer rides mutable `main`,
+    // which can diverge from what pipeline() loaded at the pinned revision —
+    // windowing decisions would then disagree with the model's own tokenizer.
+    const loaded = await withInsecureTLS(() =>
+      AutoTokenizer.from_pretrained(currentModelId, { revision: currentRevision }),
+    );
+    if (isPinnedDefaultModel()) {
+      verifyDefaultTokenizerChecksum(); // throws on mismatch; don't cache a rejected tokenizer
+    }
+    tokenizer = loaded;
   }
   return tokenizer;
 }

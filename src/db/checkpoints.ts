@@ -1,3 +1,4 @@
+import { embeddingBytes } from "../utils/vec";
 import { Database } from "bun:sqlite";
 import { type CheckpointRow } from "./types";
 
@@ -42,7 +43,7 @@ export function createCheckpoint(
 
     db.run(
       "INSERT INTO vec_checkpoints (checkpoint_id, embedding) VALUES (?, ?)",
-      [checkpointId, new Uint8Array(embedding.buffer)]
+      [checkpointId, embeddingBytes(embedding)]
     );
   });
 
@@ -121,7 +122,9 @@ export function searchCheckpoints(
        FROM (SELECT checkpoint_id, distance FROM vec_checkpoints WHERE embedding MATCH ? ORDER BY distance LIMIT ?) v
        JOIN conversation_checkpoints cp ON cp.id = v.checkpoint_id`
     )
-    .all(new Uint8Array(queryEmbedding.buffer), topK * 2);
+    // 10× overfetch when a type filter applies — the filter runs after the
+    // KNN, and only 2× headroom returned fewer than topK for minority types.
+    .all(embeddingBytes(queryEmbedding), type ? topK * 10 : topK * 2);
 
   const results: (CheckpointRow & { score: number })[] = [];
 

@@ -2,6 +2,7 @@ import { resolve } from "path";
 import { RagDB } from "../../db";
 import { embed } from "../../embeddings/embed";
 import { discoverSessions } from "../../conversation/parser";
+import { getHeadSha } from "../../git/exec";
 import { cli } from "../../utils/log";
 import { intFlag } from "../flags";
 
@@ -36,13 +37,18 @@ export async function checkpointCommand(args: string[], getFlag: (flag: string) 
 
     const sessions = discoverSessions(dir);
     const sessionId = sessions.length > 0 ? sessions[0].sessionId : "unknown";
-    const turnCount = db.getTurnCount(sessionId);
-    const turnIndex = Math.max(0, turnCount - 1);
+    // MAX(turn_index), not COUNT-1 — gapped sessions made COUNT point at an
+    // older turn.
+    const turnIndex = db.getMaxTurnIndex(sessionId) ?? 0;
 
     const embedding = await embed(`${title}. ${summary}`);
+    // Stamp the code state like the MCP tool does — without it, CLI-created
+    // checkpoints (including the session-end hook's auto-handoffs) never get
+    // the current/stale/diverged freshness tag.
+    const commitHash = await getHeadSha(dir);
     const id = db.createCheckpoint(
       sessionId, turnIndex, new Date().toISOString(),
-      type, title, summary, filesInvolved, tags, embedding
+      type, title, summary, filesInvolved, tags, embedding, commitHash
     );
     cli.log(`Checkpoint #${id} created: [${type}] ${title}`);
   } else if (subCommand === "list") {

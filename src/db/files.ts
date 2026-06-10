@@ -1,3 +1,4 @@
+import { embeddingBytes } from "../utils/vec";
 import { Database } from "bun:sqlite";
 import { type EmbeddedChunk } from "../types";
 import { type StoredFile } from "./types";
@@ -106,7 +107,39 @@ export function insertChunkBatch(
       ids.push(chunkId);
       db.run(
         "INSERT INTO vec_chunks (chunk_id, embedding) VALUES (?, ?)",
-        [chunkId, new Uint8Array(embedding.buffer)]
+        [chunkId, embeddingBytes(embedding)]
+      );
+    }
+  });
+  tx();
+  return ids;
+}
+
+/**
+ * Insert chunks at explicit (non-contiguous) chunk indices in one transaction.
+ * The incremental path inserts new chunks interleaved between kept ones, so a
+ * sequential startIndex doesn't fit — and per-chunk transactions are slow.
+ */
+export function insertChunksAt(
+  db: Database,
+  fileId: number,
+  items: { chunk: EmbeddedChunk; chunkIndex: number }[]
+): number[] {
+  const ids: number[] = [];
+  const tx = db.transaction(() => {
+    for (const { chunk, chunkIndex } of items) {
+      const { snippet, embedding, entityName, chunkType, startLine, endLine, contentHash, parentId } = chunk;
+      db.run(
+        "INSERT INTO chunks (file_id, chunk_index, snippet, entity_name, chunk_type, start_line, end_line, content_hash, parent_id, parts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [fileId, chunkIndex, snippet, entityName ?? null, chunkType ?? null, startLine ?? null, endLine ?? null, contentHash ?? null, parentId ?? null, identifierParts(snippet)]
+      );
+      const chunkId = Number(
+        db.query<{ id: number }, []>("SELECT last_insert_rowid() as id").get()!.id
+      );
+      ids.push(chunkId);
+      db.run(
+        "INSERT INTO vec_chunks (chunk_id, embedding) VALUES (?, ?)",
+        [chunkId, embeddingBytes(embedding)]
       );
     }
   });
@@ -152,7 +185,7 @@ export function insertChunkReturningId(
     );
     db.run(
       "INSERT INTO vec_chunks (chunk_id, embedding) VALUES (?, ?)",
-      [chunkId, new Uint8Array(embedding.buffer)]
+      [chunkId, embeddingBytes(embedding)]
     );
     return chunkId;
   });

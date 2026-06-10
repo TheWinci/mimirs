@@ -43,6 +43,23 @@ export function resolveImports(db: RagDB, projectDir: string): number {
   return resolvedCount;
 }
 
+// Per-pathToId basename index: a watcher batch passes the SAME prebuilt map to
+// many resolveImportsForFile calls, but the O(all files) basename index was
+// rebuilt for every importer anyway — defeating the prebuilt-maps optimization.
+const basenameIndexCache = new WeakMap<Map<string, number>, Map<string, string[]>>();
+// tsconfig/go.mod re-read per call is wasted IO in the same batch; cache with a
+// short TTL so an edited tsconfig is still picked up promptly.
+const projectMetaCache = new Map<string, { at: number; tsConfig: ReturnType<typeof loadTsConfig>; goModule: ReturnType<typeof readGoModule> }>();
+const PROJECT_META_TTL_MS = 10_000;
+
+function getProjectMeta(projectDir: string) {
+  const cached = projectMetaCache.get(projectDir);
+  if (cached && Date.now() - cached.at < PROJECT_META_TTL_MS) return cached;
+  const fresh = { at: Date.now(), tsConfig: loadTsConfig(projectDir), goModule: readGoModule(projectDir) };
+  projectMetaCache.set(projectDir, fresh);
+  return fresh;
+}
+
 /**
  * Resolve imports for a single file (used by watcher after re-indexing).
  * Accepts optional prebuilt maps to avoid repeated full-table scans
@@ -67,9 +84,12 @@ export function resolveImportsForFile(
   if (!filePath) return;
 
   const lang = detectLanguage(filePath);
-  const tsConfig = loadTsConfig(projectDir);
-  const goModule = readGoModule(projectDir);
-  const basenameIndex = buildBasenameIndex(pathToId);
+  const { tsConfig, goModule } = getProjectMeta(projectDir);
+  let basenameIndex = basenameIndexCache.get(pathToId);
+  if (!basenameIndex) {
+    basenameIndex = buildBasenameIndex(pathToId);
+    basenameIndexCache.set(pathToId, basenameIndex);
+  }
 
   for (const imp of imports) {
     if (imp.resolvedFileId !== null) continue;

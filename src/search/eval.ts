@@ -54,10 +54,33 @@ export async function loadEvalTasks(path: string): Promise<EvalTask[]> {
   return parsed;
 }
 
+// Baseline arm: what an agent without RAG can do — guess files by matching
+// task words against indexed file PATHS (the glob/filename heuristic). The old
+// arm returned [] so its hit rate was always 0 and the A/B comparison could
+// not fail; a comparison that can't lose measures nothing.
+function filenameBaseline(taskText: string, db: RagDB, topK: number): DedupedResult[] {
+  const words = taskText
+    .toLowerCase()
+    .split(/[^a-z0-9_]+/)
+    .filter((w) => w.length >= 3);
+  if (words.length === 0) return [];
+
+  const scored: { path: string; score: number }[] = [];
+  for (const f of db.getAllFilePaths()) {
+    const p = f.path.toLowerCase();
+    const matches = words.filter((w) => p.includes(w)).length;
+    if (matches > 0) scored.push({ path: f.path, score: matches });
+  }
+  return scored
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topK)
+    .map((s) => ({ path: s.path, score: s.score, snippets: [] }));
+}
+
 /**
  * Simulate an agent's search behavior for a task.
  * "with-rag": runs semantic search on the task description and returns what was found.
- * "without-rag": returns empty results (simulating an agent with no RAG).
+ * "without-rag": filename-keyword baseline (what an agent can do with globbing alone).
  */
 export async function runEvalTask(
   task: EvalTask,
@@ -74,6 +97,9 @@ export async function runEvalTask(
     const config = await loadConfig(projectDir);
     searchResults = await search(task.task, db, topK, 0, config.hybridWeight, config.generated);
     searchCount = 1;
+  } else {
+    searchResults = filenameBaseline(task.task, db, topK);
+    searchCount = 1;
   }
 
   const durationMs = Math.round(performance.now() - start);
@@ -88,6 +114,16 @@ export async function runEvalTask(
     searchCount,
     durationMs,
   };
+}
+
+// True when `found` (absolute index path) refers to the same file as
+// `expected` (eval-file path, usually project-relative). Boundary-aware:
+// "src/ragdb.ts".endsWith("db.ts") used to count as a hit and inflate the
+// headline fileHitRate.
+function pathHit(found: string, expected: string, projectDir: string): boolean {
+  const f = found.replaceAll("\\", "/");
+  const absExpected = resolve(projectDir, expected).replaceAll("\\", "/");
+  return f === absExpected || f === expected || f.endsWith("/" + expected.replace(/^\.\//, ""));
 }
 
 export async function runEval(
@@ -121,9 +157,7 @@ export async function runEval(
         withExpected++;
         const expected = tasks[i].expectedFiles!;
         const found = traceSet[i].filesReferenced;
-        const hasHit = expected.some((e) =>
-          found.some((f) => f === e || f.endsWith(e) || e.endsWith(f))
-        );
+        const hasHit = expected.some((e) => found.some((f) => pathHit(f, e, projectDir)));
         if (hasHit) hits++;
       }
     }

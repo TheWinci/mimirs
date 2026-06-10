@@ -1,8 +1,7 @@
 import { watch } from "fs";
-import { resolve, relative } from "path";
+import { resolve, relative, basename } from "path";
 import { existsSync } from "fs";
-import { Glob } from "bun";
-import { indexFile } from "./indexer";
+import { indexFile, buildIncludeFilter, buildExcludeFilter } from "./indexer";
 import { type RagConfig } from "../config";
 import { type RagDB } from "../db";
 import { resolveImportsForFile, buildPathToIdMap, buildIdToPathMap } from "../graph/resolver";
@@ -22,13 +21,12 @@ export function startWatcher(
 ): Watcher {
   const pending = new Map<string, NodeJS.Timeout>();
 
-  // Pre-compile globs once instead of per-event
-  const excludeGlobs = config.exclude.map((pat) => new Glob(pat));
-  const includeGlobs = config.include.map((pat) => new Glob(pat));
-
-  function matchesAny(filePath: string, globs: Glob[]): boolean {
-    return globs.some((g) => g.match(filePath));
-  }
+  // SAME filters as the scan path — the watcher used to compile raw Globs,
+  // which disagreed with the scan's pattern semantics for suffix shapes
+  // (`*.min.js` is any-depth in the scan, root-only as a raw Glob), so the
+  // watcher indexed files the next startup scan pruned: an oscillating index.
+  const isExcluded = buildExcludeFilter(config.exclude);
+  const isIncluded = buildIncludeFilter(config.include);
 
   // Serial queue: prevents concurrent indexFile + buildPathToIdMap from interleaving.
   // While one cycle runs, new files accumulate in nextBatch and get processed next.
@@ -69,9 +67,29 @@ export function startWatcher(
                 const idToPath = buildIdToPathMap(pathToId);
                 resolveImportsForFile(db, file.id, directory, pathToId, idToPath);
                 db.resolveSymbolRefs(file.id);
+                const reResolved = new Set<number>([file.id]);
                 for (const importerId of db.getImportersOf(file.id)) {
                   resolveImportsForFile(db, importerId, directory, pathToId, idToPath);
                   db.resolveSymbolRefs(importerId);
+                  reResolved.add(importerId);
+                }
+                // getImportersOf only finds files whose import already RESOLVED
+                // to this file. Files holding an unresolved import that targets
+                // the newly created path (delete→recreate, branch switch, module
+                // added to fix a missing import) were never revisited, leaving
+                // dependents/impact/trace edges missing until a full re-index.
+                // Re-resolve files whose unresolved specifier names this file.
+                const fileBase = basename(absPath);
+                const fileStem = fileBase.replace(/\.[^.]+$/, "");
+                for (const ui of db.getUnresolvedImports()) {
+                  if (reResolved.has(ui.fileId)) continue;
+                  const lastSeg = ui.source.split("/").pop() ?? ui.source;
+                  const lastStem = lastSeg.replace(/\.[^.]+$/, "");
+                  if (lastSeg === fileBase || lastStem === fileStem) {
+                    resolveImportsForFile(db, ui.fileId, directory, pathToId, idToPath);
+                    db.resolveSymbolRefs(ui.fileId);
+                    reResolved.add(ui.fileId);
+                  }
                 }
               }
               onEvent?.(`Re-indexed: ${rel}`);
@@ -94,8 +112,8 @@ export function startWatcher(
     // watcher would index excluded dirs (e.g. node_modules) the full scan skips.
     const rel = normalizePath(filename.toString());
 
-    if (matchesAny(rel, excludeGlobs)) return;
-    if (!matchesAny(rel, includeGlobs)) return;
+    if (isExcluded(rel)) return;
+    if (!isIncluded(rel)) return;
 
     const absPath = resolve(directory, rel);
 

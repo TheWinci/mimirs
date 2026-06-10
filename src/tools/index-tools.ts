@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { resolve } from "path";
 import { indexDirectory } from "../indexing/indexer";
 import { type GetDB, type WriteStatus, resolveProject } from "./index";
 
@@ -22,7 +23,7 @@ export function registerIndexTools(server: McpServer, getDB: GetDB, writeStatus?
         ),
     },
     async ({ directory, patterns }) => {
-      const { projectDir, db: ragDb, config: baseConfig } = await resolveProject(directory, getDB);
+      const { projectDir, db: ragDb, config: baseConfig } = await resolveProject(directory, getDB, { allowCreate: true });
       const config = patterns ? { ...baseConfig, include: patterns } : baseConfig;
 
       let totalFiles = 0;
@@ -119,15 +120,17 @@ export function registerIndexTools(server: McpServer, getDB: GetDB, writeStatus?
     "remove_file",
     "Remove a specific file from the RAG index.",
     {
-      path: z.string().describe("Absolute path of the file to remove"),
+      path: z.string().describe("Path of the file to remove (relative to project root or absolute)"),
       directory: z
         .string()
         .optional()
         .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
     },
     async ({ path, directory }) => {
-      const { db: ragDb } = await resolveProject(directory, getDB);
-      const removed = ragDb.removeFile(path);
+      const { projectDir, db: ragDb } = await resolveProject(directory, getDB);
+      // Index stores absolute paths; every sibling tool accepts relative —
+      // resolve so both forms work instead of failing silently on relative.
+      const removed = ragDb.removeFile(resolve(projectDir, path));
 
       return {
         content: [

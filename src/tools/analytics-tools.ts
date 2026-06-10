@@ -29,7 +29,7 @@ export function registerAnalyticsTools(server: McpServer, getDB: GetDB) {
         `  Total queries:    ${analytics.totalQueries}`,
         `  Avg results:      ${analytics.avgResultCount.toFixed(1)}`,
         `  Avg top score:    ${analytics.avgTopScore?.toFixed(2) ?? "n/a"}`,
-        `  Zero-result rate: ${analytics.totalQueries > 0 ? ((analytics.zeroResultQueries.reduce((s, q) => s + q.count, 0) / analytics.totalQueries) * 100).toFixed(0) : 0}%`,
+        `  Zero-result rate: ${analytics.totalQueries > 0 ? ((analytics.zeroResultCount / analytics.totalQueries) * 100).toFixed(0) : 0}%`,
       ];
 
       if (analytics.topSearchedTerms.length > 0) {

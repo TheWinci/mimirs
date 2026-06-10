@@ -60,8 +60,9 @@ export async function affectedCommand(args: string[], getFlag: (flag: string) =>
       );
       process.exit(1);
     }
-    const out = await runGit(["diff", "--name-only", "HEAD"], gitRoot);
-    const files = splitLines(out ?? "");
+    const out = await runGit(["diff", "--name-only", "-z", "HEAD"], gitRoot);
+    // NUL-separated (-z) so paths with spaces stay literal, not C-quoted.
+    const files = (out ?? "").split("\0").filter(Boolean);
     if (files.length === 0) {
       if (json) cli.log(JSON.stringify({ changed: [], unknown: [], tests: [] }, null, 2));
       else if (!quiet) cli.log("No changed files (git diff against HEAD is empty).");

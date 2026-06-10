@@ -67,19 +67,20 @@ export async function runBenchmark(
     const resultPaths = searchResults.map((r) => r.path);
     const expectedNormalized = q.expected.map((p) => normalizePath(p, projectDir));
 
+    // Path-boundary suffix match: a raw endsWith let expected "db.ts" count
+    // ".../indexdb.ts" as a hit, inflating recall/MRR — and these metrics
+    // gate a non-zero exit, so a real regression could pass.
+    const pathsMatch = (r: string, e: string) =>
+      r === e || r.endsWith("/" + e) || e.endsWith("/" + r);
+
     // Recall: fraction of expected files found in results
-    const found = expectedNormalized.filter((e) =>
-      resultPaths.some((r) => r === e || r.endsWith(e) || e.endsWith(r))
-    );
+    const found = expectedNormalized.filter((e) => resultPaths.some((r) => pathsMatch(r, e)));
     const recall = found.length / expectedNormalized.length;
 
     // Reciprocal rank: 1/rank of first expected file in results
     let reciprocalRank = 0;
     for (let i = 0; i < resultPaths.length; i++) {
-      const matchesExpected = expectedNormalized.some(
-        (e) => resultPaths[i] === e || resultPaths[i].endsWith(e) || e.endsWith(resultPaths[i])
-      );
-      if (matchesExpected) {
+      if (expectedNormalized.some((e) => pathsMatch(resultPaths[i], e))) {
         reciprocalRank = 1 / (i + 1);
         break;
       }

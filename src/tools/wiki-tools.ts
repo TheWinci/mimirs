@@ -43,7 +43,9 @@ export function registerWikiTools(server: McpServer, getDB: GetDB) {
           {
             db,
             projectDir,
-            version: process.env.npm_package_version ?? "unknown",
+            // package.json import, not npm_package_version: that env var only exists
+            // under `bun run` scripts, so the stamp was always "unknown" via bunx.
+            version: (await import("../../package.json")).version ?? "unknown",
           },
           command,
         );

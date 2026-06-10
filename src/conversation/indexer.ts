@@ -11,7 +11,16 @@ const TAIL_DEBOUNCE_MS = 1500;
 
 /**
  * Index all turns from a JSONL transcript file.
- * Returns the number of new turns indexed and the final byte offset.
+ *
+ * Incremental contract: the persisted cursor is rewound to the byte offset
+ * where the LAST stored turn starts, not to the last complete JSONL line. A
+ * read routinely ends mid-turn (any tool call longer than the watcher debounce
+ * produces file-quiet mid-turn); advancing past that point split the turn and
+ * permanently dropped its continuation. The next pass re-parses the open turn
+ * whole and `upsertTurn` replaces the partial version. Unchanged turns are
+ * skipped before embedding, so steady-state re-reads cost no model time.
+ *
+ * Returns the number of new/updated turns and the persisted byte offset.
  */
 export async function indexConversation(
   jsonlPath: string,
@@ -19,7 +28,7 @@ export async function indexConversation(
   db: RagDB,
   projectDir: string,
   fromOffset = 0,
-  startTurnIndex = 0,
+  startTurnIndex?: number,
   onProgress?: (msg: string) => void
 ): Promise<{ turnsIndexed: number; newOffset: number; totalTokens: number }> {
   const { entries, newOffset } = readJSONL(jsonlPath, fromOffset);
@@ -36,44 +45,123 @@ export async function indexConversation(
     return { turnsIndexed: 0, newOffset: fromOffset, totalTokens: 0 };
   }
 
-  const turns = parseTurns(
-    entries.filter((e) => belongsToProject(e, projectDir)),
-    sessionId,
-    startTurnIndex,
-  );
+  // Resume point: when reading from a rewound cursor, the first re-parsed turn
+  // IS the last stored turn — assign it the same index so upsertTurn replaces
+  // it. MAX(turn_index) (not COUNT) tolerates gaps in stored indices.
+  //
+  // Upgrade safety: sessions indexed before the cursor fix persisted offsets
+  // with OLD semantics (end of last complete line, usually past the last
+  // turn's start). From such an offset the first parsed turn is genuinely NEW
+  // content — assigning it maxIdx replaced the real last stored turn. The
+  // rewind check therefore needs strong identity, not just userText (repeated
+  // messages like "continue" collide; reproduced data loss): a genuinely
+  // rewound turn re-parses with the SAME opening timestamp, and its stored
+  // assistant text is a prefix of the re-parse (the continuation only appends).
+  const ownEntries = entries.filter((e) => belongsToProject(e, projectDir));
+  const maxIdx = db.getMaxTurnIndex(sessionId);
+  let effectiveStart: number;
+  if (startTurnIndex !== undefined) {
+    effectiveStart = startTurnIndex;
+  } else if (fromOffset === 0 || maxIdx === null) {
+    effectiveStart = 0;
+  } else {
+    const probe = parseTurns(ownEntries, sessionId, 0);
+    const stored = db.getTurnByIndex(sessionId, maxIdx);
+    const first = probe[0];
+    const isRewoundLastTurn =
+      !!first && !!stored &&
+      first.userText === stored.userText &&
+      (first.timestamp && stored.timestamp
+        ? first.timestamp === stored.timestamp
+        : stored.assistantText === "" || first.assistantText.startsWith(stored.assistantText));
+    effectiveStart = isRewoundLastTurn ? maxIdx : maxIdx + 1;
+  }
+
+  // parseTurns assigns startTurnIndex + position, so re-parse once at the
+  // chosen base instead of parsing the whole tail twice.
+  const turns = parseTurns(ownEntries, sessionId, effectiveStart);
 
   let turnsIndexed = 0;
   let totalTokens = 0;
+  let lastStoredTurn: ParsedTurn | null = null;
+  let failed = false;
 
-  for (const turn of turns) {
-    const indexed = await indexTurn(turn, db);
-    if (indexed) {
-      turnsIndexed++;
-      onProgress?.(`Indexed turn ${turn.turnIndex} (${turn.toolsUsed.join(", ") || "no tools"})`);
+  // Persist session cursor + stats anchored to the last STORED turn. Also
+  // called when an embed throws mid-loop: stored turns already advanced past
+  // the old cursor, and resuming from it would re-assign them NEW indices
+  // (duplicating every turn between the stale cursor and the failure point).
+  // turn_count derives from the stored index space — adding `turnsIndexed`
+  // would double-count re-indexed open turns. Tokens likewise sum over STORED
+  // turns; a per-pass sum clobbered the total on every tick.
+  const persistCursor = (offset: number) => {
+    const stat = statSync(jsonlPath);
+    const totalTurnCount = (db.getMaxTurnIndex(sessionId) ?? -1) + 1;
+    const sessionTokens = db.sumSessionTokens(sessionId);
+    db.upsertSession(sessionId, jsonlPath, turns[0]?.timestamp || new Date().toISOString(), stat.mtimeMs, offset);
+    db.updateSessionStats(sessionId, totalTurnCount, sessionTokens, offset);
+  };
+
+  try {
+    for (const turn of turns) {
+      const indexed = await indexTurn(turn, db);
+      if (indexed !== "skipped-empty") lastStoredTurn = turn;
+      if (indexed === "indexed") {
+        turnsIndexed++;
+        onProgress?.(`Indexed turn ${turn.turnIndex} (${turn.toolsUsed.join(", ") || "no tools"})`);
+      }
+      totalTokens += turn.tokenCost;
     }
-    totalTokens += turn.tokenCost;
+
+    // A full from-0 re-parse is authoritative for the whole session: stale
+    // stored turns above the last parsed index (gapped/drifted legacy data)
+    // would survive the upserts and collide with future cursor resumes.
+    if (fromOffset === 0 && turns.length > 0) {
+      db.deleteTurnsAbove(sessionId, turns[turns.length - 1].turnIndex);
+    }
+  } catch (err) {
+    failed = true;
+    // Only move the cursor up to what was actually stored; with nothing
+    // stored this pass, leave it untouched so the retry re-reads everything.
+    if (lastStoredTurn?.startByteOffset !== undefined) {
+      persistCursor(lastStoredTurn.startByteOffset);
+    }
+    throw err;
   }
 
-  // Update session tracking
-  const existingSession = db.getSession(sessionId);
-  const totalTurnCount = (existingSession?.turnCount || 0) + turnsIndexed;
-  const stat = statSync(jsonlPath);
-
-  db.upsertSession(sessionId, jsonlPath, turns[0]?.timestamp || new Date().toISOString(), stat.mtimeMs, newOffset);
-  db.updateSessionStats(sessionId, totalTurnCount, totalTokens, newOffset);
-
-  return { turnsIndexed, newOffset, totalTokens };
+  if (!failed) {
+    const persistedOffset =
+      lastStoredTurn?.startByteOffset !== undefined ? lastStoredTurn.startByteOffset : newOffset;
+    persistCursor(persistedOffset);
+    return { turnsIndexed, newOffset: persistedOffset, totalTokens };
+  }
+  // Unreachable (failure rethrows) — keeps TS happy about the return path.
+  return { turnsIndexed, newOffset: fromOffset, totalTokens };
 }
 
 /**
  * Index a single parsed turn: chunk the text, embed chunks, store in DB.
+ * Skips the embed + write when the stored version already has identical
+ * texts — the open turn is re-parsed on every pass, and re-embedding it
+ * each watcher tick would burn model time for nothing.
  */
-async function indexTurn(turn: ParsedTurn, db: RagDB): Promise<boolean> {
+async function indexTurn(
+  turn: ParsedTurn,
+  db: RagDB
+): Promise<"indexed" | "unchanged" | "skipped-empty"> {
   const text = buildTurnText(turn);
-  if (!text.trim()) return false;
+  if (!text.trim()) return "skipped-empty";
 
   // Chunk the turn text (use .md extension for paragraph-style splitting)
   const { chunks: textChunks } = await chunkText(text, ".md", 512, 50);
+
+  // Change detection BEFORE embedding (the expensive step): chunking is
+  // deterministic, so identical chunk text means the stored version already
+  // reflects this content — including tool results, which a user/assistant
+  // text comparison would miss (tool-result-only continuations stayed stale).
+  const stored = db.getTurnChunkText(turn.sessionId, turn.turnIndex);
+  if (stored !== null && stored === textChunks.map((c) => c.text).join("\0")) {
+    return "unchanged";
+  }
 
   // Embed all chunks in one batch
   const embeddings = await embedBatch(textChunks.map(c => c.text));
@@ -82,8 +170,7 @@ async function indexTurn(turn: ParsedTurn, db: RagDB): Promise<boolean> {
     embedding: embeddings[i],
   }));
 
-  // Store in DB — returns 0 if this turn was already indexed (duplicate)
-  const turnId = db.insertTurn(
+  db.upsertTurn(
     turn.sessionId,
     turn.turnIndex,
     turn.timestamp,
@@ -96,7 +183,7 @@ async function indexTurn(turn: ParsedTurn, db: RagDB): Promise<boolean> {
     embeddedChunks
   );
 
-  return turnId !== 0;
+  return "indexed";
 }
 
 /**
@@ -116,13 +203,15 @@ async function indexSessionFromStoredOffset(
   if (!existsSync(jsonlPath)) return 0;
   const sessionId = basename(jsonlPath).replace(/\.jsonl$/, "");
   const session = db.getSession(sessionId);
+  // startTurnIndex stays undefined: indexConversation derives the resume index
+  // from MAX(turn_index), which tolerates gaps (turnCount/COUNT did not).
   const result = await indexConversation(
     jsonlPath,
     sessionId,
     db,
     projectDir,
     session?.readOffset ?? 0,
-    session?.turnCount ?? 0,
+    undefined,
     onEvent,
   );
   if (result.turnsIndexed > 0) {

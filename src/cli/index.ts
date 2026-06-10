@@ -33,6 +33,7 @@ Usage:
   mimirs serve                      Start MCP server (stdio)
   mimirs init [dir] [--ide IDEs]    Create default .mimirs/config.json
               IDEs: claude,cursor,windsurf,copilot,all
+              [-y|--yes]            Skip the "index now?" prompt
               [-v|--verbose]        Show per-file indexing output
   mimirs index [dir] [--patterns ...] Index files in directory
               [-v|--verbose]        Show per-file indexing output
@@ -56,6 +57,7 @@ Usage:
   mimirs conversation sessions      List indexed sessions
                 [--dir D]
   mimirs conversation index [--dir D] Index all sessions for a project
+                [--rebuild]           Drop + re-index stored turns (recovery)
   mimirs checkpoint create <type>   Create a checkpoint
                 <title> <summary>
                 [--dir D] [--files f1,f2] [--tags t1,t2]
@@ -72,13 +74,15 @@ Usage:
                 [--path P] [--dir D]
   mimirs session-context [dir]      Session start context summary
                 [--dir D]
+  mimirs benchmark-models <file>     Compare embedding models on a query set
+              [--dir D] [--models a,b]
   mimirs doctor [dir]               Diagnose MCP server startup issues
   mimirs cleanup [dir] [-y]          Remove all mimirs files
   mimirs demo [dir]                 Run interactive feature demo
 
 Options:
   dir       Project directory (default: current directory)
-  --top N   Number of results (default: 10)
+  --top N   Number of results (defaults vary: search 8, read 5, checkpoints 5-20)
   --patterns  Comma-separated glob patterns to include`);
 }
 

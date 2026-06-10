@@ -171,6 +171,53 @@ export function stable(): boolean {
     expect(startLineOf(db, "MARK_FULL")).toBe(before! + 4);
   });
 
+  // Class invariant: every stored line range, sliced from the REAL file, must
+  // contain the chunk's text. Catches any future drift between embedding-text
+  // offsets and on-disk offsets (frontmatter, trimming, transforms).
+  test("markdown with frontmatter cites real file lines (round-trip invariant)", async () => {
+    const md = `---
+name: my-doc
+description: a doc about widgets
+tags: [a, b]
+---
+
+intro paragraph
+
+# Widget Heading
+
+widget body text
+`;
+    await writeFixture(tempDir, "doc.md", md);
+    const mdConfig: RagConfig = { ...tsConfig, include: ["**/*.md"] };
+    await indexDirectory(tempDir, db, mdConfig);
+
+    const fileLines = md.split("\n");
+    const raw = (db as unknown as { db: import("bun:sqlite").Database }).db;
+    const rows = raw
+      .query<{ snippet: string; start_line: number | null; end_line: number | null }, []>(
+        "SELECT snippet, start_line, end_line FROM chunks WHERE chunk_index >= 0",
+      )
+      .all();
+    expect(rows.length).toBeGreaterThan(0);
+
+    let verified = 0;
+    for (const r of rows) {
+      if (r.start_line === null || r.end_line === null) continue; // synthetic chunks may opt out
+      const slice = fileLines.slice(r.start_line - 1, r.end_line).join("\n");
+      // The cited range must contain the chunk text (chunk may be a sub-span).
+      expect(slice).toContain(r.snippet.trim().split("\n")[0]);
+      verified++;
+    }
+    // The heading chunk must carry numbers and point at the real line (9, after
+    // 5 frontmatter lines + intro) — the old code said line 1. Asserted
+    // unconditionally: an `if (start_line !== null)` guard here would let a
+    // regression to null line numbers pass silently.
+    const heading = rows.find((r) => r.snippet.includes("# Widget Heading"));
+    expect(heading).toBeDefined();
+    expect(heading!.start_line).toBe(9);
+    expect(verified).toBeGreaterThan(0);
+  });
+
   test("incremental re-index updates a KEPT chunk's start_line after a shift", async () => {
     const incConfig: RagConfig = { ...tsConfig, incrementalChunks: true };
     await writeFixture(tempDir, "shift.ts", manyFns(0, "MARK_INC"));

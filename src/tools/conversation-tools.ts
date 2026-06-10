@@ -147,12 +147,26 @@ export function registerConversationTools(server: McpServer, getDB: GetDB) {
         };
       }
 
-      const turnCount = ragDb.getTurnCount(resolvedSession);
-      if (turnCount === 0) {
+      // Bounds come from MAX(turn_index), not COUNT(*): stored indices can
+      // have gaps, and COUNT-based clamping made the newest turns unreachable
+      // and silently redirected `turn: N` to a different turn.
+      const maxTurnIdx = ragDb.getMaxTurnIndex(resolvedSession);
+      if (maxTurnIdx === null) {
         return {
           content: [{
             type: "text" as const,
             text: `Session ${resolvedSession} has no indexed turns yet. Run index_files or start the server to index it.`,
+          }],
+        };
+      }
+
+      // An explicitly requested out-of-range turn is an error, not a silent
+      // clamp — the caller asked for a specific turn and must know it isn't there.
+      if (turn !== undefined && turn > maxTurnIdx) {
+        return {
+          content: [{
+            type: "text" as const,
+            text: `Turn ${turn} is out of range — session ${resolvedSession} has turns 0–${maxTurnIdx}.`,
           }],
         };
       }
@@ -165,15 +179,15 @@ export function registerConversationTools(server: McpServer, getDB: GetDB) {
         toIdx = turn + context;
       } else if (from !== undefined || to !== undefined) {
         fromIdx = from ?? 0;
-        toIdx = to ?? from ?? turnCount - 1;
+        toIdx = to ?? from ?? maxTurnIdx;
       } else {
         // No selector: tail of the conversation.
-        fromIdx = turnCount - DEFAULT_TAIL;
-        toIdx = turnCount - 1;
+        fromIdx = maxTurnIdx - DEFAULT_TAIL + 1;
+        toIdx = maxTurnIdx;
       }
       // Clamp to valid bounds.
-      fromIdx = Math.max(0, Math.min(fromIdx, turnCount - 1));
-      toIdx = Math.max(fromIdx, Math.min(toIdx, turnCount - 1));
+      fromIdx = Math.max(0, Math.min(fromIdx, maxTurnIdx));
+      toIdx = Math.max(fromIdx, Math.min(toIdx, maxTurnIdx));
 
       // Render each turn to a block.
       const blocks: string[] = [];
@@ -212,7 +226,7 @@ export function registerConversationTools(server: McpServer, getDB: GetDB) {
 
       // Enforce the character ceiling: emit whole blocks until the budget is
       // spent, truncating the block that crosses it and noting what was dropped.
-      const header = `Session ${resolvedSession} — turns ${fromIdx}–${toIdx} of ${turnCount}\n`;
+      const header = `Session ${resolvedSession} — turns ${fromIdx}–${toIdx} (max turn index ${maxTurnIdx})\n`;
       let body = "";
       let used = header.length;
       let droppedBlocks = 0;

@@ -1,10 +1,14 @@
 import { readFileSync, statSync, openSync, readSync, closeSync } from "fs";
+import { homedir } from "os";
 import { Glob } from "bun";
 
 // ── JSONL entry types ──────────────────────────────────────────────
 
 export interface JournalEntry {
   type: "user" | "assistant" | "queue-operation" | "file-history-snapshot";
+  /** Absolute byte offset of this entry's line in the transcript file.
+   *  Set by readJSONL; used to rewind the incremental cursor to a turn start. */
+  byteOffset?: number;
   uuid?: string;
   parentUuid?: string | null;
   timestamp?: string;
@@ -51,6 +55,10 @@ export interface ParsedTurn {
   filesReferenced: string[];
   tokenCost: number;
   summary: string; // first 200 chars of assistant text
+  /** Byte offset of the user-text line that opened this turn (if known).
+   *  The incremental cursor is held back to the LAST turn's start so a turn
+   *  split across two reads is re-parsed whole instead of losing its tail. */
+  startByteOffset?: number;
 }
 
 export interface ToolResultInfo {
@@ -82,10 +90,19 @@ export function readJSONL(
   }
 
   const bytesToRead = stat.size - fromOffset;
-  const buf = Buffer.alloc(bytesToRead);
+  let buf = Buffer.alloc(bytesToRead);
   const fd = openSync(filePath, "r");
   try {
-    readSync(fd, buf, 0, bytesToRead, fromOffset);
+    // Honor readSync's return value: a short read (or the file shrinking
+    // between stat and read) used to leave NUL-padded garbage at the tail,
+    // silently masked by JSON.parse failures. Loop until EOF or buffer full.
+    let filled = 0;
+    while (filled < bytesToRead) {
+      const n = readSync(fd, buf, filled, bytesToRead - filled, fromOffset + filled);
+      if (n <= 0) break; // EOF — file shrank since stat
+      filled += n;
+    }
+    if (filled < bytesToRead) buf = buf.subarray(0, filled);
   } finally {
     closeSync(fd);
   }
@@ -99,17 +116,27 @@ export function readJSONL(
     // No complete line yet — don't advance.
     return { entries: [], newOffset: fromOffset };
   }
-  const text = buf.subarray(0, lastNl + 1).toString("utf-8");
+  const consumed = buf.subarray(0, lastNl + 1);
+  const text = consumed.toString("utf-8");
   const entries: JournalEntry[] = [];
 
+  // Track each line's absolute byte offset so callers can rewind the
+  // incremental cursor to a turn boundary. Computed on raw bytes (not string
+  // indices) so multibyte UTF-8 doesn't skew offsets.
+  let lineStartByte = 0;
   for (const line of text.split("\n")) {
+    const lineBytes = Buffer.byteLength(line, "utf-8");
     const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      entries.push(JSON.parse(trimmed));
-    } catch {
-      // Skip malformed lines
+    if (trimmed) {
+      try {
+        const entry = JSON.parse(trimmed) as JournalEntry;
+        entry.byteOffset = fromOffset + lineStartByte;
+        entries.push(entry);
+      } catch {
+        // Skip malformed lines
+      }
     }
+    lineStartByte += lineBytes + 1; // +1 for the "\n" the split consumed
   }
 
   return { entries, newOffset: fromOffset + lastNl + 1 };
@@ -146,6 +173,7 @@ export function parseTurns(
     tokenCost: number;
     timestamp: string;
     sessionId: string;
+    startByteOffset?: number;
   } | null = null;
 
   function flushTurn() {
@@ -165,6 +193,7 @@ export function parseTurns(
       filesReferenced: [...new Set(current.filesReferenced)],
       tokenCost: current.tokenCost,
       summary,
+      startByteOffset: current.startByteOffset,
     });
   }
 
@@ -195,6 +224,7 @@ export function parseTurns(
           tokenCost: 0,
           timestamp: msg.timestamp || "",
           sessionId: sessionId || msg.sessionId || "",
+          startByteOffset: msg.byteOffset,
         };
       } else if (hasToolResult && current) {
         // Tool result — extract content selectively
@@ -254,10 +284,12 @@ export function parseTurns(
         }
       }
 
-      // Accumulate token cost
+      // Accumulate token cost. Output tokens only: input_tokens includes the
+      // FULL context on every assistant message, so summing it overcounted a
+      // turn's cost by roughly the message count.
       const usage = msg.message!.usage;
       if (usage) {
-        current.tokenCost += (usage.input_tokens || 0) + (usage.output_tokens || 0);
+        current.tokenCost += usage.output_tokens || 0;
       }
     }
   }
@@ -337,10 +369,30 @@ export function classifyTranscript(
  * Resolve the directory holding a project's conversation transcripts.
  * Claude Code stores them in ~/.claude/projects/<encoded-path>/, where the
  * encoded path is the absolute project dir with `/` replaced by `-`.
+ *
+ * Fallback: Claude Code's encoding flattens more than `/` (dots and other
+ * specials also become `-` in some versions), so when the exact encoding
+ * doesn't exist on disk, scan for a folder that matches after flattening every
+ * non-alphanumeric character — keeping dotted project paths discoverable.
  */
 export function getTranscriptsDir(projectDir: string): string {
+  // homedir(), not $HOME — HOME is typically unset on Windows, which made
+  // the base "undefined/.claude/projects" and silently disabled indexing.
+  const base = `${homedir()}/.claude/projects`;
   const encoded = projectDir.replace(/\//g, "-");
-  return `${process.env.HOME}/.claude/projects/${encoded}`;
+  const exact = `${base}/${encoded}`;
+  try {
+    if (statSync(exact).isDirectory()) return exact;
+  } catch { /* not there — try the flattened form */ }
+
+  const flattened = projectDir.replace(/[^a-zA-Z0-9-]/g, "-");
+  if (flattened !== encoded) {
+    const alt = `${base}/${flattened}`;
+    try {
+      if (statSync(alt).isDirectory()) return alt;
+    } catch { /* fall through to the canonical (possibly missing) path */ }
+  }
+  return exact;
 }
 
 /**

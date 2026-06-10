@@ -1,3 +1,4 @@
+import { positionalArg } from "../flags";
 import { resolve } from "path";
 import { RagDB } from "../../db";
 import { loadConfig } from "../../config";
@@ -6,7 +7,7 @@ import { cliProgress, createQuietProgress } from "../progress";
 import { cli } from "../../utils/log";
 
 export async function indexCommand(args: string[], getFlag: (flag: string) => string | undefined) {
-  const dir = resolve(args[1] && !args[1].startsWith("--") ? args[1] : ".");
+  const dir = resolve(positionalArg(args[1], "."));
   const verbose = args.includes("--verbose") || args.includes("-v");
   const db = new RagDB(dir);
   // RagDB's constructor applies the project's embedding config before creating

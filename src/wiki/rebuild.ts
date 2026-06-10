@@ -1,4 +1,4 @@
-import { existsSync } from "fs";
+import { existsSync, realpathSync } from "fs";
 import { mkdir, readdir, readFile, writeFile } from "fs/promises";
 import { dirname, join, relative, resolve } from "path";
 import type { AnnotationRow, RagDB } from "../db";
@@ -194,6 +194,28 @@ async function gitOutput(projectDir: string, args: string[]): Promise<string | n
   }
 }
 
+// git porcelain/numstat output paths are relative to the REPO ROOT regardless
+// of cwd. When the mimirs project is a subdirectory of the repo, treating them
+// as projectDir-relative breaks every consumer (churn read against missing
+// files, wiki/ filter missing, slugs carrying a directory prefix) — the same
+// root-vs-project mapping staleness.ts handles. Returns a function that maps a
+// root-relative path to projectDir-relative, or null when outside the project.
+async function gitPathMapper(projectDir: string): Promise<(rootRel: string) => string | null> {
+  const top = (await gitOutput(projectDir, ["rev-parse", "--show-toplevel"]))?.trim();
+  if (!top) return (p) => p;
+  let canonicalProject = projectDir;
+  try {
+    canonicalProject = realpathSync(projectDir);
+  } catch { /* degrade to raw path */ }
+  const prefix = normalizePath(relative(top, canonicalProject)).replace(/\/+$/, "");
+  if (!prefix || prefix === ".") return (p) => normalizePath(p);
+  return (rootRel) => {
+    const p = normalizePath(rootRel);
+    if (p === prefix) return null;
+    return p.startsWith(prefix + "/") ? p.slice(prefix.length + 1) : null;
+  };
+}
+
 // A modified wiki page whose changed-line ratio is at or above this is treated
 // as a wholesale rewrite (reword / restructure / diagram swap), not a behavior
 // change: it is listed as "refreshed" rather than fed to the changelog
@@ -231,13 +253,15 @@ async function pendingWikiChanges(projectDir: string): Promise<{
   surgicalDiff: string;
 }> {
   const status = (await gitOutput(projectDir, ["status", "--porcelain", "--", "wiki"])) ?? "";
+  const toProjectRel = await gitPathMapper(projectDir);
   const pages: { path: string; slug: string; state: "modified" | "added" | "deleted" }[] = [];
   for (const line of status.split("\n").filter(Boolean)) {
     const code = line.slice(0, 2);
-    let path = line.slice(3).trim();
-    if (path.includes(" -> ")) path = path.split(" -> ")[1]; // rename: take the new path
-    if (path.startsWith('"') && path.endsWith('"')) path = path.slice(1, -1);
-    if (!path.endsWith(".md") || path.endsWith("CHANGELOG.md")) continue;
+    let rootPath = line.slice(3).trim();
+    if (rootPath.includes(" -> ")) rootPath = rootPath.split(" -> ")[1]; // rename: take the new path
+    if (rootPath.startsWith('"') && rootPath.endsWith('"')) rootPath = rootPath.slice(1, -1);
+    const path = toProjectRel(rootPath); // git paths are repo-root-relative
+    if (!path || !path.endsWith(".md") || path.endsWith("CHANGELOG.md")) continue;
     const state = code.includes("?") || code.includes("A") ? "added" : code.includes("D") ? "deleted" : "modified";
     pages.push({ path, slug: slugFromWikiPath(path), state });
   }
@@ -252,12 +276,16 @@ async function pendingWikiChanges(projectDir: string): Promise<{
   // the current line count to get a churn ratio in [0,1].
   const churn = new Map<string, number>();
   if (modified.length) {
+    // Pathspecs after `--` are cwd-relative (projectDir), so the converted
+    // project-relative paths are correct here; numstat OUTPUT is root-relative
+    // again and is mapped back before use.
     const numstat = (await gitOutput(projectDir, ["diff", "--numstat", "HEAD", "--", ...modified.map((p) => p.path)])) ?? "";
     for (const line of numstat.split("\n").filter(Boolean)) {
       const parts = line.split("\t");
       const addCount = parts[0] === "-" ? 0 : parseInt(parts[0], 10) || 0; // "-" == binary
       const delCount = parts[1] === "-" ? 0 : parseInt(parts[1], 10) || 0;
-      const path = parts.slice(2).join("\t");
+      const path = toProjectRel(parts.slice(2).join("\t"));
+      if (!path) continue;
       const newLines = (await readFile(join(projectDir, path), "utf-8").catch(() => "")).split("\n").length;
       const oldLines = Math.max(0, newLines - addCount + delCount);
       const denom = oldLines + newLines;
@@ -342,10 +370,17 @@ function buildMap(projectDir: string, db: RagDB): PrefetchFileEntry[] {
     importedByPath.set(rel, new Set());
   }
 
-  const relEdges = graph.edges.map((edge) => ({
-    fromPath: relPath(projectDir, edge.fromPath),
-    toPath: relPath(projectDir, edge.toPath),
-  }));
+  // Dedupe edges per file pair — multiple imports between the same two files
+  // otherwise multiply that link's PageRank weight.
+  const edgeSeen = new Set<string>();
+  const relEdges: { fromPath: string; toPath: string }[] = [];
+  for (const edge of graph.edges) {
+    const e = { fromPath: relPath(projectDir, edge.fromPath), toPath: relPath(projectDir, edge.toPath) };
+    const k = `${e.fromPath} ${e.toPath}`;
+    if (edgeSeen.has(k)) continue;
+    edgeSeen.add(k);
+    relEdges.push(e);
+  }
 
   for (const edge of relEdges) {
     importsByPath.get(edge.fromPath)?.add(edge.toPath);
@@ -631,6 +666,14 @@ function validateDiscoveryShape(discovery: DiscoveryFile): string[] {
   const errors: string[] = [];
   if (!discovery || typeof discovery !== "object") return ["Discovery must be a JSON object."];
   if (!("metadata" in discovery)) errors.push("Missing top-level `metadata`.");
+  // The stamped schemaVersion was never checked — a discovery file written
+  // against any other schema passed validation cleanly.
+  const stamped = (discovery as { metadata?: { schemaVersion?: unknown } }).metadata?.schemaVersion;
+  if (stamped !== undefined && Number(stamped) !== WIKI_DISCOVERY_SCHEMA_VERSION) {
+    errors.push(
+      `Discovery schemaVersion ${String(stamped)} does not match expected ${WIKI_DISCOVERY_SCHEMA_VERSION} — regenerate with wiki(command: "shape").`,
+    );
+  }
   if (!Array.isArray(discovery.flows)) errors.push("Missing top-level `flows` array.");
   if (!Array.isArray(discovery.pages)) errors.push("Missing top-level `pages` array.");
   if (!Array.isArray(discovery.flows) || !Array.isArray(discovery.pages)) return errors;
@@ -961,14 +1004,17 @@ async function buildCausePacket(projectDir: string): Promise<{
   }
 
   // numstat over baseline → working tree; drop binaries ("-\t-"), lockfiles, and
-  // anything under wiki/ (the output we regenerate).
+  // anything under wiki/ (the output we regenerate). Output paths are
+  // repo-root-relative — map to projectDir-relative (drops sibling-project
+  // paths when mimirs lives in a repo subdirectory).
   const numstat = (await gitOutput(projectDir, ["diff", "--numstat", baseline])) ?? "";
+  const toProjectRel = await gitPathMapper(projectDir);
   const files: string[] = [];
   for (const line of numstat.split("\n").filter(Boolean)) {
     const parts = line.split("\t");
     const isBinary = parts[0] === "-" && parts[1] === "-";
-    const path = parts.slice(2).join("\t");
-    if (!path || isBinary || isNoiseFile(path) || normalizePath(path).startsWith("wiki/")) continue;
+    const path = toProjectRel(parts.slice(2).join("\t"));
+    if (!path || isBinary || isNoiseFile(path) || path.startsWith("wiki/")) continue;
     files.push(path);
   }
   files.sort();

@@ -125,10 +125,18 @@ export async function chunkText(
   extension: string,
   chunkSize = DEFAULT_CHUNK_SIZE,
   chunkOverlap = DEFAULT_CHUNK_OVERLAP,
-  filePath?: string
+  filePath?: string,
+  lineSource?: string
 ): Promise<ChunkTextResult> {
   const result = await _chunkText(text, extension, chunkSize, chunkOverlap, filePath);
-  assignLineNumbers(result.chunks, text);
+  // Line numbers must come from the RAW file content (`lineSource`), not the
+  // embedding text: parseFile trims and (for markdown with frontmatter)
+  // prepends synthetic weighted lines, so offsets in `text` are shifted vs the
+  // file on disk — and `path:line` citations are the tool's core contract.
+  // Chunks whose text isn't a verbatim substring of the raw file (synthetic
+  // frontmatter chunks, merged tiny parts) get no line numbers rather than
+  // wrong ones.
+  assignLineNumbers(result.chunks, lineSource ?? text);
   return result;
 }
 
@@ -183,11 +191,17 @@ async function _chunkText(
     }
   }
 
-  if (text.length <= chunkSize) {
+  const isMarkdown = [".md", ".mdx", ".markdown"].includes(extension);
+
+  // Small files become one chunk — EXCEPT markdown: parseFile prepends
+  // synthetic frontmatter lines to the embedding text, so a single whole-text
+  // chunk is never a verbatim substring of the raw file and gets no line
+  // numbers. Heading-split sections come verbatim from the body and keep
+  // their citations (a small frontmatter doc cited `path` with no lines was
+  // this exact hole).
+  if (text.length <= chunkSize && !isMarkdown) {
     return { chunks: [{ text, index: 0 }] };
   }
-
-  const isMarkdown = [".md", ".mdx", ".markdown"].includes(extension);
   // Code-like files: split on blank-line-separated blocks as a heuristic.
   // Includes AST-supported languages plus shell, HCL, proto, GraphQL, etc.
   const isCode = AST_SUPPORTED.has(extension) || HEURISTIC_CODE.has(extension);
@@ -258,6 +272,10 @@ function assignLineNumbers(chunks: Chunk[], fullText: string): void {
 
   let cursor = 0;
   for (const chunk of chunks) {
+    // AST chunks already carry exact line numbers read from disk — never
+    // overwrite them with offsets recomputed against (possibly transformed)
+    // text. This used to silently shift markdown/leading-whitespace files.
+    if (chunk.startLine !== undefined) continue;
     const idx = fullText.indexOf(chunk.text, cursor);
     if (idx >= 0) {
       chunk.startLine = offsetToLine(idx);
@@ -268,9 +286,34 @@ function assignLineNumbers(chunks: Chunk[], fullText: string): void {
 }
 
 function splitMarkdown(text: string): string[] {
-  // Split on heading boundaries (## or ###)
-  const parts = text.split(/(?=^#{1,3}\s)/m);
-  return parts.filter((p) => p.trim().length > 0);
+  // Split on heading boundaries (#, ## or ###) — but not inside fenced code
+  // blocks, where a `# shell comment` line is not a heading and a naive split
+  // produced chunks with dangling fences.
+  const lines = text.split("\n");
+  const sections: string[] = [];
+  let current: string[] = [];
+  let fence: "`" | "~" | null = null;
+
+  for (const line of lines) {
+    const fenceMatch = line.match(/^\s{0,3}(```|~~~)/);
+    if (fenceMatch) {
+      const ch = fenceMatch[1][0] as "`" | "~";
+      if (fence === null) fence = ch;
+      else if (fence === ch) fence = null;
+    }
+    if (fence === null && !fenceMatch && /^#{1,3}\s/.test(line) && current.length > 0) {
+      const section = current.join("\n");
+      if (section.trim()) sections.push(section);
+      current = [line];
+    } else {
+      current.push(line);
+    }
+  }
+  if (current.length > 0) {
+    const section = current.join("\n");
+    if (section.trim()) sections.push(section);
+  }
+  return sections;
 }
 
 function splitDockerfile(text: string): string[] {

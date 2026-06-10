@@ -38,16 +38,26 @@ export function tryAcquireIndexLock(directory: string): IndexLock | null {
   }
 
   if (existsSync(lockPath)) {
+    let staleContent: string | null = null;
     try {
-      const content = readFileSync(lockPath, "utf-8").trim();
-      const pid = Number.parseInt(content, 10);
+      staleContent = readFileSync(lockPath, "utf-8");
+      const pid = Number.parseInt(staleContent.trim(), 10);
       if (Number.isFinite(pid) && pid !== process.pid && isPidAlive(pid)) {
         return null;
       }
     } catch {
       // Unreadable lock — treat as stale.
     }
-    try { unlinkSync(lockPath); } catch { /* best-effort */ }
+    // Reclaim only if the file still holds the stale content we examined — a
+    // racing process may have already reclaimed and written its own live PID,
+    // which we must not unlink (that was the double-acquire TOCTOU).
+    try {
+      if (staleContent === null || readFileSync(lockPath, "utf-8") === staleContent) {
+        unlinkSync(lockPath);
+      } else {
+        return null;
+      }
+    } catch { /* already gone */ }
   }
 
   try {
@@ -58,6 +68,17 @@ export function tryAcquireIndexLock(directory: string): IndexLock | null {
     if (code === "EEXIST") return null;
     log.warn(`Failed to acquire index lock: ${err instanceof Error ? err.message : err}`, "index-lock");
     return null;
+  }
+
+  // Close the stale-reclaim TOCTOU: two processes can both see a stale lock,
+  // and the slower one then unlinks the faster one's fresh `wx` write and
+  // re-creates the file — both believe they hold the lock. Re-read after the
+  // write: whoever's PID actually landed in the file owns it.
+  try {
+    const owner = readFileSync(lockPath, "utf-8").trim();
+    if (Number.parseInt(owner, 10) !== process.pid) return null;
+  } catch {
+    return null; // lock vanished under us — someone else is reclaiming
   }
 
   heldLocks.set(dir, 1);

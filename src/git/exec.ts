@@ -5,13 +5,28 @@
  * Run `git` with the given args in `cwd`. Returns trimmed stdout on a clean
  * exit, or `null` on any non-zero exit or spawn failure (e.g. not a repo,
  * git not installed). Never throws.
+ *
+ * Pass `{ raw: true }` for output where leading whitespace is SIGNIFICANT —
+ * `status --porcelain` encodes worktree-only changes with a leading space
+ * (` M file`), and trim corrupted the first entry's status and path.
  */
-export async function runGit(args: string[], cwd: string): Promise<string | null> {
+export async function runGit(
+  args: string[],
+  cwd: string,
+  opts?: { raw?: boolean },
+): Promise<string | null> {
   try {
     const proc = Bun.spawn(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe" });
-    const output = await new Response(proc.stdout).text();
+    // Drain BOTH pipes concurrently: stderr left unread deadlocks git once it
+    // fills the ~64KB pipe buffer (e.g. broken-ref warnings during log --all),
+    // and stdout then never reaches EOF.
+    const [output] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+    ]);
     const exitCode = await proc.exited;
-    return exitCode === 0 ? output.trim() : null;
+    if (exitCode !== 0) return null;
+    return opts?.raw ? output : output.trim();
   } catch {
     return null;
   }

@@ -1,3 +1,4 @@
+import { embeddingBytes } from "../utils/vec";
 import { Database } from "bun:sqlite";
 import { type AnnotationRow } from "./types";
 
@@ -43,7 +44,7 @@ export function upsertAnnotation(
       db.run("DELETE FROM vec_annotations WHERE annotation_id = ?", [existing.id]);
       db.run(
         "INSERT INTO vec_annotations (annotation_id, embedding) VALUES (?, ?)",
-        [existing.id, new Uint8Array(embedding.buffer)]
+        [existing.id, embeddingBytes(embedding)]
       );
       annotationId = existing.id;
     } else {
@@ -57,7 +58,7 @@ export function upsertAnnotation(
       db.run("INSERT INTO fts_annotations(rowid, note) VALUES (?, ?)", [annotationId, note]);
       db.run(
         "INSERT INTO vec_annotations (annotation_id, embedding) VALUES (?, ?)",
-        [annotationId, new Uint8Array(embedding.buffer)]
+        [annotationId, embeddingBytes(embedding)]
       );
     }
   });
@@ -163,7 +164,7 @@ export function searchAnnotations(
        FROM (SELECT annotation_id, distance FROM vec_annotations WHERE embedding MATCH ? ORDER BY distance LIMIT ?) v
        JOIN annotations a ON a.id = v.annotation_id`
     )
-    .all(new Uint8Array(queryEmbedding.buffer), topK)
+    .all(embeddingBytes(queryEmbedding), topK)
     .map((row) => ({
       id: row.id,
       path: row.path,

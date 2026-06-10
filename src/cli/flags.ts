@@ -53,6 +53,31 @@ export function intFlag(
 }
 
 /**
+ * Pick a positional argument that is NOT a flag. The old inline pattern only
+ * rejected `--`-prefixed args, so documented short flags leaked through as
+ * positionals: `mimirs index -v` indexed a junk `./-v` directory, and
+ * `mimirs cleanup -y` resolved the wrong target while still mutating global
+ * IDE configs. Anything starting with `-` is a flag, never a path. (A real
+ * dash-prefixed directory can be addressed as `./-y`.)
+ */
+export function positionalArg(raw: string | undefined, def: string): string {
+  if (raw && !raw.startsWith("-")) return raw;
+  return def;
+}
+
+/**
+ * Validate a positional query/text argument: present and not a flag token.
+ * Guards `mimirs search --top 5` from semantically searching the literal
+ * string "--top". Throws with the caller-supplied usage hint.
+ */
+export function queryArg(raw: string | undefined, usage: string): string {
+  if (!raw || raw.startsWith("-")) {
+    throw new CliFlagError(usage);
+  }
+  return raw;
+}
+
+/**
  * Parse a floating-point flag value. Returns `def` when the flag is absent.
  */
 export function floatFlag(

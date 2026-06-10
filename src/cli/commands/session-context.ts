@@ -1,10 +1,11 @@
+import { positionalArg } from "../flags";
 import { resolve } from "path";
 import { RagDB } from "../../db";
 import { cli } from "../../utils/log";
 import { runGit, findGitRoot } from "../../git/exec";
 
 export async function sessionContextCommand(args: string[], getFlag: (flag: string) => string | undefined) {
-  const dir = resolve(args[1] && !args[1].startsWith("--") ? args[1] : getFlag("--dir") || ".");
+  const dir = resolve(positionalArg(args[1], getFlag("--dir") || "."));
   const sections: string[] = [];
 
   // 1. Git context
@@ -54,12 +55,13 @@ export async function sessionContextCommand(args: string[], getFlag: (flag: stri
 
     // 3. Annotations on recently modified files
     if (gitRoot) {
-      const modifiedOutput = await runGit(["diff", "--name-only", "HEAD"], gitRoot);
-      const untrackedOutput = await runGit(["ls-files", "--others", "--exclude-standard"], gitRoot);
+      // -z: NUL-separated, unquoted — C-quoted paths never match annotations.
+      const modifiedOutput = await runGit(["diff", "--name-only", "-z", "HEAD"], gitRoot);
+      const untrackedOutput = await runGit(["ls-files", "--others", "--exclude-standard", "-z"], gitRoot);
       const modifiedFiles = new Set<string>();
       for (const output of [modifiedOutput, untrackedOutput]) {
         if (output) {
-          for (const f of output.split("\n").filter(Boolean)) {
+          for (const f of output.split("\0").filter(Boolean)) {
             modifiedFiles.add(f);
           }
         }

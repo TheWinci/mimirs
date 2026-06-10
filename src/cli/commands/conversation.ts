@@ -73,13 +73,18 @@ export async function conversationCommand(args: string[], getFlag: (flag: string
       }
     }
   } else if (subCommand === "index") {
+    const rebuild = args.includes("--rebuild");
     const sessions = discoverSessions(dir);
     if (sessions.length === 0) {
       cli.log("No conversation sessions found for this project.");
     } else {
-      cli.log(`Found ${sessions.length} sessions, indexing...`);
+      cli.log(`Found ${sessions.length} sessions, ${rebuild ? "rebuilding" : "indexing"}...`);
       let totalTurns = 0;
       for (const session of sessions) {
+        // --rebuild drops the stored turns first: indexes written before the
+        // turn-cursor fix have split turns (lost tails) and drifted indices
+        // that incremental upserts alone can't fully repair.
+        if (rebuild) db.deleteSessionTurns(session.sessionId);
         const result = await indexConversation(session.jsonlPath, session.sessionId, db, dir);
         totalTurns += result.turnsIndexed;
         if (result.turnsIndexed > 0) {
@@ -89,7 +94,7 @@ export async function conversationCommand(args: string[], getFlag: (flag: string
       cli.log(`Done: ${totalTurns} turns indexed across ${sessions.length} sessions`);
     }
   } else {
-    cli.error("Usage: mimirs conversation <search|sessions|index>");
+    cli.error("Usage: mimirs conversation <search|sessions|index [--rebuild]>");
     process.exit(1);
   }
 

@@ -1,3 +1,4 @@
+import { positionalArg } from "../flags";
 import { resolve, relative } from "path";
 import { RagDB } from "../../db";
 import { loadConfig } from "../../config";
@@ -34,7 +35,7 @@ function renderBlock(text: string, indent: string, maxLines: number, wrap: numbe
 }
 
 export async function demoCommand(args: string[]) {
-  const dir = resolve(args[1] && !args[1].startsWith("--") ? args[1] : ".");
+  const dir = resolve(positionalArg(args[1], "."));
 
   cli.log(`${BOLD}mimirs demo${RESET}`);
   cli.log(`${DIM}Running against: ${dir}${RESET}`);

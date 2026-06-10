@@ -35,19 +35,22 @@ function parseGitLog(output: string): RawCommit[] {
     .filter((s) => s.trim())
     .map((entry) => {
       const fields = entry.trim().split(FIELD_SEP);
-      if (fields.length < 6) return null;
+      if (fields.length < 7) return null;
 
-      const [hash, authorName, authorEmail, date, refs, ...messageParts] = fields;
+      const [hash, authorName, authorEmail, date, parents, refs, ...messageParts] = fields;
+      // A commit message can itself contain the record separator; the split
+      // then yields a fragment whose first field isn't a hash. Drop those
+      // instead of parsing them as bogus commits.
+      if (!COMMIT_HASH.test(hash)) return null;
       const message = messageParts.join(FIELD_SEP).trim();
-      // Count parents from hash — merge commits have 2+ parents
-      // We'll get parent count separately
       return {
         hash,
         message,
         authorName,
         authorEmail,
         date,
-        parentCount: 0, // filled in separately
+        // %P lists parent hashes space-separated; merges have 2+.
+        parentCount: parents.trim() ? parents.trim().split(/\s+/).length : 0,
         refs: refs || "",
       };
     })
@@ -68,78 +71,74 @@ function assertCommitHashes(hashes: string[]): void {
   }
 }
 
-/**
- * Get file changes (numstat) for a batch of commits.
- */
-async function getFileChanges(
-  hashes: string[],
-  gitRoot: string
-): Promise<Map<string, FileChange[]>> {
-  assertCommitHashes(hashes);
-  const result = new Map<string, FileChange[]>();
-
-  // Process in batches to avoid argument list too long
-  const BATCH = 50;
-  for (let i = 0; i < hashes.length; i += BATCH) {
-    const batch = hashes.slice(i, i + BATCH);
-    for (const hash of batch) {
-      // --root: emit the root (parentless) commit's files too, else any file
-      // first introduced there is invisible to file-history.
-      // core.quotepath=false: keep non-ASCII paths literal ("café.ts"), not
-      // octal-escaped+quoted, so they match in getFileHistory.
-      const output = await runGit(
-        ["-c", "core.quotepath=false", "diff-tree", "--no-commit-id", "-r", "--numstat", "--root", hash],
-        gitRoot
-      );
-      if (!output) {
-        result.set(hash, []);
-        continue;
-      }
-
-      const files: FileChange[] = output
-        .split("\n")
-        .filter((line) => line.trim())
-        .map((line) => {
-          const [ins, del, path] = line.split("\t");
-          return {
-            path: path || "",
-            // Binary files show "-" for insertions/deletions
-            insertions: ins === "-" ? 0 : parseInt(ins, 10) || 0,
-            deletions: del === "-" ? 0 : parseInt(del, 10) || 0,
-          };
-        })
-        .filter((f) => f.path);
-
-      result.set(hash, files);
-    }
-  }
-
-  return result;
+function parseNumstatLines(lines: string[]): FileChange[] {
+  return lines
+    .filter((line) => line.includes("\t"))
+    .map((line) => {
+      const [ins, del, path] = line.split("\t");
+      return {
+        path: path || "",
+        // Binary files show "-" for insertions/deletions
+        insertions: ins === "-" ? 0 : parseInt(ins, 10) || 0,
+        deletions: del === "-" ? 0 : parseInt(del, 10) || 0,
+      };
+    })
+    .filter((f) => f.path);
 }
 
 /**
- * Get parent counts for commits to detect merges.
+ * Get file changes (numstat) for a batch of commits.
+ *
+ * Non-merge commits: one `git log --no-walk --numstat` per 500-hash batch
+ * (the old shape spawned one `diff-tree` per commit — N subprocesses).
+ * Merge commits: `git log/diff-tree` emit NOTHING for a merge without `-m`,
+ * so every merge used to index with zero file changes — including evil-merge
+ * conflict resolutions that exist in no branch commit. They get a per-hash
+ * `diff-tree -m --first-parent` (what the merge landed on its target branch).
  */
-async function getParentCounts(
+async function getFileChanges(
   hashes: string[],
-  gitRoot: string
-): Promise<Map<string, number>> {
+  gitRoot: string,
+  mergeHashes: Set<string>
+): Promise<Map<string, FileChange[]>> {
   assertCommitHashes(hashes);
-  const result = new Map<string, number>();
+  const result = new Map<string, FileChange[]>();
+  for (const h of hashes) result.set(h, []);
 
-  // Single git command for all hashes
-  const output = await runGit(
-    ["log", "--format=%H %P", "--no-walk", ...hashes],
-    gitRoot
-  );
-  if (!output) return result;
+  // core.quotepath=false: keep non-ASCII paths literal ("café.ts"), not
+  // octal-escaped+quoted, so they match in getFileHistory.
+  const plain = hashes.filter((h) => !mergeHashes.has(h));
+  const BATCH = 500; // batched argv — a full-history index can be 10k+ hashes
+  for (let i = 0; i < plain.length; i += BATCH) {
+    const batch = plain.slice(i, i + BATCH);
+    const output = await runGit(
+      [
+        "-c", "core.quotepath=false",
+        "log", "--no-walk", "--numstat", `--format=${RECORD_SEP}%H`,
+        ...batch,
+      ],
+      gitRoot
+    );
+    if (output === null) continue; // leaves [] — caller's commits still index
 
-  for (const line of output.split("\n")) {
-    if (!line.trim()) continue;
-    const parts = line.split(" ");
-    const hash = parts[0];
-    const parentCount = parts.length - 1;
-    result.set(hash, parentCount);
+    for (const record of output.split(RECORD_SEP)) {
+      const lines = record.split("\n").filter((l) => l.trim());
+      if (lines.length === 0) continue;
+      const hash = lines[0].trim();
+      if (!COMMIT_HASH.test(hash)) continue;
+      result.set(hash, parseNumstatLines(lines.slice(1)));
+    }
+  }
+
+  for (const hash of mergeHashes) {
+    const output = await runGit(
+      [
+        "-c", "core.quotepath=false",
+        "diff-tree", "--no-commit-id", "-r", "--numstat", "-m", "--first-parent", "--root", hash,
+      ],
+      gitRoot
+    );
+    if (output) result.set(hash, parseNumstatLines(output.split("\n")));
   }
 
   return result;
@@ -149,18 +148,27 @@ async function getParentCounts(
  * Handle force push: find which indexed commits are still reachable,
  * purge the orphaned ones, and return the latest surviving commit
  * as the new sinceRef for incremental indexing.
+ *
+ * A FAILED `git log --all` (lock contention, OOM, …) must be distinguishable
+ * from "no shared history": the caller responds to the latter with
+ * clearGitHistory(), and one transient subprocess failure must not wipe the
+ * entire commit index.
  */
 async function handleForcePush(
   db: RagDB,
   gitRoot: string,
   onProgress?: (msg: string, opts?: { transient?: boolean }) => void,
-): Promise<{ hash: string; purged: number } | null> {
+): Promise<
+  | { status: "recovered"; hash: string; purged: number }
+  | { status: "no-shared-history" }
+  | { status: "git-failed" }
+> {
   // Get all commits currently reachable from any ref
   const reachableOutput = await runGit(
     ["log", "--format=%H", "--all"],
     gitRoot
   );
-  if (!reachableOutput) return null;
+  if (reachableOutput === null) return { status: "git-failed" };
 
   const reachable = new Set(reachableOutput.split("\n").filter(Boolean));
 
@@ -169,9 +177,9 @@ async function handleForcePush(
 
   // Find the latest remaining indexed commit to use as sinceRef
   const lastHash = db.getLastIndexedCommit();
-  if (!lastHash) return null;
+  if (!lastHash) return { status: "no-shared-history" };
 
-  return { hash: lastHash, purged };
+  return { status: "recovered", hash: lastHash, purged };
 }
 
 /**
@@ -243,10 +251,12 @@ export async function indexGitHistory(
     return result;
   }
 
-  // Determine the range to index
+  // Determine the range to index. The resume point is the HEAD recorded when
+  // the last run completed (explicit cursor); legacy DBs without one fall back
+  // to the newest indexed commit by date.
   let sinceRef = options?.since;
   if (!sinceRef) {
-    const lastHash = db.getLastIndexedCommit();
+    const lastHash = db.getGitResumePoint() ?? db.getLastIndexedCommit();
     if (lastHash) {
       // Check if lastHash is still a valid ancestor
       const isAncestor = await runGit(
@@ -261,21 +271,33 @@ export async function indexGitHistory(
         // in current history. Purge everything after it.
         onProgress?.("Force push detected — finding shared history...");
         const recovery = await handleForcePush(db, gitRoot, onProgress);
-        if (recovery) {
+        if (recovery.status === "recovered") {
           sinceRef = recovery.hash;
+          // Persist the recovered resume point NOW: the normal persist at the
+          // end of a successful run is skipped by the "no new commits" early
+          // returns, and a stale git_resume_head re-triggered this full
+          // `git log --all` recovery scan on every subsequent run.
+          db.setGitResumePoint(recovery.hash);
           onProgress?.(`Purged ${recovery.purged} orphaned commits, resuming from ${recovery.hash.slice(0, 8)}`);
-        } else {
+        } else if (recovery.status === "no-shared-history") {
           onProgress?.("No shared history found — rebuilding full index.");
           db.clearGitHistory();
+          db.clearGitResumePoint();
+        } else {
+          // Transient git failure — do NOT clear the index; retry next run.
+          log.warn("git log --all failed during force-push recovery; keeping existing index, will retry", "git-index");
+          return result;
         }
       }
     }
   }
 
-  // Get commit log
+  // Get commit log (%P = parent hashes, parsed into parentCount — a separate
+  // per-batch parent lookup used to blow ARG_MAX on big repos and silently
+  // mark every commit non-merge when it failed)
   const logArgs = [
     "log",
-    `--format=${RECORD_SEP}%H${FIELD_SEP}%an${FIELD_SEP}%ae${FIELD_SEP}%aI${FIELD_SEP}%D${FIELD_SEP}%B`,
+    `--format=${RECORD_SEP}%H${FIELD_SEP}%an${FIELD_SEP}%ae${FIELD_SEP}%aI${FIELD_SEP}%P${FIELD_SEP}%D${FIELD_SEP}%B`,
     "--all",
   ];
   if (sinceRef) {
@@ -292,8 +314,20 @@ export async function indexGitHistory(
   const commits = parseGitLog(logOutput);
   result.total = commits.length;
 
+  // Advance the resume point on "nothing to do" outcomes too — otherwise the
+  // same already-covered range is re-listed (and a recovery hash re-checked)
+  // on every subsequent run until a genuinely new commit lands. NEVER when the
+  // caller passed an explicit --since: that scopes a partial index, and
+  // jumping the cursor to HEAD would permanently skip everything below REF.
+  const persistHead = async () => {
+    if (options?.since) return;
+    const head = await runGit(["rev-parse", "HEAD"], gitRoot);
+    if (head) db.setGitResumePoint(head);
+  };
+
   if (commits.length === 0) {
     onProgress?.("No new commits to index");
+    await persistHead();
     return result;
   }
 
@@ -305,23 +339,21 @@ export async function indexGitHistory(
 
   if (newCommits.length === 0) {
     onProgress?.("All commits already indexed");
+    await persistHead();
     return result;
   }
 
   onProgress?.(`Indexing ${newCommits.length} new commits...`);
 
-  // Get file changes and parent counts
+  // Get file changes (parent counts already parsed from %P in the log format)
   const hashes = newCommits.map((c) => c.hash);
-  const [fileChanges, parentCounts] = await Promise.all([
-    getFileChanges(hashes, gitRoot),
-    getParentCounts(hashes, gitRoot),
-  ]);
+  const mergeHashes = new Set(newCommits.filter((c) => c.parentCount > 1).map((c) => c.hash));
+  const fileChanges = await getFileChanges(hashes, gitRoot, mergeHashes);
 
   // Build embeddable texts
   const texts: string[] = [];
   for (const commit of newCommits) {
     const files = fileChanges.get(commit.hash) || [];
-    commit.parentCount = parentCounts.get(commit.hash) || 0;
     texts.push(buildEmbeddableText(commit, files));
   }
 
@@ -370,6 +402,10 @@ export async function indexGitHistory(
 
   result.indexed = inserts.length;
   onProgress?.(`Indexed ${result.indexed} commits`);
+
+  // Record the explicit resume point only after a fully successful run.
+  const head = await runGit(["rev-parse", "HEAD"], gitRoot);
+  if (head) db.setGitResumePoint(head);
 
   return result;
 }

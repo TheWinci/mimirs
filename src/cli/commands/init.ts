@@ -1,3 +1,4 @@
+import { positionalArg } from "../flags";
 import { resolve, join } from "path";
 import { mkdirSync, writeFileSync, unlinkSync } from "fs";
 import { RagDB } from "../../db";
@@ -8,7 +9,7 @@ import { cliProgress, createQuietProgress } from "../progress";
 import { cli } from "../../utils/log";
 
 export async function initCommand(args: string[], getFlag: (flag: string) => string | undefined) {
-  const dir = resolve(args[1] && !args[1].startsWith("--") ? args[1] : ".");
+  const dir = resolve(positionalArg(args[1], "."));
   const autoYes = args.includes("--yes") || args.includes("-y");
   const verbose = args.includes("--verbose") || args.includes("-v");
   const ideFlag = getFlag("--ide");
@@ -26,7 +27,7 @@ export async function initCommand(args: string[], getFlag: (flag: string) => str
   }
 
   cli.log();
-  const shouldIndex = autoYes || await confirm("Index project now? [Y/n] ");
+  const shouldIndex = autoYes || await confirm("Index project now? [Y/n] ", true);
   if (shouldIndex) {
     const db = new RagDB(dir);
     const config = await loadConfig(dir);

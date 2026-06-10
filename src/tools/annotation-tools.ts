@@ -4,6 +4,7 @@ import { type AnnotationRow } from "../db";
 import { embed } from "../embeddings/embed";
 import { getHeadSha } from "../git/exec";
 import { computeFreshness, freshnessTag } from "../git/staleness";
+import { toProjectRelative } from "../utils/path";
 import { type GetDB, resolveProject } from "./index";
 
 export function registerAnnotationTools(server: McpServer, getDB: GetDB) {
@@ -29,14 +30,19 @@ export function registerAnnotationTools(server: McpServer, getDB: GetDB) {
     async ({ path, note, symbol, author, directory }) => {
       const { projectDir, db: ragDb } = await resolveProject(directory, getDB);
 
+      // Other tools display absolute paths, so agents feed them back here —
+      // stored verbatim they never match read_relevant's relative lookup and
+      // the note silently never surfaces. Canonicalize at the boundary.
+      const relPath = toProjectRelative(projectDir, path);
+
       const embText = symbol ? `${symbol}: ${note}` : note;
       const embedding = await embed(embText);
       // Stamp the code state the note was written against, so recall can flag
       // when the annotated file has changed since.
       const commitHash = await getHeadSha(projectDir);
-      const id = ragDb.upsertAnnotation(path, note, embedding, symbol ?? null, author ?? "agent", commitHash);
+      const id = ragDb.upsertAnnotation(relPath, note, embedding, symbol ?? null, author ?? "agent", commitHash);
 
-      const target = symbol ? `${path}  •  ${symbol}` : path;
+      const target = symbol ? `${relPath}  •  ${symbol}` : relPath;
       return {
         content: [{ type: "text" as const, text: `Annotation #${id} saved for ${target}` }],
       };
@@ -62,14 +68,15 @@ export function registerAnnotationTools(server: McpServer, getDB: GetDB) {
     },
     async ({ path, query, directory }) => {
       const { projectDir, db: ragDb } = await resolveProject(directory, getDB);
+      const relPath = path !== undefined ? toProjectRelative(projectDir, path) : undefined;
 
       let results: AnnotationRow[];
       if (query) {
         const embedding = await embed(query);
         const searchResults = ragDb.searchAnnotations(embedding, 10);
-        results = path ? searchResults.filter((r) => r.path === path) : searchResults;
-      } else if (path) {
-        results = ragDb.getAnnotations(path);
+        results = relPath ? searchResults.filter((r) => r.path === relPath) : searchResults;
+      } else if (relPath) {
+        results = ragDb.getAnnotations(relPath);
       } else {
         results = ragDb.getAnnotations();
       }

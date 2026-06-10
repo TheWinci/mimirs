@@ -283,7 +283,7 @@ function mergeSymbolResults(
     const existing = byFile.get(sym.path);
     if (existing) {
       // Boost existing result — it matched both semantically and by symbol name
-      existing.score = Math.max(existing.score, existing.score * 1.3);
+      existing.score *= 1.3;
     } else {
       // Add new result from symbol search — exact name matches are high-signal
       byFile.set(sym.path, {
@@ -311,7 +311,18 @@ function expandForDocs<T extends { path: string }>(
   // there's nothing to protect and expansion would exceed topK for no reason.
   const codeCount = initial.length - docCount;
   if (docCount === 0 || codeCount === 0) return initial;
-  return pool.slice(0, topK + docCount);
+  // Extend until the original code-slot count is restored — the extension
+  // slots can themselves be docs, so a fixed +docCount could still come up
+  // short on code results. Hard cap at 2×topK: in docs-heavy pools an
+  // unbounded walk returned the entire 8×topK candidate pool.
+  const cap = Math.min(pool.length, topK * 2);
+  let end = topK;
+  let codes = codeCount;
+  while (codes < topK && end < cap) {
+    if (!DOC_EXTENSIONS.test(pool[end].path)) codes++;
+    end++;
+  }
+  return pool.slice(0, end);
 }
 
 // ── Dependency graph boost ───────────────────────────────────────
@@ -543,9 +554,28 @@ export async function searchChunks(
     textResults = textResults.filter((r) => r.chunkIndex !== -1);
   }
 
+  // `threshold` is documented as a 0-1 relevance score, but fused scores are
+  // positional RRF values (single-list max = weight ≤ 1, decaying fast) — the
+  // two scales diverged in the RRF migration and a user passing e.g. 0.5
+  // silently filtered out almost everything. Compare against the TRUE cosine
+  // of the vector match instead — but only for VECTOR-ONLY rows: a keyword
+  // match is its own relevance signal, and filtering rows that matched BOTH
+  // ways (weak cosine + strong keyword) made adding semantic signal strictly
+  // worse than having none.
+  const cosineByKey = new Map<string, number | null>();
+  for (const v of vectorResults) {
+    cosineByKey.set(`${v.path}:${v.chunkIndex}`, vectorScoreToCosine(v.score));
+  }
+  const textKeys = new Set(textResults.map((t) => `${t.path}:${t.chunkIndex}`));
+
   const isGenerated = buildGeneratedMatcher(generatedPatterns);
   let results = mergeHybridScores(vectorResults, textResults, hybridWeight)
-    .filter((r) => r.score >= threshold)
+    .filter((r) => {
+      const key = `${r.path}:${r.chunkIndex}`;
+      if (textKeys.has(key)) return true; // keyword-matched — keep
+      const cos = cosineByKey.get(key);
+      return cos == null || cos >= threshold;
+    })
     .map((r) => {
       // Path-based score adjustment for chunks: demote tests. (We deliberately do
       // NOT bump a hardcoded src/lib/... whitelist — it's not generic and measured
@@ -586,7 +616,12 @@ export async function searchChunks(
         if (importerCount > 0) boost = 0.05 * Math.log2(importerCount + 1);
       }
 
-      const pBoost = parentScoreByPath ? (parentScoreByPath.get(r.path) ?? 0) * parentBoost : 0;
+      // Parent rows (chunkIndex === -1, kept when leafOnly=false) must not
+      // self-boost from their own match score — that ranked every parent above
+      // its children and defeated the tight-spans goal.
+      const pBoost = parentScoreByPath && r.chunkIndex !== -1
+        ? (parentScoreByPath.get(r.path) ?? 0) * parentBoost
+        : 0;
       return { ...r, score: r.score * multiplier + boost + pBoost };
     })
     .sort((a, b) => b.score - a.score);
