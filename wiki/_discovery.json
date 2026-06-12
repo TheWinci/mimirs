@@ -2414,7 +2414,7 @@
       "id": "tools/search-analytics",
       "title": "Tool: search_analytics",
       "kind": "tool",
-      "summary": "MCP tool that reports search usage analytics over a look-back window (days): total queries, average results, average top score, zero-result rate, top searched terms, zero-result queries, and low-relevance queries \u2014 aggregated from query_log.",
+      "summary": "MCP tool that reports search usage analytics over a look-back window (days): total queries, average results, average top score, zero-result rate, top searched terms, zero-result queries, and low-relevance queries — aggregated from query_log.",
       "confidence": "high",
       "entrypoints": [
         "search_analytics (MCP tool)"
@@ -4019,7 +4019,7 @@
       ],
       "mustCover": [
         "the two runtime entry styles: per-invocation CLI vs long-running stdio MCP server",
-        "shared core (RagDB, indexer, hybrid search \u2014 vector + BM25 fused by reciprocal-rank fusion, embeddings) used by both",
+        "shared core (RagDB, indexer, hybrid search — vector + BM25 fused by reciprocal-rank fusion, embeddings) used by both",
         "tool registration wiring (registerAllTools) and resolveProject",
         "background indexing/watching inside the server"
       ],
@@ -4101,6 +4101,81 @@
         "env vars: RAG_PROJECT_DIR, RAG_DB_DIR, LOG_LEVEL",
         "embedding model/dim/pooling/dtype precedence: config.json (embeddingModel/embeddingDim/embeddingPooling/embeddingDtype) over defaults, passed to configureEmbedder",
         "applyEmbeddingConfigFromDisk in the RagDB constructor"
+      ],
+      "openQuestions": []
+    },
+    {
+      "slug": "mechanisms/hybrid-ranking",
+      "title": "Hybrid search ranking",
+      "kind": "mechanism",
+      "flowIds": [
+        "tools/search",
+        "tools/read-relevant",
+        "tools/write-relevant",
+        "cli/search",
+        "cli/read",
+        "cli/demo"
+      ],
+      "primaryFiles": [
+        "src/search/hybrid.ts"
+      ],
+      "mustCover": [
+        "how vector and keyword results are fused into one ranking",
+        "which rows the cosine relevance threshold filters and which bypass it",
+        "the boosts applied after fusion and where each is computed",
+        "what callers configure (topK, extensions/dirs filters) versus what is fixed"
+      ],
+      "openQuestions": []
+    },
+    {
+      "slug": "mechanisms/embedding-pipeline",
+      "title": "Embedding model loading and caching",
+      "kind": "mechanism",
+      "flowIds": [
+        "tools/search-conversation",
+        "tools/create-checkpoint",
+        "tools/search-checkpoints",
+        "tools/annotate",
+        "tools/get-annotations",
+        "tools/search-commits",
+        "cli/benchmark-models",
+        "cli/checkpoint"
+      ],
+      "primaryFiles": [
+        "src/embeddings/embed.ts"
+      ],
+      "mustCover": [
+        "the pinned default model (revision + sha256) and checksum verification with corrupt-cache purge",
+        "the embedder singleton lifecycle: configure, lazy load, reset",
+        "token windowing and merged embeddings for inputs past the model token limit",
+        "thread-count default and why it stays conservative"
+      ],
+      "openQuestions": []
+    },
+    {
+      "slug": "mechanisms/call-graph",
+      "title": "Call graph construction and traversal",
+      "kind": "mechanism",
+      "flowIds": [
+        "tools/impact",
+        "tools/trace",
+        "tools/callees",
+        "tools/affected",
+        "cli/affected",
+        "tools/usages",
+        "tools/depends-on",
+        "tools/dependents",
+        "tools/project-map"
+      ],
+      "primaryFiles": [
+        "src/graph/trace.ts",
+        "src/db/graph.ts"
+      ],
+      "mustCover": [
+        "how the call graph is built from the database and cached, and what invalidates the cache",
+        "symbol resolution including ambiguity between same-named definitions",
+        "traversal pruning: ambient fan-in cutoff and node count cap",
+        "static-resolution limits: dynamic dispatch breaks chains and how results say so"
       ],
       "openQuestions": []
     }
