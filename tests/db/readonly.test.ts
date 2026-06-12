@@ -50,6 +50,25 @@ describe("readonly attach (connect_repo / cross-repo queries)", () => {
       .toThrow(/No mimirs index/);
   });
 
+  test("ignores RAG_DB_DIR: a readonly attach reads the foreign repo's own .mimirs", async () => {
+    buildIndex(tempDir);
+    const shared = await createTempDir(); // RAG_DB_DIR location — holds NO index
+    const prev = process.env.RAG_DB_DIR;
+    process.env.RAG_DB_DIR = shared;
+    try {
+      // RAG_DB_DIR relocates the primary project's index; honoring it here
+      // would look for index.db in `shared` and throw (or worse, silently
+      // answer cross-repo queries from the primary's index).
+      const db = new RagDB(tempDir, undefined, { readonly: true });
+      open.push(db);
+      expect(db.isReadonly).toBe(true);
+    } finally {
+      if (prev === undefined) delete process.env.RAG_DB_DIR;
+      else process.env.RAG_DB_DIR = prev;
+      await cleanupTempDir(shared);
+    }
+  });
+
   test("newer schema version warns but still serves reads", () => {
     buildIndex(tempDir);
     const raw = new Database(join(tempDir, ".mimirs", "index.db"));

@@ -42,7 +42,9 @@ export function tryAcquireIndexLock(directory: string): IndexLock | null {
     try {
       staleContent = readFileSync(lockPath, "utf-8");
       const pid = Number.parseInt(staleContent.trim(), 10);
-      if (Number.isFinite(pid) && pid !== process.pid && isPidAlive(pid)) {
+      // pid > 0: kill(0)/kill(-n) probe process groups and always succeed, so
+      // a corrupted lock holding "0" would never be reclaimed.
+      if (Number.isFinite(pid) && pid > 0 && pid !== process.pid && isPidAlive(pid)) {
         return null;
       }
     } catch {

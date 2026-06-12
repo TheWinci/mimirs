@@ -32,7 +32,9 @@ export function readLockHolderPid(projectDir: string): number | null {
       readFileSync(join(projectDir, ".mimirs", "index.lock"), "utf-8").trim(),
       10,
     );
-    return Number.isFinite(pid) ? pid : null;
+    // pid > 0: kill(0)/kill(-n) probe process groups, so a corrupted lock
+    // holding "0" would read as a permanently-alive holder.
+    return Number.isFinite(pid) && pid > 0 ? pid : null;
   } catch {
     return null;
   }
@@ -74,9 +76,14 @@ export async function sendCommand(
   let lastStatus = "";
   while (Date.now() < deadline) {
     if (existsSync(resPath)) {
-      const result = JSON.parse(readFileSync(resPath, "utf-8")) as CommandResult;
-      try { unlinkSync(resPath); } catch { /* fine, server cleans old results */ }
-      return result;
+      let result: CommandResult | null = null;
+      try {
+        result = JSON.parse(readFileSync(resPath, "utf-8")) as CommandResult;
+      } catch { /* swept by the server's TTL GC between exists and read — keep polling */ }
+      if (result) {
+        try { unlinkSync(resPath); } catch { /* fine, server cleans old results */ }
+        return result;
+      }
     }
 
     const holder = readLockHolderPid(projectDir);

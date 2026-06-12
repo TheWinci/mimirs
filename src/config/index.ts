@@ -1,6 +1,6 @@
-import { readFile, writeFile, mkdir } from "fs/promises";
+import { readFile, writeFile, mkdir, rename } from "fs/promises";
 import { join, resolve } from "path";
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, statSync, unlinkSync, writeFileSync } from "fs";
 import { z } from "zod";
 import { log } from "../utils/log";
 import { configureEmbedder, DEFAULT_MODEL_ID, DEFAULT_EMBEDDING_DIM } from "../embeddings/embed";
@@ -243,10 +243,59 @@ export function readConnectedReposSync(projectDir: string): ConnectedRepoEntry[]
   }
 }
 
+/** `wx`-create a lock file next to config.json so two concurrent writers
+ * (IDE server + CLI) can't interleave a read-modify-write and silently drop
+ * each other's edit. A lock older than 10s is stolen (holder crashed before
+ * unlink); acquisition gives up after 2s — config writes take milliseconds. */
+async function acquireConfigLock(lockPath: string): Promise<() => void> {
+  const deadline = Date.now() + 2000;
+  for (;;) {
+    try {
+      writeFileSync(lockPath, String(process.pid), { flag: "wx" });
+      return () => { try { unlinkSync(lockPath); } catch { /* already gone */ } };
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+      try {
+        if (Date.now() - statSync(lockPath).mtimeMs > 10_000) {
+          unlinkSync(lockPath);
+          continue;
+        }
+      } catch { continue; /* vanished — retry acquire */ }
+      if (Date.now() > deadline) {
+        throw new Error(`config.json is locked by another mimirs process (${lockPath}) — retry in a moment`);
+      }
+      await new Promise((r) => setTimeout(r, 25));
+    }
+  }
+}
+
+/** Read-modify-write config.json under the lock, preserving every other field
+ * as-is (raw JSON edit, not a re-serialize of the validated config — that
+ * would bake defaults into the user's file). Writes via temp+rename so a
+ * crash mid-write can't truncate the file. `fn` mutates `raw` and returns
+ * `{write, result}`; the file is rewritten only when `write` is true. */
+async function mutateRawConfig<T>(
+  projectDir: string,
+  fn: (raw: Record<string, unknown>) => { write: boolean; result: T },
+): Promise<T> {
+  const configPath = join(projectDir, ".mimirs", "config.json");
+  const release = await acquireConfigLock(configPath + ".lock");
+  try {
+    const raw = JSON.parse(await readFile(configPath, "utf-8")) as Record<string, unknown>;
+    const { write, result } = fn(raw);
+    if (write) {
+      const tmpPath = configPath + ".tmp";
+      await writeFile(tmpPath, JSON.stringify(raw, null, 2) + "\n");
+      await rename(tmpPath, configPath);
+    }
+    return result;
+  } finally {
+    release();
+  }
+}
+
 /**
- * Persist a connected repo into .mimirs/config.json, preserving every other
- * field as-is (raw JSON edit, not a re-serialize of the validated config —
- * that would bake defaults into the user's file). Dedup by resolved path.
+ * Persist a connected repo into .mimirs/config.json. Dedup by resolved path.
  */
 export async function addConnectedRepo(
   projectDir: string,
@@ -254,29 +303,29 @@ export async function addConnectedRepo(
 ): Promise<"added" | "exists"> {
   const configPath = join(projectDir, ".mimirs", "config.json");
   if (!existsSync(configPath)) await loadConfig(projectDir); // scaffold defaults first
-  const raw = JSON.parse(await readFile(configPath, "utf-8")) as Record<string, unknown>;
-  const repos = Array.isArray(raw.connectedRepos) ? (raw.connectedRepos as ConnectedRepoEntry[]) : [];
-  if (repos.some((r) => resolve(projectDir, r.path) === resolve(projectDir, entry.path))) {
-    return "exists";
-  }
-  raw.connectedRepos = [...repos, entry];
-  await writeFile(configPath, JSON.stringify(raw, null, 2) + "\n");
-  return "added";
+  return mutateRawConfig(projectDir, (raw) => {
+    const repos = Array.isArray(raw.connectedRepos) ? (raw.connectedRepos as ConnectedRepoEntry[]) : [];
+    if (repos.some((r) => resolve(projectDir, r.path) === resolve(projectDir, entry.path))) {
+      return { write: false, result: "exists" as const };
+    }
+    raw.connectedRepos = [...repos, entry];
+    return { write: true, result: "added" as const };
+  });
 }
 
 /** Remove a connected repo by alias or path. Returns true when an entry was removed. */
 export async function removeConnectedRepo(projectDir: string, ref: string): Promise<boolean> {
   const configPath = join(projectDir, ".mimirs", "config.json");
   if (!existsSync(configPath)) return false;
-  const raw = JSON.parse(await readFile(configPath, "utf-8")) as Record<string, unknown>;
-  const repos = Array.isArray(raw.connectedRepos) ? (raw.connectedRepos as ConnectedRepoEntry[]) : [];
-  const kept = repos.filter(
-    (r) => r.alias !== ref && r.path !== ref && resolve(projectDir, r.path) !== resolve(projectDir, ref),
-  );
-  if (kept.length === repos.length) return false;
-  raw.connectedRepos = kept;
-  await writeFile(configPath, JSON.stringify(raw, null, 2) + "\n");
-  return true;
+  return mutateRawConfig(projectDir, (raw) => {
+    const repos = Array.isArray(raw.connectedRepos) ? (raw.connectedRepos as ConnectedRepoEntry[]) : [];
+    const kept = repos.filter(
+      (r) => r.alias !== ref && r.path !== ref && resolve(projectDir, r.path) !== resolve(projectDir, ref),
+    );
+    if (kept.length === repos.length) return { write: false, result: false };
+    raw.connectedRepos = kept;
+    return { write: true, result: true };
+  });
 }
 
 /**

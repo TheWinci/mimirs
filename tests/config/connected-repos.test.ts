@@ -73,6 +73,17 @@ describe("connectedRepos config", () => {
     expect(await removeConnectedRepo(tempDir, "ghost")).toBe(false);
     expect(readConnectedReposSync(tempDir)).toEqual([]);
   });
+
+  test("concurrent adds all persist (no lost read-modify-write)", async () => {
+    await loadConfig(tempDir);
+    await Promise.all([
+      addConnectedRepo(tempDir, { path: "../one" }),
+      addConnectedRepo(tempDir, { path: "../two" }),
+      addConnectedRepo(tempDir, { path: "../three" }),
+    ]);
+    const paths = readConnectedReposSync(tempDir).map((r) => r.path).sort();
+    expect(paths).toEqual(["../one", "../three", "../two"]);
+  });
 });
 
 describe("alias resolution in resolveProject", () => {

@@ -11,7 +11,8 @@ import {
   type CommandResult,
 } from "../../src/control/protocol";
 import { startCommandDropbox, type CommandExecutors } from "../../src/control/consumer";
-import { sendCommand, withIndexAccess } from "../../src/control/producer";
+import { readLockHolderPid, sendCommand, withIndexAccess } from "../../src/control/producer";
+import { tryAcquireIndexLock } from "../../src/utils/index-lock";
 import type { Watcher } from "../../src/indexing/watcher";
 
 let tempDir: string;
@@ -268,5 +269,25 @@ describe("producer", () => {
       { cmd: "index.conversation", args: {} },
       { pollMs: 20, probeTimeoutMs: 300 },
     )).rejects.toMatchObject({ kind: "no-channel" });
+  });
+});
+
+describe("lock pid validation", () => {
+  // kill(0)/kill(-n) probe process groups and always succeed, so a corrupted
+  // lock holding "0" used to read as a permanently-alive holder.
+  test("pid 0 or negative in the lock file reads as no holder", () => {
+    mkdirSync(join(tempDir, ".mimirs"), { recursive: true });
+    writeFileSync(join(tempDir, ".mimirs", "index.lock"), "0");
+    expect(readLockHolderPid(tempDir)).toBe(null);
+    writeFileSync(join(tempDir, ".mimirs", "index.lock"), "-1");
+    expect(readLockHolderPid(tempDir)).toBe(null);
+  });
+
+  test("a lock holding pid 0 is reclaimed as stale instead of blocking forever", () => {
+    mkdirSync(join(tempDir, ".mimirs"), { recursive: true });
+    writeFileSync(join(tempDir, ".mimirs", "index.lock"), "0");
+    const lock = tryAcquireIndexLock(tempDir);
+    expect(lock).not.toBe(null);
+    lock!.release();
   });
 });

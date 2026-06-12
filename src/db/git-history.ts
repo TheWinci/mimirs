@@ -142,11 +142,18 @@ function applyFilters(
   until?: string,
   path?: string
 ): GitCommitSearchResult[] {
+  // Dates compare lexically against full ISO timestamps. Truncate the stored
+  // date to the filter's granularity so a date-only bound is inclusive of that
+  // whole day — `until: "2025-01-31"` must keep commits made ON the 31st
+  // ("2025-01-31T10:00:00Z" > "2025-01-31" would otherwise drop them all).
+  // Normalize a "YYYY-MM-DD HH:MM" filter's space to "T" so positions align.
+  const sinceN = since?.replace(" ", "T");
+  const untilN = until?.replace(" ", "T");
   return results.filter((r) => {
     if (author && !r.authorName.toLowerCase().includes(author.toLowerCase()) &&
         !r.authorEmail.toLowerCase().includes(author.toLowerCase())) return false;
-    if (since && r.date < since) return false;
-    if (until && r.date > until) return false;
+    if (sinceN && r.date.slice(0, sinceN.length) < sinceN) return false;
+    if (untilN && r.date.slice(0, untilN.length) > untilN) return false;
     if (path && !r.filesChanged.some((f) => f.includes(path))) return false;
     return true;
   });

@@ -55,9 +55,9 @@ export function registerGitHistoryTools(server: McpServer, getDB: GetDB) {
       author: z.string().optional()
         .describe("Filter by author name or email (case-insensitive substring match)"),
       since: z.string().optional()
-        .describe("Filter commits after this ISO date (e.g. 2025-01-01)"),
+        .describe("Filter commits from this ISO date on, inclusive (e.g. 2025-01-01)"),
       until: z.string().optional()
-        .describe("Filter commits before this ISO date"),
+        .describe("Filter commits up to this ISO date, inclusive (a date-only value covers that whole day)"),
       path: z.string().optional()
         .describe("Filter to commits that touched this file path (substring match)"),
       threshold: z.number().min(0).max(1).optional().default(0)

@@ -113,6 +113,20 @@ describe("git history search", () => {
     expect(results[0].message.toLowerCase()).toContain("database");
   });
 
+  test("date-only until includes commits made on that day", () => {
+    const all = db.textSearchGitCommits("database", 5);
+    expect(all.length).toBeGreaterThan(0);
+
+    // "until <day of the commit>" must keep the commit — full ISO timestamps
+    // compare lexically GREATER than their own date prefix, which used to
+    // drop every commit on the boundary day.
+    const day = all[0].date.slice(0, 10);
+    const sameDay = db.textSearchGitCommits("database", 5, undefined, undefined, day);
+    expect(sameDay.map((r) => r.hash)).toContain(all[0].hash);
+
+    expect(db.textSearchGitCommits("database", 5, undefined, undefined, "2000-01-01")).toEqual([]);
+  });
+
   test("author filter works", async () => {
     const { embed } = await import("../../src/embeddings/embed");
     const queryEmbedding = await embed("project");

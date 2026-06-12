@@ -114,9 +114,13 @@ export class RagDB {
     this.projectDirAbs = resolve(projectDir);
     this.isReadonly = opts?.readonly === true;
 
+    // RAG_DB_DIR relocates the PRIMARY project's index. A readonly open is a
+    // query-only attach to a FOREIGN repo, whose index lives in its own
+    // .mimirs — honoring the env var here would silently open the primary's
+    // index and answer cross-repo queries with the wrong repo's data.
     const ragDir = customRagDir
       ? resolve(customRagDir)
-      : process.env.RAG_DB_DIR
+      : process.env.RAG_DB_DIR && !this.isReadonly
         ? resolve(process.env.RAG_DB_DIR)
         : join(projectDir, ".mimirs");
     this.ragDir = ragDir;
