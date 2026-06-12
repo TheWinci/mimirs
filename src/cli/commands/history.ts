@@ -35,7 +35,10 @@ export async function historyCommand(args: string[], getFlag: (flag: string) => 
   }
 }
 
-async function historyIndexCommand(args: string[], getFlag: (flag: string) => string | undefined) {
+/** Exported for `mimirs index git`, which is a thin alias: indexGitHistory
+ * takes no lock (disjoint tables, WAL serializes writers), so it is safe
+ * beside a live server and needs no drop-box round trip. */
+export async function historyIndexCommand(args: string[], getFlag: (flag: string) => string | undefined) {
   const dir = resolve(positionalArg(args[2], "."));
   const verbose = args.includes("--verbose") || args.includes("-v");
   const since = getFlag("--since");

@@ -2,6 +2,7 @@ import { initCommand } from "./commands/init";
 import { indexCommand } from "./commands/index-cmd";
 import { searchCommand, readCommand } from "./commands/search-cmd";
 import { statusCommand } from "./commands/status";
+import { pingCommand } from "./commands/ping";
 import { removeCommand } from "./commands/remove";
 import { analyticsCommand } from "./commands/analytics";
 import { mapCommand } from "./commands/map";
@@ -35,8 +36,13 @@ Usage:
               IDEs: claude,cursor,windsurf,copilot,all
               [-y|--yes]            Skip the "index now?" prompt
               [-v|--verbose]        Show per-file indexing output
-  mimirs index [dir] [--patterns ...] Index files in directory
-              [-v|--verbose]        Show per-file indexing output
+  mimirs index [dir] [--patterns ...] Index files (runs via the live server
+              [-v|--verbose]          if one holds the index lock)
+  mimirs index files [dir]          Same as \`mimirs index\` (explicit alias)
+  mimirs index git [dir] [--since REF] Alias of \`mimirs history index\`
+  mimirs index conversation [--dir D] Alias of \`mimirs conversation index\`
+  mimirs ping [dir]                 Check whether a live mimirs server
+                                    answers on the command channel
   mimirs search <query> [--top N]   Search indexed files
   mimirs read <query> [--top N]     Read relevant chunks (full content)
               [--threshold T] [--dir D]
@@ -131,6 +137,9 @@ async function dispatch() {
       break;
     case "status":
       await statusCommand(args);
+      break;
+    case "ping":
+      await pingCommand(args);
       break;
     case "remove":
       await removeCommand(args);

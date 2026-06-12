@@ -264,34 +264,57 @@ export async function indexAllSessions(
  * one file could corrupt `turn_count`). The folder is flat, so a non-recursive
  * `fs.watch` is enough and stays portable across platforms.
  */
+export interface ConversationWatcher extends Watcher {
+  /** Re-enqueue every transcript through the serial queue and resolve when
+   * the pass drains. Returns the turns indexed while the pass ran. This is
+   * how the drop-box command channel triggers a backfill without a second,
+   * racing `indexConversation` path. */
+  backfillAll(): Promise<number>;
+}
+
 export function startConversationFolderWatch(
   transcriptsDir: string,
   db: RagDB,
   projectDir: string,
   onEvent?: (msg: string) => void,
-): Watcher {
+): ConversationWatcher {
   const pending = new Map<string, NodeJS.Timeout>();
   const queue = new Set<string>();
-  let processing = false;
+  let drainPromise: Promise<void> | null = null;
+  let turnsIndexed = 0;
 
-  async function drain() {
-    if (processing) return;
-    processing = true;
-    try {
-      while (queue.size > 0) {
-        const batch = [...queue];
-        queue.clear();
-        for (const jsonlPath of batch) {
-          try {
-            await indexSessionFromStoredOffset(db, jsonlPath, projectDir, onEvent);
-          } catch (err) {
-            onEvent?.(`Conversation index error (${basename(jsonlPath)}): ${(err as Error).message}`);
+  // A running drain picks up files added mid-pass (queue re-checked every
+  // iteration), so awaiting the shared promise means "drained, including my
+  // items" — which is what backfillAll needs.
+  function drain(): Promise<void> {
+    if (!drainPromise) {
+      drainPromise = (async () => {
+        // Yield first: with an empty queue this body would otherwise complete
+        // synchronously, running the finally BEFORE the assignment to
+        // drainPromise lands — leaving a forever-resolved promise that makes
+        // every future drain() a no-op.
+        await Promise.resolve();
+        try {
+          while (queue.size > 0) {
+            const batch = [...queue];
+            queue.clear();
+            for (const jsonlPath of batch) {
+              try {
+                turnsIndexed += await indexSessionFromStoredOffset(db, jsonlPath, projectDir, onEvent);
+              } catch (err) {
+                onEvent?.(`Conversation index error (${basename(jsonlPath)}): ${(err as Error).message}`);
+              }
+            }
           }
+        } finally {
+          drainPromise = null;
+          // An add can slip in between the final queue check and this reset —
+          // it would otherwise sit unprocessed until the next event.
+          if (queue.size > 0) drain();
         }
-      }
-    } finally {
-      processing = false;
+      })();
     }
+    return drainPromise;
   }
 
   // Initial backfill: enqueue every existing transcript through the same queue
@@ -334,6 +357,18 @@ export function startConversationFolderWatch(
       for (const timer of pending.values()) clearTimeout(timer);
       pending.clear();
       fsWatcher?.close();
+    },
+    async backfillAll() {
+      const before = turnsIndexed;
+      try {
+        for (const file of new Glob("*.jsonl").scanSync(transcriptsDir)) {
+          queue.add(join(transcriptsDir, file));
+        }
+      } catch {
+        // folder doesn't exist yet — nothing to backfill
+      }
+      await drain();
+      return turnsIndexed - before;
     },
   };
 }

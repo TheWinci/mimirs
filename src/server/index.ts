@@ -8,7 +8,9 @@ import { loadConfig } from "../config";
 import { indexDirectory } from "../indexing/indexer";
 import { startWatcher, type Watcher } from "../indexing/watcher";
 import { getTranscriptsDir } from "../conversation/parser";
-import { startConversationFolderWatch } from "../conversation/indexer";
+import { startConversationFolderWatch, type ConversationWatcher } from "../conversation/indexer";
+import { indexGitHistory } from "../git/indexer";
+import { startCommandDropbox } from "../control/consumer";
 import { ensureGitignore } from "../cli/setup";
 import { registerAllTools } from "../tools";
 import { log } from "../utils/log";
@@ -147,7 +149,8 @@ export async function startServer() {
   // The cleanup targets (watcher, convWatcher) start as null and get assigned
   // later — this is safe because cleanup just skips null values.
   let watcher: Watcher | null = null;
-  let convWatcher: Watcher | null = null;
+  let convWatcher: ConversationWatcher | null = null;
+  let cmdWatcher: Watcher | null = null;
   let indexLock: IndexLock | null = null;
   let lockRetryTimer: ReturnType<typeof setInterval> | null = null;
   let ppidWatchdog: ReturnType<typeof setInterval> | null = null;
@@ -182,6 +185,7 @@ export async function startServer() {
     log.debug("Shutting down...", "shutdown");
     if (watcher) watcher.close();
     if (convWatcher) convWatcher.close();
+    if (cmdWatcher) cmdWatcher.close();
     if (indexLock) indexLock.release();
     for (const entry of dbMap.values()) entry.db.close();
     dbMap.clear();
@@ -404,12 +408,62 @@ export async function startServer() {
     // current, so one agent's findings become searchable to another in near
     // real time. Idempotent (insertTurn dedups; offsets advance by bytes read)
     // and gated by the index lock so only one server instance writes.
-    convWatcher = startConversationFolderWatch(
+    const convW = startConversationFolderWatch(
       getTranscriptsDir(startupDir),
       startupDb,
       startupDir,
       (msg) => log.debug(msg, "conversation"),
     );
+    convWatcher = convW;
+
+    // Drop-box command channel: a CLI beside this server directs the lock
+    // holder through .mimirs/commands/ (plans/command-dropbox.md). Started
+    // here so only the holder ever consumes; the lock-retry takeover picks
+    // it up with the rest of the indexing work.
+    cmdWatcher = startCommandDropbox(startupDir, {
+      "ping": async () => ({ pid: process.pid, version }),
+      "index.git": async (args) => {
+        const result = await indexGitHistory(startupDir, startupDb, {
+          since: args.since,
+          threads: startupConfig.indexThreads,
+          onProgress: (msg, opts) => {
+            if (!opts?.transient) writeStatus(msg);
+          },
+        });
+        return { indexed: result.indexed, skipped: result.skipped };
+      },
+      "index.conversation": async () => {
+        // Rides the conversation watcher's serial queue — the only thing
+        // preventing overlapping indexConversation runs from corrupting
+        // turn_count.
+        return { turnsIndexed: await convW.backfillAll() };
+      },
+      "index.files": async (args) => {
+        const config = args.patterns ? { ...startupConfig, include: args.patterns } : startupConfig;
+        let total = 0;
+        let processed = 0;
+        const result = await indexDirectory(startupDir, startupDb, config, (msg) => {
+          if (msg === "file:done") {
+            processed++;
+            if (total > 0) writeStatus(`${processed}/${total} files (${Math.round((processed / total) * 100)}%)`);
+            return;
+          }
+          const found = msg.match(/^Found (\d+) files to index$/);
+          if (found) {
+            total = parseInt(found[1], 10);
+            writeStatus(`0/${total} files`);
+          }
+        }, undefined, { prune: !args.patterns });
+        const dbStatus = startupDb.getStatus();
+        writeStatus([
+          `done`,
+          `version: ${version}`,
+          `indexed: ${result.indexed}, skipped: ${result.skipped}, pruned: ${result.pruned}`,
+          `total files: ${dbStatus.totalFiles}, total chunks: ${dbStatus.totalChunks}`,
+        ].join("\n"));
+        return { indexed: result.indexed, skipped: result.skipped, pruned: result.pruned };
+      },
+    }, (msg) => log.debug(msg, "dropbox"));
     }; // end startIndexingWork
 
     // Process-level lock: only one mimirs server per project directory

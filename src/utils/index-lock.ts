@@ -109,7 +109,7 @@ function makeToken(dir: string, lockPath: string): IndexLock {
   };
 }
 
-function isPidAlive(pid: number): boolean {
+export function isPidAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;

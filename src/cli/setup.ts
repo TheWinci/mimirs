@@ -59,7 +59,7 @@ This project has a local RAG index (mimirs). Use these MCP tools:
 - **\`search_commits\`**: Semantically search git commit history — find *why* code
   was changed, when decisions were made, or what an author worked on. Supports
   filters for author, date range, and file path. Requires git history to be
-  indexed first (\`index_files\` or \`mimirs history index\`).
+  indexed first (\`mimirs history index\` or \`mimirs index git\`).
 - **\`file_history\`**: Get the commit history for a specific file. Returns commits
   that touched it, sorted by date. Use this to understand how a file evolved.
 - **\`annotate\`**: Call this immediately when you encounter a known bug, race
