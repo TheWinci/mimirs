@@ -18,6 +18,7 @@ project wiki. Editing them customizes how *this project's* wiki is written.
 - `page-flow.md` — the prompt for a single backend flow page (route, command, tool, message, job).
 - `page-screen.md` — the prompt for a single frontend UI screen page.
 - `page-overview.md` — the prompt for a bird's-eye overview page.
+- `page-mechanism.md` — the prompt for a shared-internal-subsystem page (`mechanisms/<name>`).
 - `changelog.md` — the prompt for writing one `wiki/CHANGELOG.md` entry (the `changelog` step).
 - `update.md` — the prompt for an incremental update: decide which pages a code/instruction change made stale and regenerate only those (the `update` step).
 

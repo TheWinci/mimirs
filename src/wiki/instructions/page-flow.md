@@ -42,6 +42,7 @@ For the assigned page:
 - Add a short `Key source files` section when a page touches several files, listing each important root-relative file path and what role it plays.
 - Mention important `openQuestions` instead of hiding uncertainty.
 - Only link to related pages whose subject is named in `relatedFlows`, appears as a caller or callee of `primaryFiles`, or is otherwise structurally connected in source. Do not invent thematic relationships.
+- When a `mechanisms/<name>.md` page exists for shared internals this flow uses (ranking, caching, graph traversal, or similar), link it and keep only the flow-specific behavior on this page — do not re-explain the mechanism.
 - Keep the page focused on its assigned `slug`, `flowIds`, and `primaryFiles`.
 
 Self-check before finishing:

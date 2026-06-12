@@ -489,6 +489,7 @@ export async function writePagePrompt(projectDir: string, slug: string, kind: st
     });
   }
   if (kind === "screen") return await renderInstruction(projectDir, "page-screen", { slug });
+  if (kind === "mechanism") return await renderInstruction(projectDir, "page-mechanism", { slug });
   return await renderInstruction(projectDir, "page-flow", { slug });
 }
 
@@ -692,6 +693,7 @@ function validateDiscoveryShape(discovery: DiscoveryFile): string[] {
     "entities",
     "events",
     "glossary",
+    "mechanisms",
     "messages",
     "modules",
     "overview",
@@ -744,13 +746,21 @@ function validateDiscoveryShape(discovery: DiscoveryFile): string[] {
     } else if (broadPageSlugs.has(page.slug)) {
       errors.push(`pages[${index}].slug \`${page.slug}\` is too broad. Use one page per concrete flow instead.`);
     }
+    const mechanism = kindIsString && page.kind === "mechanism";
+    if (mechanism && !page.slug.startsWith("mechanisms/")) {
+      errors.push(`pages[${index}].slug \`${page.slug}\` must start with \`mechanisms/\` for kind \`mechanism\`.`);
+    }
+    if (!mechanism && page.slug.startsWith("mechanisms/")) {
+      errors.push(`pages[${index}].slug \`${page.slug}\` is reserved for mechanism pages. Set \`kind\` to \`mechanism\`.`);
+    }
     if (pageSlugs.has(page.slug)) errors.push(`Duplicate page slug \`${page.slug}\`.`);
     pageSlugs.add(page.slug);
-    if (overview) {
+    if (overview || mechanism) {
       if (page.flowIds !== undefined && !Array.isArray(page.flowIds)) {
         errors.push(`pages[${index}].flowIds must be an array when present.`);
       }
-      validateStringArray(page.primaryFiles, `pages[${index}].primaryFiles`, errors, { required: true, minItems: 3 });
+      // Overviews tie ≥3 components together; a mechanism is often one core module.
+      validateStringArray(page.primaryFiles, `pages[${index}].primaryFiles`, errors, { required: true, minItems: overview ? 3 : 1 });
       const ids = Array.isArray(page.flowIds) ? page.flowIds : [];
       for (const flowId of ids) {
         if (!flowIds.has(flowId)) errors.push(`pages[${index}].flowIds references missing flow id \`${flowId}\`.`);
@@ -1131,6 +1141,7 @@ export async function runWikiRebuild(ctx: WikiContext, input: string): Promise<s
       "page-flow",
       "page-overview",
       "page-screen",
+      "page-mechanism",
       "changelog",
       "update",
     ];

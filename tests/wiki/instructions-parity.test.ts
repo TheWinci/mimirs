@@ -4,9 +4,10 @@ import { join } from "path";
 import { writePagePrompt } from "../../src/wiki/rebuild";
 import { createTempDir, cleanupTempDir } from "../helpers";
 
-// Goldens captured from the pre-refactor prompt builders (scripts/gen-wiki-
-// instructions.ts). They guard that lifting the prose into .md + expanding the
-// shared blocks reproduces the original output byte-for-byte.
+// Goldens originally captured from the pre-refactor prompt builders (scripts/
+// gen-wiki-instructions.ts), re-captured when the prose deliberately changes.
+// They guard that token substitution + shared-block expansion reproduce the
+// expected output byte-for-byte.
 const FIX = join(import.meta.dir, "fixtures");
 const INSTR = join(import.meta.dir, "../../src/wiki/instructions");
 const SLUG = "example/sample-page";
@@ -32,6 +33,10 @@ describe("wiki instruction extraction parity", () => {
 
   test("screen page prompt matches", async () => {
     expect(await writePagePrompt(NO_OVERRIDE, SLUG, "screen")).toBe(golden("golden-page-screen"));
+  });
+
+  test("mechanism page prompt matches", async () => {
+    expect(await writePagePrompt(NO_OVERRIDE, SLUG, "mechanism")).toBe(golden("golden-page-mechanism"));
   });
 
   test("overview page prompt (diagram required) matches", async () => {

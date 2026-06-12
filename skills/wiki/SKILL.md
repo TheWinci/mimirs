@@ -11,7 +11,7 @@ Use the `wiki` MCP tool as the source of truth. This skill is only a workflow
 wrapper; do not invent a separate wiki structure.
 
 The generation prose — discovery rules, the source-first writing contract, the
-self-check, and the per-page prompts (flow, screen, overview) — is served from
+self-check, and the per-page prompts (flow, screen, overview, mechanism) — is served from
 markdown, using packaged defaults unless a project overrides them. To customize
 it for a project, run `wiki(eject)` once: it writes the defaults to
 `.mimirs/wiki/*.md` for you to edit, and a file there overrides the packaged
@@ -31,6 +31,12 @@ Do not bundle all API endpoints into one page. Do not bundle all messages into
 one page. Do not create broad architecture, module, entity, glossary, or generic
 data-flow pages unless the human explicitly asks for those.
 
+The sanctioned exception for shared internals is a mechanism page
+(`kind: "mechanism"`, slug `mechanisms/<name>`): one page per internal subsystem
+that three or more flows call but that is nobody's entry point — ranking,
+caching, graph traversal, or similar. Flow pages link to it instead of each
+re-explaining the same internals.
+
 If many flows share files, keep separate pages and connect them with related
 flows.
 
@@ -38,7 +44,8 @@ flows.
 
 1. Call `index_files()` if the project index is empty or stale.
 2. Call `wiki(shape)`.
-3. Use the returned prompt and prefetch selectors to create `wiki/_discovery.json`.
+3. Use the returned prompt and prefetch selectors to create `wiki/_discovery.json`
+   (flows first, then the overview second pass, then the mechanism third pass).
 4. Validate with `wiki(validate-discovery)`.
 5. If validation reports errors, fix `wiki/_discovery.json` and validate again.
 6. If validation passes, ask the human whether to continue.
@@ -80,6 +87,11 @@ Each page should have:
 
 Avoid broad slugs such as `api`, `endpoints`, `messages`, `events`,
 `data-flows`, `architecture`, `modules`, or `entities`.
+
+Mechanism pages are the exception to the one-flow rule: `kind` is
+`"mechanism"`, the slug lives under `mechanisms/`, `flowIds` is optional and
+may list several flows that use the mechanism, and `primaryFiles` needs only
+the owning module.
 
 When a flow depends on concrete caller-provided values or external
 conditions, add an `inputs` array naming what the caller, environment,

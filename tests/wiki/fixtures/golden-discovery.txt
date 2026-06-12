@@ -12,7 +12,7 @@ Granularity rules:
 2. HTTP routes and API endpoints must be split by concrete method and route, such as `POST /checkout`. Do not create one broad `api`, `endpoints`, or `routes` page.
 3. Messages, events, queue topics, and consumers must be split by concrete message, topic, event, or handler. Do not create one broad `messages`, `events`, or `queues` page.
 4. CLI subcommands, MCP tools, workers, jobs, schedules, webhooks, and server starts each get their own flow and page when they have separate triggers.
-5. Do not create glossary, entity, or generic data-flow pages. The only non-flow pages allowed are the six overview kinds described below.
+5. Do not create glossary, entity, or generic data-flow pages. The only non-flow pages allowed are the six overview kinds and the `mechanism` pages described below.
 6. If many flows share the same files, keep separate pages and connect them with `relatedFlows`; do not merge them into one category page.
 7. Every flow page should have a category `kind`, usually matching the referenced flow kind, such as `tool`, `command`, `route`, `message`, `job`, or `schedule`. Every flow page must have exactly one `flowIds` item. Add `inputs` and `outputs` arrays when they help explain the flow; omit either one when there is no meaningful value.
 8. Frontend UI screens (route components, top-level views mounted by a router or app shell) use kind `screen`. One screen flow per route. User interactions within a screen (button clicks, form submits, mutations) are not separate flows; capture them in the screen flow's `interactions[]` array. Do not create a separate page per interaction.
@@ -54,6 +54,19 @@ The six kinds, with triggers:
 - `overview:runtime-lifecycle` — boot → ready → handle → shutdown, with where state is initialized. Trigger: at least one long-running process (server, daemon, worker). Skip for CLIs that exit per invocation. Slug: `runtime-lifecycle`.
 - `overview:configuration` — env vars, config files, flag precedence. Trigger: configuration surface beyond roughly five knobs, or multi-source precedence (env > file > defaults). No diagram required. Slug: `configuration`.
 - `overview:integrations` — external services the project talks to (databases, APIs, queues, model providers). Trigger: at least two external services or providers. Slug: `integrations`.
+
+Mechanism pages (third pass):
+
+After the overview pass, look for shared internal subsystems worth their own page. A mechanism page documents one internal subsystem that many flows call but that is nobody's entry point — ranking, caching, graph traversal, chunking, staleness detection, or similar. One copy of the explanation, linked from every flow page that uses it, instead of the same internals re-explained on five flow pages.
+
+Detection is structural, from prefetch data:
+
+1. From `wiki(prefetch:map)`, rank internal files by `fanIn` and `pageRank`. High fan-in files that are not entry points are the candidates.
+2. A file is a mechanism candidate when (a) it appears in the `files[]` of three or more flows, (b) it is not an entrypoint of any flow, and (c) no existing page already has it as the page subject.
+3. Emit a mechanism page only when it would deduplicate explanation across at least three flow pages. Keep the set small — about eight mechanism pages is the ceiling for even a large project; prefer fewer, deeper pages over many thin ones.
+4. Every claim the page will make must be source-verifiable. When in doubt, record the uncertainty in `openQuestions` instead of inventing structure.
+
+Mechanism pages use `kind: "mechanism"` and a slug under `mechanisms/` naming the specific subsystem (for example `mechanisms/<specific-subsystem>`). `primaryFiles` must name at least the owning module. `flowIds` is optional and may list several flows that use the mechanism; each listed id must exist, and the same flow may appear on several mechanism pages.
 
 Create `wiki/_discovery.json` with this shape:
 
@@ -167,6 +180,21 @@ Create `wiki/_discovery.json` with this shape:
       ],
       "mustCover": [
         "<topic this overview must explain>"
+      ],
+      "openQuestions": []
+    },
+    {
+      "slug": "mechanisms/<specific-subsystem>",
+      "title": "<human title for the mechanism>",
+      "kind": "mechanism",
+      "flowIds": [
+        "<optional flow ids that use this mechanism>"
+      ],
+      "primaryFiles": [
+        "<root-relative path of the owning module>"
+      ],
+      "mustCover": [
+        "<invariant, algorithm step, or failure mode this page must explain>"
       ],
       "openQuestions": []
     }

@@ -15,7 +15,8 @@ change affects:
 - A change to a wiki **instruction** file (`.../instructions/page-*.md`, or a
   project's `.mimirs/wiki/page-*.md`) affects a whole page **kind**: a flow-page
   instruction change touches every flow page (commands, tools, routes, messages,
-  jobs, server-start); an overview-instruction change touches the overview pages.
+  jobs, server-start); an overview-instruction change touches the overview pages;
+  a `page-mechanism.md` change touches every `mechanisms/*` page.
 - A change to `discovery.md` or `write.md` changes how discovery or page-splitting
   works — that is a full rebuild, not a page update.
 - When unsure whether a change affects a page, include it. A needless regeneration
