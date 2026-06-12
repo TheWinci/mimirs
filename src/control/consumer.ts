@@ -172,33 +172,47 @@ export function startCommandDropbox(
   } catch { /* dir vanished — watch below recreates interest */ }
   drain();
 
+  // Enqueue every pending request file. The watch event's filename is
+  // unusable: macOS reports a rename-into-place under the SOURCE name
+  // (`<id>.json.tmp`) and never fires for the target, so any trigger just
+  // rescans — the folder holds at most a handful of files, and handleRequest
+  // dedups via the processed set.
+  function enqueuePending() {
+    let found = false;
+    try {
+      for (const name of readdirSync(dir)) {
+        if (!isRequestFile(name)) continue;
+        queue.add(join(dir, name));
+        found = true;
+      }
+    } catch {
+      return; // dir vanished mid-scan
+    }
+    if (found) drain();
+  }
+
   let fsWatcher: ReturnType<typeof watch> | null = null;
   try {
-    // Folder is flat; non-recursive fs.watch is enough and portable (win32
-    // ok). The event's filename is unusable: macOS reports a rename-into-
-    // place under the SOURCE name (`<id>.json.tmp`) and never fires for the
-    // target, so any event just triggers a rescan — the folder holds at most
-    // a handful of files, and handleRequest dedups via the processed set.
-    fsWatcher = watch(dir, () => {
-      let found = false;
-      try {
-        for (const name of readdirSync(dir)) {
-          if (!isRequestFile(name)) continue;
-          queue.add(join(dir, name));
-          found = true;
-        }
-      } catch {
-        return; // dir vanished mid-scan
-      }
-      if (found) drain();
-    });
+    // Folder is flat; non-recursive fs.watch is enough and portable (win32 ok).
+    fsWatcher = watch(dir, () => enqueuePending());
   } catch (err) {
     onEvent?.(`Could not watch commands folder ${dir}: ${(err as Error).message}`);
   }
 
+  // fs.watch is best-effort: a request landing between the startup drain and
+  // the watcher becoming active gets no event (macOS FSEvents activates
+  // asynchronously), and platforms may drop events under load. Rescan once
+  // now to close the startup gap, then poll slowly as a delivery guarantee —
+  // the producer polls for its result anyway, so a late pickup only adds
+  // seconds of latency in the rare lost-event case.
+  enqueuePending();
+  const rescanTimer = setInterval(enqueuePending, 2_000);
+  if (typeof rescanTimer.unref === "function") rescanTimer.unref();
+
   onEvent?.(`Consuming commands: ${dir}`);
   return {
     close() {
+      clearInterval(rescanTimer);
       fsWatcher?.close();
     },
   };
