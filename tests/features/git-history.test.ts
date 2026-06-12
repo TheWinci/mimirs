@@ -3,7 +3,6 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { createTempDir, cleanupTempDir, writeFixture } from "../helpers";
 import { join } from "path";
-import { mkdir } from "fs/promises";
 import { RagDB } from "../../src/db";
 import { indexGitHistory } from "../../src/git/indexer";
 import { loadConfig, applyEmbeddingConfig } from "../../src/config";
@@ -418,8 +417,9 @@ describe("git history MCP tools", () => {
 
   test("search_commits on empty index shows helpful message", async () => {
     const emptyDir = await createTempDir();
-    // Mark as a real project — read tools no longer scaffold DBs elsewhere.
-    await mkdir(join(emptyDir, ".mimirs"), { recursive: true });
+    // A real (empty) mimirs project needs an index.db — foreign dirs attach
+    // query-only now, so a read tool won't create one in a bare .mimirs/.
+    new RagDB(emptyDir).close();
     const result = await client.callTool({
       name: "search_commits",
       arguments: { query: "anything", directory: emptyDir },

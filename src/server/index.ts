@@ -24,6 +24,7 @@ const { version } = await import("../../package.json");
 // Cleanup happens on process exit (signals + stdin EOF).
 interface DBEntry {
   db: RagDB;
+  readonly: boolean;
   openedAt: Date;
   lastAccessed: Date;
 }
@@ -42,17 +43,29 @@ let permanentError: string | null = null;
 const DB_MAP_MAX = 8;
 const DB_IDLE_MS = 10 * 60 * 1000;
 
-function getDB(projectDir: string): RagDB {
+function getDB(projectDir: string, opts?: { writable?: boolean }): RagDB {
   if (permanentError) {
     throw new Error(permanentError);
   }
 
   const resolved = resolve(projectDir);
+  const primary = resolve(process.env.RAG_PROJECT_DIR || process.cwd());
+  // Foreign repos attach QUERY-ONLY by default: their own server owns the
+  // index file, and a writable open would create/migrate/stamp it under that
+  // writer. Only an explicit index request (index_files via allowCreate)
+  // opens a foreign dir writable. The primary project is always writable.
+  const wantWritable = resolved === primary || opts?.writable === true;
   let entry = dbMap.get(resolved);
 
   if (entry) {
-    entry.lastAccessed = new Date();
-    return entry.db;
+    if (wantWritable && entry.readonly) {
+      // Explicit index request on a query-only attach — upgrade the handle.
+      try { entry.db.close(); } catch { /* already closed */ }
+      dbMap.delete(resolved);
+    } else {
+      entry.lastAccessed = new Date();
+      return entry.db;
+    }
   }
 
   if (dbMap.size >= DB_MAP_MAX) {
@@ -77,16 +90,17 @@ function getDB(projectDir: string): RagDB {
     // No evictable entry → exceed the soft cap rather than close a busy DB.
   }
 
-  const db = new RagDB(resolved);
-  dbMap.set(resolved, { db, openedAt: new Date(), lastAccessed: new Date() });
+  const db = new RagDB(resolved, undefined, wantWritable ? undefined : { readonly: true });
+  dbMap.set(resolved, { db, readonly: !wantWritable, openedAt: new Date(), lastAccessed: new Date() });
 
   return db;
 }
 
 /** Returns info about all currently open database connections. */
-export function getConnectedDBs(): Array<{ projectDir: string; openedAt: Date; lastAccessed: Date }> {
+export function getConnectedDBs(): Array<{ projectDir: string; readonly: boolean; openedAt: Date; lastAccessed: Date }> {
   return Array.from(dbMap.entries()).map(([dir, entry]) => ({
     projectDir: dir,
+    readonly: entry.readonly,
     openedAt: entry.openedAt,
     lastAccessed: entry.lastAccessed,
   }));

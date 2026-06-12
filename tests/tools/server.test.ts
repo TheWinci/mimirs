@@ -88,9 +88,11 @@ describe("MCP Server", () => {
 
   test("search returns message when nothing indexed", async () => {
     const emptyDir = await createTempDir();
-    // The dir is a real (empty) mimirs project — read tools no longer scaffold
-    // a DB in arbitrary directories, only open existing ones.
-    await mkdir(join(emptyDir, ".mimirs"), { recursive: true });
+    // The dir is a real (empty) mimirs project: it must have an index.db —
+    // foreign dirs attach query-only now, so a read tool will not create one
+    // (a bare .mimirs/ folder is no longer enough).
+    const { RagDB } = await import("../../src/db");
+    new RagDB(emptyDir).close();
     const result = await client.callTool({
       name: "search",
       arguments: { query: "anything", directory: emptyDir },
@@ -99,6 +101,21 @@ describe("MCP Server", () => {
     const text = (result.content as Array<{ type: string; text: string }>)[0].text;
     expect(text).toContain("No results found");
     await cleanupTempDir(emptyDir);
+  });
+
+  test("read tools refuse to create index.db inside a bare .mimirs folder", async () => {
+    const bareDir = await createTempDir();
+    await mkdir(join(bareDir, ".mimirs"), { recursive: true });
+    const result = await client.callTool({
+      name: "search",
+      arguments: { query: "anything", directory: bareDir },
+    });
+
+    const text = (result.content as Array<{ type: string; text: string }>)[0].text;
+    expect(text).toContain("No mimirs index at");
+    // Query-only attach must not scaffold the foreign DB.
+    expect(existsSync(join(bareDir, ".mimirs", "index.db"))).toBe(false);
+    await cleanupTempDir(bareDir);
   });
 
   test("read tools refuse to scaffold a DB in an un-indexed directory", async () => {

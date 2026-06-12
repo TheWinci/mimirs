@@ -26,7 +26,7 @@ import { registerGitHistoryTools } from "./git-history-tools";
 import { registerServerInfoTools, type ConnectedDBInfo } from "./server-info-tools";
 import { registerWikiTools } from "./wiki-tools";
 
-export type GetDB = (dir: string) => RagDB;
+export type GetDB = (dir: string, opts?: { writable?: boolean }) => RagDB;
 export type WriteStatus = (status: string) => void;
 
 /** Resolve the project directory, database, and config from an optional directory param. */
@@ -79,7 +79,9 @@ export async function resolveProject(
   // the index was built at the real one → wrong-dim embeds. The invariant: the
   // query embedder always matches what the index was built with.
   applyEmbeddingConfigFromDisk(resolved);
-  return { projectDir: resolved, db: getDB(resolved), config };
+  // Foreign dirs open query-only unless the caller explicitly indexes them
+  // (allowCreate) — getDB decides; primary is always writable.
+  return { projectDir: resolved, db: getDB(resolved, { writable: opts?.allowCreate === true }), config };
 }
 
 // Actionable hints for failure shapes an agent can actually recover from.
@@ -90,6 +92,7 @@ const ERROR_HINTS: [RegExp, string][] = [
   [/Directory does not exist/i, "Check the `directory` argument — it must be an existing absolute or relative path."],
   [/checksum mismatch/i, "The embedding model cache failed verification and was deleted — the next call re-downloads it."],
   [/dimension|dim mismatch/i, "The index was built with a different embedding model/dim — re-index or fix .mimirs/config.json."],
+  [/readonly database|SQLITE_READONLY/i, "This repo is attached query-only (connect_repo) — writes (annotate, checkpoints, indexing) must run from that repo's own mimirs server or CLI."],
 ];
 
 /**

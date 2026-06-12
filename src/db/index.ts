@@ -102,14 +102,17 @@ export class RagDB {
   private db: Database;
   private ragDir: string;
   private projectDirAbs: string;
+  /** True when opened as a query-only attach to another repo's index. */
+  readonly isReadonly: boolean;
 
   constructor(
     projectDir: string,
     customRagDir?: string,
-    opts?: { autoEmbeddingConfig?: boolean },
+    opts?: { autoEmbeddingConfig?: boolean; readonly?: boolean },
   ) {
     loadCustomSQLite();
     this.projectDirAbs = resolve(projectDir);
+    this.isReadonly = opts?.readonly === true;
 
     const ragDir = customRagDir
       ? resolve(customRagDir)
@@ -117,6 +120,39 @@ export class RagDB {
         ? resolve(process.env.RAG_DB_DIR)
         : join(projectDir, ".mimirs");
     this.ragDir = ragDir;
+
+    if (this.isReadonly) {
+      // Query-only attach to a FOREIGN repo's index (connect_repo / cross-repo
+      // queries). That repo's own server owns the file — so no mkdir, no WAL
+      // pragma, no schema creation/migration, no model stamping: a migration
+      // under an older live writer is exactly the corruption we must not risk.
+      const dbPath = join(ragDir, "index.db");
+      if (!existsSync(dbPath)) {
+        throw new Error(
+          `No mimirs index at "${ragDir}" — index that repo from its own side first ` +
+          `(\`mimirs index\` there, or open it in an IDE running mimirs).`,
+        );
+      }
+      // Still configure the query embedder from THAT repo's config — queries
+      // against its vectors must use the model its index was built with.
+      if (opts?.autoEmbeddingConfig !== false) {
+        applyEmbeddingConfigFromDisk(projectDir);
+      }
+      this.db = new Database(dbPath, { readonly: true });
+      this.db.exec("PRAGMA busy_timeout = 5000");
+      sqliteVec.load(this.db);
+      const stored = this.db.query<{ user_version: number }, []>("PRAGMA user_version").get()?.user_version ?? 0;
+      if (stored > SCHEMA_VERSION) {
+        log.warn(
+          `index at "${ragDir}" was created by a newer mimirs (schema v${stored} > v${SCHEMA_VERSION}); ` +
+          `proceeding query-only, but some columns may be unknown to this version`,
+          "db",
+        );
+      }
+      this.assertEmbeddingDimCompatible();
+      this.assertEmbeddingModelCompatible();
+      return;
+    }
 
     try {
       mkdirSync(ragDir, { recursive: true });
@@ -195,6 +231,15 @@ export class RagDB {
       "INSERT INTO meta(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
       [key, value],
     );
+  }
+
+  /** Embedding model + variant this index was built with (stamped on first
+   * creation; null for legacy indexes that predate stamping). */
+  getRecordedEmbeddingModel(): { model: string | null; variant: string | null } {
+    return {
+      model: this.getMeta("embedding_model"),
+      variant: this.getMeta("embedding_variant"),
+    };
   }
 
   /**
@@ -1239,6 +1284,10 @@ export class RagDB {
     query: string, resultCount: number,
     topScore: number | null, topPath: string | null, durationMs: number
   ) {
+    // Analytics are best-effort telemetry for the repo's OWN searches. On a
+    // query-only attach (connect_repo) the handle can't write — and a
+    // consumer's queries don't belong in the owner's analytics anyway.
+    if (this.isReadonly) return;
     analyticsOps.logQuery(this.db, query, resultCount, topScore, topPath, durationMs);
   }
   getAnalytics(days?: number) {

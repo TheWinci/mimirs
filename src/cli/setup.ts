@@ -91,6 +91,9 @@ This project has a local RAG index (mimirs). Use these MCP tools:
   prior decisions.
 - **\`write_relevant\`**: Before adding new code or docs, find the best insertion
   point — returns the most semantically appropriate file and anchor.
+- **\`connect_repo\`**: Attach another repo's mimirs index for cross-repo
+  queries (query-only — that repo's own server keeps it fresh). Then pass its
+  path as \`directory\` to \`search\`/\`read_relevant\`/other read tools.
 - **\`wiki\`**: Rebuild the project wiki. Start with \`wiki(command: "shape")\` and
   follow the prompts it returns — each step names the next.`;
 

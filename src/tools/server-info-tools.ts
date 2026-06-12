@@ -1,10 +1,15 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { resolve, join } from "path";
+import { existsSync } from "fs";
 import { type GetDB, resolveProject } from "./index";
 import { getModelId, getEmbeddingDim } from "../embeddings/embed";
+import { readLockHolderPid } from "../control/producer";
+import { isPidAlive } from "../utils/index-lock";
 
 export interface ConnectedDBInfo {
   projectDir: string;
+  readonly?: boolean;
   openedAt: Date;
   lastAccessed: Date;
 }
@@ -63,10 +68,71 @@ export function registerServerInfoTools(
         for (const conn of connections) {
           const age = formatDuration(Date.now() - conn.openedAt.getTime());
           const idle = formatDuration(Date.now() - conn.lastAccessed.getTime());
-          lines.push(`  - ${conn.projectDir}`);
+          lines.push(`  - ${conn.projectDir}${conn.readonly ? "  (query-only)" : ""}`);
           lines.push(`    opened: ${age} ago  |  last_active: ${idle} ago`);
         }
       }
+
+      return {
+        content: [{ type: "text" as const, text: lines.join("\n") }],
+      };
+    }
+  );
+
+  server.tool(
+    "connect_repo",
+    "Connect another repo's mimirs index for cross-repo queries. Opens it QUERY-ONLY — no indexing, no writes; the repo's own mimirs server keeps it fresh — and reports its status: size, last indexed, embedding model, and whether a live server maintains it. After connecting, pass that repo's path as `directory` to search, read_relevant, and other read tools.",
+    {
+      directory: z
+        .string()
+        .describe("Path to the repo to connect. Must already have a mimirs index (.mimirs/index.db)."),
+    },
+    async ({ directory }) => {
+      const resolved = resolve(directory);
+      if (!existsSync(resolved)) {
+        throw new Error(`Directory does not exist: ${resolved}`);
+      }
+      const primary = resolve(process.env.RAG_PROJECT_DIR || process.cwd());
+      if (resolved === primary) {
+        return {
+          content: [{
+            type: "text" as const,
+            text: `${resolved} is this server's primary project — already connected (read-write). No connect needed.`,
+          }],
+        };
+      }
+      if (!existsSync(join(resolved, ".mimirs", "index.db"))) {
+        throw new Error(
+          `No mimirs index at ${resolved} — index that repo from its own side first ` +
+          `(run \`mimirs index\` there, or open it in an IDE running mimirs).`,
+        );
+      }
+
+      // Opens query-only (foreign dir) and validates schema + embedding
+      // model/dim compatibility against that repo's own config.
+      const db = getDB(resolved);
+      const status = db.getStatus();
+      const recorded = db.getRecordedEmbeddingModel();
+
+      // Freshness: a live server in that repo keeps its index current via its
+      // watcher; without one the index is frozen at last_indexed.
+      const holder = readLockHolderPid(resolved);
+      const holderAlive = holder !== null && isPidAlive(holder);
+
+      const lines = [
+        `Connected ${resolved} (query-only).`,
+        ``,
+        `  files:        ${status.totalFiles}`,
+        `  chunks:       ${status.totalChunks}`,
+        `  last_indexed: ${status.lastIndexed ?? "never"}`,
+        `  model:        ${recorded.model ?? "(pre-stamp index — assumed current default)"}`,
+        ``,
+        holderAlive
+          ? `  freshness: live mimirs server (pid ${holder}) maintains this index — results stay current.`
+          : `  freshness: NO live server in that repo — results are frozen at last_indexed. Refresh by running \`mimirs index\` there.`,
+        ``,
+        `Use it by passing directory: "${resolved}" to search/read_relevant/etc. Write tools (annotate, checkpoints, index_files without intent) stay with that repo's own server.`,
+      ];
 
       return {
         content: [{ type: "text" as const, text: lines.join("\n") }],
