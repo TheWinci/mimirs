@@ -1,5 +1,5 @@
 import { readFile, writeFile, mkdir } from "fs/promises";
-import { join } from "path";
+import { join, resolve } from "path";
 import { existsSync, readFileSync } from "fs";
 import { z } from "zod";
 import { log } from "../utils/log";
@@ -47,6 +47,14 @@ const RagConfigSchema = z.object({
   benchmarkTopK: z.number().int().min(1).default(5),
   benchmarkMinRecall: z.number().min(0).max(1).default(0.8),
   benchmarkMinMrr: z.number().min(0).max(1).default(0.6),
+  // External repos attached for cross-repo queries (query-only — each repo's
+  // own server keeps its index fresh). Paths may be relative to this project.
+  // The server warm-attaches these at startup, and read tools accept an
+  // entry's alias (or path) as their `directory` argument.
+  connectedRepos: z.array(z.object({
+    path: z.string().min(1),
+    alias: z.string().min(1).optional(),
+  })).default([]),
 }).refine((c) => c.chunkOverlap < c.chunkSize, {
   // An overlap >= chunkSize stalls the size-splitter's sliding window (it would
   // loop forever). splitBySize also clamps defensively, but reject it here so a
@@ -151,6 +159,7 @@ const DEFAULT_CONFIG: RagConfig = {
   benchmarkTopK: 5,
   benchmarkMinRecall: 0.8,
   benchmarkMinMrr: 0.6,
+  connectedRepos: [],
 };
 
 /**
@@ -210,6 +219,64 @@ export async function loadConfig(projectDir: string): Promise<RagConfig> {
   if (!("exclude" in obj)) result.data.exclude = DEFAULT_CONFIG.exclude;
 
   return result.data;
+}
+
+export interface ConnectedRepoEntry {
+  path: string;
+  alias?: string;
+}
+
+/** Raw-disk read of connectedRepos — sync so tool registration (which runs
+ * before any async config load) can advertise aliases in descriptions.
+ * Config edits need a server restart to refresh those descriptions. */
+export function readConnectedReposSync(projectDir: string): ConnectedRepoEntry[] {
+  try {
+    const parsed = JSON.parse(
+      readFileSync(join(projectDir, ".mimirs", "config.json"), "utf-8"),
+    ) as { connectedRepos?: unknown };
+    if (!Array.isArray(parsed.connectedRepos)) return [];
+    return parsed.connectedRepos.filter(
+      (r): r is ConnectedRepoEntry => typeof (r as ConnectedRepoEntry)?.path === "string",
+    );
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Persist a connected repo into .mimirs/config.json, preserving every other
+ * field as-is (raw JSON edit, not a re-serialize of the validated config —
+ * that would bake defaults into the user's file). Dedup by resolved path.
+ */
+export async function addConnectedRepo(
+  projectDir: string,
+  entry: ConnectedRepoEntry,
+): Promise<"added" | "exists"> {
+  const configPath = join(projectDir, ".mimirs", "config.json");
+  if (!existsSync(configPath)) await loadConfig(projectDir); // scaffold defaults first
+  const raw = JSON.parse(await readFile(configPath, "utf-8")) as Record<string, unknown>;
+  const repos = Array.isArray(raw.connectedRepos) ? (raw.connectedRepos as ConnectedRepoEntry[]) : [];
+  if (repos.some((r) => resolve(projectDir, r.path) === resolve(projectDir, entry.path))) {
+    return "exists";
+  }
+  raw.connectedRepos = [...repos, entry];
+  await writeFile(configPath, JSON.stringify(raw, null, 2) + "\n");
+  return "added";
+}
+
+/** Remove a connected repo by alias or path. Returns true when an entry was removed. */
+export async function removeConnectedRepo(projectDir: string, ref: string): Promise<boolean> {
+  const configPath = join(projectDir, ".mimirs", "config.json");
+  if (!existsSync(configPath)) return false;
+  const raw = JSON.parse(await readFile(configPath, "utf-8")) as Record<string, unknown>;
+  const repos = Array.isArray(raw.connectedRepos) ? (raw.connectedRepos as ConnectedRepoEntry[]) : [];
+  const kept = repos.filter(
+    (r) => r.alias !== ref && r.path !== ref && resolve(projectDir, r.path) !== resolve(projectDir, ref),
+  );
+  if (kept.length === repos.length) return false;
+  raw.connectedRepos = kept;
+  await writeFile(configPath, JSON.stringify(raw, null, 2) + "\n");
+  return true;
 }
 
 /**

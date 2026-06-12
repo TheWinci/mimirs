@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { resolve, join } from "path";
 import { existsSync } from "fs";
 import { type GetDB, resolveProject } from "./index";
+import { addConnectedRepo, readConnectedReposSync } from "../config";
 import { getModelId, getEmbeddingDim } from "../embeddings/embed";
 import { readLockHolderPid } from "../control/producer";
 import { isPidAlive } from "../utils/index-lock";
@@ -79,15 +80,30 @@ export function registerServerInfoTools(
     }
   );
 
+  const configuredRepos = readConnectedReposSync(resolve(process.env.RAG_PROJECT_DIR || process.cwd()));
+  const aliasHint = configuredRepos.length > 0
+    ? ` Already configured (pass alias or path as \`directory\` to read tools): ${configuredRepos
+        .map((r) => (r.alias ? `${r.alias} → ${r.path}` : r.path))
+        .join(", ")}.`
+    : "";
+
   server.tool(
     "connect_repo",
-    "Connect another repo's mimirs index for cross-repo queries. Opens it QUERY-ONLY — no indexing, no writes; the repo's own mimirs server keeps it fresh — and reports its status: size, last indexed, embedding model, and whether a live server maintains it. After connecting, pass that repo's path as `directory` to search, read_relevant, and other read tools.",
+    "Connect another repo's mimirs index for cross-repo queries. Opens it QUERY-ONLY — no indexing, no writes; the repo's own mimirs server keeps it fresh — and reports its status: size, last indexed, embedding model, and whether a live server maintains it. After connecting, pass that repo's path (or alias) as `directory` to search, read_relevant, and other read tools. Set persist=true to save the connection to .mimirs/config.json so future sessions auto-attach it." + aliasHint,
     {
       directory: z
         .string()
         .describe("Path to the repo to connect. Must already have a mimirs index (.mimirs/index.db)."),
+      alias: z
+        .string()
+        .optional()
+        .describe("Short name for this repo — usable as the `directory` argument of read tools. Stored when persist=true."),
+      persist: z
+        .boolean()
+        .optional()
+        .describe("Save this connection to .mimirs/config.json (connectedRepos) so every future session auto-attaches it. Default false: connection lasts for this server's lifetime only."),
     },
-    async ({ directory }) => {
+    async ({ directory, alias, persist }) => {
       const resolved = resolve(directory);
       if (!existsSync(resolved)) {
         throw new Error(`Directory does not exist: ${resolved}`);
@@ -119,8 +135,16 @@ export function registerServerInfoTools(
       const holder = readLockHolderPid(resolved);
       const holderAlive = holder !== null && isPidAlive(holder);
 
+      let persistNote = "";
+      if (persist) {
+        const outcome = await addConnectedRepo(primary, { path: directory, ...(alias ? { alias } : {}) });
+        persistNote = outcome === "added"
+          ? `Saved to .mimirs/config.json${alias ? ` as "${alias}"` : ""} — future sessions auto-attach it.`
+          : `Already in .mimirs/config.json — nothing to save.`;
+      }
+
       const lines = [
-        `Connected ${resolved} (query-only).`,
+        `Connected ${resolved} (query-only).${alias && !persist ? ` Alias "${alias}" works only if persisted — pass persist=true.` : ""}`,
         ``,
         `  files:        ${status.totalFiles}`,
         `  chunks:       ${status.totalChunks}`,
@@ -131,8 +155,9 @@ export function registerServerInfoTools(
           ? `  freshness: live mimirs server (pid ${holder}) maintains this index — results stay current.`
           : `  freshness: NO live server in that repo — results are frozen at last_indexed. Refresh by running \`mimirs index\` there.`,
         ``,
-        `Use it by passing directory: "${resolved}" to search/read_relevant/etc. Write tools (annotate, checkpoints, index_files without intent) stay with that repo's own server.`,
+        `Use it by passing directory: "${persist && alias ? alias : resolved}" to search/read_relevant/etc. Write tools (annotate, checkpoints, index_files without intent) stay with that repo's own server.`,
       ];
+      if (persistNote) lines.push(persistNote);
 
       return {
         content: [{ type: "text" as const, text: lines.join("\n") }],

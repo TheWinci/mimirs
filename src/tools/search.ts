@@ -6,6 +6,7 @@ import { search, searchChunks } from "../search/hybrid";
 import { computeFreshness, freshnessTag, type Freshness } from "../git/staleness";
 import { normalizePath } from "../utils/path";
 import { type GetDB, resolveProject } from "./index";
+import { readConnectedReposSync } from "../config";
 
 /**
  * Build a PathFilter from tool params, resolving dir paths relative to the
@@ -31,6 +32,15 @@ function buildFilter(
 }
 
 export function registerSearchTools(server: McpServer, getDB: GetDB) {
+  // Advertise configured cross-repo connections so the model knows it can pass
+  // an alias. Read once at registration; config edits refresh on server restart.
+  const connected = readConnectedReposSync(resolve(process.env.RAG_PROJECT_DIR || process.cwd()));
+  const aliasHint = connected.length > 0
+    ? ` Also accepts a connected repo alias: ${connected
+        .map((r) => (r.alias ? `"${r.alias}" (${r.path})` : `"${r.path}"`))
+        .join(", ")}.`
+    : "";
+  const dirDescribe = `Project directory to search. Defaults to RAG_PROJECT_DIR env or cwd.${aliasHint}`;
   server.tool(
     "search",
     "Search the full codebase by meaning — finds files that grep misses. Use natural language ('how does auth work') or symbol names. Searches all indexed files semantically + by keyword in <100ms. Returns ranked file paths with snippets. Use read_relevant next to get full content with line ranges. Pass extensions/dirs/excludeDirs to scope the search.",
@@ -39,9 +49,7 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
       directory: z
         .string()
         .optional()
-        .describe(
-          "Project directory to search. Defaults to RAG_PROJECT_DIR env or cwd"
-        ),
+        .describe(dirDescribe),
       top: z
         .number()
         .int()
@@ -111,9 +119,7 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
       directory: z
         .string()
         .optional()
-        .describe(
-          "Project directory to search. Defaults to RAG_PROJECT_DIR env or cwd"
-        ),
+        .describe(dirDescribe),
       top: z
         .number()
         .int()

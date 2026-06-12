@@ -3,6 +3,7 @@ import { indexCommand } from "./commands/index-cmd";
 import { searchCommand, readCommand } from "./commands/search-cmd";
 import { statusCommand } from "./commands/status";
 import { pingCommand } from "./commands/ping";
+import { connectCommand, disconnectCommand } from "./commands/connect";
 import { removeCommand } from "./commands/remove";
 import { analyticsCommand } from "./commands/analytics";
 import { mapCommand } from "./commands/map";
@@ -43,6 +44,9 @@ Usage:
   mimirs index conversation [--dir D] Alias of \`mimirs conversation index\`
   mimirs ping [dir]                 Check whether a live mimirs server
                                     answers on the command channel
+  mimirs connect [repo]             List configured cross-repo connections,
+              [--alias X] [--dir D]   or save one (query-only attach)
+  mimirs disconnect <repo|alias>    Remove a configured connection
   mimirs search <query> [--top N]   Search indexed files
   mimirs read <query> [--top N]     Read relevant chunks (full content)
               [--threshold T] [--dir D]
@@ -140,6 +144,12 @@ async function dispatch() {
       break;
     case "ping":
       await pingCommand(args);
+      break;
+    case "connect":
+      await connectCommand(args, getFlag);
+      break;
+    case "disconnect":
+      await disconnectCommand(args, getFlag);
       break;
     case "remove":
       await removeCommand(args);

@@ -93,7 +93,9 @@ This project has a local RAG index (mimirs). Use these MCP tools:
   point — returns the most semantically appropriate file and anchor.
 - **\`connect_repo\`**: Attach another repo's mimirs index for cross-repo
   queries (query-only — that repo's own server keeps it fresh). Then pass its
-  path as \`directory\` to \`search\`/\`read_relevant\`/other read tools.
+  path as \`directory\` to \`search\`/\`read_relevant\`/other read tools. With
+  \`persist: true\` (+ optional \`alias\`) the connection is saved to config,
+  auto-attaches in future sessions, and the alias works as \`directory\`.
 - **\`wiki\`**: Rebuild the project wiki. Start with \`wiki(command: "shape")\` and
   follow the prompts it returns — each step names the next.`;
 

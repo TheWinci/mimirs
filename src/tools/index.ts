@@ -36,7 +36,18 @@ export async function resolveProject(
   opts?: { allowCreate?: boolean }
 ): Promise<{ projectDir: string; db: RagDB; config: RagConfig }> {
   const defaultDir = resolve(process.env.RAG_PROJECT_DIR || process.cwd());
-  const projectDir = directory || defaultDir;
+  let projectDir = directory || defaultDir;
+
+  // `directory` may be a connectedRepos alias (or configured path) from the
+  // primary project's config — substitute the real path. An exact alias match
+  // wins over a same-named real directory; address the latter as ./name.
+  if (directory && directory !== defaultDir) {
+    const primaryConfig = await loadConfig(defaultDir);
+    const hit = primaryConfig.connectedRepos.find(
+      (r) => r.alias === directory || r.path === directory,
+    );
+    if (hit) projectDir = resolve(defaultDir, hit.path);
+  }
 
   // Resolve to an absolute path and confirm it exists. Note: this is not a
   // sandbox — mimirs is a local tool that already runs with the caller's full

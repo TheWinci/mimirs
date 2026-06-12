@@ -4,7 +4,7 @@ import { resolve, join } from "path";
 import { checkIndexDir } from "../utils/dir-guard";
 import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { RagDB } from "../db";
-import { loadConfig } from "../config";
+import { loadConfig, applyEmbeddingConfigFromDisk } from "../config";
 import { indexDirectory } from "../indexing/indexer";
 import { startWatcher, type Watcher } from "../indexing/watcher";
 import { getTranscriptsDir } from "../conversation/parser";
@@ -331,6 +331,29 @@ export async function startServer() {
   }
 
   const startupConfig = await loadConfig(startupDir);
+
+  // Eagerly warm-attach configured external repos (query-only). Best-effort:
+  // a moved repo or incompatible index warns and is skipped — never fails
+  // startup. Every instance attaches (read handles need no lock), so the
+  // config problem surfaces at startup instead of on the first cross-repo query.
+  for (const repo of startupConfig.connectedRepos) {
+    const repoDir = resolve(startupDir, repo.path);
+    try {
+      getDB(repoDir);
+      log.debug(`Connected repo ${repo.alias ?? repo.path} (query-only): ${repoDir}`, "connect");
+    } catch (err) {
+      log.warn(
+        `connectedRepos: could not attach "${repo.alias ?? repo.path}" (${repoDir}): ${err instanceof Error ? err.message : err}`,
+        "connect",
+      );
+    }
+  }
+  if (startupConfig.connectedRepos.length > 0) {
+    // Each attach configured the GLOBAL query embedder for that repo's model
+    // (needed for its compat asserts). Restore the primary's before startup
+    // indexing embeds anything, or it would index with the last repo's model.
+    applyEmbeddingConfigFromDisk(startupDir);
+  }
 
   if (!isHomeDirTrap) {
     // All indexing/watching work, gated behind the lock. Extracted so the
