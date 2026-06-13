@@ -20,16 +20,18 @@ All three subcommands start from this same step, so they only ever touch the cur
 
 ## Dispatch and branching
 
-`mimirs conversation ...` enters through the shared CLI dispatcher. The top-level command string is matched in a switch, and `conversation` routes to `conversationCommand(args, getFlag)` (`src/cli/index.ts:156-158`). That handler reads the second positional argument as the subcommand, resolves the working directory from `--dir` (defaulting to `.`), opens the project database, and branches (`src/cli/commands/conversation.ts:11-14`). Because the value of the command is in which branch runs, the flow is best read as a dispatch tree.
+`mimirs conversation ...` enters through the shared CLI dispatcher. The top-level command string is matched in a switch, and `conversation` routes to `conversationCommand(args, getFlag)` (`src/cli/index.ts:156-158`). That handler reads the second positional argument as the subcommand and resolves the working directory from `--dir` (defaulting to `.`), then branches (`src/cli/commands/conversation.ts:94-96`). It does not open a database up front: `search` and `sessions` each open and close their own `RagDB`, while `index` delegates to a helper that manages its own. Because the value of the command is in which branch runs, the flow is best read as a dispatch tree.
 
 ```mermaid
 flowchart TD
-  startNode["mimirs conversation &lt;sub&gt; [args]"] --> open["resolve --dir<br>open RagDB"]
-  open --> sub{subcommand?}
+  startNode["mimirs conversation &lt;sub&gt; [args]"] --> sub{subcommand?}
 
   sub -->|search| q{query given<br>and not a flag?}
   q -->|no| usageErr["print usage, exit 1"]
-  q -->|yes| reindex["discoverSessions<br>re-index new or stale ones"]
+  q -->|yes| openS["open RagDB"]
+  openS --> fresh{lock free?<br>(no live server)}
+  fresh -->|yes| reindex["freshen new/stale<br>sessions in-process"]
+  fresh -->|no| emb
   reindex --> emb["embed query"]
   emb --> vec["searchConversation (vector)"]
   emb --> bm25["textSearchConversation (keyword)"]
@@ -38,66 +40,69 @@ flowchart TD
   fuse --> empty{any results?}
   empty -->|no| none["print<br>No conversation results found."]
   empty -->|yes| printR["print each turn:<br>header, snippet, files"]
+  none --> closeS["db.close()"]
+  printR --> closeS
 
-  sub -->|sessions| lst["discoverSessions"]
+  sub -->|sessions| openL["open RagDB"]
+  openL --> lst["discoverSessions"]
   lst --> lstEmpty{any sessions?}
   lstEmpty -->|no| noSess["print<br>No conversation sessions found."]
-  lstEmpty -->|yes| printL["print one line per transcript:<br>id, date, indexed status, size"]
+  lstEmpty -->|yes| printL["one line per transcript:<br>id, date, indexed status, size"]
+  noSess --> closeL["db.close()"]
+  printL --> closeL
 
-  sub -->|index| idx["discoverSessions"]
-  idx --> idxEmpty{any sessions?}
-  idxEmpty -->|no| noSess
-  idxEmpty -->|yes| idxLoop["optionally drop turns (--rebuild)<br>indexConversation each<br>sum turns, print per-session + total"]
+  sub -->|index| rebuildQ{--rebuild?}
+  rebuildQ -->|yes| exclusive["require exclusive lock<br>(error if live server holds it)"]
+  rebuildQ -->|no| access{withIndexAccess:<br>lock free or stale?}
+  exclusive --> localIdx["runConversationIndexLocal<br>print 'Done: ...'"]
+  access -->|yes, take lock| localIdx
+  access -->|no, live holder| delegate["delegate index.conversation<br>over the control channel<br>print 'Done via live server: ...'"]
 
   sub -->|other| usage2["print usage, exit 1"]
-
-  usageErr --> closeNode["db.close()"]
-  none --> closeNode
-  printR --> closeNode
-  noSess --> closeNode
-  printL --> closeNode
-  idxLoop --> closeNode
-  usage2 --> closeNode
 ```
 
-1. The handler resolves the directory from `--dir` and opens `RagDB` before any branch runs, so the database is always available to close at the end (`src/cli/commands/conversation.ts:13-14`).
-2. `search` first checks that a query string is present and is not itself a flag; a missing query, or one that starts with `--`, prints usage and exits `1` (`src/cli/commands/conversation.ts:20-23`).
-3. With a query, `search` walks every found transcript and re-indexes only the new or stale ones, then embeds the query.
-4. Two searches run against the stored turns — a vector search and a keyword search — and their results are fused by rank, sorted, and trimmed to the top count.
-5. An empty fused list prints `No conversation results found.`; otherwise each surviving turn is printed.
-6. `sessions` lists every transcript with its indexed status, or prints a "none found" message when the folder is empty.
-7. `index` indexes every transcript (after optionally dropping its stored turns when `--rebuild` is passed) and prints per-session and total turn counts, or the same "none found" message.
-8. Any other subcommand (or none) prints the usage line and exits `1`.
-9. Every branch falls through to `db.close()` (`src/cli/commands/conversation.ts:101`).
+1. The handler reads the subcommand and resolves the directory from `--dir`; it does not open a database up front — each branch opens its own only when it needs one (`src/cli/commands/conversation.ts:94-96`).
+2. `search` first checks that a query string is present and is not itself a flag; a missing query, or one that starts with `--`, prints usage and exits `1` (`src/cli/commands/conversation.ts:102-105`).
+3. With a query, `search` opens the database and, **only when no live server holds the index lock**, re-indexes the new or stale transcripts before embedding the query; when a server is running its watcher keeps them current instead (`src/cli/commands/conversation.ts:114-127`).
+4. Two searches run against the stored turns — a vector search and a keyword search — and their results are fused by rank, sorted, and trimmed to the top count (`src/cli/commands/conversation.ts:130-140`).
+5. An empty fused list prints `No conversation results found.`; otherwise each surviving turn is printed, then the database is closed (`src/cli/commands/conversation.ts:142-155`).
+6. `sessions` opens the database, lists every transcript with its indexed status (or prints a "none found" message when the folder is empty), and closes it (`src/cli/commands/conversation.ts:156-169`).
+7. `index` runs the local-or-delegate path: with the lock free it indexes every transcript in-process, otherwise it hands the job to the live server; `--rebuild` instead demands an exclusive lock (`src/cli/commands/conversation.ts:49-92`).
+8. Any other subcommand (or none) prints the usage line and exits `1` (`src/cli/commands/conversation.ts:172-174`).
+9. `search` and `sessions` each close their own handle; the `index` path's helper closes its own (`src/cli/commands/conversation.ts:155`, `src/cli/commands/conversation.ts:169`, `src/cli/commands/conversation.ts:38`).
 
 ## `search`: index-on-demand, then rank fusion
 
-`search` is the only subcommand that both writes and reads. Before searching it makes sure the index is current: it walks every found transcript, compares the on-disk modification time against the `mtime` stored in the session row, and calls `indexConversation` for anything that has never been indexed or whose file has grown since (`src/cli/commands/conversation.ts:29-35`). This is why a fresh search picks up turns from a session you just finished without a separate `index` run, while unchanged transcripts are skipped.
+`search` is the only subcommand that both writes and reads. Before searching it makes the index current — but only when it can acquire the index lock, i.e. when no live mimirs server is running for the project. In that case it walks every found transcript, compares the on-disk modification time against the `mtime` stored in the session row, and calls `indexConversation` for anything that has never been indexed or whose file has grown since (`src/cli/commands/conversation.ts:114-127`). When a live server *is* running it holds the lock, so the freshen step is skipped entirely: that server's conversation-folder watcher already keeps the turns current, and indexing beside it would race its serial queue and corrupt `turn_count`. Either way a fresh search picks up turns from a session you just finished without a separate `index` run.
 
-Once the index is current the handler embeds the query with `embed`, then runs two searches over the stored turn chunks (`src/cli/commands/conversation.ts:38-43`):
+Once the index is current the handler embeds the query with `embed`, then runs two searches over the stored turn chunks (`src/cli/commands/conversation.ts:130-135`):
 
 - A vector search, `searchConversation`, matches the query embedding against the `vec_conversation` virtual table and turns the L2 distance into a similarity via `1 / (1 + distance)` (`src/db/conversation.ts:326`, `src/db/conversation.ts:350`).
 - A keyword search, `textSearchConversation`, runs an FTS5 `MATCH` against `fts_conversation` and converts the BM25 `rank` into a score via `1 / (1 + abs(rank))` (`src/db/conversation.ts:385`, `src/db/conversation.ts:409`).
 
 Both searches return at most one row per turn. The DB layer over-fetches (three times the requested top count when searching across the whole project) and de-duplicates by `turn_id`, so a turn split into several chunks does not crowd out other turns (`src/db/conversation.ts:330`, `src/db/conversation.ts:335-337`).
 
-The two lists are then combined by **reciprocal-rank fusion** rather than by blending the raw scores. The handler calls `rrfFuse(vecResults, bm25Results, config.hybridWeight, (r) => r.turnId)`, sorts the fused list by score descending, and slices it to the top count (`src/cli/commands/conversation.ts:46-48`). This matters because cosine/L2 similarity and the BM25-derived `1/(1+|rank|)` score live on different, non-comparable scales — adding them directly would let whichever has the larger magnitude dominate and make the weight nearly inert. Fusing by *position* avoids that.
+The two lists are then combined by **reciprocal-rank fusion** rather than by blending the raw scores. The handler calls `rrfFuse(vecResults, bm25Results, config.hybridWeight, (r) => r.turnId)`, sorts the fused list by score descending, and slices it to the top count (`src/cli/commands/conversation.ts:138-140`). This is the same shared fusion core used by code search, documented in depth on the [hybrid search ranking](../mechanisms/hybrid-ranking.md) mechanism. This matters because cosine/L2 similarity and the BM25-derived `1/(1+|rank|)` score live on different, non-comparable scales — adding them directly would let whichever has the larger magnitude dominate and make the weight nearly inert. Fusing by *position* avoids that.
 
 Inside `rrfFuse` each list is scored only by where a turn lands in it: a turn at rank `i` contributes `RRF_K / (RRF_K + i)` with `RRF_K = 60`, which is `1` at the top and decays smoothly down the list (`src/search/hybrid.ts:83-88`). A turn's final score is `weight * vectorRankScore + (1 - weight) * keywordRankScore`, where the vector list is the primary (weight) side and the keyword list is the secondary; a turn missing from one list contributes `0` from that side (`src/search/hybrid.ts:99-102`). The `weight` is `config.hybridWeight`, whose default is `0.5` — equal pull from semantic and keyword rank — so neither signal dominates and an exact keyword hit can still surface a turn the vector search ranked lower (`src/search/hybrid.ts:63`). The same `rrfFuse` is the single fusion path for ordinary chunk search too, so conversation search and code search rank by the same rule.
 
-Each printed result shows `Turn <turnIndex> (<timestamp>)`, an optional `[tool, tool]` list when the turn used tools, the first 200 characters of the matching snippet, and up to five referenced files when present (`src/cli/commands/conversation.ts:53-59`). When nothing matches it prints `No conversation results found.`
+Each printed result shows `Turn <turnIndex> (<timestamp>)`, an optional `[tool, tool]` list when the turn used tools, the first 200 characters of the matching snippet, and up to five referenced files when present (`src/cli/commands/conversation.ts:145-153`). When nothing matches it prints `No conversation results found.`
 
 ## `sessions`: what exists and what is indexed
 
-`sessions` is read-only. It calls `discoverSessions` and, for each transcript, looks up the stored session row with `getSession`. If a row exists it reports the stored `turnCount` as `<n> turns indexed`; otherwise it reports `not indexed` (`src/cli/commands/conversation.ts:68-72`). Each line shows the first eight characters of the session id, the file modification time as an ISO timestamp trimmed to seconds, the indexed status, and the file size in kilobytes. With no transcripts at all it prints `No conversation sessions found for this project.`
+`sessions` is read-only. It opens a `RagDB`, calls `discoverSessions`, and for each transcript looks up the stored session row with `getSession`. If a row exists it reports the stored `turnCount` as `<n> turns indexed`; otherwise it reports `not indexed` (`src/cli/commands/conversation.ts:156-167`). Each line shows the first eight characters of the session id, the file modification time as an ISO timestamp trimmed to seconds, the indexed status, and the file size in kilobytes. With no transcripts at all it prints `No conversation sessions found for this project.`
 
 This is the quickest way to see whether a recent session has made it into the index, and how large each transcript is.
 
 ## `index`: index everything now
 
-`index` indexes every found transcript and reports per-session and total turn counts. It reads whether `--rebuild` was passed, prints a `Found N sessions, <indexing|rebuilding>...` header, then loops over the sessions (`src/cli/commands/conversation.ts:75-94`). For each session it optionally drops the stored turns first (only with `--rebuild`), calls `indexConversation`, accumulates `turnsIndexed`, prints a line for every session that produced new turns, and finishes with a total. Unlike `search`, it does not check `mtime` first — it calls `indexConversation` unconditionally. That is safe because indexing is idempotent at the turn level (see below): a session that is already fully indexed and unchanged contributes zero new turns and prints nothing.
+`index` indexes every found transcript and reports a total turn count. The path it takes depends on whether `--rebuild` was passed and whether a live server holds the index lock (`src/cli/commands/conversation.ts:49-92`).
 
-The `--rebuild` flag exists to recover indexes written before the turn-cursor fix, where some turns lost their tails (assistant text missing) and turn indices drifted. For those, an incremental upsert alone cannot fully repair the damage, so `--rebuild` calls `deleteSessionTurns` to clear the session's turns, chunks, and cursor before re-indexing from scratch (`src/cli/commands/conversation.ts:84-87`, `src/db/conversation.ts:208-222`).
+**Without `--rebuild`**, the command calls `withIndexAccess`. If the lock is free or held by a dead process it indexes in-process via `runConversationIndexLocal` and prints `Done: <turns> turns indexed across <N> sessions`; if a live server holds the lock it hands the job over as an `index.conversation` command and prints `Done (via live server): <turns> new turns indexed`, echoing the server's progress (`src/cli/commands/conversation.ts:70-84`). Delegating matters here specifically because two overlapping `indexConversation` runs on one file corrupt `turn_count`; the live server runs the request on its serial conversation queue, so the CLI must not index the same sessions beside it. The transport is the [drop-box command channel](../mechanisms/control-channel.md).
+
+**With `--rebuild`** the path is different: dropping stored turns needs exclusive access, not a queue slot beside a watcher that may be touching the same session. So `--rebuild` acquires the index lock directly, and if a live server already holds it the command errors out — telling you to stop that server and retry — rather than delegating (`src/cli/commands/conversation.ts:50-66`). It exists to recover indexes written before the turn-cursor fix, where some turns lost their tails (assistant text missing) and turn indices drifted; an incremental upsert alone cannot fully repair that, so `runConversationIndexLocal` calls `deleteSessionTurns` to clear each session's turns, chunks, and cursor before re-indexing from scratch (`src/cli/commands/conversation.ts:29`, `src/db/conversation.ts:208-222`).
+
+In both local cases the work is done by `runConversationIndexLocal`, which opens its own `RagDB`, loops the discovered sessions, calls `indexConversation` for each, prints a short line for every session that produced new turns, and closes the database (`src/cli/commands/conversation.ts:17-40`). Unlike `search`, it does not check `mtime` first — it calls `indexConversation` unconditionally. That is safe because indexing is idempotent at the turn level (see below): a session that is already fully indexed and unchanged contributes zero new turns and prints nothing.
 
 ## Inside `indexConversation`
 
@@ -127,19 +132,21 @@ Session bookkeeping happens after the turns. `upsertSession` inserts or updates 
 
 ## Branches and failure cases
 
-- **Missing or flag-shaped query for `search`.** With no query argument — or one that begins with `--`, such as `conversation search --top 5 "real query"` where the parser would otherwise treat `--top` as the query and embed the literal string — the handler prints `Usage: mimirs conversation search <query> [--dir D] [--top N]` and exits `1` (`src/cli/commands/conversation.ts:20-23`).
-- **Unknown or missing subcommand.** Anything other than `search`, `sessions`, or `index` prints `Usage: mimirs conversation <search|sessions|index [--rebuild]>` and exits `1` (`src/cli/commands/conversation.ts:96-98`).
-- **No transcripts found.** `sessions` and `index` print `No conversation sessions found for this project.` and do nothing further; the transcripts folder simply may not exist yet (`src/cli/commands/conversation.ts:65-66`, `src/cli/commands/conversation.ts:78-79`).
-- **No search matches.** When the fused result list is empty, `search` prints `No conversation results found.` (`src/cli/commands/conversation.ts:50-51`).
-- **Full-text search errors.** FTS5 can throw on queries with special characters. The keyword search is wrapped in a `try/catch` that swallows the error and leaves the keyword list empty, so `search` still returns its vector results (`src/cli/commands/conversation.ts:40-43`). The DB layer also passes the query through `sanitizeFTS` before matching (`src/db/conversation.ts:389`).
+- **Missing or flag-shaped query for `search`.** With no query argument — or one that begins with `--`, such as `conversation search --top 5 "real query"` where the parser would otherwise treat `--top` as the query and embed the literal string — the handler prints `Usage: mimirs conversation search <query> [--dir D] [--top N]` and exits `1` (`src/cli/commands/conversation.ts:102-105`).
+- **Unknown or missing subcommand.** Anything other than `search`, `sessions`, or `index` prints `Usage: mimirs conversation <search|sessions|index [--rebuild]>` and exits `1` (`src/cli/commands/conversation.ts:172-174`).
+- **No transcripts found.** `sessions` prints `No conversation sessions found for this project.` and does nothing further (`src/cli/commands/conversation.ts:159-160`); `index` simply reports `Done: 0 turns indexed across 0 sessions`. The transcripts folder may not exist yet.
+- **Live server holds the lock (`index`).** Without `--rebuild`, the reindex is delegated to the live server over the [drop-box command channel](../mechanisms/control-channel.md) rather than run locally, and the result prints `Done (via live server): …`; a `DropboxError` (channel-less or dead holder) prints the error and exits `1` (`src/cli/commands/conversation.ts:70-91`).
+- **`--rebuild` with a live server.** `--rebuild` needs an exclusive lock and refuses to delegate: if a live server holds the lock it errors with the pid and exits `1`, asking you to stop that server and retry (`src/cli/commands/conversation.ts:53-60`).
+- **No search matches.** When the fused result list is empty, `search` prints `No conversation results found.` (`src/cli/commands/conversation.ts:142-143`).
+- **Full-text search errors.** FTS5 can throw on queries with special characters. The keyword search is wrapped in a `try/catch` that swallows the error and leaves the keyword list empty, so `search` still returns its vector results (`src/cli/commands/conversation.ts:132-135`). The DB layer also passes the query through `sanitizeFTS` before matching (`src/db/conversation.ts:389`).
 - **Foreign transcript.** If `classifyTranscript` finds every line of a transcript belongs to a sibling project that collided into the same folder, `indexConversation` returns early with zero turns and leaves the cursor untouched, so it never claims another project's turns (`src/conversation/indexer.ts:44-46`).
 - **Empty transcript.** If `readJSONL` returns no entries (an empty file, or an offset already at end-of-file), `indexConversation` returns early with zero turns indexed (`src/conversation/indexer.ts:36-38`).
 - **Empty turn text.** A turn whose combined text is blank after trimming is skipped by `indexTurn` and never reaches the database (`src/conversation/indexer.ts:151-152`).
 - **Already-indexed, unchanged turn.** Re-running `index` on an unchanged session is a no-op at the model level: each turn's chunk text matches the stored version, so `indexTurn` returns `unchanged`, `turnsIndexed` stays `0`, and no per-session line prints (`src/conversation/indexer.ts:161-164`).
-- **`--rebuild`.** Passing `--rebuild` to `index` drops each session's stored turns, chunks, and cursor before re-indexing, recovering indexes damaged by the pre-cursor-fix turn splitting (`src/cli/commands/conversation.ts:84-87`).
-- **Stale-only re-index in `search`.** A session is re-indexed only when it has no row or its `mtime` grew; an unchanged session is skipped entirely on the search path (`src/cli/commands/conversation.ts:31-34`).
+- **`--rebuild`.** Passing `--rebuild` to `index` drops each session's stored turns, chunks, and cursor before re-indexing, recovering indexes damaged by the pre-cursor-fix turn splitting (`src/cli/commands/conversation.ts:29`, `src/db/conversation.ts:208-222`).
+- **Stale-only re-index in `search`.** When the freshen step runs (no live server), a session is re-indexed only if it has no row or its `mtime` grew; an unchanged session is skipped (`src/cli/commands/conversation.ts:118-122`).
 - **Bad `--top` value.** `--top` is parsed by `intFlag`, which rejects non-integers and values below `1` by throwing `CliFlagError`; the dispatcher catches it, prints the message, and exits `1` (`src/cli/flags.ts:40-53`, `src/cli/index.ts:102-108`).
-- **Always closes the DB.** Every branch falls through to `db.close()` at the end of the handler (`src/cli/commands/conversation.ts:101`).
+- **Closes its DB per branch.** `search` and `sessions` close the handle they opened; the `index` path's `runConversationIndexLocal` closes its own in a `finally` (`src/cli/commands/conversation.ts:155`, `src/cli/commands/conversation.ts:169`, `src/cli/commands/conversation.ts:37-39`).
 
 ## Inputs
 
@@ -157,8 +164,8 @@ Session bookkeeping happens after the turns. `upsertSession` inserts or updates 
 | --- | --- |
 | Search results | Printed to stdout for `search`: per turn, `Turn <index> (<timestamp>)` with an optional `[tool, ...]` list, a snippet capped at 200 chars, and up to 5 referenced files. Empty case prints `No conversation results found.` |
 | Session list | Printed to stdout for `sessions`: one line per transcript with short session id, ISO timestamp, indexed-turn count or `not indexed`, and file size in KB. |
-| Index summary | Printed to stdout for `index`: a `Found N sessions, indexing...` (or `rebuilding...`) header, a per-session line for sessions with new turns, and a final `Done: <total> turns indexed across N sessions`. |
-| Persisted rows | Both `index` and the `search` on-demand path write session, turn, chunk, embedding, and FTS rows into the project database (see State changes). |
+| Index summary | Printed to stdout for `index`: a per-session line for sessions with new turns, then `Done: <total> turns indexed across N sessions` for a local run, or `Done (via live server): <total> new turns indexed` when the live server did the work. |
+| Persisted rows | Both `index` and the `search` on-demand path write session, turn, chunk, embedding, and FTS rows into the project database (see State changes). The `search` path only writes when no live server holds the lock. |
 
 ## Example
 
@@ -182,12 +189,13 @@ Values such as session ids, timestamps, and turn indices above are illustrative.
 
 ## Background indexing
 
-The CLI is the manual way to fill the conversation index. When the MCP server is running it indexes transcripts automatically: `startConversationFolderWatch` backfills every existing session on startup and then watches the transcripts folder, draining both the backfill and live file-change events through a single serial queue so two index runs never overlap on the same file (`src/conversation/indexer.ts:267-339`). That background path reads from the byte offset stored in each session row rather than re-reading whole files (`src/conversation/indexer.ts:197-221`), and is described under [server start](../server/start.md). Because both paths funnel into the same idempotent `indexConversation`, running the CLI `index` while the server watches is safe — already-indexed turns are simply left unchanged.
+The CLI is the manual way to fill the conversation index. When the MCP server is running it indexes transcripts automatically: `startConversationFolderWatch` backfills every existing session on startup and then watches the transcripts folder, draining both the backfill and live file-change events through a single serial queue so two index runs never overlap on the same file (`src/conversation/indexer.ts:275-347`). This is the same serial queue the `index.conversation` command rides when the CLI delegates to a live server, which is why the CLI never indexes conversations beside a running server. That background path reads from the byte offset stored in each session row rather than re-reading whole files (`src/conversation/indexer.ts:197-221`), and is described under [server start](../server/start.md). Because both paths funnel into the same idempotent `indexConversation`, running the CLI `index` while the server watches is safe — already-indexed turns are simply left unchanged.
 
 ## Key source files
 
 - `src/cli/index.ts` — top-level CLI dispatcher; routes `conversation` to its handler and catches `CliFlagError`.
-- `src/cli/commands/conversation.ts` — the handler implementing `search`, `sessions`, and `index`.
+- `src/cli/commands/conversation.ts` — the handler implementing `search`, `sessions`, and `index`, plus `runConversationIndexLocal` and the `withIndexAccess` local-or-delegate call.
+- `src/control/producer.ts` — `withIndexAccess`, which routes `index` to a live server when one holds the lock (see the [drop-box command channel](../mechanisms/control-channel.md)).
 - `src/conversation/parser.ts` — transcript lookup (`discoverSessions`, `getTranscriptsDir`), JSONL reading (`readJSONL`), turn parsing (`parseTurns`, `buildTurnText`), and project classification (`classifyTranscript`, `belongsToProject`).
 - `src/conversation/indexer.ts` — the `indexConversation` worker, `indexTurn`, and the server's folder watcher.
 - `src/db/conversation.ts` — the SQL behind session upserts, the insert-or-replace turn write, change detection, and the vector/keyword searches.

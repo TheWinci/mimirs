@@ -8,11 +8,14 @@ to follow up with `read_relevant`. It is the locate-first half of the workflow:
 `search` tells you which files matter; [read_relevant](read-relevant.md) then
 returns the actual function or class body with exact line ranges.
 
-The tool is registered in `src/tools/search.ts:33` and hands the real work to the
+The tool is registered in `src/tools/search.ts:34` and hands the real work to the
 `search()` function in `src/search/hybrid.ts:342`, which runs a hybrid query —
 semantic plus keyword — against the SQLite index, fuses the two result lists by
 rank, dedupes to one row per file, and reranks the survivors through several
-scoring stages before returning them.
+scoring stages before returning them. The fusion and rerank internals are shared
+with [read_relevant](read-relevant.md) and documented once on the
+[hybrid search ranking](../mechanisms/hybrid-ranking.md) mechanism page; the
+sections below summarize the parts that matter for this tool.
 
 ## When to use it
 
@@ -104,15 +107,15 @@ flowchart TD
 
 1. **Entry.** The MCP server invokes the handler registered under the name
    `search` with the validated arguments `query`, `directory`, `top`,
-   `extensions`, `dirs`, and `excludeDirs` (`src/tools/search.ts:63`).
+   `extensions`, `dirs`, and `excludeDirs` (`src/tools/search.ts:44-73`).
 2. **Resolve the project.** `resolveProject` turns the optional `directory` into
    an absolute path (falling back to `RAG_PROJECT_DIR` or the current working
    directory), verifies it exists, loads the project config, and returns the index
-   database for it (`src/tools/index.ts:22-37`).
+   database for it (`src/tools/index.ts:38-57`).
 3. **Build the path filter.** `buildFilter` returns `undefined` when none of the
    three scope arrays is populated; otherwise it builds a `PathFilter`, resolving
    each `dirs`/`excludeDirs` entry against the project directory so they match the
-   absolute paths stored in the index (`src/tools/search.ts:13-29`).
+   absolute paths stored in the index (`src/tools/search.ts:16-32`).
 4. **Embed and dual-search.** `search()` embeds the query, then runs the vector
    k-nearest-neighbour search and the BM25 keyword search, each over-fetching four
    times `topK` to leave room for deduplication and reranking
@@ -130,28 +133,28 @@ flowchart TD
    before returning (`src/search/hybrid.ts:412-428`).
 8. **Format or report empty.** Back in the tool, an empty list returns a plain "no
    results" message with an indexing hint; otherwise the results become a header,
-   a scored body, and a footer tip (`src/tools/search.ts:74-102`).
+   a scored body, and a footer tip (`src/tools/search.ts:82-110`).
 
 ## Inputs
 
 | name | type | required | description |
 | --- | --- | --- | --- |
-| `query` | string (1–2000 chars) | yes | Natural-language question or symbol name. Embedded for the vector search and passed (after `sanitizeFTS`) to the keyword search (`src/tools/search.ts:38`). |
-| `top` | integer 1–1000 | no | Number of results to return. Defaults to `config.searchTopK`, which is 8 unless overridden (`src/config/index.ts:24`, `src/tools/search.ts:70`). |
+| `query` | string (1–2000 chars) | yes | Natural-language question or symbol name. Embedded for the vector search and passed (after `sanitizeFTS`) to the keyword search (`src/tools/search.ts:48`). |
+| `top` | integer 1–1000 | no | Number of results to return. Defaults to `config.searchTopK`, which is 8 unless overridden (`src/config/index.ts:24`, `src/tools/search.ts:78`). |
 | `extensions` | string[] | no | Restrict to these file extensions, e.g. `[".ts", ".tsx"]`. A leading dot is optional; it is added if missing (`src/db/search.ts:52`). |
-| `dirs` | string[] | no | Restrict to these directories, relative to the project root or absolute. Resolved to absolute paths before matching (`src/tools/search.ts:28`). |
-| `excludeDirs` | string[] | no | Exclude these directories. Also resolved to absolute paths (`src/tools/search.ts:29`). |
-| `directory` | string | no | Project directory to search. Defaults to the `RAG_PROJECT_DIR` env var or the current working directory (`src/tools/index.ts`). |
+| `dirs` | string[] | no | Restrict to these directories, relative to the project root or absolute. Resolved to absolute paths before matching (`src/tools/search.ts:29`). |
+| `excludeDirs` | string[] | no | Exclude these directories. Also resolved to absolute paths (`src/tools/search.ts:30`). |
+| `directory` | string | no | Project directory to search. Defaults to the `RAG_PROJECT_DIR` env var or the current working directory. May also be a [connected repo](../tools/connect-repo.md)'s path or alias — at registration the tool reads `connectedRepos` and advertises any configured aliases in this argument's description (`src/tools/search.ts:35-43`). |
 
 The `top`, `extensions`, `dirs`, and `excludeDirs` arguments are all optional;
 only `query` must be supplied. The Zod schema rejects an empty query or one over
-2000 characters before the handler runs (`src/tools/search.ts:38`).
+2000 characters before the handler runs (`src/tools/search.ts:48`).
 
 ## Outputs
 
 | output | where it lands / shape / description |
 | --- | --- |
-| Ranked file paths with snippet previews | Returned as MCP text content. Each result is the fused score to four decimals, two spaces, the file path, then on the next line the first matched snippet truncated to 400 characters with a trailing `…` ellipsis. A `── N results across M indexed files (Tms) ──` header sits above and a tip to call `read_relevant` below (`src/tools/search.ts:86-98`). |
+| Ranked file paths with snippet previews | Returned as MCP text content. Each result is the fused score to four decimals, two spaces, the file path, then on the next line the first matched snippet truncated to 400 characters with a trailing `…` ellipsis. A `── N results across M indexed files (Tms) ──` header sits above and a tip to call `read_relevant` below (`src/tools/search.ts:94-110`). |
 | `query_log` row | One row inserted into the `query_log` table per call, recording the query text, result count, the top vector hit's cosine similarity, the top result's path, and duration. This is a side effect, not part of the returned text (`src/search/hybrid.ts:422-428`). |
 
 A sample of the returned text (synthetic values):
@@ -210,13 +213,13 @@ zero-result queries, low-scoring queries, top terms, and per-day volume — the
 signal that reveals documentation or indexing gaps (`src/db/analytics.ts:10-77`).
 Note the duration logged here is measured inside `search()` and covers only the
 embed-search-rerank work; the tool computes a separate `durationMs` for the header
-it returns, so the two timings can differ slightly (`src/tools/search.ts:69-71`).
+it returns, so the two timings can differ slightly (`src/tools/search.ts:77-80`).
 
 ## Branches and failure cases
 
 - **No scope filter.** When `extensions`, `dirs`, and `excludeDirs` are all empty
   or absent, `buildFilter` returns `undefined` and the search runs across the
-  whole index with no path constraints (`src/tools/search.ts:21-25`).
+  whole index with no path constraints (`src/tools/search.ts:22-26`).
 - **Scoped search.** When any scope array is set, the resulting `PathFilter` is
   pushed down into the SQL as parametrized `LIKE ? ESCAPE '\'` clauses
   (extensions as `%.ext`, dirs as `dir/%`, excludeDirs as `NOT LIKE dir/%`), and
@@ -231,7 +234,7 @@ it returns, so the two timings can differ slightly (`src/tools/search.ts:69-71`)
   `No results found ... across <N> indexed files. Has the directory been indexed?
   Try calling index_files first.` When a filter was active, the phrase ` matching
   the given scope` is inserted, hinting the scope may be too narrow rather than the
-  index being empty (`src/tools/search.ts:74-84`).
+  index being empty (`src/tools/search.ts:82-92`).
 - **Keyword-search failure.** The BM25 query is wrapped in a try/catch. If the
   full-text query throws (for example on input the FTS tokenizer rejects), it is
   logged at debug level and the search continues vector-only instead of failing
@@ -249,7 +252,7 @@ it returns, so the two timings can differ slightly (`src/tools/search.ts:69-71`)
   every result is a doc, or none is, no expansion happens
   (`src/search/hybrid.ts:304-326`).
 - **Missing directory.** `resolveProject` throws if the resolved path is absent,
-  surfacing as a tool error before any search runs (`src/tools/index.ts`).
+  surfacing as a tool error before any search runs (`src/tools/index.ts:52-57`).
 
 ## Ranking heuristics
 

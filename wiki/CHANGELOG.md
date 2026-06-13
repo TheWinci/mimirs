@@ -4,6 +4,21 @@ Notable changes to the generated wiki, newest first, by wiki version. The format
 follows [Keep a Changelog](https://keepachangelog.com/); each version is stamped
 with the source commit the wiki was generated from.
 
+## [d58b275] - 2026-06-13
+
+### Added
+- New page documenting mechanisms/control-channel — the drop-box command channel: a sessionless CLI drops a JSON request into `.mimirs/commands/`, the index-lock-holding server consumes it and writes a result, with rename-into-place atomicity, a closed zod-validated command enum, a serial consumer queue, and a watch+poll delivery guarantee
+- New page documenting tools/connect-repo — attach another repo's index query-only for cross-repo search, with optional persistence to `connectedRepos`
+- New page documenting cli/connect — persist a cross-repo connection (or list configured ones with freshness) in `.mimirs/config.json`
+- New page documenting cli/disconnect — remove a saved cross-repo connection by path or alias
+- New page documenting cli/ping — health-check the live server end-to-end over the command channel
+
+### Changed
+- `mimirs index` and `mimirs conversation index` now run-local-or-delegate: when a live server holds the index lock they hand the reindex to it over the command channel (`index.files` / `index.conversation`) and print a "via live server" summary, instead of the old race that printed `Done: 0 indexed`. `conversation --rebuild` requires an exclusive lock and refuses to delegate; `conversation search` only freshens stale sessions when no live server is running (cli/index, cli/conversation)
+- `server_info` now marks query-only connections with a `(query-only)` suffix in its Connected Databases section; `search` advertises configured connected-repo aliases in its `directory` argument; server start now stands up the command-channel consumer on the lock holder (tools/server-info, tools/search, server/start)
+
+_Pages updated: cli/connect, cli/disconnect, cli/ping, mechanisms/control-channel, tools/connect-repo, cli/conversation, cli/index, server/start, tools/search, tools/server-info_
+
 ## [7f07c5a] - 2026-06-10
 
 ### Added

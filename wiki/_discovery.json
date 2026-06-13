@@ -1,8 +1,8 @@
 {
   "metadata": {
     "schemaVersion": 1,
-    "prefetchCommitHash": "7f07c5a13720dd95311cb997e23352d5c3732aec",
-    "createdAt": "2026-06-10T20:38:03.000Z"
+    "prefetchCommitHash": "af4d96b4a90fcc4cfeacb4910e5733ead0072b8d",
+    "createdAt": "2026-06-13T08:00:00.000Z"
   },
   "flows": [
     {
@@ -2623,6 +2623,244 @@
         }
       ],
       "relatedFlows": []
+    },
+    {
+      "id": "cli/ping",
+      "title": "CLI: ping",
+      "kind": "command",
+      "summary": "Sends a ping over the drop-box command channel to the live index-lock-holding server and reports whether the channel answered, proving end-to-end connectivity to the running server.",
+      "confidence": "high",
+      "entrypoints": [
+        "mimirs ping [dir]"
+      ],
+      "files": [
+        {
+          "path": "src/cli/index.ts",
+          "role": "entrypoint"
+        },
+        {
+          "path": "src/cli/commands/ping.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/control/producer.ts",
+          "role": "service"
+        }
+      ],
+      "evidence": [
+        {
+          "path": "src/cli/index.ts",
+          "startLine": 145,
+          "endLine": 146
+        },
+        {
+          "path": "src/cli/commands/ping.ts",
+          "startLine": 12,
+          "endLine": 42
+        }
+      ],
+      "relatedFlows": [
+        "server-start",
+        "cli/status"
+      ]
+    },
+    {
+      "id": "cli/connect",
+      "title": "CLI: connect",
+      "kind": "command",
+      "summary": "Validates another repo's mimirs index and saves it as a persistent connection in .mimirs/config.json (optionally under an alias); with no repo argument it lists the connected repos and their freshness.",
+      "confidence": "high",
+      "entrypoints": [
+        "mimirs connect <repo> [--alias name]",
+        "mimirs connect"
+      ],
+      "files": [
+        {
+          "path": "src/cli/index.ts",
+          "role": "entrypoint"
+        },
+        {
+          "path": "src/cli/commands/connect.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/config/index.ts",
+          "role": "store"
+        }
+      ],
+      "evidence": [
+        {
+          "path": "src/cli/index.ts",
+          "startLine": 148,
+          "endLine": 149
+        },
+        {
+          "path": "src/cli/commands/connect.ts",
+          "startLine": 25,
+          "endLine": 70
+        },
+        {
+          "path": "src/config/index.ts",
+          "startLine": 300,
+          "endLine": 316
+        }
+      ],
+      "stateChanges": [
+        {
+          "item": "connected repo entry",
+          "from": null,
+          "to": "saved",
+          "trigger": "addConnectedRepo writes connectedRepos to .mimirs/config.json",
+          "description": "A new cross-repo connection is appended to the connectedRepos array in the project config so future sessions auto-attach it.",
+          "files": [
+            {
+              "path": "src/config/index.ts",
+              "role": "writer"
+            }
+          ],
+          "evidence": [
+            {
+              "path": "src/config/index.ts",
+              "startLine": 300,
+              "endLine": 316
+            }
+          ]
+        }
+      ],
+      "relatedFlows": [
+        "cli/disconnect",
+        "tools/connect-repo"
+      ]
+    },
+    {
+      "id": "cli/disconnect",
+      "title": "CLI: disconnect",
+      "kind": "command",
+      "summary": "Removes a saved cross-repo connection from .mimirs/config.json, matched by repo path or alias.",
+      "confidence": "high",
+      "entrypoints": [
+        "mimirs disconnect <repo|alias>"
+      ],
+      "files": [
+        {
+          "path": "src/cli/index.ts",
+          "role": "entrypoint"
+        },
+        {
+          "path": "src/cli/commands/connect.ts",
+          "role": "handler"
+        },
+        {
+          "path": "src/config/index.ts",
+          "role": "store"
+        }
+      ],
+      "evidence": [
+        {
+          "path": "src/cli/index.ts",
+          "startLine": 151,
+          "endLine": 152
+        },
+        {
+          "path": "src/cli/commands/connect.ts",
+          "startLine": 72,
+          "endLine": 82
+        },
+        {
+          "path": "src/config/index.ts",
+          "startLine": 317,
+          "endLine": 340
+        }
+      ],
+      "stateChanges": [
+        {
+          "item": "connected repo entry",
+          "from": "saved",
+          "to": null,
+          "trigger": "removeConnectedRepo rewrites connectedRepos without the matched entry",
+          "description": "The matched connection is dropped from the connectedRepos array in the project config.",
+          "files": [
+            {
+              "path": "src/config/index.ts",
+              "role": "writer"
+            }
+          ],
+          "evidence": [
+            {
+              "path": "src/config/index.ts",
+              "startLine": 317,
+              "endLine": 340
+            }
+          ]
+        }
+      ],
+      "relatedFlows": [
+        "cli/connect",
+        "tools/connect-repo"
+      ]
+    },
+    {
+      "id": "tools/connect-repo",
+      "title": "Tool: connect_repo",
+      "kind": "tool",
+      "summary": "Opens another repo's mimirs index query-only for cross-repo search, validates schema and embedding-model compatibility, reports its size and freshness, and can persist the connection to config.",
+      "confidence": "high",
+      "entrypoints": [
+        "connect_repo (MCP tool)"
+      ],
+      "files": [
+        {
+          "path": "src/tools/server-info-tools.ts",
+          "role": "entrypoint"
+        },
+        {
+          "path": "src/tools/index.ts",
+          "role": "service"
+        },
+        {
+          "path": "src/config/index.ts",
+          "role": "store"
+        },
+        {
+          "path": "src/db/index.ts",
+          "role": "store"
+        }
+      ],
+      "evidence": [
+        {
+          "path": "src/tools/server-info-tools.ts",
+          "startLine": 90,
+          "endLine": 170
+        }
+      ],
+      "stateChanges": [
+        {
+          "item": "connected database handle",
+          "from": null,
+          "to": "attached (query-only)",
+          "trigger": "getDB(resolved) opens the foreign repo's index read-only",
+          "description": "The foreign repo's index.db is opened query-only and registered as a connected database the server can route reads to.",
+          "files": [
+            {
+              "path": "src/tools/server-info-tools.ts",
+              "role": "other"
+            }
+          ],
+          "evidence": [
+            {
+              "path": "src/tools/server-info-tools.ts",
+              "startLine": 113,
+              "endLine": 160
+            }
+          ]
+        }
+      ],
+      "relatedFlows": [
+        "cli/connect",
+        "tools/server-info",
+        "tools/search",
+        "tools/read-relevant"
+      ]
     }
   ],
   "pages": [
@@ -4176,6 +4414,139 @@
         "symbol resolution including ambiguity between same-named definitions",
         "traversal pruning: ambient fan-in cutoff and node count cap",
         "static-resolution limits: dynamic dispatch breaks chains and how results say so"
+      ],
+      "openQuestions": []
+    },
+    {
+      "slug": "cli/ping",
+      "title": "CLI: ping",
+      "kind": "command",
+      "flowIds": [
+        "cli/ping"
+      ],
+      "primaryFiles": [
+        "src/cli/index.ts",
+        "src/cli/commands/ping.ts",
+        "src/control/producer.ts"
+      ],
+      "mustCover": [
+        "sending the ping command via sendCommand over the drop-box channel with a 5s timeout",
+        "readLockHolderPid to find the live server, and the case where no server holds the lock",
+        "interpreting the result: channel answered (pid/version) vs a DropboxError or version without the command channel"
+      ],
+      "inputs": [
+        "[dir] arg"
+      ],
+      "outputs": [
+        "channel-alive / holder pid printout"
+      ],
+      "openQuestions": []
+    },
+    {
+      "slug": "cli/connect",
+      "title": "CLI: connect",
+      "kind": "command",
+      "flowIds": [
+        "cli/connect"
+      ],
+      "primaryFiles": [
+        "src/cli/index.ts",
+        "src/cli/commands/connect.ts",
+        "src/config/index.ts"
+      ],
+      "mustCover": [
+        "addConnectedRepo validating the target index and appending to connectedRepos in .mimirs/config.json",
+        "optional --alias and how the alias is later usable as a directory argument",
+        "no-argument mode listing connected repos with freshness",
+        "why the CLI being sessionless means connect = persist rather than open"
+      ],
+      "inputs": [
+        "<repo> path arg",
+        "--alias name flag",
+        "[--dir D]"
+      ],
+      "outputs": [
+        "updated connectedRepos in .mimirs/config.json",
+        "connection list printout"
+      ],
+      "openQuestions": []
+    },
+    {
+      "slug": "cli/disconnect",
+      "title": "CLI: disconnect",
+      "kind": "command",
+      "flowIds": [
+        "cli/disconnect"
+      ],
+      "primaryFiles": [
+        "src/cli/index.ts",
+        "src/cli/commands/connect.ts",
+        "src/config/index.ts"
+      ],
+      "mustCover": [
+        "removeConnectedRepo matching by path or alias and rewriting connectedRepos",
+        "the result when no matching connection exists"
+      ],
+      "inputs": [
+        "<repo|alias> ref arg",
+        "[--dir D]"
+      ],
+      "outputs": [
+        "updated connectedRepos in .mimirs/config.json"
+      ],
+      "openQuestions": []
+    },
+    {
+      "slug": "tools/connect-repo",
+      "title": "Tool: connect_repo",
+      "kind": "tool",
+      "flowIds": [
+        "tools/connect-repo"
+      ],
+      "primaryFiles": [
+        "src/tools/server-info-tools.ts",
+        "src/tools/index.ts",
+        "src/config/index.ts"
+      ],
+      "mustCover": [
+        "opening the foreign repo query-only via getDB and reporting files/chunks/last_indexed/model",
+        "rejecting a directory with no .mimirs/index.db, and the primary-project short-circuit",
+        "freshness reporting from readLockHolderPid + isPidAlive (live server vs frozen index)",
+        "optional persist + alias saving the connection via addConnectedRepo",
+        "the readonly-write guidance: writes must run from that repo's own server"
+      ],
+      "inputs": [
+        "directory (path to repo to attach)",
+        "persist flag",
+        "alias"
+      ],
+      "outputs": [
+        "connection status report",
+        "optionally a saved connectedRepos entry"
+      ],
+      "openQuestions": []
+    },
+    {
+      "slug": "mechanisms/control-channel",
+      "title": "Drop-box command channel",
+      "kind": "mechanism",
+      "flowIds": [
+        "cli/ping",
+        "cli/index",
+        "cli/conversation",
+        "server-start"
+      ],
+      "primaryFiles": [
+        "src/control/protocol.ts",
+        "src/control/producer.ts",
+        "src/control/consumer.ts"
+      ],
+      "mustCover": [
+        "request/result file protocol: CLI drops .mimirs/commands/<id>.json, the lock-holding server writes <id>.result.json, rename-into-place avoids partial reads",
+        "the closed command enum (ping, index.git, index.conversation, index.files) and per-command zod arg validation as the trust boundary",
+        "only the index-lock holder consumes; query-only servers never start the dropbox",
+        "consumer serial queue, fs.watch best-effort rescan with poll fallback, startup drain and REQUEST_TTL_MS expiry of orphans",
+        "producer withIndexAccess: run locally when it can take the lock, else delegate to the holder via sendCommand"
       ],
       "openQuestions": []
     }
