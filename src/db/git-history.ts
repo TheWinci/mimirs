@@ -304,6 +304,96 @@ export function getFileHistory(
   return rows.map(parseRow);
 }
 
+export interface CoChangeResult {
+  filePath: string;
+  together: number; // commits where this file changed alongside the target
+  fileCommits: number; // total commits (in scope) touching this file
+  targetCommits: number; // total commits (in scope) touching the target file
+  jaccard: number; // together / (target ∪ file) — penalizes hub files
+  confidence: number; // together / min(target, file) — directional coupling
+}
+
+/**
+ * Files that historically change in the same commit as `filePath` — "logical
+ * coupling" the static import graph cannot see (doc↔code, test↔impl, synced
+ * mirrors, sibling files with no import edge).
+ *
+ * Scope guards keep the signal clean: merge commits are excluded (they touch
+ * everything), and commits touching more than `maxCommitFiles` distinct files
+ * are dropped as bulk/sweeping changes that couple unrelated files by accident.
+ * Ranked by Jaccard so ubiquitous files (package.json, lockfiles) sink even
+ * though they co-occur with everything. Target match is exact-or-suffix, the
+ * same path semantics as {@link getFileHistory}.
+ */
+export function getCoChangedFiles(
+  db: Database,
+  filePath: string,
+  opts?: { topK?: number; minTogether?: number; maxCommitFiles?: number },
+): CoChangeResult[] {
+  const topK = opts?.topK ?? 15;
+  const minTogether = opts?.minTogether ?? 2;
+  const maxCommitFiles = opts?.maxCommitFiles ?? 25;
+  const like = `%/${escapeLike(filePath)}`;
+
+  const rows = db
+    .query<
+      {
+        file_path: string;
+        together: number;
+        file_commits: number;
+        target_commits: number;
+        jaccard: number;
+        confidence: number;
+      },
+      { $max: number; $path: string; $like: string; $min: number; $top: number }
+    >(
+      `WITH good AS (
+         SELECT gcf.commit_id AS cid, gcf.file_path AS path
+         FROM git_commit_files gcf
+         JOIN git_commits gc ON gc.id = gcf.commit_id AND gc.is_merge = 0
+         WHERE gcf.commit_id IN (
+           SELECT commit_id FROM git_commit_files
+           GROUP BY commit_id HAVING COUNT(*) BETWEEN 2 AND $max
+         )
+       ),
+       tcommits AS (
+         SELECT DISTINCT cid FROM good
+         WHERE path = $path OR path LIKE $like ESCAPE '\\'
+       ),
+       tn AS (SELECT COUNT(*) AS n FROM tcommits),
+       counts AS (SELECT path, COUNT(DISTINCT cid) AS n FROM good GROUP BY path),
+       co AS (
+         SELECT g.path, COUNT(DISTINCT g.cid) AS together
+         FROM good g
+         WHERE g.cid IN (SELECT cid FROM tcommits)
+           AND NOT (g.path = $path OR g.path LIKE $like ESCAPE '\\')
+         GROUP BY g.path
+       )
+       SELECT co.path AS file_path,
+              co.together AS together,
+              counts.n AS file_commits,
+              tn.n AS target_commits,
+              (co.together * 1.0) / (tn.n + counts.n - co.together) AS jaccard,
+              (co.together * 1.0) / MIN(tn.n, counts.n) AS confidence
+       FROM co
+       JOIN counts ON counts.path = co.path
+       CROSS JOIN tn
+       WHERE co.together >= $min
+       ORDER BY jaccard DESC, together DESC
+       LIMIT $top`,
+    )
+    .all({ $max: maxCommitFiles, $path: filePath, $like: like, $min: minTogether, $top: topK });
+
+  return rows.map((r) => ({
+    filePath: r.file_path,
+    together: r.together,
+    fileCommits: r.file_commits,
+    targetCommits: r.target_commits,
+    jaccard: r.jaccard,
+    confidence: r.confidence,
+  }));
+}
+
 /**
  * Get all indexed commit hashes ordered oldest to newest.
  */

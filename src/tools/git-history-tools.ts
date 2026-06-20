@@ -126,6 +126,54 @@ export function registerGitHistoryTools(server: McpServer, getDB: GetDB) {
   );
 
   server.tool(
+    "co_change",
+    "Files that historically change in the same commit as a given file — logical coupling the import graph can't see (doc↔code, test↔impl, synced mirrors, sibling files with no import edge). Use before editing a file to find what else usually changes with it, or to widen a change's blast radius beyond static dependents. Ranked by Jaccard so ubiquitous files (lockfiles, manifests) sink. Requires git history to be indexed.",
+    {
+      path: z.string().describe("File path (relative to project root, suffix match)"),
+      top: z.number().int().min(1).optional().default(15)
+        .describe("Max coupled files to return"),
+      minTogether: z.number().int().min(1).optional().default(2)
+        .describe("Minimum co-change count to report a pair"),
+      maxCommitFiles: z.number().int().min(2).optional().default(25)
+        .describe("Ignore commits touching more than this many files (bulk/sweeping changes couple unrelated files)"),
+      directory: z.string().optional()
+        .describe("Project directory. Defaults to RAG_PROJECT_DIR env or cwd"),
+    },
+    async ({ path, top, minTogether, maxCommitFiles, directory }) => {
+      const { db: ragDb } = await resolveProject(directory, getDB);
+
+      const status = ragDb.getGitHistoryStatus();
+      if (status.totalCommits === 0) {
+        return {
+          content: [{
+            type: "text" as const,
+            text: "No git history indexed. Run `index_files()` or `mimirs history index` first.",
+          }],
+        };
+      }
+
+      const results = ragDb.getCoChangedFiles(path, { topK: top, minTogether, maxCommitFiles });
+
+      if (results.length === 0) {
+        return {
+          content: [{
+            type: "text" as const,
+            text: `No co-change found for "${path}". Either it changes alone, has too little history, or the path didn't match an indexed file.`,
+          }],
+        };
+      }
+
+      const header = `## Files that co-change with "${path}" (${results.length})\n`;
+      const body = results
+        .map((r, i) =>
+          `${i + 1}. ${r.filePath}\n   together ${r.together} · jaccard ${r.jaccard.toFixed(2)} · confidence ${r.confidence.toFixed(2)} (${r.fileCommits} commits touch it)`)
+        .join("\n");
+
+      return { content: [{ type: "text" as const, text: header + "\n" + body }] };
+    }
+  );
+
+  server.tool(
     "file_history",
     "Get the commit history for a specific file. Returns commits that touched the file, sorted by date (newest first). Faster than git log for indexed repositories.",
     {

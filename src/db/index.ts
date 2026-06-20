@@ -1269,6 +1269,9 @@ export class RagDB {
   getFileHistoryForPaths(filePaths: string[], topK?: number) {
     return gitHistoryOps.getFileHistoryForPaths(this.db, filePaths, topK);
   }
+  getCoChangedFiles(filePath: string, opts?: { topK?: number; minTogether?: number; maxCommitFiles?: number }) {
+    return gitHistoryOps.getCoChangedFiles(this.db, filePath, opts);
+  }
   getAllCommitHashes() {
     return gitHistoryOps.getAllCommitHashes(this.db);
   }
