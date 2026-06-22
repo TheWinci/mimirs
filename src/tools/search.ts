@@ -45,7 +45,7 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
     "search",
     "Search the full codebase by meaning — finds files that grep misses. Use natural language ('how does auth work') or symbol names. Searches all indexed files semantically + by keyword in <100ms. Returns ranked file paths with snippets. Use read_relevant next to get full content with line ranges. Pass extensions/dirs/excludeDirs to scope the search.",
     {
-      query: z.string().min(1).max(2000).describe("The search query (natural language)"),
+      query: z.string().min(1).max(2000).describe("The search query — natural language. Describe the behavior/symptom in a short coherent phrase ('where user sessions expire'); that retrieves better than a bag of keywords. Don't pad with guessed internal symbol or file names — describe what you want, not how it's implemented."),
       directory: z
         .string()
         .optional()
@@ -115,7 +115,7 @@ export function registerSearchTools(server: McpServer, getDB: GetDB) {
     "read_relevant",
     "Get the actual content of the most relevant code chunks — individual functions, classes, or sections — with exact line ranges for navigation. Smarter than grep: finds code by meaning, not just string matching. Multiple chunks from the same file can appear. Use this instead of search + Read when you need the content itself. Pass extensions/dirs/excludeDirs to scope the search.",
     {
-      query: z.string().min(1).max(2000).describe("The search query (natural language)"),
+      query: z.string().min(1).max(2000).describe("The search query — natural language. Describe the behavior/symptom in a short coherent phrase ('where user sessions expire'); that retrieves better than a bag of keywords. Don't pad with guessed internal symbol or file names — describe what you want, not how it's implemented."),
       directory: z
         .string()
         .optional()
