@@ -144,6 +144,31 @@ path, where each result is a whole function of tokens, is tuned for balance inst
 (line precision #2). Knobs: `searchTopK` (file recall), `chunkParentBoost` /
 `chunkRelCutoff` / `chunkSteepSkip` (chunk balance) — see `.mimirs/config.json`.
 
+**Why the low precision overstates the cost — measured.** ContextBench gold is the
+*edit-set*: the files the fix patch changed. But mimirs returns the *context-set* — the
+relevant code to understand the fix — which is a superset (you read callers, types, base
+classes you never edit). So precision-vs-gold scores every relevant-but-unmodified file as
+wrong. Scored instead against a relevance label (gold **∪** files coupled to gold by import
+≤2 hops or git co-change ≥0.05, n=15):
+
+| metric | vs gold (recorded) | vs relevance |
+| --- | --- | --- |
+| file precision @8 | 0.192 | **0.867** |
+| file precision @12 | 0.144 | **0.872** |
+| line precision | 0.316 | **0.935** |
+
+**84% of the non-gold files mimirs ranks in the top-8 are coupled to a gold file** —
+relevant context, not noise. So the #6 file-precision rank is not over-retrieval; it is the
+metric counting correct context retrieval as error. Coverage is unaffected — it is measured
+against the edit-set, the correct floor (must-edit code is a subset of relevant context, so
+surfacing it is necessary) and stands as recorded. Caveats: the relevance label is a proxy,
+not human-judged — import-2-hop is its softest tier (counting only 1-hop + co-change lowers
+the figure), line precision credits whole-file relevance (right file, not exact line), and
+co-change history covered 7 of 15 instances. Reproduce:
+[benchmarks/contextbench/cb-relevance.ts](benchmarks/contextbench/cb-relevance.ts) (recorded
+numbers + relevance), [cb-coupling.ts](benchmarks/contextbench/cb-coupling.ts) (the 84%), and
+the [inspector](benchmarks/contextbench/inspector/) — the per-instance view that surfaced it.
+
 **Reality check — agent edit-set, not just top-K.** A real agent doesn't take the top-K
 wholesale; it reasons and returns the ~2 files it can confirm, so its edit-set coverage
 is lower than the leaderboard's top-K recall. At that step, mimirs retrieval is roughly
