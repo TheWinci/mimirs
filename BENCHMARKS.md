@@ -180,6 +180,26 @@ edge is its **dependency graph**: `depends_on`/`impact` recover secondary gold f
 mimirs (leaf mode) pulled **0.91×** the context a careful grep-only agent did for an
 equal-quality answer, in **half the tool calls** (12 vs 22).
 
+**Cost vs a grep-only agent — measured (n=15).** We gave 15 localizer agents the raw issue
+and the repo at the buggy commit — no semantic index, no gold, no `git` peeking — and compared
+the path each took to the gold files against mimirs' single retrieval call:
+
+| | mimirs (1 call) | grep-only agent |
+| --- | --- | --- |
+| tool calls / issue | **1** | **11.5** (173 total) |
+| latency | ~10–22 ms | 11 LLM-driven steps |
+| retrieval API tokens | **0** (local embedder) | LLM tokens every step |
+| gold found | 23/35 in top-8 (0.66) | 14/35 (0.40) |
+| multi-file fixes | **15/27 (0.56)** | 6/27 (0.22) |
+
+The agent reliably finds the *primary* file (13/15) but stops there; mimirs surfaces the
+secondary, coupled gold — helpers the issue never names — in the same call, which is where the
+multi-file gap (0.56 vs 0.22) opens. Caveats: tool-calls are self-reported, a proxy for cost
+not metered tokens (the real gap is larger — each agent step also carries reasoning + read
+payloads); the agent was capped ~15 calls and told to stop when confident, so this measures
+*cost per gold file reached*, not a ceiling. Harnesses:
+[cb-cost.ts](benchmarks/contextbench/cb-cost.ts), [cb-agent-score.ts](benchmarks/contextbench/cb-agent-score.ts).
+
 **SWE-bench-Live** (contamination-resistant real issues, file-level, n=16): gold file in
 the **top-10 for ~75%** of issues (Recall@10 55%), with high per-repo variance.
 

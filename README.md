@@ -288,8 +288,20 @@ the issue), **one mimirs retrieval call** ranks like this against whole agent tr
 mimirs **leads both coverage metrics** as a single call. File precision is last on
 purpose: a missed gold file is fatal (the LLM never sees the code to fix), an extra file
 reference is cheap to filter — so mimirs maximizes recall and lets the model do the
-precision pass. _n=15 sample vs the agents' 500-set — directional. Full leaderboards,
-caveats, and the graph-recovery story in [BENCHMARKS.md](BENCHMARKS.md)._
+precision pass. And that low file precision is mostly an artifact of the metric: ~**86%**
+of the non-gold files mimirs returns are relevant context *coupled* to the fix (callers,
+types, sibling implementations), not noise — measured against gold the precision is 0.19,
+against relevance it is **0.87**.
+
+**Same recall, a fraction of the cost.** Head-to-head against a grep-only agent (raw issue,
+no index, no peeking at the fix) localizing the same 15 issues: mimirs delivers the relevant
+cluster in **one ~15 ms call with zero LLM tokens**; the agent took **~11.5 tool calls per
+issue** (each an LLM step) to converge — and stopped at the primary file. On multi-file fixes
+the agent reached **22%** of the gold files, mimirs **56%** in that single call — the
+dependency graph surfaces the secondary files the issue never names.
+
+_n=15 sample vs the agents' 500-set — directional; agent tool-calls self-reported and capped.
+Full leaderboards, caveats, relevance + cost tables in [BENCHMARKS.md](BENCHMARKS.md)._
 
 ## How it compares
 
