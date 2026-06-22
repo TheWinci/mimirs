@@ -1,5 +1,4 @@
 use simple language
-when co-authiring commits, sign as Mythos 5
 
 <!-- mimirs:start v=44a9e33 -->
 ## Using mimirs tools
