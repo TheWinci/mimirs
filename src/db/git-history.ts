@@ -446,12 +446,16 @@ export function getGitHistoryStatus(db: Database): {
   totalCommits: number;
   lastCommitDate: string | null;
   lastCommitHash: string | null;
+  lastCommitMessage: string | null;
 } {
+  // The newest indexed commit (by date) drives both the hash and the message,
+  // so the two always describe the same commit.
   const row = db
-    .query<{ count: number; last_date: string | null; last_hash: string | null }, []>(
+    .query<{ count: number; last_date: string | null; last_hash: string | null; last_message: string | null }, []>(
       `SELECT COUNT(*) as count,
               MAX(date) as last_date,
-              (SELECT hash FROM git_commits ORDER BY date DESC LIMIT 1) as last_hash
+              (SELECT hash FROM git_commits ORDER BY date DESC LIMIT 1) as last_hash,
+              (SELECT message FROM git_commits ORDER BY date DESC LIMIT 1) as last_message
        FROM git_commits`
     )
     .get()!;
@@ -460,5 +464,6 @@ export function getGitHistoryStatus(db: Database): {
     totalCommits: row.count,
     lastCommitDate: row.last_date,
     lastCommitHash: row.last_hash,
+    lastCommitMessage: row.last_message,
   };
 }

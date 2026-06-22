@@ -4,7 +4,7 @@ import { loadConfig } from "../../config";
 import { rrfFuse } from "../../search/hybrid";
 import { indexGitHistory } from "../../git/indexer";
 import { embed } from "../../embeddings/embed";
-import { cliProgress, createQuietProgress } from "../progress";
+import { cliProgress, clearTransient, writeTransient } from "../progress";
 import { cli } from "../../utils/log";
 import { intFlag, positionalArg } from "../flags";
 
@@ -52,16 +52,22 @@ export async function historyIndexCommand(args: string[], getFlag: (flag: string
     since: since || undefined,
     threads: config.indexThreads,
     onProgress: verbose ? cliProgress : (msg, opts) => {
-      // In quiet mode, only show summary messages
-      if (opts?.transient) return;
+      // Quiet mode: one live "N/total" line for the slow embedding pass, plus
+      // summary headers. All other chatter (model load, DB-insert ticks) drops.
+      if (opts?.transient) {
+        if (msg.startsWith("Indexing commits ")) writeTransient(msg);
+        return;
+      }
       if (msg.startsWith("Scanning") || msg.startsWith("Found") ||
           msg.startsWith("Indexing") || msg.startsWith("No ") ||
           msg.startsWith("All ") || msg.startsWith("Warning")) {
+        clearTransient();
         cli.log(msg);
       }
     },
   });
 
+  clearTransient();
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   cli.log(`Done: ${result.indexed} indexed, ${result.skipped} skipped (${elapsed}s)`);
   db.close();

@@ -55,6 +55,12 @@ const RagConfigSchema = z.object({
     path: z.string().min(1),
     alias: z.string().min(1).optional(),
   })).default([]),
+  // Opt-in: index git commit history at server startup so search_commits /
+  // file_history work without a manual `mimirs history index`. Incremental via
+  // the resume cursor — only new commits embed after the first run. Off by
+  // default because the first full walk embeds every commit message and is slow
+  // on large histories; many repos never need commit search.
+  autoIndexGit: z.boolean().default(false),
 }).refine((c) => c.chunkOverlap < c.chunkSize, {
   // An overlap >= chunkSize stalls the size-splitter's sliding window (it would
   // loop forever). splitBySize also clamps defensively, but reject it here so a
@@ -160,6 +166,7 @@ const DEFAULT_CONFIG: RagConfig = {
   benchmarkMinRecall: 0.8,
   benchmarkMinMrr: 0.6,
   connectedRepos: [],
+  autoIndexGit: false,
 };
 
 /**

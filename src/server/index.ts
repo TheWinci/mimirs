@@ -157,6 +157,32 @@ export async function startServer() {
     }
   };
 
+  // Extra lines appended to every "done" status block so the status file
+  // reflects the two background indexes besides the file index:
+  //   - git: auto-index on/off (config.autoIndexGit) plus the newest indexed
+  //     commit (short hash + title), or "not indexed". When off, git history is
+  //     indexed only on demand (CLI `history index` / drop-box `index.git`).
+  //   - conversations: the transcripts folder the server live-watches.
+  // Reads startupConfig, which is assigned before this helper is ever called.
+  const indexStatusLines = (db: ReturnType<typeof getDB>): string[] => {
+    const lines: string[] = [];
+    const mode = startupConfig.autoIndexGit ? "auto-index on" : "auto-index off";
+    try {
+      const git = db.getGitHistoryStatus();
+      if (git.totalCommits > 0 && git.lastCommitHash) {
+        const short = git.lastCommitHash.slice(0, 7);
+        const title = (git.lastCommitMessage ?? "").split("\n")[0].slice(0, 72);
+        lines.push(`git: ${mode}, ${git.totalCommits} commits, last indexed ${short} ${title}`.trimEnd());
+      } else {
+        lines.push(`git: ${mode}, not indexed`);
+      }
+    } catch {
+      // git_commits table may not exist on a fresh DB — skip the git line.
+    }
+    lines.push(`conversations: watching ${getTranscriptsDir(startupDir)}`);
+    return lines;
+  };
+
   writeStatus(`starting\nversion: ${version}\nstarted: ${new Date().toISOString()}`);
 
   // Register shutdown handlers early so any crash during startup is recorded.
@@ -415,6 +441,7 @@ export async function startServer() {
         `finished: ${new Date().toISOString()}`,
         `indexed: ${result.indexed}, skipped: ${result.skipped}, pruned: ${result.pruned}`,
         `total files: ${dbStatus.totalFiles}, total chunks: ${dbStatus.totalChunks}`,
+        ...indexStatusLines(startupDb),
       ].join("\n");
       writeStatus(doneStatus);
       log.debug(`Startup index: ${result.indexed} indexed, ${result.skipped} skipped, ${result.pruned} pruned`, "indexer");
@@ -435,9 +462,35 @@ export async function startServer() {
           `version: ${version}`,
           `finished: ${new Date().toISOString()}`,
           `total files: ${dbStatus.totalFiles}, total chunks: ${dbStatus.totalChunks}`,
+          ...indexStatusLines(startupDb),
           `watcher: ${msg}`,
         ].join("\n"));
       });
+
+      // Opt-in (config.autoIndexGit): index git commit history once the file
+      // index has settled. Fired here — after the file index resolves — so its
+      // status writes don't race the file index's per-file progress. Incremental
+      // via the resume cursor, so only new commits embed after the first run.
+      if (startupConfig.autoIndexGit) {
+        indexGitHistory(startupDir, startupDb, {
+          threads: startupConfig.indexThreads,
+          onProgress: (msg, opts) => {
+            if (!opts?.transient) writeStatus(msg);
+          },
+        }).then((r) => {
+          log.debug(`Startup git index: ${r.indexed} indexed, ${r.skipped} skipped`, "git-index");
+          const dbStatus = startupDb.getStatus();
+          writeStatus([
+            `done`,
+            `version: ${version}`,
+            `finished: ${new Date().toISOString()}`,
+            `total files: ${dbStatus.totalFiles}, total chunks: ${dbStatus.totalChunks}`,
+            ...indexStatusLines(startupDb),
+          ].join("\n"));
+        }).catch((err) => {
+          log.warn(`Startup git index failed: ${err instanceof Error ? err.message : err}`, "git-index");
+        });
+      }
     });
     // Watch the whole conversations folder and index every transcript from its
     // stored offset — the live session plus any other session that changes or
@@ -497,6 +550,7 @@ export async function startServer() {
           `version: ${version}`,
           `indexed: ${result.indexed}, skipped: ${result.skipped}, pruned: ${result.pruned}`,
           `total files: ${dbStatus.totalFiles}, total chunks: ${dbStatus.totalChunks}`,
+          ...indexStatusLines(startupDb),
         ].join("\n"));
         return { indexed: result.indexed, skipped: result.skipped, pruned: result.pruned };
       },
@@ -516,6 +570,7 @@ export async function startServer() {
         `done`,
         `version: ${version}`,
         `total files: ${dbStatus.totalFiles}, total chunks: ${dbStatus.totalChunks}`,
+        ...indexStatusLines(startupDb),
       ].join("\n"));
       // Don't give up permanently. The lock owner may be an orphaned server
       // that exits shortly (the ppid watchdog kills such orphans), or any

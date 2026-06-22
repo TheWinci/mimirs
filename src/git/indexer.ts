@@ -357,13 +357,22 @@ export async function indexGitHistory(
     texts.push(buildEmbeddableText(commit, files));
   }
 
-  // Batch embed
+  // Embed in sub-batches so a single live counter can tick during the slow
+  // part (the whole-array call gave no progress between start and finish).
   onProgress?.("Embedding commit messages...");
-  const embeddings = await embedBatchMerged(
-    texts,
-    options?.threads,
-    onProgress ? (msg: string) => onProgress(msg, { transient: true }) : undefined,
-  );
+  const EMBED_BATCH = 32;
+  const embeddings: Float32Array[] = [];
+  for (let i = 0; i < texts.length; i += EMBED_BATCH) {
+    const chunk = texts.slice(i, i + EMBED_BATCH);
+    const chunkEmbeddings = await embedBatchMerged(
+      chunk,
+      options?.threads,
+      onProgress ? (msg: string) => onProgress(msg, { transient: true }) : undefined,
+    );
+    embeddings.push(...chunkEmbeddings);
+    const done = Math.min(i + EMBED_BATCH, texts.length);
+    onProgress?.(`Indexing commits ${done}/${texts.length}`, { transient: true });
+  }
 
   // Build insert batch
   const inserts: GitCommitInsert[] = newCommits.map((commit, i) => {

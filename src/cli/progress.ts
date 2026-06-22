@@ -7,7 +7,7 @@ import { cli } from "../utils/log";
  */
 let lastWasTransient = false;
 
-function writeTransient(msg: string): void {
+export function writeTransient(msg: string): void {
   // No carriage-return animation into pipes — `mimirs index | tee` got
   // control-char junk. Transient lines are progress-only; drop them when
   // stdout isn't a TTY (persistent lines still print normally).
@@ -18,7 +18,7 @@ function writeTransient(msg: string): void {
   lastWasTransient = true;
 }
 
-function clearTransient(): void {
+export function clearTransient(): void {
   if (lastWasTransient) {
     process.stdout.write("\r" + " ".repeat((process.stdout.columns || 80) - 1) + "\r");
     lastWasTransient = false;
