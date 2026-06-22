@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>mimirs retrieval inspector</title>
+<script src="https://unpkg.com/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
+<style>
+  :root { --bg:#0f1115; --panel:#171a21; --line:#2a2f3a; --fg:#d7dbe2; --dim:#8b93a3;
+          --gold:#e0b341; --found:#3fb964; --amber:#d8922e; --miss:#e0524d; --acc:#5aa0f2; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; background:var(--bg); color:var(--fg); }
+  #app { display:grid; grid-template-columns:280px 1fr; height:100vh; }
+  #side { background:var(--panel); border-right:1px solid var(--line); padding:14px; overflow:auto; }
+  #main { overflow:auto; padding:16px 20px; }
+  h1 { font-size:13px; letter-spacing:.5px; text-transform:uppercase; color:var(--dim); margin:0 0 12px; }
+  .ctl { margin:10px 0; }
+  .ctl label { display:block; color:var(--dim); margin-bottom:3px; font-size:11px; text-transform:uppercase; letter-spacing:.4px; }
+  select, input[type=number] { width:100%; background:var(--bg); color:var(--fg); border:1px solid var(--line); border-radius:5px; padding:5px 7px; font:inherit; }
+  input[type=range] { width:100%; }
+  .row { display:flex; gap:8px; align-items:center; }
+  .row > * { flex:1; }
+  .seg { display:flex; border:1px solid var(--line); border-radius:5px; overflow:hidden; }
+  .seg button { flex:1; background:var(--bg); color:var(--dim); border:0; padding:5px; cursor:pointer; font:inherit; }
+  .seg button.on { background:var(--acc); color:#06101f; font-weight:600; }
+  .tabs { display:flex; gap:4px; margin-bottom:14px; border-bottom:1px solid var(--line); }
+  .tabs button { background:none; border:0; border-bottom:2px solid transparent; color:var(--dim); padding:8px 12px; cursor:pointer; font:inherit; }
+  .tabs button.on { color:var(--fg); border-bottom-color:var(--acc); }
+  .qbox { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:10px 12px; margin-bottom:14px; }
+  .qbox .q { color:var(--fg); } .qbox .meta { color:var(--dim); margin-top:6px; font-size:12px; }
+  .stage { background:var(--panel); border:1px solid var(--line); border-radius:6px; margin-bottom:10px; }
+  .stage > summary { cursor:pointer; padding:8px 12px; color:var(--acc); font-weight:600; list-style:none; display:flex; justify-content:space-between; }
+  .stage > summary .n { color:var(--dim); font-weight:400; }
+  .stage .body { padding:4px 12px 12px; overflow:auto; }
+  table { border-collapse:collapse; width:100%; }
+  th,td { text-align:left; padding:2px 8px 2px 0; white-space:nowrap; }
+  th { color:var(--dim); font-weight:400; font-size:11px; }
+  td.score { color:var(--dim); } td.path { white-space:normal; word-break:break-all; }
+  tr.gold td.path { color:var(--gold); }
+  .badge { display:inline-block; padding:0 5px; border-radius:3px; font-size:11px; margin-left:6px; color:#06101f; }
+  .b-found{background:var(--found)} .b-amber{background:var(--amber)} .b-miss{background:var(--miss)} .b-gold{background:var(--gold)}
+  .miss-panel { background:var(--panel); border:1px solid var(--miss); border-radius:6px; padding:10px 12px; margin-bottom:14px; }
+  .miss-panel h3 { margin:0 0 8px; font-size:12px; color:var(--miss); text-transform:uppercase; letter-spacing:.4px; }
+  #cy { height:72vh; background:var(--panel); border:1px solid var(--line); border-radius:6px; }
+  .legend { color:var(--dim); margin:8px 0; font-size:12px; } .legend b { color:var(--fg); }
+  .hidden { display:none; }
+  .err { color:var(--miss); padding:12px; }
+  small { color:var(--dim); }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <h1>retrieval inspector</h1>
+    <div class="ctl"><label>instance</label><select id="instance"></select></div>
+    <div class="ctl"><label>query mode</label>
+      <div class="seg" id="mode"><button data-v="distilled" class="on">distilled</button><button data-v="raw">raw</button></div>
+    </div>
+    <div class="ctl"><label>hybrid weight <span id="weightV"></span></label><input type="range" id="weight" min="0" max="1" step="0.05" /></div>
+    <div class="ctl row"><div><label>file k</label><input type="number" id="k" value="60" /></div><div><label>chunk k</label><input type="number" id="kchunk" value="10" /></div></div>
+    <div class="ctl row"><div><label>chunk thresh</label><input type="number" id="threshold" step="0.05" value="0.3" /></div><div><label>parentGroup</label><input type="number" id="pgmc" value="2" /></div></div>
+    <div class="ctl"><label>leafOnly</label><div class="seg" id="leafOnly"><button data-v="true" class="on">on</button><button data-v="false">off</button></div></div>
+    <div class="ctl row"><div><label>relCutoff</label><input type="number" id="relCutoff" step="0.05" value="0.85" /></div><div><label>parentBoost</label><input type="number" id="parentBoost" step="0.05" value="0.3" /></div></div>
+    <div class="ctl"><label>co-change source</label><div class="seg" id="includeFix"><button data-v="false" class="on">leak-safe</button><button data-v="true">incl. fix</button></div></div>
+    <div class="ctl"><small id="status"></small></div>
+  </aside>
+  <main id="main">
+    <div class="tabs" id="tabs"><button data-t="file" class="on">Files</button><button data-t="chunk">Chunks / Lines</button><button data-t="graph">Graph</button></div>
+    <div id="head"></div>
+    <div id="view"></div>
+  </main>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>

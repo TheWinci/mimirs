@@ -38,6 +38,29 @@ function matchesFilter(path: string, filter?: PathFilter): boolean {
   return true;
 }
 
+// ── Inspector trace sink ─────────────────────────────────────────
+// Opt-in: when a SearchTrace is passed to search()/searchChunks(), each pipeline
+// stage pushes a snapshot of its intermediate result. Zero cost when absent —
+// every capture is guarded by `if (trace)`, and snapshots copy by value so later
+// in-place boosts can't corrupt an earlier stage. Consumed by the retrieval
+// inspector (benchmarks/contextbench/inspector). Production callers pass nothing.
+export interface SearchTrace { stage(name: string, payload: unknown): void; }
+
+function snapList(list: { score: number; path: string }[], n = 120): unknown[] {
+  return list.slice(0, n).map((r) => {
+    const a = r as Record<string, unknown>;
+    const o: Record<string, unknown> = { path: a.path, score: a.score };
+    if (a.chunkIndex !== undefined) o.chunkIndex = a.chunkIndex;
+    if (a.startLine != null) o.startLine = a.startLine;
+    if (a.endLine != null) o.endLine = a.endLine;
+    if (a.entityName != null) o.entityName = a.entityName;
+    if (typeof a.snippet === "string") o.snippet = a.snippet.slice(0, 200);
+    else if (Array.isArray(a.snippets) && a.snippets[0]) o.snippet = String(a.snippets[0]).slice(0, 200);
+    if (typeof a.content === "string") o.content = a.content.slice(0, 200);
+    return o;
+  });
+}
+
 export interface DedupedResult {
   path: string;
   score: number;
@@ -347,12 +370,15 @@ export async function search(
   hybridWeight: number = DEFAULT_HYBRID_WEIGHT,
   generatedPatterns: string[] = [],
   filter?: PathFilter,
+  trace?: SearchTrace,
 ): Promise<DedupedResult[]> {
   const start = performance.now();
+  if (trace) trace.stage("input", { query, topK, threshold, hybridWeight });
   const queryEmbedding = await embed(query);
 
   // Fetch more than topK to allow deduplication
   const vectorResults = db.search(queryEmbedding, topK * 4, filter);
+  if (trace) trace.stage("vector", snapList(vectorResults));
 
   // BM25 text search for keyword matching
   let textResults: typeof vectorResults = [];
@@ -361,8 +387,10 @@ export async function search(
   } catch (err) {
     log.debug(`FTS query failed, falling back to vector-only: ${err instanceof Error ? err.message : err}`, "search");
   }
+  if (trace) trace.stage("text", snapList(textResults));
 
   const merged = mergeHybridScores(vectorResults, textResults, hybridWeight);
+  if (trace) trace.stage("fused", snapList(merged));
 
   // Deduplicate by file path, keeping the best score per file
   const byFile = new Map<string, DedupedResult>();
@@ -387,6 +415,8 @@ export async function search(
     }
   }
 
+  if (trace) trace.stage("deduped", snapList([...byFile.values()].sort((a, b) => b.score - a.score)));
+
   // Symbol expansion — find exact symbol matches and merge into candidates
   const identifiers = extractIdentifiers(query);
   if (identifiers.length > 0) {
@@ -400,17 +430,26 @@ export async function search(
       }
     }
     mergeSymbolResults(byFile, symbolHits);
+    if (trace) trace.stage("symbols", { identifiers, hits: symbolHits.map((s) => s.path) });
+  } else if (trace) {
+    trace.stage("symbols", { identifiers: [], hits: [] });
   }
 
-  // Source file boost (source up, test down) + filename affinity + generated demotion + dependency graph boost
+  // Source file boost (source up, test down) + filename affinity + generated
+  // demotion + dependency graph boost. Unnested into sequential steps (was a
+  // single nested call) so the inspector can capture each boost's delta — same
+  // result, the boosts are pure per-element maps.
   const isGenerated = buildGeneratedMatcher(generatedPatterns);
-  const allSorted = applyGraphBoost(
-    applyFilenameBoost(applyPathBoost(Array.from(byFile.values())), query, isGenerated),
-    db
-  ).sort((a, b) => b.score - a.score);
+  const afterPath = applyPathBoost(Array.from(byFile.values()));
+  const afterFilename = applyFilenameBoost(afterPath, query, isGenerated);
+  const afterGraph = applyGraphBoost(afterFilename, db);
+  if (trace) trace.stage("boosts", { path: snapList(afterPath), filename: snapList(afterFilename), graph: snapList(afterGraph) });
+  const allSorted = afterGraph.sort((a, b) => b.score - a.score);
+  if (trace) trace.stage("ranked", snapList(allSorted));
 
   // Doc expansion — docs are bonus results, don't displace code
   const results = expandForDocs(allSorted, topK);
+  if (trace) trace.stage("final", snapList(results));
 
   // Log query for analytics. The result score is now a positional rank-fusion
   // value (~1 at the top), so log the top vector hit's cosine similarity as the
@@ -521,11 +560,14 @@ export async function searchChunks(
   // too high. relCutoff=0 disables. Trims the weak tail for precision.
   relCutoff: number = 0,
   steepSkip: number = 0.15,
+  trace?: SearchTrace,
 ): Promise<ChunkResult[]> {
   const start = performance.now();
+  if (trace) trace.stage("input", { query, topK, threshold, hybridWeight, leafOnly, parentBoost, relCutoff, steepSkip, parentGroupingMinCount });
   const queryEmbedding = await embed(query);
 
   let vectorResults = db.searchChunks(queryEmbedding, topK * 4, filter);
+  if (trace) trace.stage("vectorChunks", snapList(vectorResults));
 
   let textResults: ChunkSearchResult[] = [];
   try {
@@ -533,6 +575,7 @@ export async function searchChunks(
   } catch (err) {
     log.debug(`FTS chunk query failed, falling back to vector-only: ${err instanceof Error ? err.message : err}`, "search");
   }
+  if (trace) trace.stage("textChunks", snapList(textResults));
 
   // Whole-class boost (parentBoost): instead of just discarding the whole-class/file
   // parent blobs, use how well the blob matched as a per-file signal.
@@ -550,8 +593,11 @@ export async function searchChunks(
   // concatenations) so retrieval returns tight function-level spans. Children
   // carry the same lines, so coverage is preserved while context/token cost drops.
   if (leafOnly) {
+    const droppedV = vectorResults.filter((r) => r.chunkIndex === -1).length;
+    const droppedT = textResults.filter((r) => r.chunkIndex === -1).length;
     vectorResults = vectorResults.filter((r) => r.chunkIndex !== -1);
     textResults = textResults.filter((r) => r.chunkIndex !== -1);
+    if (trace) trace.stage("leafFilter", { droppedParentRows: droppedV + droppedT });
   }
 
   // `threshold` is documented as a 0-1 relevance score, but fused scores are
@@ -625,6 +671,7 @@ export async function searchChunks(
       return { ...r, score: r.score * multiplier + boost + pBoost };
     })
     .sort((a, b) => b.score - a.score);
+  if (trace) trace.stage("chunkScored", snapList(results));
 
   // Symbol expansion (port of search()'s file-level symbol injection to the chunk
   // path): when the query names code identifiers, inject the defining symbol's
@@ -658,11 +705,15 @@ export async function searchChunks(
       }
     }
     if (injected.length) results = [...results, ...injected].sort((a, b) => b.score - a.score);
+    if (trace) trace.stage("symbolExpand", snapList(injected));
   }
 
   // Parent grouping: if ≥minCount sub-chunks from the same parent appear, consolidate.
   // Skipped in leaf-only mode (we want tight child spans, not promoted parents).
-  if (!leafOnly) results = groupByParent(results, db, parentGroupingMinCount);
+  if (!leafOnly) {
+    results = groupByParent(results, db, parentGroupingMinCount);
+    if (trace) trace.stage("grouped", snapList(results));
+  }
 
   // Doc expansion
   results = expandForDocs(results, topK);
@@ -678,8 +729,11 @@ export async function searchChunks(
       if (dp > steepSkip) anchor = results[i].score; else break;
     }
     const floor = anchor * relCutoff;
+    const before = results.length;
     results = results.filter((r) => r.score >= floor);
+    if (trace) trace.stage("tailCut", { anchor, relCutoff, floor, trimmed: before - results.length });
   }
+  if (trace) trace.stage("final", snapList(results));
 
   // Log query for analytics — log the top vector hit's cosine similarity as the
   // relevance signal (the result score is now a positional rank-fusion value).
