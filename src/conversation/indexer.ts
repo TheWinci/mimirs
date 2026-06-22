@@ -3,11 +3,18 @@ import { join, basename } from "path";
 import { Glob } from "bun";
 import { readJSONL, parseTurns, buildTurnText, belongsToProject, classifyTranscript, type ParsedTurn } from "./parser";
 import { chunkText } from "../indexing/chunker";
-import { embedBatch } from "../embeddings/embed";
+import { embedBatchMerged } from "../embeddings/embed";
 import { type RagDB } from "../db";
 import { type Watcher } from "../indexing/watcher";
 
 const TAIL_DEBOUNCE_MS = 1500;
+
+// Max chunks per embed forward pass for a turn. Kept small because a turn's
+// chunks can each be near the model's token limit and the batch pads to the
+// longest: memory scales with batch · seq², so a large batch of long chunks
+// allocates GBs at once (the OOM this caps). 16 keeps the worst case well
+// under ~200 MB while staying efficient for typical small turns.
+const CONV_EMBED_BATCH = 16;
 
 /**
  * Index all turns from a JSONL transcript file.
@@ -163,8 +170,19 @@ async function indexTurn(
     return "unchanged";
   }
 
-  // Embed all chunks in one batch
-  const embeddings = await embedBatch(textChunks.map(c => c.text));
+  // Embed in bounded batches, NOT all chunks in one model() call. The model
+  // pads every input in a batch to the longest one's token length, and the
+  // ONNX attention tensor is O(batch · seq²): a turn with a big tool output
+  // chunks into hundreds of near-512-token pieces, and a single forward pass
+  // over all of them allocated multiple GB of WASM heap (measured ~2.3 GB for
+  // ~200 chunks) — enough to OOM-kill the server on a memory-capped host. The
+  // file index already batches its embeds (indexBatchSize) for this reason;
+  // this path was the one that still passed the whole turn at once.
+  const embeddings: Float32Array[] = [];
+  for (let i = 0; i < textChunks.length; i += CONV_EMBED_BATCH) {
+    const batch = textChunks.slice(i, i + CONV_EMBED_BATCH).map((c) => c.text);
+    embeddings.push(...(await embedBatchMerged(batch)));
+  }
   const embeddedChunks = textChunks.map((chunk, i) => ({
     snippet: chunk.text,
     embedding: embeddings[i],
