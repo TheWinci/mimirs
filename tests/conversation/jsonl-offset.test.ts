@@ -45,4 +45,51 @@ describe("readJSONL byte-offset (live-tail safety)", () => {
     const r = readJSONL(file, 0);
     expect((r.entries[0] as { text: string }).text).toBe("café — déjà");
   });
+
+  // The streaming reader processes the file in 1 MiB blocks; these exercise the
+  // cross-block carry path that a small single-block file never reaches.
+  test("lines and multibyte chars spanning the 1 MiB block boundary stay intact", () => {
+    dir = mkdtempSync(join(tmpdir(), "jsonl-"));
+    const file = join(dir, "t.jsonl");
+    // ~3 MiB of lines, each padded with multibyte chars so no line aligns to a
+    // block boundary — guarantees several lines (and their UTF-8 chars) straddle
+    // the 1 MiB edges.
+    const lines: string[] = [];
+    for (let n = 0; n < 6000; n++) {
+      lines.push(JSON.stringify({ type: "user", n, pad: "café—".repeat(40) }));
+    }
+    writeFileSync(file, lines.join("\n") + "\n");
+
+    const r = readJSONL(file, 0);
+    expect(r.entries.length).toBe(6000);
+    // n values intact and in order (no dropped/duplicated/garbled line)
+    expect(r.entries.map((e) => (e as { n: number }).n)).toEqual(
+      Array.from({ length: 6000 }, (_, i) => i),
+    );
+    // multibyte payload survives across block edges
+    expect((r.entries[5999] as { pad: string }).pad).toBe("café—".repeat(40));
+    expect(r.newOffset).toBe(Buffer.byteLength(lines.join("\n") + "\n"));
+  });
+
+  test("each entry's byteOffset points at the true start of its line", () => {
+    dir = mkdtempSync(join(tmpdir(), "jsonl-"));
+    const file = join(dir, "t.jsonl");
+    const lines: string[] = [];
+    for (let n = 0; n < 4000; n++) {
+      lines.push(JSON.stringify({ type: "user", n, pad: "x".repeat(300) }));
+    }
+    const content = lines.join("\n") + "\n";
+    writeFileSync(file, content);
+
+    const r = readJSONL(file, 0);
+    const bytes = Buffer.from(content, "utf-8");
+    // Re-read each line from its reported byteOffset; it must parse back to the
+    // same entry — proves offsets are absolute and block-boundary-correct.
+    for (const e of r.entries) {
+      const off = (e as { byteOffset: number }).byteOffset;
+      const nl = bytes.indexOf(0x0a, off);
+      const parsed = JSON.parse(bytes.subarray(off, nl).toString("utf-8"));
+      expect(parsed.n).toBe((e as { n: number }).n);
+    }
+  });
 });

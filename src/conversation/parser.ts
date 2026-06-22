@@ -89,57 +89,84 @@ export function readJSONL(
     return { entries: [], newOffset: fromOffset };
   }
 
-  const bytesToRead = stat.size - fromOffset;
-  let buf = Buffer.alloc(bytesToRead);
+  // Stream the tail in fixed-size blocks instead of allocating
+  // (stat.size - fromOffset) up front: a large/growing transcript made that a
+  // whole-file Buffer + a full toString() copy + a split() array — hundreds of
+  // MB of transient heap per pass. Memory here is now bounded by BLOCK plus the
+  // single in-progress line, regardless of file size. (The returned `entries`
+  // array still holds every parsed object — that's the API's contract and the
+  // caller batches the embed step that follows.)
+  const BLOCK = 1 << 20; // 1 MiB read window
+  const block = Buffer.allocUnsafe(BLOCK);
+  const entries: JournalEntry[] = [];
+
+  // `carry` holds the bytes of a line that straddles a block boundary; it must
+  // be an OWNED copy because `block` is reused on the next read. `lineStart` is
+  // the absolute byte offset of `carry`'s first byte (or the next line's start
+  // once a line is consumed). `newOffset` only advances past a complete '\n',
+  // so a partially-written trailing line is never consumed (live-tail safety).
+  let carry: Buffer | null = null;
+  let lineStart = fromOffset;
+  let readPos = fromOffset;
+  let newOffset = fromOffset;
+
+  const pushLine = (lineBytes: Buffer, startByte: number) => {
+    const trimmed = lineBytes.toString("utf-8").trim();
+    if (!trimmed) return;
+    try {
+      const entry = JSON.parse(trimmed) as JournalEntry;
+      entry.byteOffset = startByte;
+      entries.push(entry);
+    } catch {
+      // Skip malformed lines
+    }
+  };
+
   const fd = openSync(filePath, "r");
   try {
-    // Honor readSync's return value: a short read (or the file shrinking
-    // between stat and read) used to leave NUL-padded garbage at the tail,
-    // silently masked by JSON.parse failures. Loop until EOF or buffer full.
-    let filled = 0;
-    while (filled < bytesToRead) {
-      const n = readSync(fd, buf, filled, bytesToRead - filled, fromOffset + filled);
-      if (n <= 0) break; // EOF — file shrank since stat
-      filled += n;
+    while (readPos < stat.size) {
+      const want = Math.min(BLOCK, stat.size - readPos);
+      // Honor readSync's return value: a short read (or the file shrinking
+      // between stat and read) must not read stale bytes past EOF.
+      let filled = 0;
+      while (filled < want) {
+        const n = readSync(fd, block, filled, want - filled, readPos + filled);
+        if (n <= 0) break; // EOF — file shrank since stat
+        filled += n;
+      }
+      if (filled === 0) break;
+      const blockBase = readPos; // absolute offset of block[0]
+      readPos += filled;
+
+      // Split this block on '\n' (0x0A). A '\n' byte never appears inside a
+      // multibyte UTF-8 sequence (its other bytes are all >= 0x80), so scanning
+      // raw bytes is safe even when a character straddles the block boundary —
+      // such a character is carried into the next block and decoded whole.
+      let scan = 0;
+      while (true) {
+        const nl = block.indexOf(0x0a, scan);
+        if (nl === -1 || nl >= filled) break; // no more complete lines this block
+        const slice = block.subarray(scan, nl);
+        pushLine(carry ? Buffer.concat([carry, slice]) : slice, lineStart);
+        carry = null;
+        newOffset = blockBase + nl + 1; // just past this '\n'
+        lineStart = newOffset;
+        scan = nl + 1;
+      }
+
+      // Trailing bytes after the last '\n' belong to an in-progress line — copy
+      // them out of the reused block buffer and carry to the next read.
+      if (scan < filled) {
+        const tail = Buffer.from(block.subarray(scan, filled));
+        carry = carry ? Buffer.concat([carry, tail]) : tail;
+      }
     }
-    if (filled < bytesToRead) buf = buf.subarray(0, filled);
   } finally {
     closeSync(fd);
   }
-  // Only consume up to the last newline. A trailing partial line is normal for
-  // a live-tailed transcript (mid-write); advancing past it (to stat.size) would
-  // leave the saved offset mid-line, so the completion bytes read back as corrupt
-  // JSON next pass and that turn is lost forever. Operate on bytes so a multibyte
-  // UTF-8 sequence never straddles the boundary.
-  const lastNl = buf.lastIndexOf(0x0a);
-  if (lastNl < 0) {
-    // No complete line yet — don't advance.
-    return { entries: [], newOffset: fromOffset };
-  }
-  const consumed = buf.subarray(0, lastNl + 1);
-  const text = consumed.toString("utf-8");
-  const entries: JournalEntry[] = [];
 
-  // Track each line's absolute byte offset so callers can rewind the
-  // incremental cursor to a turn boundary. Computed on raw bytes (not string
-  // indices) so multibyte UTF-8 doesn't skew offsets.
-  let lineStartByte = 0;
-  for (const line of text.split("\n")) {
-    const lineBytes = Buffer.byteLength(line, "utf-8");
-    const trimmed = line.trim();
-    if (trimmed) {
-      try {
-        const entry = JSON.parse(trimmed) as JournalEntry;
-        entry.byteOffset = fromOffset + lineStartByte;
-        entries.push(entry);
-      } catch {
-        // Skip malformed lines
-      }
-    }
-    lineStartByte += lineBytes + 1; // +1 for the "\n" the split consumed
-  }
-
-  return { entries, newOffset: fromOffset + lastNl + 1 };
+  // `newOffset === fromOffset` means no complete line yet — don't advance.
+  return { entries, newOffset };
 }
 
 /**
