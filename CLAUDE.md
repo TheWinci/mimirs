@@ -1,6 +1,7 @@
 use simple language
+when co-authiring commits, sign as Mythos 5
 
-<!-- mimirs:start v=cbecfa0 -->
+<!-- mimirs:start v=44a9e33 -->
 ## Using mimirs tools
 
 This project has a local RAG index (mimirs). Use these MCP tools:
@@ -9,6 +10,12 @@ This project has a local RAG index (mimirs). Use these MCP tools:
   with snippet previews — use this when you need to know *where* something is.
   Supports optional `extensions`, `dirs`, and `excludeDirs` filters to scope
   results (e.g. restrict to `.ts` files, or under `src/`).
+  *Query craft:* describe the behavior or symptom in plain words ("where user
+  sessions expire") — a short coherent phrase retrieves better than a bag of
+  keywords. Don't pad the query with guessed internal symbol or file names;
+  describe what you're looking for, not how you think it's implemented. (Measured:
+  intent phrases beat keyword-stuffed queries even when the stuffing named the
+  right files.)
 - **`read_relevant`**: Get the actual content of relevant semantic chunks —
   individual functions, classes, or markdown sections — ranked by relevance.
   Results include exact line ranges (`src/db.ts:42-67`) so you can navigate
