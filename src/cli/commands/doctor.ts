@@ -1,6 +1,6 @@
 import { positionalArg } from "../flags";
 import { existsSync, readFileSync } from "fs";
-import { join, resolve } from "path";
+import { dirname, join, resolve } from "path";
 import { platform } from "os";
 import { cli } from "../../utils/log";
 
@@ -184,6 +184,32 @@ export async function doctorCommand(args: string[]) {
         } catch (err: unknown) {
           return `Embedding module failed to load: ${err instanceof Error ? err.message : String(err)}`;
         }
+      },
+    },
+    {
+      name: "MCP config: bunx findable by GUI-launched editors",
+      run: () => {
+        // Editors started from the Dock/desktop launcher don't source the shell
+        // profile, so a bare "bunx" command in the MCP config fails there even
+        // though bunx works in this terminal.
+        const mcpPath = join(projectDir, ".mcp.json");
+        if (!existsSync(mcpPath)) return null;
+        let cmd: unknown;
+        try {
+          cmd = JSON.parse(readFileSync(mcpPath, "utf8")).mcpServers?.mimirs?.command;
+        } catch {
+          return null; // malformed .mcp.json is not doctor's problem
+        }
+        if (cmd !== "bunx") return null; // absolute path or custom command — fine
+        const systemDirs = ["/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"];
+        const found = typeof Bun !== "undefined" ? Bun.which("bunx") : null;
+        if (found && systemDirs.includes(dirname(found))) return null;
+        return (
+          `.mcp.json launches the server with a bare "bunx", but bunx is installed at ` +
+          `${found ?? "a location outside the system PATH"} — editors launched from the ` +
+          `Dock or a desktop launcher won't find it.\n` +
+          `    Fix: run "bunx mimirs init" to rewrite the config with the absolute path.`
+        );
       },
     },
   ];

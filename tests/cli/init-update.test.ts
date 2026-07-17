@@ -123,12 +123,45 @@ describe("init: fenced + version-stamped instruction region", () => {
 
     const vscode = JSON.parse(await readFile(join(dir, ".vscode", "mcp.json"), "utf-8"));
     expect(vscode.servers.mimirs.type).toBe("stdio");
-    expect(vscode.servers.mimirs.command).toBe("bunx");
+    // Absolute path (not bare "bunx") so GUI-launched editors can spawn it
+    // without a shell-profile PATH.
+    expect(vscode.servers.mimirs.command).toMatch(/bunx(\.exe)?$/);
+    expect(vscode.servers.mimirs.command).not.toBe("bunx");
     expect(vscode.servers.mimirs.args).toEqual(["mimirs@latest", "serve"]);
     expect(vscode.mcpServers).toBeUndefined(); // VS Code uses `servers`, not the Claude schema
 
     // Claude's .mcp.json still uses the mcpServers schema
     const claude = JSON.parse(await readFile(join(dir, ".mcp.json"), "utf-8"));
-    expect(claude.mcpServers.mimirs.command).toBe("bunx");
+    expect(claude.mcpServers.mimirs.command).toMatch(/bunx(\.exe)?$/);
+  });
+
+  test("upsert upgrades an existing bare-bunx command to the absolute path", async () => {
+    const dir = await projectDir();
+    const mcpPath = join(dir, ".mcp.json");
+    await writeFile(
+      mcpPath,
+      JSON.stringify({
+        mcpServers: {
+          mimirs: {
+            command: "bunx",
+            args: ["mimirs@latest", "serve"],
+            env: { RAG_PROJECT_DIR: dir, CUSTOM: "kept" },
+          },
+        },
+      }) + "\n",
+    );
+
+    const actions = await ensureMcpJson(dir, []);
+    expect(actions.some((a) => a.includes("Updated mimirs") && a.includes(".mcp.json"))).toBe(true);
+
+    const claude = JSON.parse(await readFile(mcpPath, "utf-8"));
+    expect(claude.mcpServers.mimirs.command).not.toBe("bunx");
+    expect(claude.mcpServers.mimirs.command).toMatch(/bunx(\.exe)?$/);
+    // Everything else untouched
+    expect(claude.mcpServers.mimirs.env.CUSTOM).toBe("kept");
+
+    // Second run: nothing left to change
+    const again = await ensureMcpJson(dir, []);
+    expect(again.find((a) => a.includes(".mcp.json"))).toBeUndefined();
   });
 });

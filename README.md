@@ -59,6 +59,8 @@ This creates the MCP server config, editor rules, `.mimirs/config.json`, and `.g
 
 The mimirs MCP server runs over stdio. Every client needs the same three things: a `command` (`bunx`), `args` (`["mimirs@latest", "serve"]`), and a `RAG_PROJECT_DIR` env var pointing at your project root.
 
+> **"command not found: bunx" / server fails to start (but `bunx` works in your terminal)?** Editors launched from the Dock or a desktop launcher don't load your shell profile, so `~/.bun/bin` isn't on their PATH. Use the absolute path from `which bunx` as the `command` instead of the bare `bunx` in the snippets below. `bunx mimirs init` writes the absolute path automatically (re-run it to fix an existing config), and `bunx mimirs doctor` detects the problem.
+
 <details>
 <summary><b>Claude Code</b> — <code>.mcp.json</code> in project root</summary>
 

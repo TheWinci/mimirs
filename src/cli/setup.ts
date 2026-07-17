@@ -297,11 +297,26 @@ export async function ensureAgentInstructions(projectDir: string, ides?: string[
   return actions;
 }
 
+// MCP clients launched from a GUI (Dock, Spotlight, desktop launcher) inherit a
+// minimal PATH without ~/.bun/bin, so a bare "bunx" command fails there even
+// though it works in a terminal. Capture the absolute path at init time instead.
+// The written config is already machine-specific (RAG_PROJECT_DIR is absolute).
+export function resolveBunx(): string {
+  const found = typeof Bun !== "undefined" ? Bun.which("bunx") : null;
+  if (found) return found;
+  const candidates = [
+    join(homedir(), ".bun", "bin", "bunx"),
+    "/opt/homebrew/bin/bunx",
+    "/usr/local/bin/bunx",
+  ];
+  return candidates.find((p) => existsSync(p)) ?? "bunx";
+}
+
 export function mcpConfigSnippet(projectDir: string): string {
   const abs = resolve(projectDir);
   return JSON.stringify({
     "mimirs": {
-      command: "bunx",
+      command: resolveBunx(),
       args: ["mimirs@latest", "serve"],
       env: { RAG_PROJECT_DIR: abs },
     },
@@ -310,10 +325,18 @@ export function mcpConfigSnippet(projectDir: string): string {
 
 function mcpServerEntry(projectDir: string) {
   return {
-    command: "bunx",
+    command: resolveBunx(),
     args: ["mimirs@latest", "serve"],
     env: { RAG_PROJECT_DIR: resolve(projectDir) },
   };
+}
+
+// An existing entry with a bare "bunx" command is the pre-fix shape that GUI
+// clients can't spawn — upgrade just the command, leave everything else alone.
+function upgradeBareBunx(existing: any, entry: any): boolean {
+  if (existing?.command !== "bunx" || entry.command === "bunx") return false;
+  existing.command = entry.command;
+  return true;
 }
 
 async function upsertMcpJson(mcpPath: string, entry: object): Promise<string | null> {
@@ -324,7 +347,12 @@ async function upsertMcpJson(mcpPath: string, entry: object): Promise<string | n
     } catch {
       return `Skipped ${mcpPath} (invalid JSON — fix it manually or delete it)`;
     }
-    if (raw.mcpServers?.["mimirs"]) return null;
+    const existing = raw.mcpServers?.["mimirs"];
+    if (existing) {
+      if (!upgradeBareBunx(existing, entry)) return null;
+      await writeFile(mcpPath, JSON.stringify(raw, null, 2) + "\n");
+      return `Updated mimirs in ${mcpPath} (absolute bunx path so GUI-launched editors find it)`;
+    }
     raw.mcpServers = raw.mcpServers || {};
     raw.mcpServers["mimirs"] = entry;
     await writeFile(mcpPath, JSON.stringify(raw, null, 2) + "\n");
@@ -349,7 +377,12 @@ async function upsertVscodeMcp(mcpPath: string, entry: object): Promise<string |
     } catch {
       return `Skipped ${mcpPath} (invalid JSON — fix it manually or delete it)`;
     }
-    if (raw.servers?.["mimirs"]) return null;
+    const existing = raw.servers?.["mimirs"];
+    if (existing) {
+      if (!upgradeBareBunx(existing, vsEntry)) return null;
+      await writeFile(mcpPath, JSON.stringify(raw, null, 2) + "\n");
+      return `Updated mimirs in ${mcpPath} (absolute bunx path so GUI-launched editors find it)`;
+    }
     raw.servers = raw.servers || {};
     raw.servers["mimirs"] = vsEntry;
     await writeFile(mcpPath, JSON.stringify(raw, null, 2) + "\n");
