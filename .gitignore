@@ -24,3 +24,6 @@ PROCESS.md
 posts.md
 
 wiki/_meta/_pre-regen-snapshot.json
+
+docs/concepts/
+.cb-anthropic
