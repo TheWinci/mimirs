@@ -1,0 +1,19 @@
+.DS_Store
+.agents
+.claude
+skills-lock.json
+node_modules/
+.bun/
+dist/
+build/
+benchmarks/embedding-runtime/rust/target/
+plans/
+learning/
+benchmarks/
+docs/
+scripts/
+Makefile
+
+# mimirs index
+.mimirs/
+.mimirs-legacy/
