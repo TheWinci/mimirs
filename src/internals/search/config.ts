@@ -1,0 +1,14 @@
+/** Search tuning constants. */
+
+export const MAX_SEARCH_RESULTS = 100;
+export const SEARCH_RRF_K = 60;
+export const SEARCH_SEMANTIC_WEIGHT = 0.6;
+export const SEARCH_CANDIDATE_LIMIT = 100;
+export const SEARCH_SEMANTIC_CANDIDATE_LIMIT = 150;
+export const SEARCH_COMPLETE_MISSING_CANDIDATE_SCORES = true;
+export const SEARCH_CANDIDATE_AGGREGATION = "chunk-file" as const;
+export const SEARCH_FILE_CONFIRMATION_WEIGHT = 0.25;
+export const SEARCH_EXACT_NAME_MULTIPLIER = 1.2;
+export const SEARCH_UNIQUE_SYMBOL_MULTIPLIER = 1.3;
+export const SEARCH_TEST_PATH_MULTIPLIER = 0.85;
+export const SEARCH_GENERATED_PATH_MULTIPLIER = 0.75;

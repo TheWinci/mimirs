@@ -330,7 +330,7 @@ function retireActivePathProjection(database: Database): void {
     ).get()?.count ?? 0) > 0;
 
   // An empty projection is ambiguous for programmatic v8 indexes that never
-  // published a project view. Preserve those unless inactive vectors prove
+  // completed a project refresh. Preserve those unless inactive vectors prove
   // that the empty set was deliberately published.
   if (activePaths > 0 || hasInactiveVectors) {
     database.exec(`
