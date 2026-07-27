@@ -22,7 +22,8 @@ Mimirs is a Bun-first tool for project facts, semantic search, and project memor
 
 ## Writing
 
-- Use the `ste` skill for documentation, comments, plans, and user-facing prose.
+- Write documentation, comments, plans, and user-facing prose in clear,
+  direct technical English.
 - Keep commands, identifiers, file names, error messages, and quotations exact.
 
 ## Commands
@@ -81,6 +82,6 @@ For benchmark changes, run the related benchmark and inspect its generated repor
 
 ## Commits
 
-- Use the `commit` skill when the user requests a commit or commit message.
+- Use Conventional Commits for commit messages.
 - Do not commit unless the user asks.
 - Do not add co-author or tool-generated trailers.
