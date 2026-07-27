@@ -1,0 +1,6 @@
+tests/fixtures/rust/modules.rs
+├── module external [1]
+├── module nested [3–9]
+│   ├── function run [4–6]
+│   └── function helper [8]
+└── function start [11–13]

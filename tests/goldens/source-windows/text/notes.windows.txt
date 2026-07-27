@@ -1,0 +1,7 @@
+tests/fixtures/source-windows/text/notes.txt
+├── paragraph [1]
+│   └── window [1] (69 chars) “Mimirs keeps the original source text available for later expansion.”
+├── paragraph [3]
+│   └── window [3] (155 chars) “Search results return a compact preview with the file path and exact line range. An agent can t…”
+└── paragraph [5]
+    └── window [5] (127 chars) “Embedding windows remain connected to their parent source chunk through stored ownership rather…”

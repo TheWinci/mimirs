@@ -1,0 +1,6 @@
+tests/fixtures/haskell/functions.hs
+├── type square [1–2]
+│   └── comment [1]
+├── function square [3]
+├── type factorial [5]
+└── function factorial [6–8]

@@ -1,0 +1,7 @@
+tests/fixtures/python/evaluation-scope.py
+├── import [1]
+├── function configured [4–6]
+└── class Configured [9–14]
+    ├── field factory [10]
+    ├── field value [11]
+    └── method run [13–14]

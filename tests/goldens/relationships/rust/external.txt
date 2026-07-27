@@ -1,0 +1,3 @@
+rust/external
+├── unresolved call src/lib.rs:function encode -> serde_json::to_string [4]
+└── unresolved call src/lib.rs:function encode -> Serialize::serialize [5]

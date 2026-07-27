@@ -1,0 +1,2 @@
+tests/fixtures/python/class-fields.py
+└── call build_cache in field cache [6]

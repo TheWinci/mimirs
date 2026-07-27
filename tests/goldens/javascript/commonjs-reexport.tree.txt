@@ -1,0 +1,2 @@
+tests/fixtures/javascript/commonjs-reexport.cjs
+└── block [1]

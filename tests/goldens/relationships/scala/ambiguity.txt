@@ -1,0 +1,3 @@
+scala/ambiguity
+├── unresolved import app/Main.scala -> "duplicate" [3]
+└── unresolved call app/Main.scala:method launch -> Tools.run [6]

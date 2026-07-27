@@ -1,0 +1,7 @@
+tests/fixtures/lua/functions.lua
+├── variable M [1]
+├── function helper [3–5]
+├── function run [7–9]
+├── function M.build [11–13]
+├── method M:execute [15–17]
+└── block [18–23]

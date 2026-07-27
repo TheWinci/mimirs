@@ -1,0 +1,11 @@
+tests/fixtures/source-windows/python/module-comments.py
+├── import [1]
+│   └── window [1] (32 chars) “from .scheduler import schedule”
+├── variable RETRY_DELAY [3]
+│   └── window [3] (18 chars) “RETRY_DELAY = 250”
+├── function initialize [6–8]
+│   └── window [6–8] (124 chars) “def initialize(task: dict[str, str]) -> object: """Schedule the initial task.""" return schedul…”
+├── comment [11]
+│   └── window [11] (53 chars) “# This comment explains the eager module-level call.”
+└── block [12]
+    └── window [12] (32 chars) “initialize({"kind": "refresh"})”

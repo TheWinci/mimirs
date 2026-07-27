@@ -1,0 +1,3 @@
+tests/fixtures/source-windows/typescript/small-function.ts
+└── function formatUser [1–5]
+    └── window [1–5] (205 chars) “/** Format one user for display in search results. */ export function formatUser(name: string,…”

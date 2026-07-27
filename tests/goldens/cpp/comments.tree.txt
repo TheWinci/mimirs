@@ -1,0 +1,7 @@
+tests/fixtures/cpp/comments.cpp
+└── class Coordinator [1–12]
+    ├── comment [1]
+    ├── method run [4–8]
+    │   ├── comment [4]
+    │   └── comment [6]
+    └── field worker_ [11]

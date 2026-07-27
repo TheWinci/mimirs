@@ -1,0 +1,5 @@
+tests/fixtures/javascript/class-fields.js
+└── class Store [1–5]
+    ├── field value [2]
+    ├── field #cache [3]
+    └── field ready [4]

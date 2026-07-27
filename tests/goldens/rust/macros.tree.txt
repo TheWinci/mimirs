@@ -1,0 +1,4 @@
+tests/fixtures/rust/macros.rs
+├── macro trace [1–5]
+├── function trace [7]
+└── function log [9–12]

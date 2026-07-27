@@ -1,0 +1,9 @@
+tests/fixtures/toml/arrays.toml
+├── section products [1–4]
+│   ├── property name [2]
+│   └── property sku [3]
+├── section products [5–8]
+│   ├── property name [6]
+│   └── property sku [7]
+└── section products.variants [9–10]
+    └── property name [10]

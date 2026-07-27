@@ -1,0 +1,5 @@
+html/basic
+├── import pages/index.html -> assets/app.css via "/assets/app.css?v=1" [3]
+├── import pages/index.html -> images/hero.png via "../images/hero.png#focus" [7]
+├── import pages/index.html -> pages/frame.html via "frame.html" [8]
+└── import pages/index.html -> scripts/app.js via "../scripts/app.js" [4]

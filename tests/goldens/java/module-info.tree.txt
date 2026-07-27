@@ -1,0 +1,2 @@
+tests/fixtures/java/module-info.java
+└── module fixtures.app [1–10]

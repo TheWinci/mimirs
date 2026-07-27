@@ -1,0 +1,4 @@
+tests/fixtures/javascript/component.jsx
+├── import [1]
+├── function label [3–5]
+└── function Button [7–10]

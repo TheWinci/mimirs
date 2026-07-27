@@ -1,0 +1,14 @@
+tests/fixtures/source-windows/haskell/module-functions.hs
+├── module Windows.Report [1]
+│   └── window [1] (48 chars) “module Windows.Report (Entry(..), render) where”
+├── type Entry [3–6]
+│   └── window [3–6] (69 chars) “data Entry = Entry { title :: String , owner :: Maybe String }”
+├── type render [8]
+│   └── window [8] (30 chars) “render :: [Entry] -> [String]”
+├── function render [9–13]
+│   ├── window [9–10] (49 chars) “render entries = map renderEntry entries where”
+│   └── window [11–13] (133 chars) “renderEntry entry = let resolvedOwner = maybe "unassigned" id (owner entry) in title entry ++ "…”
+├── type visible [15]
+│   └── window [15] (30 chars) “visible :: [Entry] -> [Entry]”
+└── variable visible [16]
+    └── window [16] (38 chars) “visible = filter (not . null . title)”

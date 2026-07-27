@@ -1,0 +1,13 @@
+tests/fixtures/csharp/members.cs
+└── class Service [1–34]
+    ├── field client [3]
+    ├── field first, second [4]
+    ├── event Changed, Completed [6]
+    ├── event Custom [8–12]
+    ├── property Name [14]
+    ├── property this [16–20]
+    ├── method Service [22]
+    ├── method Service [24–27]
+    ├── method Service [29]
+    ├── method operator + [31]
+    └── method explicit operator int [33]

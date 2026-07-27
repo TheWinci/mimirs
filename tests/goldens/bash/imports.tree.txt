@@ -1,0 +1,3 @@
+tests/fixtures/bash/imports.sh
+├── import [1–2]
+└── block [3–5]

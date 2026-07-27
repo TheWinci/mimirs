@@ -1,0 +1,7 @@
+tests/fixtures/c/control-flow.c
+├── call factory in variable loop [4]
+├── call factory in function control_flow [4]
+├── call loop in function control_flow [5]
+├── call loop in function control_flow [7]
+├── call item in function control_flow [11]
+└── call item in function control_flow [13]

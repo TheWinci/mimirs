@@ -1,0 +1,4 @@
+typescript/barrel
+├── import src/main.ts -> src/index.ts via "./index" [1]
+├── re-export src/index.ts -> src/worker.ts via "./worker" [1]
+└── call src/main.ts:function start -> src/worker.ts:function run via run [4]

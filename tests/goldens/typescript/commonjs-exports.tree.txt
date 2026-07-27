@@ -1,0 +1,6 @@
+tests/fixtures/typescript/commonjs-exports.cts
+├── variable picked [1–2]
+│   └── comment [1]
+├── variable other [3]
+├── variable computed [4]
+└── block [5–15]

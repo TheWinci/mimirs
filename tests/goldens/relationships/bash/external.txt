@@ -1,0 +1,2 @@
+bash/external
+└── unresolved call main.sh:module -> external_command [4]

@@ -1,0 +1,2 @@
+tests/fixtures/elixir/protocols.ex
+└── call user.name in function print [7]

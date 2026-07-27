@@ -1,0 +1,6 @@
+tests/fixtures/zig/control-flow.zig
+├── constant Callback [1]
+├── function consume [3]
+├── function next [4–6]
+└── function control_flow [8–52]
+    └── constant recovered [46–49]

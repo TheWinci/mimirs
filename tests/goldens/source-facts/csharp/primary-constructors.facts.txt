@@ -1,0 +1,4 @@
+tests/fixtures/csharp/primary-constructors.cs
+├── call service.Execute in method Run [5]
+├── call value.Trim in method Run [6]
+└── call factory in method Build [12]

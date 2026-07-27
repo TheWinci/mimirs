@@ -1,0 +1,10 @@
+tests/fixtures/css/at-rules.css
+├── rule @font-face [1–4]
+├── rule @media screen and (min-width: 40rem) [6–10]
+│   └── selector .layout [7–9]
+├── rule @supports (display: grid) [12–16]
+│   └── selector .enhanced [13–15]
+├── rule @scope (.card) to (.content) [18–22]
+│   └── selector .title [19–21]
+├── rule fade [24–27]
+└── rule @layer reset, components [29]

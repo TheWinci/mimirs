@@ -1,0 +1,5 @@
+tests/fixtures/lua/tables.lua
+├── call load in variable M [2]
+├── call execute in function run [4]
+├── call build in function named [7]
+└── call process in function M.handler [12]

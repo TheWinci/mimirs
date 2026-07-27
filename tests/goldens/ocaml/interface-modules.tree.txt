@@ -1,0 +1,4 @@
+tests/fixtures/ocaml/interface-modules.mli
+├── import [1–2]
+├── module Alias [4]
+└── module Make [5]

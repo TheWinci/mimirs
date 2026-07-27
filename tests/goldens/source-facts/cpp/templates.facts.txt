@@ -1,0 +1,2 @@
+tests/fixtures/cpp/templates.cpp
+└── call identity<int> in function use_identity [23]

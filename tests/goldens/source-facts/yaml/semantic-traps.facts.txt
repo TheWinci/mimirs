@@ -1,0 +1,2 @@
+tests/fixtures/yaml/semantic-traps.yaml
+└── (no facts)

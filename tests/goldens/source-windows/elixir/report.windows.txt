@@ -1,0 +1,7 @@
+tests/fixtures/source-windows/elixir/report.exs
+├── import [1]
+│   └── window [1] (26 chars) “alias ReportApp.Formatter”
+├── module ReportScript [3–11]
+│   └── window [3–11] (162 chars) “defmodule ReportScript do @moduledoc "Helpers used by the report script." def load(path) do pat…”
+└── block [12–14]
+    └── window [12–14] (57 chars) “report = ReportScript.load("report.md") IO.puts(report)”

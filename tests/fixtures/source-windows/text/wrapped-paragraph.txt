@@ -1,0 +1,5 @@
+The first line introduces a deliberately long paragraph for projection review.
+The second line carries enough additional detail to cross the small window target while remaining part of the same paragraph.
+The third line verifies that splitting follows whole-line boundaries and reconstructs the paragraph without losing whitespace.
+
+A short final paragraph stays independent.

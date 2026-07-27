@@ -1,0 +1,4 @@
+tests/fixtures/typescript/declarations.d.ts
+├── export parse [21]
+├── export Transport [21]
+└── export Protocol [21]

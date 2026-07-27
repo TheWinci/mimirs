@@ -1,0 +1,3 @@
+tests/fixtures/css/dynamic.css
+├── import [1–2]
+└── selector .dynamic [4–11]

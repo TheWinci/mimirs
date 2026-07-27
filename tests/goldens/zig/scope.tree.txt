@@ -1,0 +1,6 @@
+tests/fixtures/zig/scope.zig
+├── constant dependency [1]
+├── function helper [3–5]
+└── function run [7–13]
+    ├── constant value [8]
+    └── constant callback [9]

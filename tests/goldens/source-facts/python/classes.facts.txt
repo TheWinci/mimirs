@@ -1,0 +1,6 @@
+tests/fixtures/python/classes.py
+├── call callable in function wrapper [3]
+├── call list in method __init__ [13]
+├── call len in method size [17]
+├── call loader in method create [21]
+└── call cls in method create [22]

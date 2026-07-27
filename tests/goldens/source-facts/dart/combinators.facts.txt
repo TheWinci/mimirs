@@ -1,0 +1,8 @@
+tests/fixtures/dart/combinators.dart
+├── import "alpha.dart" show One [1]
+├── import "beta.dart" as beta [2]
+├── export Public from "gamma.dart" [3]
+├── export * from "delta.dart" [4]
+├── call One in function run [7]
+├── call Two in function run [8]
+└── call beta.Start in function run [9]

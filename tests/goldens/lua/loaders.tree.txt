@@ -1,0 +1,10 @@
+tests/fixtures/lua/loaders.lua
+├── variable real [1]
+├── block [2]
+├── variable compiled [3]
+├── function parameter [5–8]
+├── block [9–10]
+├── function require [11–13]
+├── block [14–18]
+├── variable require [19]
+└── block [20]

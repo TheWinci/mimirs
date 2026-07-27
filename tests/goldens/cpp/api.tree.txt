@@ -1,0 +1,9 @@
+tests/fixtures/cpp/api.hpp
+└── conditional !defined(FIXTURES_API_HPP) [1–16]
+    ├── macro FIXTURES_API_HPP [2]
+    ├── import [4]
+    └── module fixtures [6–14]
+        ├── class Service [7–11]
+        │   ├── method ~Service [9]
+        │   └── method run [10]
+        └── function make_service [13]

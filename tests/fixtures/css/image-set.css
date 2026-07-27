@@ -1,0 +1,11 @@
+.hero {
+  background-image: image-set(
+    "images/hero.png" 1x,
+    url("images/hero@2x.png") 2x,
+    type("image/avif")
+  );
+}
+
+.legacy {
+  background-image: -webkit-image-set("images/legacy.png" 1x);
+}

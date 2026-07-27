@@ -1,0 +1,7 @@
+tests/fixtures/python/functions.py
+├── function greet [1–2]
+├── function fetch [5–6]
+├── function outer [9–13]
+│   └── function inner [10–11]
+└── function run_plugin [16–18]
+    └── import [17]

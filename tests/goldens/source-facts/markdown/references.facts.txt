@@ -1,0 +1,8 @@
+tests/fixtures/markdown/references.md
+├── link "docs/architecture(v2).md" in section Guides [3]
+├── link "docs/architecture(v2).md" in section Guides [3]
+├── image "images/logo&mark.png" in section Guides [5]
+├── link "docs/a&b.md" in section Guides [7]
+├── link "docs/a.md" in section Guides [8]
+├── reference "docs/architecture(v2).md" in section Guides [12]
+└── reference "images/logo&mark.png" in section Guides [13]

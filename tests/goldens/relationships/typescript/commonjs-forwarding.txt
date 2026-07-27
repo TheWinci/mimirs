@@ -1,0 +1,11 @@
+typescript/commonjs-forwarding
+├── import src/main.cts -> src/chained.cts via "./chained.cjs" [4]
+├── import src/main.cts -> src/object.cts via "./object.cjs" [2]
+├── import src/main.cts -> src/proxy.cts via "./proxy.cjs" [3]
+├── import src/proxy.cts -> src/object.cts via "./object.cjs" [2]
+├── re-export src/proxy.cts -> src/object.cts via "./object.cjs" [2]
+├── call src/main.cts:function start -> src/object.cts:function picked via picked [7]
+├── call src/main.cts:function start -> src/object.cts:function other via proxy.alias [7]
+├── call src/main.cts:function start -> src/chained.cts:function run via chained.run [7]
+├── call src/main.cts:function start -> src/chained.cts:function run via chained.execute [7]
+└── unresolved call src/main.cts:function start -> proxy.inline [7]

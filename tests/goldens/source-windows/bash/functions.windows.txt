@@ -1,0 +1,13 @@
+tests/fixtures/source-windows/bash/functions.sh
+├── comment [1]
+│   └── window [1] (20 chars) “#!/usr/bin/env bash”
+├── block [2–3]
+│   └── window [2–3] (19 chars) “set -euo pipefail”
+├── function report_add [4–8]
+│   └── window [4–8] (105 chars) “report_add() { local title=$1 local owner=${2:-unassigned} REPORT_LINES+=("${title} — ${owner}"…”
+├── function render_report [10–15]
+│   └── window [10–15] (105 chars) “render_report() { local line for line in "${REPORT_LINES[@]}"; do printf '%s\n' "$line" done }”
+├── function main [17–22]
+│   └── window [17–22] (97 chars) “main() { REPORT_LINES=() report_add "First" "Ada" report_add "Second" "" render_report }”
+└── block [23–24]
+    └── window [23–24] (11 chars) “main "$@"”

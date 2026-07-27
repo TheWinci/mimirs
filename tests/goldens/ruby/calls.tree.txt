@@ -1,0 +1,4 @@
+tests/fixtures/ruby/calls.rb
+├── class Worker [1–3]
+│   └── method create [2]
+└── method run [5–11]

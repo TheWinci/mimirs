@@ -1,0 +1,7 @@
+tests/fixtures/rust/comments.rs
+├── comment [1–2]
+├── constant VERSION [3–4]
+│   └── comment [3]
+└── function ping [6–11]
+    ├── comment [6]
+    └── comment [9]

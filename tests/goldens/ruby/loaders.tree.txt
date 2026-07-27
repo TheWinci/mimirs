@@ -1,0 +1,7 @@
+tests/fixtures/ruby/loaders.rb
+├── block [1–5]
+├── method shadowed [6–8]
+├── class Loader [10–18]
+│   ├── method require [11–13]
+│   └── method run [15–17]
+└── block [19–20]

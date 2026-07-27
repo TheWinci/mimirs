@@ -1,0 +1,2 @@
+tests/fixtures/text/single-line.log
+└── paragraph [1]

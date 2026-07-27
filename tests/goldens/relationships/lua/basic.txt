@@ -1,0 +1,4 @@
+lua/basic
+├── import app/main.lua -> app/setup/init.lua via "app.setup" [2]
+├── import app/main.lua -> app/util.lua via "app.util" [1]
+└── unresolved call app/main.lua:module -> util.prepare [4]

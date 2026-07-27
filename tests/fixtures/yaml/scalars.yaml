@@ -1,0 +1,11 @@
+plain: hello
+single: 'quoted'
+double: "escaped\nvalue"
+literal: |
+  first line
+  second line
+folded: >-
+  folded
+  text
+date: 2026-07-15
+nullable: null

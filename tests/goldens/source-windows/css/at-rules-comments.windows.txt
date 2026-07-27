@@ -1,0 +1,8 @@
+tests/fixtures/source-windows/css/at-rules-comments.css
+├── import [1]
+│   └── window [1] (29 chars) “@import url("./tokens.css");”
+├── rule @media (min-width: 48rem) [3–14]
+│   ├── window [3–7] (130 chars) “/* Responsive report layout. */ @media (min-width: 48rem) { .report { grid-template-columns: re…”
+│   └── window [8–14] (106 chars) “@supports (container-type: inline-size) { .report { container-type: inline-size; } } }”
+└── comment [16]
+    └── window [16] (54 chars) “/* This final comment is intentionally standalone. */”

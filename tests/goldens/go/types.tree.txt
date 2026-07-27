@@ -1,0 +1,11 @@
+tests/fixtures/go/types.go
+├── package sample [1]
+├── constant DefaultLimit [3]
+├── variable ActiveStore [5]
+├── type Identifier [7]
+├── struct Store [9–12]
+│   ├── field Name [10]
+│   └── field count [11]
+├── interface Runner [14–16]
+│   └── method Run [15]
+└── function ParseIdentifier [18–20]

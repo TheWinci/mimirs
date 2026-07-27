@@ -1,0 +1,9 @@
+tests/fixtures/source-windows/typescript/comments.ts
+├── function documented [1–4]
+│   └── window [1–4] (138 chars) “/** This documentation belongs to the declaration below. */ export function documented(value: n…”
+├── comment [6]
+│   └── window [6] (40 chars) “// This is a standalone source comment.”
+├── function previous [8]
+│   └── window [8] (77 chars) “function previous(): void {} // This trailing comment remains with previous.”
+└── function next [9]
+    └── window [9] (32 chars) “export function next(): void {}”

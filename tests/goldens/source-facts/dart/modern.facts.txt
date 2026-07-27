@@ -1,0 +1,13 @@
+tests/fixtures/dart/modern.dart
+├── call value.toString in method render [2]
+├── call .parse in variable parsed [11]
+├── call .new in variable identifier [12]
+├── call .parse in variable normalized [13]
+├── call .parse().abs in variable normalized [13]
+├── call identity in function modern [14]
+├── call print in function modern [17]
+├── call print in function modern [18]
+├── call print in function modern [19]
+├── call identifier.render in function modern [19]
+├── call print in function modern [20]
+└── call print in function modern [21]

@@ -1,0 +1,2 @@
+lua/missing
+└── unresolved import app/main.lua -> "app.missing" [1]

@@ -1,0 +1,5 @@
+tests/fixtures/rust/functions.rs
+├── function greet [1–3]
+├── function fetch [5–7]
+└── function transform [9–12]
+    └── function normalize [10]

@@ -1,0 +1,7 @@
+tests/fixtures/scala/script.sc
+├── import scala.util.Try [1]
+├── call args.headOption.getOrElse in variable input [3]
+├── call Try in function parse [6]
+├── call Try(value.toInt).getOrElse in function parse [6]
+├── call println in module [8]
+└── call parse in module [8]

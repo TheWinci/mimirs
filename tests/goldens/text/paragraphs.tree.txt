@@ -1,0 +1,4 @@
+tests/fixtures/text/paragraphs.txt
+├── paragraph [1–2]
+├── paragraph [4]
+└── paragraph [7]

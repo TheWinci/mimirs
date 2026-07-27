@@ -1,0 +1,5 @@
+tests/fixtures/source-windows/yaml/documents.yml
+├── section [1–7]
+│   └── window [1–7] (84 chars) “--- kind: Report metadata: name: daily spec: format: markdown archived: false”
+└── section [8–14]
+    └── window [8–14] (81 chars) “--- kind: Report metadata: name: history spec: format: text archived: true”

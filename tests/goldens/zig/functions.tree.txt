@@ -1,0 +1,6 @@
+tests/fixtures/zig/functions.zig
+├── function identity [1–3]
+├── function external [5]
+├── function helper [7–9]
+└── function run [11–16]
+    └── constant value [12]

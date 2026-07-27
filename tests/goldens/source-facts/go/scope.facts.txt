@@ -1,0 +1,5 @@
+tests/fixtures/go/scope.go
+├── import runner "example.com/project/runner" [3]
+├── call run in function Execute [6]
+├── call runner.Run in function Execute [7]
+└── call helper in function Start [11]

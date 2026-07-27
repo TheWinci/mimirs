@@ -1,0 +1,9 @@
+tests/fixtures/javascript/nesting.js
+├── export createFormatter [1–11]
+├── call value.trim in function normalize [3]
+├── call value.trim().toLowerCase in function normalize [3]
+├── call surround in function createFormatter [9]
+├── call normalize in function createFormatter [9]
+├── export Formatter [13–21]
+├── call value.trim in method trim [15]
+└── call this.trim in method format [19]

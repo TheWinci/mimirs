@@ -1,0 +1,8 @@
+@charset "UTF-8";
+@import "reset.css";
+@import url("theme.css") screen;
+@namespace svg url("http://www.w3.org/2000/svg");
+
+:root {
+  --accent: royalblue;
+}

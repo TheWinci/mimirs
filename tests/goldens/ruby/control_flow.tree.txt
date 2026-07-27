@@ -1,0 +1,3 @@
+tests/fixtures/ruby/control_flow.rb
+└── method control [1–36]
+    └── function block_local [4]

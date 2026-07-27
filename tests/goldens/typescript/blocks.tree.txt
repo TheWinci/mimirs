@@ -1,0 +1,4 @@
+tests/fixtures/typescript/blocks.ts
+├── function initialize [1]
+├── variable enabled [3]
+└── block [4–9]

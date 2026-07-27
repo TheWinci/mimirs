@@ -1,0 +1,8 @@
+tests/fixtures/yaml/documents.yml
+├── section [1–5]
+│   ├── directive [1]
+│   ├── property name [3]
+│   └── property active [4]
+└── section [6–8]
+    ├── property name [7]
+    └── property active [8]

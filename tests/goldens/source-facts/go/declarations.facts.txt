@@ -1,0 +1,2 @@
+tests/fixtures/go/declarations.go
+└── call BuildStore in variable PrimaryStore [9]

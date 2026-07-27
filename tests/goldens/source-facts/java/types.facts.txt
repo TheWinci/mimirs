@@ -1,0 +1,4 @@
+tests/fixtures/java/types.java
+├── call check in method ready [7]
+├── call x.trim in method Point [13]
+└── call validate in method Point [14]

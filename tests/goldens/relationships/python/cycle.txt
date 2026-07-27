@@ -1,0 +1,7 @@
+python/cycle
+├── import src/main.py -> src/pkg/__init__.py via "pkg" [1]
+├── import src/pkg/__init__.py -> src/pkg/a.py via ".a" [1]
+├── import src/pkg/a.py -> src/pkg/b.py via ".b" [1]
+├── import src/pkg/b.py -> src/pkg/a.py via ".a" [1]
+├── call src/main.py:module -> src/pkg/a.py:function entry via entry [3]
+└── call src/pkg/a.py:function entry -> src/pkg/a.py:function entry via forwarded [5]

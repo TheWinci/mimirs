@@ -1,0 +1,8 @@
+tests/fixtures/c/includes.c
+├── #include <stdio.h> [1]
+├── #include "local.h" [2]
+├── #include "feature.h" in conditional defined(FEATURE) [5]
+├── #include DEBUG_HEADER in conditional defined(DEBUG) && LEVEL > 1 [9]
+├── #include "fallback.h" in conditional FALLBACK [11]
+├── #include "release.h" in conditional else [13]
+└── call printf in function print_value [17]

@@ -1,0 +1,5 @@
+tests/fixtures/typescript/functions.ts
+├── export fetchLabel [5–7]
+├── export integerRange [9–13]
+├── export double [15]
+└── export identity [17–19]

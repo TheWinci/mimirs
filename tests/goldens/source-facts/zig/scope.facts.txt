@@ -1,0 +1,7 @@
+tests/fixtures/zig/scope.zig
+├── const dependency = @import("dependency.zig") in constant dependency [1]
+├── call dependency.consume in function helper [4]
+├── call loader in constant value [8]
+├── call callback in function run [10]
+├── call helper in function run [11]
+└── call missing in function run [12]

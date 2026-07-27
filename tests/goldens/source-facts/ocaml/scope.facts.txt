@@ -1,0 +1,6 @@
+tests/fixtures/ocaml/scope.ml
+├── call loader in function callback [2]
+├── call callback in variable result [3]
+├── call consume in function run [4]
+├── call List.map in function transform [7]
+└── call normalize in function transform [7]

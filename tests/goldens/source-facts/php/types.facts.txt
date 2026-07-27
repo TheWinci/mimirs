@@ -1,0 +1,4 @@
+tests/fixtures/php/types.php
+├── call write_log in method log [6]
+├── call format in method label [19]
+└── call transform in method run [26]

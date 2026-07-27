@@ -1,0 +1,7 @@
+tests/fixtures/typescript/esm-module.mts
+├── import type Stats from "node:fs" [1]
+├── import resolve from "node:path" [2]
+├── export type Stats [4]
+├── export config [6]
+├── call resolve in variable config [6]
+└── export default [8]

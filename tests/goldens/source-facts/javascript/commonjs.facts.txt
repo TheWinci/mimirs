@@ -1,0 +1,10 @@
+tests/fixtures/javascript/commonjs.cjs
+├── import * as fs from "node:fs" [1]
+├── import join as joinPath from "node:path" [2]
+├── import basename from "node:path" [2]
+├── import "./register.cjs" [3]
+├── call require in variable dynamic [4]
+├── call fs.readFileSync in function read [7]
+├── export read [10]
+├── export joinPath as join [11]
+└── export basename [12]

@@ -1,0 +1,5 @@
+tests/fixtures/javascript/commonjs-exports.cjs
+├── variable picked [1]
+├── variable other [2]
+├── variable computed [3]
+└── block [4–14]

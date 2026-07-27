@@ -1,0 +1,3 @@
+typescript/mts
+├── import src/main.mts -> src/worker.mts via "./worker.mjs" [1]
+└── call src/main.mts:function start -> src/worker.mts:function run via run [4]

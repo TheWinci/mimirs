@@ -1,0 +1,2 @@
+tests/fixtures/zig/types.zig
+└── call render in method display [11]

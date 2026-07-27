@@ -1,0 +1,5 @@
+tests/fixtures/dart/comments.dart
+├── comment [1]
+└── function documented [3–8]
+    ├── comment [4]
+    └── comment [6]

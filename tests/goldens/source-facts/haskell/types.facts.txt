@@ -1,0 +1,4 @@
+tests/fixtures/haskell/types.hs
+├── call show in function render [9]
+├── call Ok in function build [11]
+└── call UserId in function build [11]

@@ -1,0 +1,7 @@
+tests/fixtures/source-windows/php/namespace-class.php
+├── block [1]
+│   └── window [1] (6 chars) “<?php”
+└── module Windows [2–28]
+    ├── window [2–12] (278 chars) “namespace Windows; final class ReportBook { /** @var list<array{title: string, owner: ?string}>…”
+    ├── window [13–22] (271 chars) “/** @return list<string> */ public function render(): array { return array_map( static fn (arra…”
+    └── window [23–28] (85 chars) “public function size(): int { return count($this->entries); } }”

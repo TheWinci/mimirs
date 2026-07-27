@@ -1,0 +1,5 @@
+tests/fixtures/ruby/classes.rb
+├── call build_limit in constant DEFAULT_LIMIT [4]
+├── call @client.call in method run [11]
+├── call new in method create [15]
+└── call setup in method configure [20]

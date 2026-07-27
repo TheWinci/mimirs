@@ -1,0 +1,10 @@
+javascript/basic
+├── import src/main.js -> src/config.js via "./config.js" [3]
+├── import src/main.js -> src/index.js via "./index.js" [1–2]
+├── import src/main.js -> src/setup.js via "./setup.js" [4]
+├── re-export src/index.js -> src/math.js via "./math.js" [1]
+├── call src/main.js:function start -> src/main.js:function localHelper via localHelper [18]
+├── call src/main.js:function start -> src/math.js:function add via sum [19]
+├── call src/main.js:function start -> src/math.js:function multiply via math.multiply [20]
+├── call src/main.js:function start -> src/config.js:function configure via configure [21]
+└── unresolved call src/main.js:function start -> service.run [22]

@@ -1,0 +1,5 @@
+tests/fixtures/dart/scope.dart
+├── call loader.load in variable value [2]
+├── call service.execute in function callback [3]
+├── call callback in function run [4]
+└── call missing in function run [5]

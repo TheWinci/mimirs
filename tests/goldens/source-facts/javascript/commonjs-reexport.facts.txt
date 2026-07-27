@@ -1,0 +1,4 @@
+tests/fixtures/javascript/commonjs-reexport.cjs
+├── export * from "./replacement.cjs" [1]
+├── export default from "./replacement.cjs" [1]
+└── import "./replacement.cjs" [1]

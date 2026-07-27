@@ -1,0 +1,5 @@
+tests/fixtures/haskell/where.hs
+├── call output in function prepare [1]
+├── call normalize in function output [3]
+├── call consume in function run [5]
+└── call prepare in function run [5]

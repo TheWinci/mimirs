@@ -1,0 +1,12 @@
+tests/fixtures/zig/shadowing.zig
+├── call target in variable target [7]
+├── call target in function shadowing [8]
+├── call make in variable target [10]
+├── call target in function shadowing [11]
+├── call make in constant nested [14]
+├── call nested in function shadowing [15]
+├── call nested in function shadowing [17]
+├── call make in function shadowing [19]
+├── call object in function shadowing [20]
+├── call make in function shadowing [21]
+└── call values in function shadowing [22]

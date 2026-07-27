@@ -1,0 +1,6 @@
+tests/fixtures/dart/constructors.dart
+├── call zero in field y [3]
+├── call initialize in method Point.origin [8]
+├── call Point.origin in method Point.create [11]
+├── call update in method value [16]
+└── call decode in method parse [20]

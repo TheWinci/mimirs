@@ -1,0 +1,6 @@
+tests/fixtures/haskell/scope.hs
+├── function run [1–4]
+│   ├── function callback [2]
+│   └── variable result [3]
+├── function transform [6]
+└── function process [8–10]

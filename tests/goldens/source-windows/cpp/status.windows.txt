@@ -1,0 +1,4 @@
+tests/fixtures/source-windows/cpp/status.hh
+└── conditional !defined(REPORT_STATUS_HH) [1–18]
+    ├── window [1–10] (129 chars) “#ifndef REPORT_STATUS_HH #define REPORT_STATUS_HH namespace reports { enum class Status { draft…”
+    └── window [11–18] (114 chars) “constexpr bool visible(Status status) { return status == Status::published; } } // namespace re…”

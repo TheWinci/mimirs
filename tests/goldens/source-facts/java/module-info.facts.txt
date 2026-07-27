@@ -1,0 +1,4 @@
+tests/fixtures/java/module-info.java
+├── requires java.base [2]
+├── requires transitive fixtures.api [3]
+└── requires static optional.logging [4]

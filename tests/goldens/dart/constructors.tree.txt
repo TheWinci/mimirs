@@ -1,0 +1,10 @@
+tests/fixtures/dart/constructors.dart
+└── class Point [1–22]
+    ├── field x [2]
+    ├── field y [3]
+    ├── method Point [5]
+    ├── method Point.origin [7–9]
+    ├── method Point.create [11]
+    ├── method sum [13]
+    ├── method value [15–17]
+    └── method parse [19–21]

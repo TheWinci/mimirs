@@ -1,0 +1,12 @@
+tests/fixtures/ocaml/patterns.ml
+├── call callback in variable result [4]
+├── call callback in variable result [4]
+├── call fallback in variable result [5]
+├── call callback in function case_scope [7]
+├── call split in variable left, right [10]
+├── call left in function pair_scope [11]
+├── call callback in variable apply [15]
+├── call fallback in variable apply [16]
+├── call apply in function function_scope [18]
+├── call action in function exception_scope [21]
+└── call callback in function exception_scope [22]

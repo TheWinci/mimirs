@@ -1,0 +1,11 @@
+tests/fixtures/source-windows/ocaml/opens-comments.ml
+├── import [1]
+│   └── window [1] (12 chars) “open Stdlib”
+├── module Clock [3]
+│   └── window [3] (20 chars) “module Clock = Unix”
+├── variable retry_delay_ms [5]
+│   └── window [5] (25 chars) “let retry_delay_ms = 250”
+├── function retry_delay [7–8]
+│   └── window [7–8] (78 chars) “(** Return the configured retry delay. *) let retry_delay () = retry_delay_ms”
+└── comment [10]
+    └── window [10] (54 chars) “(* This final comment is intentionally standalone. *)”

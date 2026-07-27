@@ -1,0 +1,2 @@
+tests/fixtures/yaml/anchors.yaml
+└── (no facts)

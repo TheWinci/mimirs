@@ -1,0 +1,7 @@
+tests/fixtures/python/conditional-imports.py
+├── from package.fast import run as selected in function choose [3]
+├── from package.slow import run as selected in function choose [5]
+├── call selected in function choose [7]
+├── from package.optional import load in function optional [12]
+├── from package.fallback import load in function optional [14]
+└── call load in function optional [16]

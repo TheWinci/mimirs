@@ -1,0 +1,14 @@
+---
+kind: Report
+metadata:
+  name: daily
+spec:
+  format: markdown
+  archived: false
+---
+kind: Report
+metadata:
+  name: history
+spec:
+  format: text
+  archived: true

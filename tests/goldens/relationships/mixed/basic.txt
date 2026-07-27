@@ -1,0 +1,5 @@
+mixed/basic
+├── import src/consumer.ts -> src/helper.js via "./helper.js" [1]
+├── import src/main.js -> src/worker.ts via "./worker.js" [1]
+├── call src/consumer.ts:function consume -> src/helper.js:function help via help [4]
+└── call src/main.js:function start -> src/worker.ts:function run via run [4]

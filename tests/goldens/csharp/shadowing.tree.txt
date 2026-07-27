@@ -1,0 +1,7 @@
+tests/fixtures/csharp/shadowing.cs
+└── module Fixtures.Shadowing [1–33]
+    ├── delegate Callback [3]
+    └── class Shadowing [5–33]
+        ├── method Make [7]
+        ├── method Target [8]
+        └── method Run [10–32]

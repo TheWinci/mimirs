@@ -1,0 +1,4 @@
+tests/fixtures/c/functions.c
+├── call lookup in function find [8]
+├── call declared in function run [12]
+└── call helper in function run [12]

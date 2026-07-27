@@ -1,0 +1,8 @@
+tests/fixtures/cpp/shadowing.cpp
+├── type Callback [1]
+├── function make [3]
+├── function target [4]
+└── function shadowing [6–27]
+    ├── variable target [7]
+    ├── variable first, second [13]
+    └── variable nested [18]

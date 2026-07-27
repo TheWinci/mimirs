@@ -1,0 +1,5 @@
+tests/fixtures/html/document.html
+├── stylesheet "/app.css" in element head [4]
+├── modulepreload "/feature.js" in element head [5]
+├── script "/app.js" in element head [6]
+└── img.src "hero.png" in element main [13]

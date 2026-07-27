@@ -1,0 +1,4 @@
+tests/fixtures/ocaml/bindings.ml
+├── call split in variable left, right [2]
+├── call normalize in function callback [3]
+└── call callback in variable result [5]

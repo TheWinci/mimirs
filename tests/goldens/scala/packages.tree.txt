@@ -1,0 +1,6 @@
+tests/fixtures/scala/packages.scala
+└── package fixtures [1–8]
+    ├── variable RootValue [3]
+    └── package nested [5–8]
+        └── class Nested [7–8]
+            └── field value [8]

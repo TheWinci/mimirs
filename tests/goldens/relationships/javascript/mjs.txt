@@ -1,0 +1,3 @@
+javascript/mjs
+├── import src/main.mjs -> src/worker.mjs via "./worker.mjs" [1]
+└── call src/main.mjs:function start -> src/worker.mjs:function run via run [4]

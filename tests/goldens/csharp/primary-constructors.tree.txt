@@ -1,0 +1,6 @@
+tests/fixtures/csharp/primary-constructors.cs
+├── class Controller [1–8]
+│   └── method Run [3–7]
+└── record Envelope [10–13]
+    ├── property factory [10]
+    └── method Build [12]

@@ -1,0 +1,7 @@
+tests/fixtures/lua/modules.lua
+├── local json = require "json" in variable json [1]
+├── local util = require "app.util" in variable util [2]
+├── require "setup" [3]
+├── call require in variable dynamic [5]
+├── call util.prepare in function decode [8]
+└── call json.decode in function decode [9]

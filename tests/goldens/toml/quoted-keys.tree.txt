@@ -1,0 +1,8 @@
+tests/fixtures/toml/quoted-keys.toml
+├── property "quoted key" [1]
+├── property 'literal key' [2]
+├── property site."google.com" [3]
+├── section "service name" [5–7]
+│   └── property "display name" [6]
+└── section "service name".instances [8–9]
+    └── property id [9]

@@ -1,0 +1,8 @@
+tests/fixtures/kotlin/imports.kt
+├── import kotlin.collections.List in package fixtures.imports [3]
+├── import vendor.Worker as ImportedWorker in package fixtures.imports [4]
+├── import vendor.tools.* in package fixtures.imports [5]
+├── call List in function create [8]
+├── call ImportedWorker.create in function create [8]
+├── call unknownWildcard in function create [9]
+└── call ImportedWorker.create in function create [10]

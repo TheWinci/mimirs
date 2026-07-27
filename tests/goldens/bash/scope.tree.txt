@@ -1,0 +1,7 @@
+tests/fixtures/bash/scope.sh
+├── function helper [1–3]
+├── function run [5–13]
+│   ├── variable value [6]
+│   ├── variable callback [7]
+│   └── constant token [8]
+└── block [14–15]

@@ -1,0 +1,6 @@
+tests/fixtures/typescript/comments.ts
+├── export documented [6–8]
+├── call String in function documented [7]
+├── export DEFAULT_VALUE [12]
+├── export next [15]
+└── export Service [18–24]

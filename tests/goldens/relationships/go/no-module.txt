@@ -1,0 +1,2 @@
+go/no-module
+└── unresolved call cmd/main.go:function main -> lib.Run [6]

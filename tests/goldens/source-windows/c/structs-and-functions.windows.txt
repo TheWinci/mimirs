@@ -1,0 +1,10 @@
+tests/fixtures/source-windows/c/structs-and-functions.c
+├── import [1]
+│   └── window [1] (20 chars) “#include <stddef.h>”
+├── type ReportEntry [3–7]
+│   └── window [3–7] (90 chars) “typedef struct { const char *title; const char *owner; int archived; } ReportEntry;”
+├── function report_visible_count [9–20]
+│   ├── window [9–14] (180 chars) “size_t report_visible_count( const ReportEntry *entries, size_t length, int include_archived) {…”
+│   └── window [15–20] (99 chars) “if (include_archived || !entries[index].archived) { count++; } } return count; }”
+└── function report_owner [22–24]
+    └── window [22–24] (116 chars) “const char *report_owner(const ReportEntry *entry) { return entry->owner == NULL ? "unassigned"…”

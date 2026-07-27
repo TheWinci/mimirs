@@ -1,0 +1,9 @@
+tests/fixtures/scala/comments.scala
+├── comment [1]
+└── class Coordinator [3–12]
+    ├── comment [3]
+    ├── field worker [6–7]
+    │   └── comment [6]
+    └── method run [9–12]
+        ├── comment [9]
+        └── comment [11]

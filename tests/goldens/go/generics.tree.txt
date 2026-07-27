@@ -1,0 +1,4 @@
+tests/fixtures/go/generics.go
+├── package sample [1]
+├── function Identity [3–5]
+└── function UseGeneric [7–9]

@@ -1,0 +1,19 @@
+:root {
+  --report-gap: 1rem;
+  --report-accent: #4f46e5;
+}
+
+.report {
+  display: grid;
+  gap: var(--report-gap);
+  padding: 1rem;
+}
+
+.report__entry {
+  border-inline-start: 0.25rem solid var(--report-accent);
+  padding-inline-start: 0.75rem;
+}
+
+.report__entry[data-state="archived"] {
+  opacity: 0.6;
+}

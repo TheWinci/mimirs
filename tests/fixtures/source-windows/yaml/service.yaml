@@ -1,0 +1,17 @@
+name: report-service
+enabled: true
+
+server:
+  host: 127.0.0.1
+  port: 8080
+  routes:
+    - path: /reports
+      method: GET
+    - path: /health
+      method: GET
+
+logging:
+  level: info
+  outputs:
+    - stdout
+    - ./logs/report-service.log

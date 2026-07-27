@@ -1,0 +1,4 @@
+tests/fixtures/zig/resources.zig
+├── constant embedded [1]
+├── constant dynamic [2]
+└── function use_resource [4–7]

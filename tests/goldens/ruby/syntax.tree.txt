@@ -1,0 +1,4 @@
+tests/fixtures/ruby/syntax.rb
+└── class Fixtures::Value [1–4]
+    ├── method + [2]
+    └── method value= [3]

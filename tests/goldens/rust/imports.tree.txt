@@ -1,0 +1,5 @@
+tests/fixtures/rust/imports.rs
+├── import [1–4]
+├── function use_imports [6–12]
+└── function use_local_import [14–17]
+    └── import [15]

@@ -1,0 +1,7 @@
+tests/fixtures/cpp/preprocessor.cpp
+├── import [1–2]
+├── macro APPLY [4]
+├── macro TEMPORARY [5]
+├── directive #undef TEMPORARY [6]
+└── conditional FEATURE [8–13]
+    └── function enabled [9–12]

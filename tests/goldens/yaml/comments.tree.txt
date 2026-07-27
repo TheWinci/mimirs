@@ -1,0 +1,9 @@
+tests/fixtures/yaml/comments.yaml
+└── section [1–7]
+    ├── comment [1]
+    ├── property name [2]
+    │   └── comment [2]
+    └── property database [4–7]
+        ├── comment [4]
+        └── property pool_size [6–7]
+            └── comment [6]

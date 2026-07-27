@@ -1,0 +1,9 @@
+tests/fixtures/java/methods.java
+├── package fixtures.methods [1]
+└── class Processor [3–25]
+    ├── method Processor [4–6]
+    ├── method Processor [8–11]
+    ├── method transform [13–15]
+    ├── method defaultValue [17–20]
+    ├── method configure [22]
+    └── method configure [24]

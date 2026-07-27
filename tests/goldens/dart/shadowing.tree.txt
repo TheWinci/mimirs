@@ -1,0 +1,8 @@
+tests/fixtures/dart/shadowing.dart
+├── type Callback [1]
+├── function Make [3]
+├── function Target [4]
+└── function shadowing [6–25]
+    ├── variable target [7]
+    ├── variable nested [14]
+    └── variable reference [24]

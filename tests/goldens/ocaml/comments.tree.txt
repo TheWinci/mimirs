@@ -1,0 +1,5 @@
+tests/fixtures/ocaml/comments.ml
+├── comment [1]
+└── function documented [3–6]
+    ├── comment [3]
+    └── comment [5]

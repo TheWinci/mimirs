@@ -1,0 +1,9 @@
+tests/fixtures/lua/functions.lua
+├── call clean in function helper [4]
+├── call helper in function run [8]
+├── call loader in function run [8]
+├── call Worker.new in function M.build [12]
+├── call self.client:send in method M:execute [16]
+├── call run in module [19]
+├── call M.build in module [20]
+└── call M:execute in module [21]

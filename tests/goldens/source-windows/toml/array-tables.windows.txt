@@ -1,0 +1,7 @@
+tests/fixtures/source-windows/toml/array-tables.toml
+├── section reports [1–5]
+│   └── window [1–5] (80 chars) “[[reports]] name = "active" include_archived = false owners = ["Ada", "Grace"]”
+├── section reports [6–10]
+│   └── window [6–10] (66 chars) “[[reports]] name = "history" include_archived = true owners = []”
+└── section reports.outputs [11–13]
+    └── window [11–13] (70 chars) “[[reports.outputs]] format = "markdown" path = "./reports/history.md"”

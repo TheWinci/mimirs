@@ -1,0 +1,3 @@
+javascript/jsx
+├── import src/main.js -> src/component.jsx via "./component" [1]
+└── call src/main.js:function render -> src/component.jsx:function Component via Component [4]

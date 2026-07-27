@@ -1,0 +1,3 @@
+tests/fixtures/rust/generics.rs
+├── function identity [1–3]
+└── function make_name [5–7]

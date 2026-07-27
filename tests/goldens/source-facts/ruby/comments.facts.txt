@@ -1,0 +1,3 @@
+tests/fixtures/ruby/comments.rb
+├── call create_worker in constant WORKER [6]
+└── call WORKER.call in method run [11]

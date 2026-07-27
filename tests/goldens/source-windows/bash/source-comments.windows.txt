@@ -1,0 +1,9 @@
+tests/fixtures/source-windows/bash/source-comments.sh
+├── import [1–2]
+│   └── window [1–2] (57 chars) “#!/usr/bin/env bash source "${CONFIG_DIR:-.}/retry.conf"”
+├── constant RETRY_DELAY_MS [4]
+│   └── window [4] (28 chars) “readonly RETRY_DELAY_MS=250”
+├── function retry_delay [6–9]
+│   └── window [6–9] (89 chars) “# Return the configured retry delay. retry_delay() { printf '%s\n' "$RETRY_DELAY_MS" }”
+└── comment [11]
+    └── window [11] (50 chars) “# This final comment is intentionally standalone.”

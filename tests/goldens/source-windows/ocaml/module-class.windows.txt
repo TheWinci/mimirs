@@ -1,0 +1,4 @@
+tests/fixtures/source-windows/ocaml/module-class.ml
+└── module Report [1–22]
+    ├── window [1–11] (239 chars) “module Report = struct type entry = { title : string; owner : string option; } class report_boo…”
+    └── window [12–22] (234 chars) “method render = List.map (fun entry -> let owner = Option.value entry.owner ~default:"unassigne…”

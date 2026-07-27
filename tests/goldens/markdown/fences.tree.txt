@@ -1,0 +1,4 @@
+tests/fixtures/markdown/fences.md
+├── paragraph [1–5]
+└── section Real heading [6–19]
+    └── section Real child [17–19]

@@ -1,0 +1,8 @@
+tests/fixtures/source-windows/python/oversized-class.py
+├── import [1]
+│   └── window [1] (41 chars) “from dataclasses import dataclass, field”
+└── class JobQueue [4–28]
+    ├── window [4–11] (198 chars) “@dataclass class JobQueue: """Keep pending jobs in insertion order.""" jobs: list[str] = field(…”
+    ├── window [12–14] (86 chars) “def peek(self) -> str | None: return self.jobs[0] if self.jobs else None”
+    ├── window [15–20] (219 chars) “def drain(self, limit: int | None = None) -> list[str]: count = len(self.jobs) if limit is None…”
+    └── window [21–28] (145 chars) “@property def size(self) -> int: return len(self.jobs) @classmethod def empty(cls) -> "JobQueue…”

@@ -1,0 +1,2 @@
+tests/fixtures/javascript/namespace-export.js
+└── export * as utils from "./utils.js" [1]

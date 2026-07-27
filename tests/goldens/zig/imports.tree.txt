@@ -1,0 +1,6 @@
+tests/fixtures/zig/imports.zig
+├── constant std [1]
+├── constant local [2]
+├── constant c [3–5]
+├── constant dynamic [6]
+└── function run [8–12]

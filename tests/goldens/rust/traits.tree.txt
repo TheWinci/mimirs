@@ -1,0 +1,9 @@
+tests/fixtures/rust/traits.rs
+├── trait Runner [1–7]
+│   ├── method run [2]
+│   └── method ready [4–6]
+├── struct Worker [9]
+├── impl Runner for Worker [11–15]
+│   └── method run [12–14]
+└── impl Worker [17–21]
+    └── method new [18–20]

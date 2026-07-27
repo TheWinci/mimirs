@@ -1,0 +1,2 @@
+tests/fixtures/c/api.h
+└── #include <stddef.h> in conditional !defined(FIXTURES_API_H) [4]

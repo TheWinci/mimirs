@@ -1,0 +1,3 @@
+typescript/directory-index
+├── import src/main.ts -> src/worker/index.ts via "./worker" [1]
+└── call src/main.ts:function start -> src/worker/index.ts:function run via run [4]

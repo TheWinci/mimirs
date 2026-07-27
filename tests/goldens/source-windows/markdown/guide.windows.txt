@@ -1,0 +1,5 @@
+tests/fixtures/source-windows/markdown/guide.md
+└── section Report Service [1–15]
+    ├── window [1–4] (82 chars) “# Report Service The report service builds compact summaries from project data.”
+    ├── window [5–12] (168 chars) “## Running locally Install dependencies and start the development process. ### Configuration Se…”
+    └── window [13–15] (82 chars) “## Publishing Review the generated report before making it available to readers.”

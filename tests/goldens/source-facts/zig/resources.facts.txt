@@ -1,0 +1,5 @@
+tests/fixtures/zig/resources.zig
+├── const embedded = @embedFile("assets/message.txt") in constant embedded [1]
+├── call @embedFile in constant dynamic [2]
+├── call consume in function use_resource [5]
+└── call consume in function use_resource [6]

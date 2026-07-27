@@ -1,0 +1,3 @@
+tests/fixtures/java/classes.java
+├── call service.execute in method run [12]
+└── call check in method ready [17]

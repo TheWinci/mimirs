@@ -1,0 +1,11 @@
+tests/fixtures/go/declarations.go
+├── package sample [1]
+├── constant [3–6]
+│   ├── constant StatusReady [4]
+│   └── constant StatusDone [5]
+├── variable [8–11]
+│   ├── variable PrimaryStore [9]
+│   └── variable BackupStore [10]
+└── struct Coordinates [13–16]
+    ├── field X, Y [14]
+    └── field Store [15]

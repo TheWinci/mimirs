@@ -1,0 +1,12 @@
+tests/fixtures/kotlin/functions.kt
+├── call readValue in function load [3]
+├── call clean in function normalized [5]
+├── call mapper in function local [8]
+├── call local in function transform [9]
+├── call loader in function run [13]
+├── call load in function run [14]
+├── call items.map in function run [15]
+├── call item.normalized in function run [15]
+├── call service?.refresh in function run [16]
+├── call transform<String> in function run [17]
+└── call value.trim in function run [17]

@@ -1,0 +1,6 @@
+tests/fixtures/python/scope.py
+├── from package.runner import run [1]
+├── call run in function execute [5]
+├── call Runner in function execute [5]
+├── call default_runner in function execute [5]
+└── call run in function start [9]

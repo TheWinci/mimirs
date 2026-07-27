@@ -1,0 +1,10 @@
+mixed/basic
+├── source files [5]
+├── imports [2]
+│   ├── import src/consumer.ts -> src/helper.js via "./helper.js" [1]
+│   └── import src/main.js -> src/worker.ts via "./worker.js" [1]
+├── re-exports [0]
+├── calls [2]
+│   ├── call src/consumer.ts:function consume -> src/helper.js:function help via help [4]
+│   └── call src/main.js:function start -> src/worker.ts:function run via run [4]
+└── unresolved [0]

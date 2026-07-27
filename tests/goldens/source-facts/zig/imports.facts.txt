@@ -1,0 +1,8 @@
+tests/fixtures/zig/imports.zig
+├── const std = @import("std") in constant std [1]
+├── const local = @import("local.zig") in constant local [2]
+├── @cInclude("stdio.h") in constant c [4]
+├── call @import in constant dynamic [6]
+├── call std.debug.print in function run [9]
+├── call local.execute in function run [10]
+└── call c.printf in function run [11]

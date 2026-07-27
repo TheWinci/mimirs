@@ -1,0 +1,2 @@
+tests/fixtures/dart/comments.dart
+└── call render in function documented [7]

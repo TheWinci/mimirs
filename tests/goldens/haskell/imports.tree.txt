@@ -1,0 +1,4 @@
+tests/fixtures/haskell/imports.hs
+├── module App.Main [1]
+├── import [3–6]
+└── function run [8]

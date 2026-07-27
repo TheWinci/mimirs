@@ -1,0 +1,13 @@
+tests/fixtures/typescript/classes.ts
+├── class Store [1–3]
+│   └── method get [2]
+└── class MemoryStore [5–39]
+    ├── field kind [6]
+    ├── field #items [7]
+    ├── method constructor [9–14]
+    ├── method get [16–18]
+    ├── method set [20–22]
+    ├── method size [24–26]
+    ├── method load [28–30]
+    ├── method entries [32–34]
+    └── method empty [36–38]

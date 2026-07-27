@@ -1,0 +1,6 @@
+tests/fixtures/typescript/commonjs.cts
+├── import * as path from "node:path" [2]
+├── import * as fs from "node:fs" [4]
+├── call fs.readFileSync in function load [7]
+├── call path.resolve in function load [7]
+└── export load as default [10]

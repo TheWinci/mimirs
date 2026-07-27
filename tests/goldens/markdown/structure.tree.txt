@@ -1,0 +1,6 @@
+tests/fixtures/markdown/structure.md
+├── paragraph [1–2]
+└── section Project [3–17]
+    ├── section Install [7–14]
+    │   └── section Notes [11–14]
+    └── section Usage [15–17]

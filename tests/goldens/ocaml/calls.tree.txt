@@ -1,0 +1,5 @@
+tests/fixtures/ocaml/calls.ml
+├── function direct [1]
+├── function qualified [2]
+├── function local [3]
+└── function operated [4]

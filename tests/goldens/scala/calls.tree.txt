@@ -1,0 +1,5 @@
+tests/fixtures/scala/calls.scala
+├── class Calls [1–13]
+│   ├── method run [2–12]
+│   └── method helper [12]
+└── class Worker [14]

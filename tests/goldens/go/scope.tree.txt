@@ -1,0 +1,6 @@
+tests/fixtures/go/scope.go
+├── package sample [1]
+├── import [3]
+├── function Execute [5–8]
+├── function Start [10–12]
+└── function helper [14]

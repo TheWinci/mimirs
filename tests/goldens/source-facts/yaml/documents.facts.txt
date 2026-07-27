@@ -1,0 +1,2 @@
+tests/fixtures/yaml/documents.yml
+└── (no facts)

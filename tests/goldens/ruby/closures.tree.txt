@@ -1,0 +1,5 @@
+tests/fixtures/ruby/closures.rb
+├── function NORMALIZE [1]
+├── method transform [3–11]
+│   └── function normalize [4]
+└── block [12–13]

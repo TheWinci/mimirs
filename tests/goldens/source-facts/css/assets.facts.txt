@@ -1,0 +1,6 @@
+tests/fixtures/css/assets.css
+├── url "images/hero.png" in selector .hero [2]
+├── url "cursors/pointer.cur" in selector .hero [3]
+├── url "images/photo.png" in selector .gallery [8]
+├── url "images/photo@2x.png" in selector .gallery [9]
+└── url "https://cdn.example.com/pattern.svg" in selector .remote [14]

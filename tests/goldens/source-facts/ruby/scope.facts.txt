@@ -1,0 +1,5 @@
+tests/fixtures/ruby/scope.rb
+├── call loader.call in method run [3]
+├── call helper in method run [4]
+├── call callback.call in method run [5]
+└── call perform in function callback [7]

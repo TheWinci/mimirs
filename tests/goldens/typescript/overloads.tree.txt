@@ -1,0 +1,6 @@
+tests/fixtures/typescript/overloads.ts
+├── function parse [1–5]
+├── class Parser [7–13]
+│   └── method parse [8–12]
+└── interface Codec [15–18]
+    └── method encode [16–17]

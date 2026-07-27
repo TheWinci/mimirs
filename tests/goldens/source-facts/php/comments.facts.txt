@@ -1,0 +1,2 @@
+tests/fixtures/php/comments.php
+└── call $this->worker->run in method run [14]

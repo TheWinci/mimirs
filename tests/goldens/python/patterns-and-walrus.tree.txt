@@ -1,0 +1,2 @@
+tests/fixtures/python/patterns-and-walrus.py
+└── function modern_binders [1–30]

@@ -1,0 +1,10 @@
+tests/fixtures/typescript/types.ts
+├── export Repository [1–5]
+├── export type Identifier [7]
+├── export type Timestamped [9–12]
+├── export type UnwrapPromise [14]
+├── export type Optional [16–18]
+├── export Status [20–24]
+├── export Parsing [26–35]
+├── export Options in module Parsing [27–29]
+└── export type Result in module Parsing [31–34]

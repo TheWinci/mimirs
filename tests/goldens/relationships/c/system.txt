@@ -1,0 +1,2 @@
+c/system
+└── unresolved call main.c:function main -> printf [4]

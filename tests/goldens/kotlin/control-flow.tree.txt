@@ -1,0 +1,10 @@
+tests/fixtures/kotlin/control-flow.kt
+└── package fixtures.control [1–49]
+    ├── type Callback [3]
+    ├── class Failure [5–7]
+    │   └── method report [6]
+    ├── function make [9]
+    ├── function pair [10]
+    ├── function work [11]
+    └── function control [13–49]
+        └── variable anonymous [45–47]

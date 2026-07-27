@@ -1,0 +1,3 @@
+lua/ambiguity
+├── unresolved import main.lua -> "duplicate" [1]
+└── unresolved call main.lua:module -> duplicate.run [3]

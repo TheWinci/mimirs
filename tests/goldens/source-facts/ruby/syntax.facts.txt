@@ -1,0 +1,3 @@
+tests/fixtures/ruby/syntax.rb
+├── call combine in method + [2]
+└── call store in method value= [3]

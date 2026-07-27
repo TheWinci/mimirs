@@ -1,0 +1,3 @@
+tests/fixtures/go/control-flow.go
+├── package sample [1]
+└── function ControlFlow [3–57]

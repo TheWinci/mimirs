@@ -1,0 +1,6 @@
+tests/fixtures/elixir/comments.ex
+├── comment [1]
+└── module Fixtures.Documented [3–9]
+    ├── comment [3]
+    └── function render [5–8]
+        └── comment [5]

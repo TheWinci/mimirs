@@ -1,0 +1,11 @@
+tests/fixtures/source-windows/scala/report.sc
+├── import [1]
+│   └── window [1] (35 chars) “import java.nio.file.{Files, Path}”
+├── class Report [3]
+│   └── window [3] (52 chars) “final case class Report(name: String, body: String)”
+├── function loadReport [5–8]
+│   └── window [5–8] (116 chars) “def loadReport(path: Path): Report = val body = Files.readString(path) Report(path.getFileName.…”
+├── variable report [9]
+│   └── window [9] (46 chars) “val report = loadReport(Path.of("report.md"))”
+└── block [10]
+    └── window [10] (50 chars) “println(s"${report.name}: ${report.body.length}")”

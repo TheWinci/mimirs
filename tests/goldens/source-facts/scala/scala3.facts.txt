@@ -1,0 +1,4 @@
+tests/fixtures/scala/scala3.scala
+├── call format in method label [6]
+├── call compareState in method compare [9]
+└── call clean in method normalized [12]

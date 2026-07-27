@@ -1,0 +1,8 @@
+tests/fixtures/java/methods.java
+├── call this in method Processor [5]
+├── call defaultValue in method Processor [5]
+├── call super in method Processor [9]
+├── call configure in method Processor [10]
+├── call mapper.apply in method transform [14]
+├── call Processor.<String>create in method defaultValue [18]
+└── call create in method defaultValue [19]

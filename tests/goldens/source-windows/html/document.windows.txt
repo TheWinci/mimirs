@@ -1,0 +1,7 @@
+tests/fixtures/source-windows/html/document.html
+├── directive [1]
+│   └── window [1] (16 chars) “<!doctype html>”
+└── element html [2–20]
+    ├── window [2–10] (188 chars) “<html lang="en"> <head> <meta charset="utf-8"> <title>Report</title> </head> <body> <main> <h1>…”
+    ├── window [11–16] (189 chars) “<h2 id="active-heading">Active entries</h2> <article data-owner="Ada"> <h3>First entry</h3> <p>…”
+    └── window [17–20] (71 chars) “<footer>Generated locally</footer> </main> </body> </html>”

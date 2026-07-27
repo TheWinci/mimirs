@@ -1,0 +1,8 @@
+tests/fixtures/java/classes.java
+├── package fixtures.classes [1]
+└── class Worker [3–20]
+    ├── field service [4]
+    ├── method Worker [6–8]
+    ├── method run [10–13]
+    └── class State [15–19]
+        └── method ready [16–18]

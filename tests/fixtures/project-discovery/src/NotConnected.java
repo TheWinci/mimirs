@@ -1,0 +1,3 @@
+package discovery;
+
+class NotConnected {}

@@ -1,0 +1,5 @@
+python/relative
+├── import src/pkg/sub/main.py -> src/pkg/shared.py via "..shared" [1]
+├── import src/pkg/sub/main.py -> src/pkg/sub/helper.py via "." [2]
+├── call src/pkg/sub/main.py:function start -> src/pkg/shared.py:function load via load [6]
+└── call src/pkg/sub/main.py:function start -> src/pkg/sub/helper.py:function run via helper.run [6]

@@ -1,0 +1,4 @@
+tests/fixtures/bash/source-shadowing.sh
+├── source "./before.sh" [1]
+├── call consume in function source [4]
+└── call source in module [7]

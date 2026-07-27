@@ -1,0 +1,9 @@
+tests/fixtures/source-windows/zig/imports-comments.zig
+├── constant std [1]
+│   └── window [1] (28 chars) “const std = @import("std");”
+├── constant retry_delay_ms [3]
+│   └── window [3] (33 chars) “const retry_delay_ms: u32 = 250;”
+├── function retryDelay [5–8]
+│   └── window [5–8] (94 chars) “/// Return the configured retry delay. pub fn retryDelay() u32 { return retry_delay_ms; }”
+└── comment [10]
+    └── window [10] (51 chars) “// This final comment is intentionally standalone.”

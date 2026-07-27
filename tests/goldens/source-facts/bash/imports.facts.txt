@@ -1,0 +1,5 @@
+tests/fixtures/bash/imports.sh
+├── source "./lib.sh" [1]
+├── . "./config.sh" [2]
+├── call source in module [4]
+└── call run in module [5]

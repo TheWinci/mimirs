@@ -1,0 +1,10 @@
+tests/fixtures/java/comments.java
+├── package comments [1–2]
+│   └── comment [1]
+└── class Coordinator [4–15]
+    ├── comment [4]
+    ├── field worker [6–7]
+    │   └── comment [6]
+    └── method run [9–14]
+        ├── comment [9]
+        └── comment [12]

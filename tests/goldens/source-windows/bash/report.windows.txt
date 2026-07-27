@@ -1,0 +1,11 @@
+tests/fixtures/source-windows/bash/report.bash
+├── comment [1]
+│   └── window [1] (20 chars) “#!/usr/bin/env bash”
+├── import [3]
+│   └── window [3] (38 chars) “source "${REPORT_HOME:-.}/helpers.sh"”
+├── function print_report [5–11]
+│   └── window [5–11] (148 chars) “# Print one formatted report. print_report() { local path="$1" local contents contents="$(read_…”
+├── constant REPORT_PATH [13]
+│   └── window [13] (39 chars) “readonly REPORT_PATH="${1:-report.md}"”
+└── block [14]
+    └── window [14] (28 chars) “print_report "$REPORT_PATH"”

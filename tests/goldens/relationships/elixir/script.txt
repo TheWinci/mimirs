@@ -1,0 +1,3 @@
+elixir/script
+├── import main.exs -> app/worker.ex via "App.Worker" [1]
+└── call main.exs:module -> app/worker.ex:function run via Worker.run [3]

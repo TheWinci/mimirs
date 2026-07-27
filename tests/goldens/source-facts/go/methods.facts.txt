@@ -1,0 +1,3 @@
+tests/fixtures/go/methods.go
+├── call loader in method Load [12]
+└── call cache.normalize in method Refresh [16]

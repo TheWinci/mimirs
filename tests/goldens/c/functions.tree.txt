@@ -1,0 +1,5 @@
+tests/fixtures/c/functions.c
+├── function declared [1]
+├── function helper [3–5]
+├── function find [7–9]
+└── function run [11–13]

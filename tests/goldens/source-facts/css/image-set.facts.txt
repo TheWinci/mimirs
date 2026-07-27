@@ -1,0 +1,4 @@
+tests/fixtures/css/image-set.css
+├── image-set "images/hero.png" in selector .hero [3]
+├── url "images/hero@2x.png" in selector .hero [4]
+└── image-set "images/legacy.png" in selector .legacy [10]

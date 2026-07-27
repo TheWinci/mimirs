@@ -1,0 +1,5 @@
+tests/fixtures/source-windows/text/report.notes
+├── paragraph [1]
+│   └── window [1] (72 chars) “Review note: this unknown text extension still uses paragraph chunking.”
+└── paragraph [3]
+    └── window [3] (61 chars) “The fallback remains deterministic and retains exact ranges.”

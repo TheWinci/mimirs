@@ -1,0 +1,11 @@
+tests/fixtures/yaml/flow.yaml
+└── section [1–3]
+    ├── property metadata [1]
+    │   ├── property owner [1]
+    │   └── property labels [1]
+    │       ├── property tier [1]
+    │       └── property stable [1]
+    ├── property ports [2]
+    └── property quoted [3]
+        ├── property "display name" [3]
+        └── property 'literal key' [3]

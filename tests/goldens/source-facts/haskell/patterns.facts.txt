@@ -1,0 +1,10 @@
+tests/fixtures/haskell/patterns.hs
+├── call callback in variable result [3]
+├── call fallback in variable result [4]
+├── call callback in function caseScope [5]
+├── call split in function pairScope [8]
+├── call left in function pairScope [9]
+├── call fetch in function doScope [12]
+├── call action in function doScope [13]
+├── call action in function comprehensionScope [16]
+└── call keep in function comprehensionScope [16]

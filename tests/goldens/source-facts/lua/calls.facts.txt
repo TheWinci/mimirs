@@ -1,0 +1,11 @@
+tests/fixtures/lua/calls.lua
+├── call make in function build [2]
+├── call build in variable callable [5]
+├── call run in module [7]
+├── call service:execute in module [8]
+├── call module.helper in module [9]
+├── call build in module [10]
+├── call build() in module [10]
+├── call consume in module [11]
+├── call load in module [11]
+└── call print in module [12]

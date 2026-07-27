@@ -1,0 +1,8 @@
+tests/fixtures/yaml/semantic-traps.yaml
+└── section [1–6]
+    ├── property include [1]
+    ├── property extends [2–3]
+    │   └── section [3]
+    ├── property imports [4–5]
+    │   └── property source [5]
+    └── property command [6]

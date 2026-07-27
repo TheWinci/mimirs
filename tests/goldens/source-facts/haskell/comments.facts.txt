@@ -1,0 +1,2 @@
+tests/fixtures/haskell/comments.hs
+└── call render in function documented [6]

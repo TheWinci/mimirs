@@ -1,0 +1,12 @@
+tests/fixtures/python/evaluation-scope.py
+├── from package.factories import base_class [1]
+├── from package.factories import build_default [1]
+├── from package.factories import decorate [1]
+├── call decorate in module [4]
+├── call register in module [4]
+├── call build_default in module [5]
+├── call return_type in module [5]
+├── call callback in function configured [6]
+├── call base_class in module [9]
+├── call factory in field value [11]
+└── call factory in method run [14]

@@ -1,0 +1,3 @@
+tests/fixtures/dart/part.dart
+├── module app.main [1]
+└── function work [3–5]

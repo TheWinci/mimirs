@@ -1,0 +1,11 @@
+tests/fixtures/javascript/commonjs-shadowing.cjs
+├── variable real [1]
+├── function shadowRequire [3–5]
+├── function shadowModule [7–9]
+├── function shadowExports [11–13]
+├── function lexicalRequire [15–18]
+├── function lexicalModule [20–23]
+├── function lexicalExports [25–28]
+├── block [29–30]
+├── variable later [31]
+└── block [32–37]

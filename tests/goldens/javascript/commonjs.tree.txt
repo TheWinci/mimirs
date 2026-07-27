@@ -1,0 +1,7 @@
+tests/fixtures/javascript/commonjs.cjs
+├── variable fs [1]
+├── variable { join: joinPath, basename } [2]
+├── block [3]
+├── variable dynamic [4]
+├── function read [6–8]
+└── block [9–12]

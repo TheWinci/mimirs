@@ -1,0 +1,8 @@
+tests/fixtures/dart/functions.dart
+├── function square [1]
+├── constant limit [3]
+├── function callback [4]
+├── variable name [5]
+└── function main [7–15]
+    ├── variable result [8]
+    └── function nested [10–12]

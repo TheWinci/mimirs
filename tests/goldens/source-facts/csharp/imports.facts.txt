@@ -1,0 +1,7 @@
+tests/fixtures/csharp/imports.cs
+├── global using System [1]
+├── using static System.Math [2]
+├── using Text = System.Text [3]
+├── using Project.Services [4]
+├── call Abs in method Build [12]
+└── call Text.StringBuilder in method Build [13]

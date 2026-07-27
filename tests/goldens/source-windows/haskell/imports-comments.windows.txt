@@ -1,0 +1,11 @@
+tests/fixtures/source-windows/haskell/imports-comments.hs
+├── module Windows.Retry [1]
+│   └── window [1] (40 chars) “module Windows.Retry (retryDelay) where”
+├── import [3]
+│   └── window [3] (26 chars) “import Data.Word (Word32)”
+├── type retryDelay [5–6]
+│   └── window [5–6] (61 chars) “-- | Return the configured retry delay. retryDelay :: Word32”
+├── variable retryDelay [7]
+│   └── window [7] (17 chars) “retryDelay = 250”
+└── comment [9]
+    └── window [9] (51 chars) “-- This final comment is intentionally standalone.”

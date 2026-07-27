@@ -1,0 +1,11 @@
+tests/fixtures/source-windows/kotlin/report.kts
+├── import [1–2]
+│   └── window [1–2] (53 chars) “import java.nio.file.Files import java.nio.file.Path”
+├── record Report [4]
+│   └── window [4] (54 chars) “data class Report(val name: String, val body: String)”
+├── function loadReport [6–9]
+│   └── window [6–9] (127 chars) “fun loadReport(path: Path): Report { val body = Files.readString(path) return Report(path.fileN…”
+├── variable report [11]
+│   └── window [11] (46 chars) “val report = loadReport(Path.of("report.md"))”
+└── block [12]
+    └── window [12] (49 chars) “println("${report.name}: ${report.body.length}")”

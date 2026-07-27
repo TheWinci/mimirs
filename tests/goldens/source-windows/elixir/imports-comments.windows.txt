@@ -1,0 +1,6 @@
+tests/fixtures/source-windows/elixir/imports-comments.ex
+├── module Windows.Retry [1–11]
+│   ├── window [1–3] (94 chars) “defmodule Windows.Retry do alias DateTime, as: Clock import Kernel, only: [is_integer: 1]”
+│   └── window [4–11] (170 chars) “@retry_delay_ms 250 @doc "Return the configured retry delay." def delay when is_integer(@retry_…”
+└── comment [13]
+    └── window [13] (50 chars) “# This final comment is intentionally standalone.”

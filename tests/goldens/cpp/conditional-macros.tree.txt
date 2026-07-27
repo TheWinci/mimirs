@@ -1,0 +1,8 @@
+tests/fixtures/cpp/conditional-macros.cpp
+├── conditional defined(FEATURE) [1–11]
+│   ├── macro ACTIVE [2]
+│   ├── function feature [3–5]
+│   └── conditional else [6–10]
+│       ├── macro ACTIVE [7]
+│       └── function fallback [8–10]
+└── function after_conditional [13–15]

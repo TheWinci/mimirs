@@ -1,0 +1,9 @@
+tests/fixtures/haskell/types.hs
+├── type Result [1]
+├── type UserId [2]
+├── type Name [3]
+├── class Render [5–6]
+│   └── type render [6]
+├── impl Render UserId [8–9]
+│   └── function render [9]
+└── function build [11]

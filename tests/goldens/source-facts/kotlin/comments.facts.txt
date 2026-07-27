@@ -1,0 +1,3 @@
+tests/fixtures/kotlin/comments.kt
+├── call buildText in method render [8]
+└── call loadTitle in field title [11]

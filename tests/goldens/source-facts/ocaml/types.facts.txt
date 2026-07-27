@@ -1,0 +1,3 @@
+tests/fixtures/ocaml/types.ml
+├── call Ok in function succeed [17]
+└── call Error in function fail [18]

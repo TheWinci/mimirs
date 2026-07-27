@@ -1,0 +1,3 @@
+tests/fixtures/elixir/script-scope.exs
+├── function make [1]
+└── block [2–15]

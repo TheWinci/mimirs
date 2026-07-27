@@ -1,0 +1,8 @@
+tests/fixtures/dart/modules.dart
+├── import "dart:async" [3]
+├── import "package:app/service.dart" as service [4]
+├── import "src/optional.dart" [5]
+├── import "src/io.dart" (conditional) [5]
+├── export Api from "src/api.dart" [6]
+├── part "worker.dart" [7]
+└── call service.start in function run [10]

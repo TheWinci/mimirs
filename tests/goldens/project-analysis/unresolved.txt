@@ -1,0 +1,9 @@
+unresolved
+├── source files [1]
+├── imports [0]
+├── re-exports [0]
+├── calls [0]
+└── unresolved [3]
+    ├── unresolved import src/main.js -> "./missing.js" [1]
+    ├── unresolved re-export src/main.js -> "./absent.js" [2]
+    └── unresolved call src/main.js:function run -> missing [5]

@@ -1,0 +1,7 @@
+ruby/basic
+├── import app/main.rb -> lib/helper.rb via "../lib/helper" [2]
+├── import app/main.rb -> lib/project/worker.rb via "project/worker" [1]
+├── call app/main.rb:module -> lib/project/worker.rb:method run via Project::Worker.run [4]
+├── call app/main.rb:module -> lib/helper.rb:method start via Helper.start [5]
+├── call app/main.rb:module -> lib/project/worker.rb:class Worker via Project::Worker.new [6]
+└── unresolved call app/main.rb:module -> Project::Worker.missing [7]

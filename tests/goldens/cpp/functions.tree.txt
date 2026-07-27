@@ -1,0 +1,8 @@
+tests/fixtures/cpp/functions.cpp
+├── function declared [1]
+├── variable global_value [2]
+├── function add [4–6]
+├── function make [8–10]
+├── constant LIMIT [12]
+├── variable callback [13]
+└── function run [15–18]

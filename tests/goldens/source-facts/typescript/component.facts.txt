@@ -1,0 +1,5 @@
+tests/fixtures/typescript/component.tsx
+├── import type ReactNode from "react" [2]
+├── call value.toUpperCase in function format [10]
+├── export Card [13–21]
+└── call format in function Card [14]

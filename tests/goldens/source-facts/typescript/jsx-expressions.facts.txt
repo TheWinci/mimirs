@@ -1,0 +1,13 @@
+tests/fixtures/typescript/jsx-expressions.tsx
+├── import Card from "./ui.js" [2]
+├── import formatTitle from "./ui.js" [2]
+├── import makeProps from "./ui.js" [2]
+├── import renderItem from "./ui.js" [2]
+├── call makeProps in function propsFor [10]
+├── export Gallery [13–27]
+├── call items.at in function Gallery [14]
+├── call propsFor in function Gallery [18]
+├── call formatTitle in function Gallery [19]
+├── call onSelect in function Gallery [20]
+├── call items.map in function Gallery [23]
+└── call renderItem in function Gallery [23]

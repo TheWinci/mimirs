@@ -1,0 +1,11 @@
+@import url(var(--theme));
+@import "data:text/css,body{}";
+
+.dynamic {
+  background: url(var(--asset));
+  mask: url("#icon-mask");
+  cursor: url("data:image/svg+xml;base64,PHN2Zy8+"), auto;
+  list-style-image: url(" blob:https://example.test/id ");
+  color: rgb(20 40 60 / 80%);
+  width: calc(100% - 2rem);
+}

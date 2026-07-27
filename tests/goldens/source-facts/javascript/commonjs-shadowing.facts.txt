@@ -1,0 +1,7 @@
+tests/fixtures/javascript/commonjs-shadowing.cjs
+├── import * as real from "./real.cjs" [1]
+├── call require in function shadowRequire [4]
+├── call makeLoader in function lexicalRequire [16]
+├── call require in function lexicalRequire [17]
+├── call makeLoader in module [30]
+└── call require in variable later [31]

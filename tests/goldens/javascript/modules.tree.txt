@@ -1,0 +1,8 @@
+tests/fixtures/javascript/modules.js
+├── import [1–4]
+├── variable VERSION [6]
+├── variable internalValue [7]
+├── export [9]
+├── export [10]
+├── export [11]
+└── function configure [13–15]

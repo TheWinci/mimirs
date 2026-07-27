@@ -1,0 +1,5 @@
+tests/fixtures/source-windows/text/events.log
+├── paragraph [1–2]
+│   └── window [1–2] (71 chars) “2026-07-16 report scan started 2026-07-16 three source windows created”
+└── paragraph [4]
+    └── window [4] (46 chars) “2026-07-16 report scan completed successfully”

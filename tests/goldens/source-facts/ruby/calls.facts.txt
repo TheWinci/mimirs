@@ -1,0 +1,8 @@
+tests/fixtures/ruby/calls.rb
+├── call new in method create [2]
+├── call service.call in method run [6]
+├── call service&.execute in method run [7]
+├── call Worker.create in method run [8]
+├── call Worker::create in method run [9]
+├── call factory in method run [10]
+└── call factory().build in method run [10]

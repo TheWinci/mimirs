@@ -1,0 +1,4 @@
+tests/fixtures/haskell/equations.hs
+├── function describe [1]
+├── function describe [2]
+└── function run [4]

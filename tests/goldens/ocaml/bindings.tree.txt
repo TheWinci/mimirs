@@ -1,0 +1,5 @@
+tests/fixtures/ocaml/bindings.ml
+├── variable name [1]
+├── variable left, right [2]
+├── function callback [3]
+└── variable result [5]

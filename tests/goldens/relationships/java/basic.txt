@@ -1,0 +1,12 @@
+java/basic
+├── import src/com/acme/app/Main.java -> package com.acme.model via "com.acme.model" [3]
+├── import src/com/acme/app/Main.java -> src/com/acme/tools/Tools.java via "com.acme.tools.Tools" [5–6]
+├── import src/com/acme/app/Main.java -> src/com/acme/tools/Worker.java via "com.acme.tools.Worker" [4]
+├── call src/com/acme/app/Main.java:method launch -> src/com/acme/app/Local.java:method start via Local.start [10]
+├── call src/com/acme/app/Main.java:method launch -> src/com/acme/tools/Worker.java:method start via Worker.start [11]
+├── call src/com/acme/app/Main.java:method launch -> src/com/acme/tools/Tools.java:method run via run [12]
+├── call src/com/acme/app/Main.java:method launch -> src/com/acme/tools/Worker.java:class Worker via Worker [15]
+├── call src/com/acme/tools/Worker.java:method start -> src/com/acme/tools/Worker.java:method helper via helper [7]
+├── unresolved call src/com/acme/app/Main.java:method launch -> missingFromWildcard [13]
+├── unresolved call src/com/acme/app/Main.java:method launch -> Model.create [14]
+└── unresolved call src/com/acme/app/Main.java:method launch -> System.out.println [16]

@@ -1,0 +1,6 @@
+include = "shared.toml"
+extends = ["base.toml"]
+command = "build()"
+
+[imports]
+source = "theme.css"

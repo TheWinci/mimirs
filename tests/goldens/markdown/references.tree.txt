@@ -1,0 +1,2 @@
+tests/fixtures/markdown/references.md
+└── section Guides [1–13]

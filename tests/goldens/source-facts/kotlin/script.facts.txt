@@ -1,0 +1,6 @@
+tests/fixtures/kotlin/script.kts
+├── import java.nio.file.Path [1]
+├── call Path.of in variable root [3]
+├── call path.fileName.toString in function label [5]
+├── call println in module [7]
+└── call label in module [7]

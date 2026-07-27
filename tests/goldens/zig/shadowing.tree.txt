@@ -1,0 +1,8 @@
+tests/fixtures/zig/shadowing.zig
+├── constant Callback [1]
+├── function make [3]
+├── function target [4]
+└── function shadowing [6–23]
+    ├── variable target [7]
+    ├── variable target [10]
+    └── constant nested [14]

@@ -1,0 +1,8 @@
+tests/fixtures/haskell/shadowing.hs
+├── module App.Shadowing [1]
+├── import [3]
+├── function run [5]
+├── function transform [6]
+├── function render [8]
+├── function describe [9]
+└── function describe [10]

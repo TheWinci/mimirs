@@ -1,0 +1,10 @@
+tests/fixtures/ruby/classes.rb
+└── module Fixtures [1–25]
+    └── module Services [2–24]
+        └── class Worker [3–23]
+            ├── constant DEFAULT_LIMIT [4]
+            ├── method initialize [6–8]
+            ├── method run [10–12]
+            ├── method create [14–16]
+            └── class singleton self [18–22]
+                └── method configure [19–21]

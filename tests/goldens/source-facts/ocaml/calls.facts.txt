@@ -1,0 +1,8 @@
+tests/fixtures/ocaml/calls.ml
+├── call compute in function direct [1]
+├── call Module.compute in function qualified [2]
+├── open Core in function local [3]
+├── call compute in function local [3]
+├── call |> in function operated [4]
+├── call |> in function operated [4]
+└── call combine in function operated [4]

@@ -1,0 +1,2 @@
+ruby/external
+└── unresolved call main.rb:module -> JSON.generate [3]

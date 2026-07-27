@@ -1,0 +1,11 @@
+elixir/basic
+├── import lib/app/main.ex -> lib/app/logger.ex via "App.Logger" [5]
+├── import lib/app/main.ex -> lib/app/plugin.ex via "App.Plugin" [6]
+├── import lib/app/main.ex -> lib/app/tools.ex via "App.Tools" [4]
+├── import lib/app/main.ex -> lib/app/worker.ex via "App.Worker" [2–3]
+├── call lib/app/main.ex:function launch -> lib/app/worker.ex:function run via Worker.run [9]
+├── call lib/app/main.ex:function launch -> lib/app/worker.ex:function run via Job.run [10]
+├── call lib/app/main.ex:function launch -> lib/app/tools.ex:function build via build [11]
+├── call lib/app/main.ex:function launch -> lib/app/tools.ex:function direct via App.Tools.direct [12]
+├── call lib/app/main.ex:function launch -> lib/app/logger.ex:function info via App.Logger.info [13]
+└── unresolved call lib/app/main.ex:function launch -> Missing.run [14]

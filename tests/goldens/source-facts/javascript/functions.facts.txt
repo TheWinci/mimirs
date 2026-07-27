@@ -1,0 +1,7 @@
+tests/fixtures/javascript/functions.js
+├── export formatLabel [1–3]
+├── call value.trim in function formatLabel [2]
+├── export loadValue [5–7]
+├── call fetcher in function loadValue [6]
+├── export double [9]
+└── export integerRange [11–15]

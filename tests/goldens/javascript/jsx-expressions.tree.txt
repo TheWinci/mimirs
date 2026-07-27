@@ -1,0 +1,4 @@
+tests/fixtures/javascript/jsx-expressions.jsx
+├── import [1]
+├── function propsFor [3–5]
+└── function Gallery [7–21]

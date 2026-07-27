@@ -1,0 +1,3 @@
+tests/fixtures/bash/extension.bash
+├── call prepare in function bootstrap [2]
+└── call bootstrap in module [5]

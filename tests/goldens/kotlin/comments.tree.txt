@@ -1,0 +1,9 @@
+tests/fixtures/kotlin/comments.kt
+└── package fixtures.comments [1–12]
+    ├── comment [1]
+    └── class Documented [4–12]
+        ├── comment [4]
+        ├── method render [7–8]
+        │   └── comment [7]
+        └── field title [10–11]
+            └── comment [10]

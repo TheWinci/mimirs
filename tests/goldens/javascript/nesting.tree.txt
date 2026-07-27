@@ -1,0 +1,7 @@
+tests/fixtures/javascript/nesting.js
+├── function createFormatter [1–11]
+│   ├── function normalize [2–4]
+│   └── function surround [6]
+└── class Formatter [13–21]
+    ├── method trim [14–16]
+    └── method format [18–20]

@@ -1,0 +1,9 @@
+tests/fixtures/typescript/jsx-expressions.tsx
+├── import [1–2]
+│   ├── comment [1]
+│   └── block [2]
+├── interface GalleryProps [4–7]
+│   ├── property items [5]
+│   └── property onSelect [6]
+├── function propsFor [9–11]
+└── function Gallery [13–27]

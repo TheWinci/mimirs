@@ -1,0 +1,5 @@
+extends: base.yml
+source: https://example.com/config
+shared: &shared
+  enabled: true
+copy: *shared

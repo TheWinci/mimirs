@@ -1,0 +1,4 @@
+tests/fixtures/typescript/commonjs-reexport.cts
+├── export * from "./replacement.cjs" [2]
+├── export default from "./replacement.cjs" [2]
+└── import "./replacement.cjs" [2]

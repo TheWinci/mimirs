@@ -1,0 +1,10 @@
+tests/fixtures/bash/bindings.sh
+├── variable callback [1]
+├── block [2–12]
+├── function run [13–43]
+│   ├── variable before [15]
+│   ├── variable conditional [27]
+│   ├── variable isolated [33]
+│   └── variable captured [38–41]
+│       └── variable nested [39]
+└── block [44–47]

@@ -1,0 +1,7 @@
+tests/fixtures/ruby/scope.rb
+└── class Scope [1–18]
+    ├── method run [2–8]
+    │   └── function callback [7]
+    ├── method helper [10–11]
+    ├── method duplicate [13–14]
+    └── method duplicate [16–17]

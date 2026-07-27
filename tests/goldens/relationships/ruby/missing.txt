@@ -1,0 +1,3 @@
+ruby/missing
+├── unresolved import main.rb -> "missing" [1]
+└── unresolved call main.rb:module -> Missing.run [3]

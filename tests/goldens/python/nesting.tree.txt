@@ -1,0 +1,6 @@
+tests/fixtures/python/nesting.py
+└── function build_product [1–12]
+    ├── class Product [2–7]
+    │   ├── method __init__ [3–4]
+    │   └── method label [6–7]
+    └── function create [9–10]

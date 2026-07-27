@@ -1,0 +1,3 @@
+tests/fixtures/csharp/comments.cs
+├── call CreateWorker in field worker [8]
+└── call worker.Run in method Run [15]

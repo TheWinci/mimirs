@@ -1,0 +1,2 @@
+tests/fixtures/java/package-info.java
+└── package fixtures.metadata [1–2]

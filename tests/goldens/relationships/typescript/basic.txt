@@ -1,0 +1,9 @@
+typescript/basic
+├── import src/main.ts -> src/config.ts via "./config.js" [3]
+├── import src/main.ts -> src/math.ts via "./math" [1–2]
+├── import src/main.ts -> src/setup.ts via "./setup" [4]
+├── call src/main.ts:function start -> src/main.ts:function localHelper via localHelper [18]
+├── call src/main.ts:function start -> src/math.ts:function add via sum [19]
+├── call src/main.ts:function start -> src/math.ts:function multiply via math.multiply [20]
+├── call src/main.ts:function start -> src/config.ts:function configure via configure [21]
+└── unresolved call src/main.ts:function start -> service.run [22]

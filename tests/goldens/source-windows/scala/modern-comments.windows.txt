@@ -1,0 +1,5 @@
+tests/fixtures/source-windows/scala/modern-comments.scala
+└── package windows.modern [1–13]
+    ├── window [1–5] (153 chars) “package windows.modern: enum RetryPolicy(val delayMilliseconds: Int): case None extends RetryPo…”
+    ├── window [6–9] (160 chars) “given Ordering[RetryPolicy] with def compare(left: RetryPolicy, right: RetryPolicy): Int = left…”
+    └── window [10–13] (144 chars) “extension (policy: RetryPolicy) def delayed: Boolean = policy.delayMilliseconds > 0 // This fin…”

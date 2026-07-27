@@ -1,0 +1,6 @@
+@import "./reset.css";
+
+.hero {
+  background-image: url("../images/hero.png?v=1");
+  cursor: url("../images/pointer.cur"), auto;
+}

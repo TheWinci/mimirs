@@ -1,0 +1,12 @@
+tests/fixtures/toml/values.toml
+├── property string [1]
+├── property multiline [2–3]
+├── property integer [4]
+├── property float [5]
+├── property boolean [6]
+├── property date [7]
+├── property time [8]
+├── property array [9]
+└── property inline [10]
+    ├── property name [10]
+    └── property active [10]

@@ -1,0 +1,9 @@
+tests/fixtures/source-windows/ocaml/report.mli
+├── type report [1–5]
+│   └── window [1–5] (99 chars) “(** A report available to retrieval clients. *) type report = { id : string; title : string; }”
+├── module Store [7–11]
+│   └── window [7–11] (106 chars) “module Store : sig type t val create : report list -> t val find : t -> string -> report option…”
+├── class renderer [13–15]
+│   └── window [13–15] (63 chars) “class renderer : object method render : report -> string end”
+└── function format_report [17]
+    └── window [17] (37 chars) “val format_report : report -> string”

@@ -1,0 +1,3 @@
+Review note: this unknown text extension still uses paragraph chunking.
+
+The fallback remains deterministic and retains exact ranges.

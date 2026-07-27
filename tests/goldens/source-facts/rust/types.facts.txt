@@ -1,0 +1,3 @@
+tests/fixtures/rust/types.rs
+├── call State::Done in function finished [22]
+└── call String::new in function finished [22]

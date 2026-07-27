@@ -1,0 +1,5 @@
+tests/fixtures/csharp/imports.cs
+├── import [1–4]
+└── module Fixtures.Imports [6–15]
+    └── class Imports [8–15]
+        └── method Build [10–14]

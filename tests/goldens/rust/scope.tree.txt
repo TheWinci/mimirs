@@ -1,0 +1,6 @@
+tests/fixtures/rust/scope.rs
+├── import [1]
+├── function execute [3–20]
+│   ├── import [10]
+│   └── import [16]
+└── function helper [22]

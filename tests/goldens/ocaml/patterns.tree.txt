@@ -1,0 +1,8 @@
+tests/fixtures/ocaml/patterns.ml
+├── function case_scope [1–7]
+│   └── variable result [2–5]
+├── function pair_scope [9–11]
+│   └── variable left, right [10]
+├── function function_scope [13–18]
+│   └── variable apply [14–16]
+└── function exception_scope [20–22]

@@ -1,0 +1,11 @@
+tests/fixtures/source-windows/typescript/commonjs.cts
+├── import [1–2]
+│   └── window [1–2] (112 chars) “// @ts-nocheck -- CommonJS syntax fixture under an ESM repository tsconfig. import path = requi…”
+├── interface ReportLocation [4–7]
+│   └── window [4–7] (61 chars) “interface ReportLocation { root: string; name: string; }”
+├── function reportPath [9–11]
+│   └── window [9–11] (116 chars) “function reportPath(location: ReportLocation): string { return path.join(location.root, `${loca…”
+├── variable reportFiles [13–16]
+│   └── window [13–16] (59 chars) “const reportFiles = { reportPath, extension: ".md", };”
+└── block [17–18]
+    └── window [17–18] (23 chars) “export = reportFiles;”

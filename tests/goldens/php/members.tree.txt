@@ -1,0 +1,10 @@
+tests/fixtures/php/members.php
+├── block [1]
+└── class Configuration [2–17]
+    ├── field name, mode [4]
+    ├── field count [5]
+    ├── constant FIRST, SECOND [6]
+    ├── method __construct [8–11]
+    │   ├── field client [9]
+    │   └── field id [10]
+    └── field title [13–16]

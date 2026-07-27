@@ -1,0 +1,4 @@
+markdown/basic
+├── import docs/readme.md -> api/index.html via "/api/index.html?view=full" [5]
+├── import docs/readme.md -> docs/guide.md via "guide.md#intro" [3]
+└── import docs/readme.md -> images/diagram.svg via "../images/diagram.svg" [4]

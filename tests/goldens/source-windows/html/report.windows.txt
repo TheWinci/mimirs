@@ -1,0 +1,7 @@
+tests/fixtures/source-windows/html/report.htm
+├── directive [1]
+│   └── window [1] (16 chars) “<!doctype html>”
+└── element html [2–13]
+    ├── window [2–5] (62 chars) “<html lang="en"> <head> <title>Report</title> </head>”
+    ├── window [6–12] (180 chars) “<body> <!-- The main element owns the report content. --> <main> <h1>Project report</h1> <p>Gen…”
+    └── window [13] (8 chars) “</html>”

@@ -1,0 +1,5 @@
+tests/fixtures/scala/script.sc
+├── import [1]
+├── variable input [3]
+├── function parse [5–7]
+└── block [8]

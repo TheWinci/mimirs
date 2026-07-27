@@ -1,0 +1,3 @@
+scala/script
+├── import main.sc -> tools/Tools.scala via "tools.Tools" [1]
+└── call main.sc:module -> tools/Tools.scala:method run via run [3]

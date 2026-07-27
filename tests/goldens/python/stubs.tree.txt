@@ -1,0 +1,11 @@
+tests/fixtures/python/stubs.pyi
+├── import [1–2]
+├── variable T [4]
+├── variable PathLike [5]
+├── variable Callback [6]
+├── class Reader [8–18]
+│   ├── field name [9]
+│   ├── method read [11–12]
+│   ├── method read [14–15]
+│   └── method closed [17–18]
+└── function iter_readers [20]

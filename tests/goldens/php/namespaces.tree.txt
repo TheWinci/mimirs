@@ -1,0 +1,13 @@
+tests/fixtures/php/namespaces.php
+├── block [1]
+├── module First [2–6]
+│   ├── import [4]
+│   └── function first [5]
+├── module Second [7–11]
+│   ├── import [9]
+│   └── function second [10]
+├── module Third [12–15]
+│   ├── import [13]
+│   └── function third [14]
+└── module (global) [17–19]
+    └── function fallback [18]

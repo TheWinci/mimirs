@@ -1,0 +1,11 @@
+tests/fixtures/source-windows/javascript/module-comments.js
+├── import [1]
+│   └── window [1] (43 chars) “import { schedule } from "./scheduler.js";”
+├── variable retryDelay [3]
+│   └── window [3] (24 chars) “const retryDelay = 250;”
+├── function initialize [5–8]
+│   └── window [5–8] (108 chars) “/** Schedule the initial task. */ export function initialize(task) { return schedule(task, retr…”
+├── comment [10]
+│   └── window [10] (54 chars) “// This comment explains the eager module-level call.”
+└── block [11]
+    └── window [11] (33 chars) “initialize({ kind: "refresh" });”

@@ -1,0 +1,6 @@
+tests/fixtures/haskell/comments.hs
+├── comment [1]
+├── function documented [3–6]
+│   ├── comment [3]
+│   └── comment [5]
+└── comment [8]

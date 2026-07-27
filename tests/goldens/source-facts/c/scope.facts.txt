@@ -1,0 +1,10 @@
+tests/fixtures/c/scope.c
+├── call helper in function execute [11]
+├── call ops->run in function execute [12]
+├── call loader in function execute [13]
+├── call (*loader) in function execute [14]
+├── call callback in function execute [15]
+├── call make in function execute [16]
+├── call make()->start in function execute [16]
+├── call factory in function execute [17]
+└── call global_callback in function use_global [21]

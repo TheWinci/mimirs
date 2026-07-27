@@ -1,0 +1,7 @@
+tests/fixtures/haskell/import-details.hs
+├── module App.ImportDetails [1]
+├── import [3–5]
+├── function run [7]
+├── function readName [8]
+├── function combine [9]
+└── function qualified [10]

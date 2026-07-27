@@ -1,0 +1,10 @@
+tests/fixtures/lua/scope.lua
+├── call normalize in function helper [2]
+├── call helper in function callback [6]
+├── call loadFirst in variable first, second [9]
+├── call loadSecond in variable first, second [9]
+├── call callback in function local_callback [13]
+├── call loader in function run [16]
+├── call callback in function run [17]
+├── call local_callback in function run [18]
+└── call missing in function run [19]

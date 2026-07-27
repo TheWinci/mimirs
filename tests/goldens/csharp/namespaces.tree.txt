@@ -1,0 +1,6 @@
+tests/fixtures/csharp/namespaces.cs
+└── module Fixtures.Outer [1–12]
+    ├── import [3]
+    └── module Inner [5–11]
+        └── class Worker [7–10]
+            └── method Run [9]

@@ -1,0 +1,6 @@
+tests/fixtures/go/method-expressions.go
+├── package sample [1]
+├── struct Handler [3]
+├── method Run [5]
+├── method Stop [7]
+└── function MethodExpressions [9–17]

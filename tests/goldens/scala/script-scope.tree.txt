@@ -1,0 +1,7 @@
+tests/fixtures/scala/script-scope.sc
+├── function make [1]
+├── function callback [3]
+├── block [4–6]
+├── function nested [7]
+├── block [8–12]
+└── variable reference [13]

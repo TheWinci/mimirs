@@ -1,0 +1,3 @@
+dart/part_uri
+├── import main.dart -> worker.dart via "worker.dart" [1]
+└── import worker.dart -> main.dart via "main.dart" [1]

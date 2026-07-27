@@ -1,0 +1,4 @@
+tests/fixtures/source-windows/ruby/module-class.rb
+└── module Windows [1–23]
+    ├── window [1–10] (209 chars) “module Windows # Keep report entries in insertion order. class ReportBook def initialize @entri…”
+    └── window [11–23] (202 chars) “def render @entries.map do |entry| owner = entry[:owner] || "unassigned" "#{entry[:title]} — #{…”

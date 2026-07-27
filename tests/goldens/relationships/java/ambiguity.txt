@@ -1,0 +1,3 @@
+java/ambiguity
+├── unresolved import app/Main.java -> "duplicate.Worker" [3]
+└── unresolved call app/Main.java:method launch -> Worker.start [7]

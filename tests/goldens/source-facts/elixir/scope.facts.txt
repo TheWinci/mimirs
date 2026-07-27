@@ -1,0 +1,10 @@
+tests/fixtures/elixir/scope.ex
+├── alias App.Worker in module Fixtures.Scope [2]
+├── call normalize in function helper [4]
+├── call helper in function callback [7]
+├── call loader in function run [8]
+├── call Enum.map in function run [10]
+├── call transform in function run [10]
+├── call callback in function run [11]
+├── call Worker.build in function run [11]
+└── call missing in function run [12]

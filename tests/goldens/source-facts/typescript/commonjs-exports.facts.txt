@@ -1,0 +1,13 @@
+tests/fixtures/typescript/commonjs-exports.cts
+├── import picked from "./dep.cjs" [2]
+├── import other from "./dep.cjs" [3]
+├── import computed from "./dep.cjs" [4]
+├── export picked [7]
+├── export other as renamed [8]
+├── export default as factory from "./factory.cjs" [9]
+├── import "./factory.cjs" [9]
+├── export third from "./dep.cjs" [10]
+├── import "./dep.cjs" [10]
+├── export computed as computedObject [11]
+├── export method [12]
+└── call picked in module [13]

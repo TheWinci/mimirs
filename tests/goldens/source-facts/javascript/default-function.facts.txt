@@ -1,0 +1,3 @@
+tests/fixtures/javascript/default-function.js
+├── export default [1–3]
+└── call input.trim in function default [2]

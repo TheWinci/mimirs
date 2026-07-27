@@ -1,0 +1,2 @@
+extends = "base.toml"
+url = "https://example.com/config"

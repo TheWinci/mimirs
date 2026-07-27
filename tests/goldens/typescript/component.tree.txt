@@ -1,0 +1,9 @@
+tests/fixtures/typescript/component.tsx
+├── import [1–2]
+│   ├── comment [1]
+│   └── block [2]
+├── interface CardProps [4–7]
+│   ├── property title [5]
+│   └── property children [6]
+├── function format [9–11]
+└── function Card [13–21]

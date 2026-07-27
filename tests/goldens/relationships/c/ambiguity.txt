@@ -1,0 +1,4 @@
+c/ambiguity
+├── import app/main.c -> left/api.h via "../left/api.h" [1]
+├── import app/main.c -> right/api.h via "../right/api.h" [2]
+└── unresolved call app/main.c:function main -> run [5]
