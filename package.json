@@ -1,0 +1,29 @@
+{
+  "name": "mimirs",
+  "version": "0.0.1",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "mimirs": "bun run src/cli/index.ts",
+    "analyze": "bun run src/cli/index.ts analyze",
+    "chunk": "bun run src/cli/index.ts chunk",
+    "inspect": "bun run src/cli/index.ts inspect",
+    "index": "bun run src/cli/index.ts index",
+    "search": "bun run src/cli/index.ts search",
+    "benchmark:v1": "bun run benchmarks/compare-v1.ts",
+    "test": "bun test",
+    "test:embedding-model": "bun run tests/integration/mini-lm-smoke.ts"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "3.8.1",
+    "@winci/bun-chunk": "workspace:*",
+    "sqlite-vec": "0.1.9",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "typescript": "^7.0.2"
+  }
+}
