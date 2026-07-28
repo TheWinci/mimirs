@@ -10,7 +10,7 @@ import { renderSourceFacts } from "../renderers/source-facts.ts";
 import { renderSourceWindowTree } from "../renderers/source-windows.ts";
 
 const USAGE =
-  "Usage: bun run src/cli/index.ts chunk -f <file> " +
+  "Usage: mimirs chunk -f <file> " +
   "[--tree | --facts | --windows [--window-size <characters>]]";
 
 export const REVIEWED_SOURCE_WINDOW_LANGUAGE_BY_EXTENSION = new Map([

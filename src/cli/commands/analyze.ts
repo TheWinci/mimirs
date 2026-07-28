@@ -4,7 +4,7 @@ import {
 } from "../../internals/project/analysis.ts";
 import { renderProjectAnalysis } from "../renderers/project-analysis.ts";
 
-const USAGE = "Usage: bun run src/cli/index.ts analyze [-d] <directory>";
+const USAGE = "Usage: mimirs analyze [-d] <directory>";
 
 function flagValue(args: string[], flag: string): string | undefined {
   const index = args.indexOf(flag);

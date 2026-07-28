@@ -4,6 +4,8 @@ import { platform } from "node:os";
 import { Database } from "bun:sqlite";
 import { load as loadSqliteVec } from "sqlite-vec";
 
+import { getCompiledRuntime } from "../runtime/compiled.ts";
+
 let runtimeConfigured = false;
 const extensionLoaded = new WeakSet<Database>();
 
@@ -40,7 +42,9 @@ export function configureSqliteRuntime(): void {
 export function prepareSourceDatabase(database: Database): void {
   if (extensionLoaded.has(database)) return;
   try {
-    loadSqliteVec(database);
+    const compiled = getCompiledRuntime();
+    if (compiled) database.loadExtension(compiled.sqliteVec);
+    else loadSqliteVec(database);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`could not load sqlite-vec: ${message}`);

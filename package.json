@@ -12,6 +12,7 @@
     "inspect": "bun run src/cli/index.ts inspect",
     "index": "bun run src/cli/index.ts index",
     "search": "bun run src/cli/index.ts search",
+    "build:binary": "bun run scripts/build-binary.ts",
     "benchmark:v1": "bun run benchmarks/compare-v1.ts",
     "test": "bun test",
     "test:embedding-model": "bun run tests/integration/mini-lm-smoke.ts"

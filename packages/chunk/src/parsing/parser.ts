@@ -1,15 +1,54 @@
 import { Parser, Language as TSLanguage, Query } from "web-tree-sitter";
 import type { Language } from "../types";
-import { resolve, join } from "path";
 
 let initialized = false;
 export type Grammar = Language | "tsx" | "ocaml_interface";
+
+export const GRAMMARS = [
+  "typescript",
+  "tsx",
+  "javascript",
+  "python",
+  "rust",
+  "go",
+  "java",
+  "c",
+  "cpp",
+  "ruby",
+  "csharp",
+  "php",
+  "scala",
+  "html",
+  "css",
+  "kotlin",
+  "lua",
+  "zig",
+  "elixir",
+  "bash",
+  "toml",
+  "yaml",
+  "haskell",
+  "ocaml",
+  "ocaml_interface",
+  "dart",
+] as const satisfies readonly Grammar[];
+
+interface CompiledRuntime {
+  grammars: Readonly<Record<string, string>>;
+  treeSitter: string;
+}
+
+function compiledRuntime(): CompiledRuntime | undefined {
+  return (globalThis as typeof globalThis & {
+    __MIMIRS_COMPILED_RUNTIME__?: CompiledRuntime;
+  }).__MIMIRS_COMPILED_RUNTIME__;
+}
 
 const grammarCache = new Map<Grammar, TSLanguage>();
 const queryCache = new Map<string, Query>();
 
 /** WASM file paths per language — prefer per-package WASM, fallback to tree-sitter-wasms */
-function getGrammarPath(language: Grammar): string {
+export function getGrammarPath(language: Grammar): string {
   if (language === "tsx") return "tree-sitter-typescript/tree-sitter-tsx.wasm";
   if (language === "ocaml_interface") {
     return "tree-sitter-ocaml/tree-sitter-ocaml_interface.wasm";
@@ -52,7 +91,10 @@ function getGrammarPath(language: Grammar): string {
 
 async function ensureInit(): Promise<void> {
   if (!initialized) {
-    await Parser.init();
+    const runtime = compiledRuntime();
+    await Parser.init(runtime
+      ? { locateFile: () => runtime.treeSitter }
+      : undefined);
     initialized = true;
   }
 }
@@ -62,7 +104,8 @@ async function loadGrammar(language: Grammar): Promise<TSLanguage> {
   if (cached) return cached;
 
   await ensureInit();
-  const wasmPath = require.resolve(getGrammarPath(language));
+  const wasmPath = compiledRuntime()?.grammars[language] ??
+    require.resolve(getGrammarPath(language));
   const grammar = await TSLanguage.load(wasmPath);
   grammarCache.set(language, grammar);
   return grammar;

@@ -1,11 +1,7 @@
-import { runAnalyze } from "./commands/analyze.ts";
-import { runChunk } from "./commands/chunk.ts";
-import { inspect } from "./commands/inspect.ts";
-import { runIndex } from "./commands/index.ts";
-import { runSearch } from "./commands/search.ts";
+import { prepareCompiledRuntime } from "../internals/runtime/compiled.ts";
 
 function printUsage(): void {
-  console.log(`Usage: bun run src/cli/index.ts <command>
+  console.log(`Usage: mimirs <command>
 
 Commands:
   analyze  Analyze a multi-language project directory
@@ -17,24 +13,35 @@ Commands:
 }
 
 async function main(): Promise<void> {
+  await prepareCompiledRuntime();
   const [command, ...args] = Bun.argv.slice(2);
 
   switch (command) {
-    case "analyze":
+    case "analyze": {
+      const { runAnalyze } = await import("./commands/analyze.ts");
       process.exitCode = await runAnalyze(args);
       return;
-    case "chunk":
+    }
+    case "chunk": {
+      const { runChunk } = await import("./commands/chunk.ts");
       process.exitCode = await runChunk(args);
       return;
-    case "search":
+    }
+    case "search": {
+      const { runSearch } = await import("./commands/search.ts");
       process.exitCode = await runSearch(args);
       return;
-    case "index":
+    }
+    case "index": {
+      const { runIndex } = await import("./commands/index.ts");
       process.exitCode = await runIndex(args);
       return;
-    case "inspect":
+    }
+    case "inspect": {
+      const { inspect } = await import("./commands/inspect.ts");
       inspect();
       return;
+    }
     case undefined:
       printUsage();
       return;
