@@ -4,6 +4,7 @@ function printUsage(): void {
   console.log(`Usage: mimirs <command>
 
 Commands:
+  init     Initialize project state and configuration
   analyze  Analyze a multi-language project directory
   chunk    Analyze one source file (-f <file>, optionally --tree, --facts, or --windows)
   search   Search project source (-q <query> --max-results <n> [directory])
@@ -13,10 +14,15 @@ Commands:
 }
 
 async function main(): Promise<void> {
-  await prepareCompiledRuntime();
   const [command, ...args] = Bun.argv.slice(2);
+  if (command !== "init") await prepareCompiledRuntime();
 
   switch (command) {
+    case "init": {
+      const { runInit } = await import("./commands/init.ts");
+      process.exitCode = await runInit(args);
+      return;
+    }
     case "analyze": {
       const { runAnalyze } = await import("./commands/analyze.ts");
       process.exitCode = await runAnalyze(args);

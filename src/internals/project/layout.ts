@@ -204,11 +204,12 @@ function assertIdentity(
   }
 }
 
-/** Validate an existing state identity without writing anything. */
+/** Validate an external state identity without writing anything. */
 export async function validateProjectState(
   layout: ProjectLayout,
   required = layout.externalState,
 ): Promise<void> {
+  if (!layout.externalState) return;
   const identity = await readIdentity(layout);
   if (!identity) {
     if (required) {
@@ -222,9 +223,10 @@ export async function validateProjectState(
   assertIdentity(layout, identity);
 }
 
-/** Create or validate the durable one-project-per-state-directory identity. */
+/** Ensure state exists and bind an external host to exactly one project. */
 export async function ensureProjectState(layout: ProjectLayout): Promise<void> {
   await mkdir(layout.stateDirectory, { recursive: true });
+  if (!layout.externalState) return;
   const existing = await readIdentity(layout);
   if (existing) {
     assertIdentity(layout, existing);

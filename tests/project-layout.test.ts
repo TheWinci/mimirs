@@ -136,13 +136,15 @@ describe("project state layout", () => {
     expect(await Bun.file(layout.identityPath).exists()).toBe(true);
   });
 
-  test("adopts legacy local state but rejects unbound external Mimirs files", async () => {
-    const root = await temporary("mimirs-layout-legacy-local-");
+  test("preserves local state but rejects unbound external Mimirs files", async () => {
+    const root = await temporary("mimirs-layout-existing-local-");
     await mkdir(join(root, ".mimirs"));
     await writeFile(join(root, ".mimirs", "config.json"), "{}\n");
     await ensureProjectState(projectLayout(root));
     expect(await readFile(join(root, ".mimirs", "config.json"), "utf8"))
       .toBe("{}\n");
+    expect(await Bun.file(join(root, ".mimirs", "project.json")).exists())
+      .toBe(false);
 
     const externalRoot = await temporary("mimirs-layout-unbound-project-");
     const stateHost = await temporary("mimirs-layout-unbound-state-");
@@ -163,5 +165,13 @@ describe("project state layout", () => {
     await expect(ensureProjectState(projectLayout(root, stateHost)))
       .rejects.toBeInstanceOf(ProjectStateIdentityError);
     expect(await readFile(join(state, "project.json"), "utf8")).toBe("{oops\n");
+  });
+
+  test("does not create identity markers for local state", async () => {
+    const root = await temporary("mimirs-layout-local-identity-");
+    const layout = projectLayout(root);
+    await ensureProjectState(layout);
+    await validateProjectState(layout);
+    expect(await Bun.file(layout.identityPath).exists()).toBe(false);
   });
 });
