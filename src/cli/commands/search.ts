@@ -15,8 +15,7 @@ import {
 } from "../renderers/search-results.ts";
 
 export const SEARCH_USAGE =
-  "Usage: mimirs search -q <query> --max-results <n> [-d <directory>] " +
-  "[--state-dir <directory>]";
+  "Usage: mimirs search -q <query> --max-results <n> [-d <directory>]";
 
 export interface SearchCommandOutput {
   error(message: string): void;
@@ -27,13 +26,11 @@ export interface SearchCommandDependencies {
   search(
     directory: string,
     request: SearchRequest,
-    stateDirectory?: string,
   ): Promise<ProjectSearchResponse>;
 }
 
 interface ParsedSearchArguments extends SearchRequest {
   directory: string;
-  stateDirectory?: string;
 }
 
 class SearchArgumentError extends Error {}
@@ -44,7 +41,6 @@ const VALUE_FLAGS = new Set([
   "--max-results",
   "-d",
   "--directory",
-  "--state-dir",
 ]);
 
 function parsePositiveInteger(value: string): number {
@@ -75,7 +71,6 @@ export function parseSearchArguments(args: string[]): ParsedSearchArguments {
   let query: string | undefined;
   let maximum: string | undefined;
   let directory: string | undefined;
-  let stateDirectory: string | undefined;
   const positionals: string[] = [];
   let positionalOnly = false;
 
@@ -117,19 +112,6 @@ export function parseSearchArguments(args: string[]): ParsedSearchArguments {
       index++;
       continue;
     }
-    if (argument === "--state-dir") {
-      if (stateDirectory !== undefined) {
-        throw new SearchArgumentError(
-          "state directory may only be provided once",
-        );
-      }
-      stateDirectory = flagValue(args, index, argument);
-      if (stateDirectory.trim() === "" || stateDirectory.startsWith("-")) {
-        throw new SearchArgumentError("--state-dir requires a non-empty path");
-      }
-      index++;
-      continue;
-    }
     if (argument.startsWith("-")) {
       throw new SearchArgumentError(`unknown search option: ${argument}`);
     }
@@ -155,13 +137,12 @@ export function parseSearchArguments(args: string[]): ParsedSearchArguments {
     query,
     maxResults: parsePositiveInteger(maximum),
     directory: directory ?? positionals[0] ?? ".",
-    ...(stateDirectory === undefined ? {} : { stateDirectory }),
   };
 }
 
 const DEFAULT_DEPENDENCIES: SearchCommandDependencies = {
-  search: (directory, request, stateDirectory) =>
-    searchReadOnlyProject(directory, request, {}, stateDirectory),
+  search: (directory, request) =>
+    searchReadOnlyProject(directory, request),
 };
 
 export async function runSearch(
@@ -185,7 +166,6 @@ export async function runSearch(
         query: parsed.query,
         maxResults: parsed.maxResults,
       },
-      parsed.stateDirectory,
     );
     for (const warning of searchWarnings(response)) {
       output.error(`[mimirs] ${warning}`);

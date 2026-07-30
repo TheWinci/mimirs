@@ -7,6 +7,8 @@ import { renderProjectAnalysis } from
   "../src/cli/renderers/project-analysis.ts";
 import { analyzeProject } from
   "../src/internals/project/analysis.ts";
+import { defaultIndexConfig } from
+  "../src/internals/indexing/config.ts";
 import { analyzeIndexedProject, indexProject } from
   "../src/internals/storage/project-index.ts";
 import { SourceIndex } from
@@ -153,6 +155,7 @@ describe("project source index", () => {
       JSON.stringify({
         include: ["**/*.ts"],
         exclude: ["**/*.test.ts", "**/.mimirs/**"],
+        index: defaultIndexConfig(root).index,
       }),
     );
     await writeFile(join(root, "src", "main.ts"), "export const main = true;\n");

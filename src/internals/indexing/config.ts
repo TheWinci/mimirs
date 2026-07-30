@@ -1,18 +1,11 @@
 import { randomUUID } from "node:crypto";
-import {
-  link,
-  mkdir,
-  open,
-  readFile,
-  rename,
-  rm,
-  unlink,
-  writeFile,
-} from "node:fs/promises";
+import { link, mkdir, open, readFile, unlink } from "node:fs/promises";
+import { isAbsolute } from "node:path";
 
 import { z } from "zod";
 
 import {
+  canonicalPath,
   ensureProjectState,
   projectLayout,
 } from "../project/layout.ts";
@@ -27,21 +20,10 @@ const directoryList = z.array(z.string().min(1)).transform((directories) =>
   ))]
 );
 
-const sourceDirectoryList = z.array(z.string().min(1))
-  .transform((directories) =>
-    directories.map((directory) =>
-      directory.replaceAll("\\", "/").replace(/\/$/, "") || "."
-    )
-  )
-  .pipe(
-    z.array(z.literal(".")).max(
-      1,
-      "source indexing currently supports only the project root",
-    ),
-  );
-
 const indexDomainsSchema = z.object({
-  source: z.object({ directories: sourceDirectoryList }).strict().optional(),
+  source: z.object({
+    directories: z.array(z.string().min(1)),
+  }).strict().optional(),
   history: z.object({
     provider: z.literal("git").optional(),
     directories: directoryList,
@@ -67,69 +49,57 @@ export interface IndexConfig {
   exclude: readonly string[];
   /** Optional project-relative globs for searchable but lower-priority files. */
   generated?: readonly string[];
-  /** Desired project-local index domains. Presence of `.` enables a domain. */
   index?: IndexDomainsConfig;
 }
 
-export const DEFAULT_INDEX_CONFIG: Readonly<IndexConfig> = Object.freeze({
-  include: Object.freeze(["**/*"]),
-  exclude: Object.freeze([
-    "**/.git/**",
-    "**/.mimirs/**",
-    "**/node_modules/**",
-    "**/vendor/**",
-    "**/dist/**",
-    "**/build/**",
-    "**/out/**",
-    "**/coverage/**",
-    "**/.output/**",
-    "**/.next/**",
-    "**/.nuxt/**",
-    "**/.svelte-kit/**",
-    "**/.turbo/**",
-    "**/.cache/**",
-    "**/.parcel-cache/**",
-    "**/.webpack/**",
-    "**/.nyc_output/**",
-    "**/__pycache__/**",
-    "**/.venv/**",
-    "**/venv/**",
-    "**/.tox/**",
-    "**/*.egg-info/**",
-    "**/target/**",
-    "**/.idea/**",
-    "**/.vscode/**",
-    "**/.gitkeep",
-    "**/.keep",
-    "**/.DS_Store",
-    "**/.env",
-    "**/.env.*",
-    "**/*.pem",
-    "**/*.key",
-    "**/*.pfx",
-    "**/*.p12",
-    "**/id_rsa",
-    "**/id_dsa",
-    "**/id_ecdsa",
-    "**/id_ed25519",
-    "**/.npmrc",
-    "**/.pgpass",
-    "**/.netrc",
-    "**/*.min.js",
-    "**/*.min.css",
-    "**/*.bundle.js",
-    "**/*.chunk.js",
-  ]),
-  generated: Object.freeze([]),
-  index: Object.freeze({
-    source: Object.freeze({ directories: Object.freeze(["."]) }),
-    history: Object.freeze({
-      provider: "git" as const,
-      directories: Object.freeze([]),
-    }),
-    conversations: Object.freeze({ directories: Object.freeze([]) }),
-  }),
-});
+const DEFAULT_INCLUDE = Object.freeze(["**/*"]);
+const DEFAULT_EXCLUDE = Object.freeze([
+  "**/.git/**",
+  "**/.mimirs/**",
+  "**/node_modules/**",
+  "**/vendor/**",
+  "**/dist/**",
+  "**/build/**",
+  "**/out/**",
+  "**/coverage/**",
+  "**/.output/**",
+  "**/.next/**",
+  "**/.nuxt/**",
+  "**/.svelte-kit/**",
+  "**/.turbo/**",
+  "**/.cache/**",
+  "**/.parcel-cache/**",
+  "**/.webpack/**",
+  "**/.nyc_output/**",
+  "**/__pycache__/**",
+  "**/.venv/**",
+  "**/venv/**",
+  "**/.tox/**",
+  "**/*.egg-info/**",
+  "**/target/**",
+  "**/.idea/**",
+  "**/.vscode/**",
+  "**/.gitkeep",
+  "**/.keep",
+  "**/.DS_Store",
+  "**/.env",
+  "**/.env.*",
+  "**/*.pem",
+  "**/*.key",
+  "**/*.pfx",
+  "**/*.p12",
+  "**/id_rsa",
+  "**/id_dsa",
+  "**/id_ecdsa",
+  "**/id_ed25519",
+  "**/.npmrc",
+  "**/.pgpass",
+  "**/.netrc",
+  "**/*.min.js",
+  "**/*.min.css",
+  "**/*.bundle.js",
+  "**/*.chunk.js",
+]);
 
 export class IndexConfigError extends Error {
   constructor(
@@ -141,13 +111,26 @@ export class IndexConfigError extends Error {
   }
 }
 
-function copyDefaults(): IndexConfig {
+export class ProjectNotInitializedError extends Error {
+  constructor(readonly directory: string) {
+    super(
+      `Mimirs is not initialized for ${directory}; run \`mimirs init -d ${
+        JSON.stringify(directory)
+      }\` first`,
+    );
+    this.name = "ProjectNotInitializedError";
+  }
+}
+
+/** Materialize complete defaults for one canonical source directory. */
+export function defaultIndexConfig(directory: string): IndexConfig {
+  const root = projectLayout(directory).root;
   return {
-    include: [...DEFAULT_INDEX_CONFIG.include],
-    exclude: [...DEFAULT_INDEX_CONFIG.exclude],
-    generated: [...(DEFAULT_INDEX_CONFIG.generated ?? [])],
+    include: [...DEFAULT_INCLUDE],
+    exclude: [...DEFAULT_EXCLUDE],
+    generated: [],
     index: {
-      source: { directories: ["."] },
+      source: { directories: [root] },
       history: { provider: "git", directories: [] },
       conversations: { directories: [] },
     },
@@ -157,19 +140,19 @@ function copyDefaults(): IndexConfig {
 /** Materialize complete defaults without replacing a concurrently-created file. */
 export async function createDefaultIndexConfigIfMissing(
   directory: string,
-  stateDirectory?: string,
 ): Promise<boolean> {
-  const layout = projectLayout(directory, stateDirectory);
+  const layout = projectLayout(directory);
   await ensureProjectState(layout);
   const path = layout.configPath;
-  // Avoid emitting a temporary-file watcher event when defaults already exist.
-  // The link below still arbitrates concurrent first-time creators safely.
   if (await Bun.file(path).exists()) return false;
   const temporary = `${path}.default.${process.pid}.${randomUUID()}.tmp`;
   await mkdir(layout.stateDirectory, { recursive: true });
   const candidate = await open(temporary, "wx", 0o600);
   try {
-    await candidate.writeFile(`${JSON.stringify(copyDefaults(), null, 2)}\n`, "utf8");
+    await candidate.writeFile(
+      `${JSON.stringify(defaultIndexConfig(layout.root), null, 2)}\n`,
+      "utf8",
+    );
     await candidate.sync();
   } finally {
     await candidate.close();
@@ -185,15 +168,23 @@ export async function createDefaultIndexConfigIfMissing(
   }
 }
 
-export function indexDomains(config: IndexConfig): IndexDomainsConfig {
-  return config.index ?? copyDefaults().index!;
+export function indexDomains(
+  config: IndexConfig,
+  root = ".",
+): IndexDomainsConfig {
+  return config.index ?? {
+    source: { directories: [root] },
+    history: { provider: "git", directories: [] },
+    conversations: { directories: [] },
+  };
 }
 
 export function isIndexDomainEnabled(
   config: IndexConfig,
   domain: keyof IndexDomainsConfig,
 ): boolean {
-  return indexDomains(config)[domain].directories.length > 0;
+  if (!config.index) return domain === "source";
+  return config.index[domain].directories.length > 0;
 }
 
 function validateGlobs(configPath: string, config: IndexConfig): void {
@@ -214,17 +205,45 @@ function validateGlobs(configPath: string, config: IndexConfig): void {
   }
 }
 
-/** Load an optional, strict state-directory config without creating it. */
-export async function loadIndexConfig(
-  directory: string,
-  stateDirectory?: string,
-): Promise<IndexConfig> {
-  const configPath = projectLayout(directory, stateDirectory).configPath;
+function validateSourceDirectory(
+  configPath: string,
+  root: string,
+  directories: readonly string[],
+): string {
+  if (directories.length !== 1) {
+    throw new IndexConfigError(
+      configPath,
+      "index.source.directories must contain exactly one absolute path",
+    );
+  }
+  const configured = directories[0]!;
+  if (!isAbsolute(configured)) {
+    throw new IndexConfigError(
+      configPath,
+      "index.source.directories.0 must be an absolute path",
+    );
+  }
+  const canonical = canonicalPath(configured);
+  if (canonical !== root) {
+    throw new IndexConfigError(
+      configPath,
+      `index.source.directories.0 must match the initialized project ${root}`,
+    );
+  }
+  return canonical;
+}
+
+/** Load strict project config without creating it. Missing config uses defaults. */
+export async function loadIndexConfig(directory: string): Promise<IndexConfig> {
+  const layout = projectLayout(directory);
+  const configPath = layout.configPath;
   let raw: string;
   try {
     raw = await readFile(configPath, "utf8");
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return copyDefaults();
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return defaultIndexConfig(layout.root);
+    }
     throw error;
   }
 
@@ -245,16 +264,19 @@ export async function loadIndexConfig(
     throw new IndexConfigError(configPath, message);
   }
 
-  const config = {
-    include: parsed.data.include ?? [...DEFAULT_INDEX_CONFIG.include],
-    exclude: parsed.data.exclude ?? [...DEFAULT_INDEX_CONFIG.exclude],
-    generated: parsed.data.generated ?? [...(DEFAULT_INDEX_CONFIG.generated ?? [])],
+  const sourceDirectory = validateSourceDirectory(
+    configPath,
+    layout.root,
+    parsed.data.index?.source?.directories ?? [],
+  );
+  const config: IndexConfig = {
+    include: parsed.data.include ?? [...DEFAULT_INCLUDE],
+    exclude: parsed.data.exclude ?? [...DEFAULT_EXCLUDE],
+    generated: parsed.data.generated ?? [],
     index: {
-      source: {
-        directories: parsed.data.index?.source?.directories ?? ["."],
-      },
+      source: { directories: [sourceDirectory] },
       history: {
-        provider: parsed.data.index?.history?.provider ?? "git" as const,
+        provider: parsed.data.index?.history?.provider ?? "git",
         directories: parsed.data.index?.history?.directories ?? [],
       },
       conversations: {
@@ -266,52 +288,13 @@ export async function loadIndexConfig(
   return config;
 }
 
-
-/** Atomically persist one project-local domain's desired enabled state. */
-export async function setIndexDomainEnabled(
+/** Require explicit initialization before a stateful CLI operation. */
+export async function loadInitializedIndexConfig(
   directory: string,
-  domain: keyof IndexDomainsConfig,
-  enabled: boolean,
-  stateDirectory?: string,
 ): Promise<IndexConfig> {
-  const layout = projectLayout(directory, stateDirectory);
-  await ensureProjectState(layout);
-  const config = await loadIndexConfig(layout.root, layout.stateHost);
-  const domains = indexDomains(config);
-  const next: IndexConfig = {
-    include: [...config.include],
-    exclude: [...config.exclude],
-    generated: [...(config.generated ?? [])],
-    index: {
-      source: {
-        directories: domain === "source"
-          ? (enabled ? ["."] : [])
-          : [...domains.source.directories],
-      },
-      history: {
-        provider: "git",
-        directories: domain === "history"
-          ? (enabled ? ["."] : [])
-          : [...domains.history.directories],
-      },
-      conversations: {
-        directories: domain === "conversations"
-          ? (enabled ? ["."] : [])
-          : [...domains.conversations.directories],
-      },
-    },
-  };
-  const path = layout.configPath;
-  const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
-  await mkdir(layout.stateDirectory, { recursive: true });
-  try {
-    await writeFile(temporary, `${JSON.stringify(next, null, 2)}\n`, {
-      encoding: "utf8",
-      mode: 0o600,
-    });
-    await rename(temporary, path);
-  } finally {
-    await rm(temporary, { force: true });
+  const layout = projectLayout(directory);
+  if (!(await Bun.file(layout.configPath).exists())) {
+    throw new ProjectNotInitializedError(layout.root);
   }
-  return next;
+  return loadIndexConfig(layout.root);
 }

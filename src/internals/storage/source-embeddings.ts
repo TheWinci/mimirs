@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import {
   sameEmbeddingIdentity,
+  type EmbedOptions,
   type Embedder,
   type EmbeddingIdentity,
 } from "../embeddings/embedder.ts";
@@ -47,6 +48,7 @@ export interface SourceDocumentEmbedder extends Embedder {
   /** Document-only inference; query embedding continues to call `embed`. */
   embedProjectedInputs?: (
     texts: readonly string[],
+    options?: EmbedOptions,
   ) => Promise<readonly Float32Array[]>;
 }
 
@@ -103,7 +105,7 @@ export function withSourceEmbeddingProjection(
     revision: embedder.revision,
     variant: `${embedder.variant}|document:${id}`,
     dimensions: embedder.dimensions,
-    embed: (texts) => embedder.embed(texts),
+    embed: (texts, options) => embedder.embed(texts, options),
     documentProjection: projection,
     duplicatePathDisambiguation: embedder.duplicatePathDisambiguation,
     embedProjectedInputs: embedder.embedProjectedInputs,
@@ -140,7 +142,7 @@ export function withDuplicatePathDisambiguation(
     revision: embedder.revision,
     variant: `${embedder.variant}|document:${id}`,
     dimensions: embedder.dimensions,
-    embed: (texts) => embedder.embed(texts),
+    embed: (texts, options) => embedder.embed(texts, options),
     documentProjection: embedder.documentProjection,
     duplicatePathDisambiguation: disambiguation,
     embedProjectedInputs: embedder.embedProjectedInputs,
@@ -377,7 +379,17 @@ export async function embedSourceWindows(
   let embedded = 0;
   let batches = 0;
   let cursor = null;
-  await options.onProgress?.({ completed: total - missing, total });
+  let lastReportedCompleted: number | null = null;
+  const reportProgress = async (completed: number): Promise<void> => {
+    const monotonicCompleted = Math.max(
+      lastReportedCompleted ?? 0,
+      Math.min(total, completed),
+    );
+    if (monotonicCompleted === lastReportedCompleted) return;
+    lastReportedCompleted = monotonicCompleted;
+    await options.onProgress?.({ completed: monotonicCompleted, total });
+  };
+  await reportProgress(total - missing);
   const lastDuplicateOrdinalByProjectedInputHash = new Map<string, number>();
   let counted = 0;
   let countCursor = null;
@@ -452,9 +464,24 @@ export async function embedSourceWindows(
         }
       }
       if (pendingInputs.length > 0) {
+        const completedBeforeBatch = total - missing + embedded;
+        const reportInferenceProgress: NonNullable<
+          EmbedOptions["onProgress"]
+        > = async (progress) => {
+          const withinBatch = progress.total === 0
+            ? batch.length
+            : Math.floor(
+              (progress.completed / progress.total) * batch.length,
+            );
+          await reportProgress(completedBeforeBatch + withinBatch);
+        };
         const inferred = await (
-          embedder.embedProjectedInputs?.(pendingInputs) ??
-          embedder.embed(pendingInputs)
+          embedder.embedProjectedInputs?.(pendingInputs, {
+            onProgress: reportInferenceProgress,
+          }) ??
+          embedder.embed(pendingInputs, {
+            onProgress: reportInferenceProgress,
+          })
         );
         options.signal?.throwIfAborted();
         validateVectors(pendingCandidates, inferred, embedder.dimensions);
@@ -494,10 +521,7 @@ export async function embedSourceWindows(
       }
       embedded += batch.length;
       batches++;
-      await options.onProgress?.({
-        completed: total - missing + embedded,
-        total,
-      });
+      await reportProgress(total - missing + embedded);
       options.signal?.throwIfAborted();
     }
     cursor = page.nextCursor;

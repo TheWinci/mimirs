@@ -14,7 +14,6 @@ import {
 import {
   ensureProjectState,
   projectLayout,
-  validateProjectState,
 } from "../project/layout.ts";
 import { ProjectDirectoryNotFoundError } from "../project/analysis.ts";
 import {
@@ -39,8 +38,6 @@ export interface ProjectSearchSessionOptions {
   batchSize?: number;
   config?: IndexConfig;
   databasePath?: string;
-  /** Writable host for the owned `.mimirs` directory; defaults to the project. */
-  stateDirectory?: string;
   embedder?: Embedder;
   /** Completed identity manifest read once before this session attaches. */
   embeddingManifest?: EmbeddingIdentity | null;
@@ -141,20 +138,18 @@ export class ProjectSearchSession {
     directory: string,
     options: ProjectSearchSessionOptions = {},
   ): Promise<ProjectSearchSession> {
-    const layout = projectLayout(directory, options.stateDirectory);
+    const layout = projectLayout(directory);
     const root = layout.root;
     const usesManagedState = options.databasePath === undefined;
     await assertProjectDirectory(directory, root);
-    if (options.readOnly && usesManagedState) {
-      await validateProjectState(layout, layout.externalState);
-    } else if (!options.readOnly && options.config && usesManagedState) {
+    if (!options.readOnly && options.config && usesManagedState) {
       await ensureProjectState(layout);
     }
     if (!options.config && !options.readOnly) {
-      await createDefaultIndexConfigIfMissing(root, layout.stateHost);
+      await createDefaultIndexConfigIfMissing(root);
     }
     if (!options.config) {
-      await loadIndexConfig(root, layout.stateHost);
+      await loadIndexConfig(root);
     }
 
     const databasePath = options.databasePath ??
@@ -204,12 +199,12 @@ export class ProjectSearchSession {
     });
   }
 
-  refresh(): Promise<ProjectSearchPreparation> {
+  refresh(config?: IndexConfig): Promise<ProjectSearchPreparation> {
     if (this.options.readOnly) {
       return Promise.reject(new Error("read-only project search session cannot refresh"));
     }
     return this.enqueueRefresh(async () => {
-      const prepared = await this.refreshInternal();
+      const prepared = await this.refreshInternal(config);
       this.prepared = prepared;
       return prepared.preparation;
     });
@@ -222,12 +217,12 @@ export class ProjectSearchSession {
         throw new Error("owned index attachment requires a read-only session");
       }
       const config = restoredConfig ?? this.options.config ??
-        await loadIndexConfig(this.root, this.options.stateDirectory);
+        await loadIndexConfig(this.root);
       const embedder = this.options.embedder ?? miniLmPathAverageEmbedder;
       const dimensions = this.sourceIndex.embeddingDimensions();
       if (dimensions !== null && dimensions !== embedder.dimensions) {
         throw new Error(
-          "indexed embedding dimensions are incompatible; run `mimirs index source enable`",
+          "indexed embedding dimensions are incompatible; run `mimirs index`",
         );
       }
       const files = this.sourceIndex.listFiles().length;
@@ -289,16 +284,16 @@ export class ProjectSearchSession {
     return result;
   }
 
-  private async refreshInternal(): Promise<PreparedProjectSearch> {
+  private async refreshInternal(
+    configOverride?: IndexConfig,
+  ): Promise<PreparedProjectSearch> {
     this.options.signal?.throwIfAborted();
     const runIndexProject = this.options.dependencies?.indexProject ??
       indexProject;
     const runEmbedSourceWindows =
       this.options.dependencies?.embedSourceWindows ?? embedSourceWindows;
-    const config = this.options.config ?? await loadIndexConfig(
-      this.root,
-      this.options.stateDirectory,
-    );
+    const config = configOverride ?? this.options.config ??
+      await loadIndexConfig(this.root);
     this.options.signal?.throwIfAborted();
     const sourceConfig = isIndexDomainEnabled(config, "source")
       ? config

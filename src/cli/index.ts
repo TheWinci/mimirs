@@ -9,7 +9,7 @@ Commands:
   chunk    Analyze one source file (-f <file>, optionally --tree, --facts, or --windows)
   search   Search project source (-q <query> --max-results <n> [directory])
   inspect  Start the future inspection dashboard
-  index    Configure and update searchable index domains
+  index    Build once, watch for changes, or show index status
 `);
 }
 

@@ -1,9 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
-  chmod,
   mkdir,
   mkdtemp,
-  readFile,
   rm,
   writeFile,
 } from "node:fs/promises";
@@ -11,20 +9,23 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  configureSourceIndex,
   INDEX_USAGE,
+  indexProjectOnce,
+  indexProjectWithProgress,
   parseIndexArguments,
+  renderIndexSummary,
   runIndex,
+  type IndexCommandDependencies,
   type IndexCommandOutput,
+  type ProjectIndexRefreshResult,
 } from "../src/cli/commands/index.ts";
-import { openReadOnlyProjectSearch } from
-  "../src/internals/search/read-only-project-search.ts";
 import type { Embedder } from "../src/internals/embeddings/embedder.ts";
-import { loadIndexConfig } from "../src/internals/indexing/config.ts";
 import { tryAcquireProjectIndexLock } from
   "../src/internals/indexing/lock.ts";
 import { readSharedProjectStatus } from
   "../src/internals/indexing/status.ts";
+import { initializeProject } from
+  "../src/internals/project/initialize.ts";
 import { SourceIndex } from "../src/internals/storage/source-index.ts";
 
 const temporaryDirectories: string[] = [];
@@ -67,171 +68,260 @@ function output(): IndexCommandOutput & { errors: string[]; logs: string[] } {
   };
 }
 
+function result(root = "/project"): ProjectIndexRefreshResult {
+  return {
+    root,
+    durationMs: 1_250,
+    status: {
+      version: 2,
+      sourceIndexSchemaVersion: 6,
+      root,
+      owner: {
+        instanceId: "test",
+        pid: process.pid,
+        acquiredAt: "2026-01-01T00:00:00.000Z",
+      },
+      index: {
+        state: "ready",
+        searchable: true,
+        ownerPid: process.pid,
+        generation: 1,
+        phase: null,
+        progress: null,
+        files: 1,
+        sourceChunks: 2,
+        embeddedWindows: 2,
+        lastUpdatedAt: "2026-01-01T00:00:00.000Z",
+        error: null,
+      },
+      domains: {
+        source: {
+          state: "ready",
+          directories: [root],
+          generation: 1,
+          phase: null,
+          progress: null,
+          lastUpdatedAt: "2026-01-01T00:00:00.000Z",
+          error: null,
+        },
+        history: {
+          state: "disabled",
+          directories: [],
+          generation: 0,
+          phase: null,
+          progress: null,
+          lastUpdatedAt: null,
+          error: null,
+        },
+        conversations: {
+          state: "disabled",
+          directories: [],
+          generation: 0,
+          phase: null,
+          progress: null,
+          lastUpdatedAt: null,
+          error: null,
+        },
+      },
+      preparation: null,
+      config: null,
+    },
+  };
+}
+
+function dependencies(
+  overrides: Partial<IndexCommandDependencies> = {},
+): IndexCommandDependencies {
+  return {
+    assertDirectory: async () => undefined,
+    index: async () => result(),
+    watch: async () => result(),
+    readStatus: async () => null,
+    readLock: async () => null,
+    ...overrides,
+  };
+}
+
 describe("index CLI", () => {
-  test("parses explicit domain actions and status", () => {
-    expect(parseIndexArguments(["source", "enable", "-d", "repo"]))
-      .toEqual({
-        command: "configure",
-        domain: "source",
-        action: "enable",
-        directory: "repo",
-      });
-    expect(parseIndexArguments(["status", "--directory", "repo"]))
-      .toEqual({ command: "status", directory: "repo" });
-    expect(parseIndexArguments([
-      "source",
-      "enable",
-      "-d",
-      "repo",
-      "--state-dir",
-      "state",
-    ])).toEqual({
-      command: "configure",
-      domain: "source",
-      action: "enable",
-      directory: "repo",
-      stateDirectory: "state",
+  test("parses one-shot, watch, status, and optional project selection", () => {
+    expect(parseIndexArguments([])).toEqual({
+      command: "index",
+      directory: ".",
+      watch: false,
     });
-    expect(parseIndexArguments([
-      "status",
-      "--state-dir",
-      "state",
-      "-d",
-      "repo",
-    ])).toEqual({
+    expect(parseIndexArguments(["--watch", "-d", "repo"])).toEqual({
+      command: "index",
+      directory: "repo",
+      watch: true,
+    });
+    expect(parseIndexArguments(["status", "--directory", "repo"])).toEqual({
       command: "status",
       directory: "repo",
-      stateDirectory: "state",
+      watch: false,
     });
   });
 
-  test("forwards the state directory through configure and status commands", async () => {
-    const calls: unknown[][] = [];
-    const dependencies = {
-      assertDirectory: async () => undefined,
-      configureSource: async (...args: [string, boolean, string?]) => {
-        calls.push(args);
-        return "completed" as const;
+  test("routes one-shot, watch, and status without source mutations", async () => {
+    const calls: string[] = [];
+    const io = output();
+    const deps = dependencies({
+      index: async (directory) => {
+        calls.push(`index:${directory}`);
+        return result(directory);
       },
-      readStatus: async (...args: [string, string?]) => {
-        calls.push(args);
+      watch: async (directory) => {
+        calls.push(`watch:${directory}`);
+        return result(directory);
+      },
+      readStatus: async (directory) => {
+        calls.push(`status:${directory}`);
         return null;
       },
-    };
-    expect(await runIndex([
-      "source",
-      "enable",
-      "-d",
-      "repo",
-      "--state-dir",
-      "state",
-    ], dependencies, output())).toBe(0);
-    expect(await runIndex([
-      "status",
-      "-d",
-      "repo",
-      "--state-dir",
-      "state",
-    ], dependencies, output())).toBe(0);
+      readLock: async (directory) => {
+        calls.push(`lock:${directory}`);
+        return null;
+      },
+    });
+
+    expect(await runIndex(["-d", "one"], deps, io)).toBe(0);
+    expect(await runIndex(["--watch", "-d", "two"], deps, io)).toBe(0);
+    expect(await runIndex(["status", "-d", "three"], deps, io)).toBe(0);
     expect(calls).toEqual([
-      ["repo", true, "state"],
-      ["repo", "state"],
+      "index:one",
+      "watch:two",
+      "status:three",
+      "lock:three",
     ]);
   });
 
-  test("rejects ambiguous or incomplete command shapes", async () => {
+  test("rejects removed, duplicate, and invalid command shapes", async () => {
     for (const args of [
-      [],
+      ["source", "enable"],
       ["source"],
-      ["source", "toggle", "-d", "."],
-      ["unknown", "enable", "-d", "."],
-      ["status"],
-      ["source", "enable", "-d", "one", "-d", "two"],
-      ["source", "enable", "-d", ".", "--state-dir", ""],
-      ["status", "-d", ".", "--state-dir", "   "],
+      ["--state-dir", "state"],
+      ["status", "--watch"],
+      ["--watch", "--watch"],
+      ["-d"],
+      ["-d", "one", "-d", "two"],
+      ["history", "enable"],
     ]) {
       const io = output();
-      expect(await runIndex(args, {
-        assertDirectory: async () => undefined,
-        configureSource: async () => "completed",
-        readStatus: async () => null,
-      }, io)).toBe(2);
+      expect(await runIndex(args, dependencies(), io)).toBe(2);
       expect(io.errors.at(-1)).toBe(INDEX_USAGE);
     }
   });
 
-  test("keeps unimplemented domains side-effect free", async () => {
-    let configured = 0;
-    for (const domain of ["history", "conversations"] as const) {
-      const io = output();
-      expect(await runIndex(
-        [domain, "enable", "-d", "repo"],
-        {
-          assertDirectory: async () => undefined,
-          configureSource: async () => {
-            configured++;
-            return "completed";
-          },
-          readStatus: async () => null,
-        },
-        io,
-      )).toBe(1);
-      expect(io.errors).toEqual([`${domain} indexing is not implemented yet`]);
-    }
-    expect(configured).toBe(0);
+  test("requires init before indexing and leaves missing state absent", async () => {
+    const root = await project();
+
+    await expect(indexProjectOnce(root, {
+      embedder: controlledEmbedder([]),
+    })).rejects.toThrow("run `mimirs init");
+    expect(await Bun.file(join(root, ".mimirs")).exists()).toBe(false);
   });
 
-  test("indexes incrementally without status and physically disables source", async () => {
+  test("indexes incrementally without changing the configured source", async () => {
     const root = await project();
+    await initializeProject(root);
     const calls: string[][] = [];
     const embedder = controlledEmbedder(calls);
 
-    expect(await configureSourceIndex(root, true, { embedder })).toBe("completed");
+    expect((await indexProjectOnce(root, { embedder })).status.index.generation)
+      .toBe(1);
     expect(calls).toHaveLength(1);
-    expect((await loadIndexConfig(root)).index?.source.directories).toEqual(["."]);
-
-    await rm(join(root, ".mimirs", "status.json"));
-    expect(await configureSourceIndex(root, true, { embedder })).toBe("completed");
+    expect((await indexProjectOnce(root, { embedder })).status.index.generation)
+      .toBe(2);
     expect(calls).toHaveLength(1);
 
-    expect(await configureSourceIndex(root, false, { embedder })).toBe("completed");
-    expect((await loadIndexConfig(root)).index?.source.directories).toEqual([]);
+    await writeFile(join(root, "src", "alpha.ts"), "export const beta = true;\n");
+    await indexProjectOnce(root, { embedder });
+    expect(calls).toHaveLength(2);
+    await rm(join(root, "src", "alpha.ts"));
+    const final = await indexProjectOnce(root, { embedder });
+    expect(final.status.index.files).toBe(1); // .gitignore remains discoverable.
     const index = SourceIndex.openReadOnly(join(root, ".mimirs", "index.sqlite"));
     try {
-      expect(index.listFiles()).toEqual([]);
-      expect(index.countWindows()).toBe(0);
-      expect(index.countSemanticVectors()).toBe(0);
+      expect(index.listFiles()).not.toContain("src/alpha.ts");
     } finally {
       index.close();
     }
-    const status = await readSharedProjectStatus(root);
-    expect(status?.domains.source).toMatchObject({
-      state: "disabled",
-      directories: [],
-    });
   });
 
-  test("does not mutate config behind another indexing writer", async () => {
+  test("reports file and embedding progress during a one-shot index", async () => {
     const root = await project();
-    const lock = await tryAcquireProjectIndexLock(
+    await initializeProject(root);
+    const io = output();
+    const writes: string[] = [];
+    io.progressStream = {
+      isTTY: false,
+      write: (value) => writes.push(value),
+    };
+
+    await indexProjectWithProgress(
       root,
-      "other-cli",
-      process.pid,
+      io,
+      { embedder: controlledEmbedder([]) },
     );
+
+    expect(writes[0]).toBe("Scanning source files…\n");
+    expect(writes.some((value) => value.startsWith("Indexing:"))).toBe(true);
+    expect(writes.some((value) => value.startsWith("Embedding:"))).toBe(true);
+  });
+
+  test("renders a durable refresh summary with changed and reused work", () => {
+    const value = result();
+    value.status.preparation = {
+      index: {
+        root: "/project",
+        discovered: 3,
+        indexed: 1,
+        unchanged: 2,
+        failed: [],
+      },
+      embeddings: {
+        model: "test/index",
+        revision: "1",
+        variant: "controlled",
+        dimensions: 2,
+        total: 8,
+        embedded: 3,
+        unchanged: 5,
+        batches: 1,
+      },
+    };
+
+    expect(renderIndexSummary(value)).toBe(
+      "Indexed /project\n" +
+        "  Generation: 1 (ready)\n" +
+        "  Files: 3 total; 1 indexed, 2 unchanged, 0 failed\n" +
+        "  Chunks: 2\n" +
+        "  Embeddings: 8 total; 3 embedded, 5 unchanged, 1 batch\n" +
+        "  Duration: 1.3s",
+    );
+  });
+
+  test("does not write behind another indexing writer", async () => {
+    const root = await project();
+    await initializeProject(root);
+    const configPath = join(root, ".mimirs", "config.json");
+    const before = await Bun.file(configPath).text();
+    const lock = await tryAcquireProjectIndexLock(root, "other-cli");
     expect(lock).not.toBeNull();
     try {
-      await expect(configureSourceIndex(root, false, {
+      await expect(indexProjectOnce(root, {
         embedder: controlledEmbedder([]),
       })).rejects.toThrow("another index command owns");
-      expect(await Bun.file(join(root, ".mimirs", "config.json")).exists())
+      expect(await Bun.file(configPath).text()).toBe(before);
+      expect(await Bun.file(join(root, ".mimirs", "index.sqlite")).exists())
         .toBe(false);
     } finally {
       await lock!.release();
     }
   });
 
-  test("persists a source-domain failure for a later status command", async () => {
+  test("persists a failed initial generation for status", async () => {
     const root = await project();
+    await initializeProject(root);
     const failing: Embedder = {
       model: "test/index-cli",
       revision: "1",
@@ -241,20 +331,13 @@ describe("index CLI", () => {
         throw new Error("controlled embedding failure");
       },
     };
-    await expect(configureSourceIndex(root, true, { embedder: failing }))
-      .rejects.toThrow("controlled embedding failure");
 
-    const status = await readSharedProjectStatus(root);
-    expect(status?.index).toMatchObject({
+    await expect(indexProjectOnce(root, { embedder: failing }))
+      .rejects.toThrow("controlled embedding failure");
+    expect((await readSharedProjectStatus(root))?.index).toMatchObject({
       state: "failed",
       searchable: false,
-      error: {
-        code: "CLI_INDEX_FAILED",
-        message: "controlled embedding failure",
-      },
-    });
-    expect(status?.domains.source).toMatchObject({
-      state: "failed",
+      generation: 0,
       error: {
         code: "CLI_INDEX_FAILED",
         message: "controlled embedding failure",
@@ -262,128 +345,18 @@ describe("index CLI", () => {
     });
   });
 
-  test("indexes an empty project and creates a missing state host namespace", async () => {
-    const container = await mkdtemp(join(tmpdir(), "mimirs-index-empty-"));
-    temporaryDirectories.push(container);
-    const root = join(container, "project");
-    const stateHost = join(container, "state");
-    await mkdir(root);
+  test("reports active writer state separately from the persisted generation", async () => {
+    const io = output();
+    expect(await runIndex(["status"], dependencies({
+      readStatus: async () => result().status,
+      readLock: async () => ({
+        instanceId: "live",
+        pid: process.pid,
+        acquiredAt: new Date().toISOString(),
+      }),
+    }), io)).toBe(0);
 
-    expect(await configureSourceIndex(
-      root,
-      true,
-      { embedder: controlledEmbedder([]) },
-      stateHost,
-    )).toBe("completed");
-    expect(await Bun.file(join(root, ".mimirs")).exists()).toBe(false);
-    for (const file of [
-      "config.json",
-      "index.sqlite",
-      "project.json",
-      "status.json",
-    ]) {
-      expect(await Bun.file(join(stateHost, ".mimirs", file)).exists())
-        .toBe(true);
-    }
-    expect((await readSharedProjectStatus(root, stateHost))?.index.files).toBe(0);
-  });
-
-  test("rejects external state bound to a different project on read", async () => {
-    const first = await project();
-    const second = await project();
-    const stateHost = await mkdtemp(join(tmpdir(), "mimirs-index-bound-state-"));
-    temporaryDirectories.push(stateHost);
-    const embedder = controlledEmbedder([]);
-    await configureSourceIndex(first, true, { embedder }, stateHost);
-
-    await expect(openReadOnlyProjectSearch(second, { embedder }, stateHost))
-      .rejects.toThrow("cannot be reused");
-    await expect(readSharedProjectStatus(second, stateHost))
-      .rejects.toThrow("cannot be reused");
-  });
-
-  test("indexes and searches a read-only project using only external state", async () => {
-    const root = await project();
-    const state = await mkdtemp(join(tmpdir(), "mimirs-index-state-"));
-    temporaryDirectories.push(state);
-    const sourcePath = join(root, "src", "alpha.ts");
-    const sourceBefore = await readFile(sourcePath, "utf8");
-    const enforcePermissions = process.platform !== "win32" &&
-      process.getuid?.() !== 0;
-    if (enforcePermissions) {
-      await chmod(sourcePath, 0o444);
-      await chmod(join(root, "src"), 0o555);
-      await chmod(root, 0o555);
-      await expect(writeFile(join(root, "write-probe"), "no\n"))
-        .rejects.toMatchObject({ code: "EACCES" });
-    }
-
-    const embedder = controlledEmbedder([]);
-    try {
-      expect(await configureSourceIndex(root, true, { embedder }, state))
-        .toBe("completed");
-      const session = await openReadOnlyProjectSearch(
-        root,
-        { embedder },
-        state,
-      );
-      try {
-        expect((await session.search({ query: "alpha", maxResults: 1 })).source)
-          .toContainEqual(expect.objectContaining({ path: "src/alpha.ts" }));
-      } finally {
-        await session.close();
-      }
-      expect(await Bun.file(join(root, ".mimirs")).exists()).toBe(false);
-      expect(await readFile(sourcePath, "utf8")).toBe(sourceBefore);
-      const mimirsState = join(state, ".mimirs");
-      for (const file of [
-        "config.json",
-        "index.sqlite",
-        "project.json",
-        "status.json",
-      ]) {
-        expect(await Bun.file(join(mimirsState, file)).exists()).toBe(true);
-      }
-      expect(await Bun.file(join(mimirsState, "index.lock")).exists()).toBe(false);
-    } finally {
-      if (enforcePermissions) {
-        await chmod(root, 0o755);
-        await chmod(join(root, "src"), 0o755);
-        await chmod(sourcePath, 0o644);
-      }
-    }
-  });
-
-  test("does not fall back to project-local state when external state is unwritable", async () => {
-    if (process.platform === "win32" || process.getuid?.() === 0) return;
-    const root = await project();
-    const state = await mkdtemp(join(tmpdir(), "mimirs-index-unwritable-"));
-    temporaryDirectories.push(state);
-    await chmod(state, 0o555);
-    try {
-      await expect(configureSourceIndex(
-        root,
-        true,
-        { embedder: controlledEmbedder([]) },
-        state,
-      )).rejects.toMatchObject({ code: "EACCES" });
-      expect(await Bun.file(join(root, ".mimirs")).exists()).toBe(false);
-    } finally {
-      await chmod(state, 0o755);
-    }
-  });
-
-  test("does not initialize external state when the project is missing", async () => {
-    const container = await mkdtemp(join(tmpdir(), "mimirs-index-missing-"));
-    const stateHost = await mkdtemp(join(tmpdir(), "mimirs-index-unused-state-"));
-    temporaryDirectories.push(container, stateHost);
-    const missing = join(container, "missing");
-    await expect(configureSourceIndex(
-      missing,
-      true,
-      { embedder: controlledEmbedder([]) },
-      stateHost,
-    )).rejects.toThrow("no such project directory");
-    expect(await Bun.file(join(stateHost, ".mimirs")).exists()).toBe(false);
+    expect(io.logs[0]).toContain("Index: ready");
+    expect(io.logs[0]).toContain(`Writer: active (pid ${process.pid})`);
   });
 });

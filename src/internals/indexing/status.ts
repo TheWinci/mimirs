@@ -10,8 +10,6 @@ import {
 import {
   ensureProjectState,
   projectLayout,
-  ProjectStateMismatchError,
-  validateProjectState,
 } from "../project/layout.ts";
 
 export type ProjectIndexState =
@@ -244,7 +242,7 @@ export function projectIndexDomainStatuses(
   const domains = indexDomains(config ?? {
     include: [],
     exclude: [],
-  });
+  }, root);
   const resolved = (directories: readonly string[]): string[] =>
     directories.map((directory) => resolve(root, directory));
   const disabled = (
@@ -277,24 +275,15 @@ export function projectIndexDomainStatuses(
 /** Read the last atomically persisted project status. */
 export async function readSharedProjectStatus(
   directory: string,
-  stateDirectory?: string,
 ): Promise<SharedProjectStatus | null> {
-  const layout = projectLayout(directory, stateDirectory);
-  await validateProjectState(layout, layout.externalState);
+  const layout = projectLayout(directory);
   try {
     const parsed: unknown = JSON.parse(await readFile(layout.statusPath, "utf8"));
     if (!isSharedStatus(parsed)) return null;
     const statusRoot = projectLayout(parsed.root).root;
-    if (statusRoot !== layout.root) {
-      throw new ProjectStateMismatchError(
-        layout.stateDirectory,
-        layout.root,
-        statusRoot,
-      );
-    }
+    if (statusRoot !== layout.root) return null;
     return parsed;
-  } catch (error) {
-    if (error instanceof ProjectStateMismatchError) throw error;
+  } catch {
     return null;
   }
 }
@@ -303,16 +292,13 @@ export async function readSharedProjectStatus(
 export async function writeSharedProjectStatus(
   directory: string,
   status: SharedProjectStatus,
-  stateDirectory?: string,
 ): Promise<void> {
-  const layout = projectLayout(directory, stateDirectory);
+  const layout = projectLayout(directory);
   await ensureProjectState(layout);
   const statusRoot = projectLayout(status.root).root;
   if (statusRoot !== layout.root) {
-    throw new ProjectStateMismatchError(
-      layout.stateDirectory,
-      layout.root,
-      statusRoot,
+    throw new Error(
+      `index status root ${statusRoot} does not match project ${layout.root}`,
     );
   }
   const path = layout.statusPath;

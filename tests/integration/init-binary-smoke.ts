@@ -3,6 +3,7 @@ import {
   mkdtemp,
   readFile,
   readdir,
+  realpath,
   rm,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -52,6 +53,12 @@ try {
   if (!first.stdout.includes("Initialized Mimirs for")) {
     throw new Error(`compiled init output was unexpected:\n${first.stdout}`);
   }
+  if (
+    !first.stdout.includes("Next: mimirs index\n") ||
+    first.stdout.includes("Next: mimirs index -d")
+  ) {
+    throw new Error(`compiled init next step was unexpected:\n${first.stdout}`);
+  }
 
   const state = join(project, ".mimirs");
   const stateFiles = (await readdir(state)).sort();
@@ -59,6 +66,15 @@ try {
     throw new Error(
       `compiled init created unexpected state: ${stateFiles.join(", ")}`,
     );
+  }
+  const config = JSON.parse(
+    await readFile(join(state, "config.json"), "utf8"),
+  ) as { index?: { source?: { directories?: unknown } } };
+  if (
+    JSON.stringify(config.index?.source?.directories) !==
+      JSON.stringify([await realpath(project)])
+  ) {
+    throw new Error("compiled init did not record the absolute source path");
   }
   if (await readFile(join(project, ".gitignore"), "utf8") !== ".mimirs/\n") {
     throw new Error("compiled init did not create the root .gitignore rule");

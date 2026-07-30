@@ -24,10 +24,8 @@ export const PROJECT_GITIGNORE_ENTRY = ".mimirs/";
 
 export interface ProjectInitialization {
   root: string;
-  stateHost: string;
   stateDirectory: string;
   configPath: string;
-  externalState: boolean;
   /** True only for the contender that materialized the initial config. */
   created: boolean;
 }
@@ -89,7 +87,6 @@ function hasEffectiveProjectIgnore(contents: string): boolean {
 }
 
 async function ensureProjectGitIgnore(layout: ProjectLayout): Promise<void> {
-  if (layout.externalState) return;
   const path = join(layout.root, ".gitignore");
   if (await createFileIfMissing(path, `${PROJECT_GITIGNORE_ENTRY}\n`)) return;
 
@@ -124,25 +121,19 @@ async function ensureProjectGitIgnore(layout: ProjectLayout): Promise<void> {
 /** Initialize explicit project state without opening or creating an index. */
 export async function initializeProject(
   directory: string,
-  stateDirectory?: string,
 ): Promise<ProjectInitialization> {
-  const layout = projectLayout(directory, stateDirectory);
+  const layout = projectLayout(directory);
   await assertProjectDirectory(directory, layout.root);
 
   await ensureProjectState(layout);
-  const configCreated = await createDefaultIndexConfigIfMissing(
-    layout.root,
-    layout.stateHost,
-  );
-  await loadIndexConfig(layout.root, layout.stateHost);
+  const configCreated = await createDefaultIndexConfigIfMissing(layout.root);
+  await loadIndexConfig(layout.root);
   await ensureProjectGitIgnore(layout);
 
   return {
     root: layout.root,
-    stateHost: layout.stateHost,
     stateDirectory: layout.stateDirectory,
     configPath: layout.configPath,
-    externalState: layout.externalState,
     created: configCreated,
   };
 }

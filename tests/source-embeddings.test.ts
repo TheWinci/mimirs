@@ -177,6 +177,92 @@ describe("source-window embeddings", () => {
     }
   });
 
+  test("forwards in-flight document inference progress within a persistence batch", async () => {
+    const index = SourceIndex.open();
+    try {
+      for (const name of ["alpha", "beta", "gamma"]) {
+        await index.indexFile(
+          `${name}.ts`,
+          `export const ${name} = true;\n`,
+        );
+      }
+      const base = withSourceEmbeddingProjection(
+        new RecordingEmbedder(),
+        SOURCE_PATH_PROJECTION,
+      );
+      const embedder: SourceDocumentEmbedder = {
+        ...base,
+        variant: `${base.variant}|in-flight-progress`,
+        embedProjectedInputs: async (texts, options) => {
+          const vectors: Float32Array[] = [];
+          for (let ordinal = 0; ordinal < texts.length; ordinal++) {
+            vectors.push(deterministicVector(texts[ordinal]!, 4));
+            await options?.onProgress?.({
+              completed: ordinal + 1,
+              total: texts.length,
+            });
+          }
+          return vectors;
+        },
+      };
+      const progress: Array<{ completed: number; total: number }> = [];
+
+      await embedSourceWindows(index, embedder, {
+        batchSize: 1_024,
+        onProgress: (value) => {
+          progress.push(value);
+        },
+      });
+
+      expect(progress).toContainEqual({ completed: 1, total: 3 });
+      expect(progress).toContainEqual({ completed: 2, total: 3 });
+      expect(progress.at(-1)).toEqual({ completed: 3, total: 3 });
+    } finally {
+      index.close();
+    }
+  });
+
+  test("keeps embedding progress monotonic when nested inference restarts", async () => {
+    const index = SourceIndex.open();
+    try {
+      for (const name of ["alpha", "beta", "gamma", "delta", "epsilon"]) {
+        await index.indexFile(
+          `${name}.ts`,
+          `export const ${name} = true;\n`,
+        );
+      }
+      const base = withSourceEmbeddingProjection(
+        new RecordingEmbedder(),
+        SOURCE_PATH_PROJECTION,
+      );
+      const embedder: SourceDocumentEmbedder = {
+        ...base,
+        variant: `${base.variant}|restarting-progress`,
+        embedProjectedInputs: async (texts, options) => {
+          await options?.onProgress?.({ completed: 4, total: 4 });
+          await options?.onProgress?.({ completed: 1, total: 4 });
+          return texts.map((text) => deterministicVector(text, 4));
+        },
+      };
+      const progress: Array<{ completed: number; total: number }> = [];
+
+      await embedSourceWindows(index, embedder, {
+        batchSize: 2,
+        onProgress: (value) => {
+          progress.push(value);
+        },
+      });
+
+      expect(progress.at(-1)).toEqual({ completed: 5, total: 5 });
+      expect(progress.filter((value) => value.completed === 5)).toHaveLength(1);
+      expect(progress.every((value, index) =>
+        index === 0 || value.completed >= progress[index - 1]!.completed
+      )).toBe(true);
+    } finally {
+      index.close();
+    }
+  });
+
   test("path projection keeps identical text in different files distinct", async () => {
     const index = SourceIndex.open();
     try {

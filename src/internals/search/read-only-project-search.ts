@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 
+import { loadInitializedIndexConfig } from "../indexing/config.ts";
 import { projectLayout } from "../project/layout.ts";
 import {
   ProjectSearchSession,
@@ -11,13 +12,10 @@ import { SourceIndexSchemaMismatchError } from
   "../storage/source-index.ts";
 
 export class ProjectNotIndexedError extends Error {
-  constructor(directory: string, stateDirectory?: string) {
-    const stateOption = stateDirectory
-      ? ` --state-dir ${JSON.stringify(resolve(stateDirectory))}`
-      : "";
+  constructor(directory: string) {
     super(
       `project is not indexed: ${resolve(directory)}; ` +
-        `run \`mimirs index source enable -d <directory>${stateOption}\` first`,
+        "run `mimirs index -d <directory>` first",
     );
     this.name = "ProjectNotIndexedError";
   }
@@ -27,16 +25,12 @@ export class ProjectIndexSchemaCompatibilityError extends Error {
   constructor(
     directory: string,
     mismatch: SourceIndexSchemaMismatchError,
-    stateDirectory?: string,
   ) {
     const root = resolve(directory);
-    const stateOption = stateDirectory
-      ? ` --state-dir ${JSON.stringify(resolve(stateDirectory))}`
-      : "";
     super(
       mismatch.actual < mismatch.expected
         ? `project index schema ${mismatch.actual} requires migration to ` +
-          `${mismatch.expected}; run \`mimirs index source enable -d .${stateOption}\` ` +
+          `${mismatch.expected}; run \`mimirs index -d .\` ` +
           `from ${root}`
         : `project index schema ${mismatch.actual} was created by a newer ` +
           `Mimirs version; upgrade Mimirs before searching ${root}`,
@@ -48,18 +42,18 @@ export class ProjectIndexSchemaCompatibilityError extends Error {
 export async function openReadOnlyProjectSearch(
   directory: string,
   options: Omit<ProjectSearchSessionOptions, "databasePath" | "readOnly"> = {},
-  stateDirectory?: string,
 ): Promise<ProjectSearchSession> {
-  const layout = projectLayout(directory, stateDirectory);
+  const layout = projectLayout(directory);
+  const config = await loadInitializedIndexConfig(layout.root);
   if (!(await Bun.file(layout.databasePath).exists())) {
-    throw new ProjectNotIndexedError(directory, stateDirectory);
+    throw new ProjectNotIndexedError(directory);
   }
 
   let session: ProjectSearchSession;
   try {
     session = await ProjectSearchSession.open(directory, {
       ...options,
-      stateDirectory: layout.stateHost,
+      config,
       readOnly: true,
     });
   } catch (error) {
@@ -67,7 +61,6 @@ export async function openReadOnlyProjectSearch(
       throw new ProjectIndexSchemaCompatibilityError(
         directory,
         error,
-        stateDirectory,
       );
     }
     throw error;
@@ -86,12 +79,10 @@ export async function searchReadOnlyProject(
   directory: string,
   request: SearchRequest,
   options: Omit<ProjectSearchSessionOptions, "databasePath" | "readOnly"> = {},
-  stateDirectory?: string,
 ): Promise<ProjectSearchResponse> {
   const session = await openReadOnlyProjectSearch(
     directory,
     options,
-    stateDirectory,
   );
   try {
     return await session.search(request);

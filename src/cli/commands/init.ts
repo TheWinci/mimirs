@@ -1,18 +1,19 @@
+import { createInterface } from "node:readline/promises";
+
 import {
   initializeProject,
   type ProjectInitialization,
 } from "../../internals/project/initialize.ts";
 import { ProjectDirectoryNotFoundError } from
   "../../internals/project/files.ts";
-import { ProjectStateLocationError } from
-  "../../internals/project/layout.ts";
+import { prepareCompiledRuntime } from
+  "../../internals/runtime/compiled.ts";
 
 export const INIT_USAGE =
-  "Usage: mimirs init [-d <directory>] [--state-dir <directory>]";
+  "Usage: mimirs init [-d <directory>]";
 
 export interface ParsedInitArguments {
   directory: string;
-  stateDirectory?: string;
 }
 
 export interface InitCommandOutput {
@@ -21,10 +22,12 @@ export interface InitCommandOutput {
 }
 
 export interface InitCommandDependencies {
-  initialize(
+  initialize(directory: string): Promise<ProjectInitialization>;
+  confirmIndex?(): Promise<boolean | null>;
+  index?(
     directory: string,
-    stateDirectory?: string,
-  ): Promise<ProjectInitialization>;
+    output: InitCommandOutput,
+  ): Promise<number>;
 }
 
 class InitArgumentError extends Error {}
@@ -39,7 +42,6 @@ function value(args: string[], index: number, flag: string): string {
 
 export function parseInitArguments(args: string[]): ParsedInitArguments {
   let directory: string | undefined;
-  let stateDirectory: string | undefined;
 
   for (let index = 0; index < args.length; index++) {
     const argument = args[index]!;
@@ -51,37 +53,42 @@ export function parseInitArguments(args: string[]): ParsedInitArguments {
       index++;
       continue;
     }
-    if (argument === "--state-dir") {
-      if (stateDirectory !== undefined) {
-        throw new InitArgumentError(
-          "state directory may only be provided once",
-        );
-      }
-      stateDirectory = value(args, index, argument);
-      index++;
-      continue;
-    }
     throw new InitArgumentError(`unknown init option: ${argument}`);
   }
 
-  return {
-    directory: directory ?? ".",
-    ...(stateDirectory === undefined ? {} : { stateDirectory }),
-  };
+  return { directory: directory ?? "." };
+}
+
+async function confirmIndex(): Promise<boolean | null> {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) return null;
+  const prompt = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  try {
+    const answer = (await prompt.question(
+      "Index this project now? [Y/n] ",
+    )).trim().toLowerCase();
+    return answer === "" || answer === "y" || answer === "yes";
+  } finally {
+    prompt.close();
+  }
+}
+
+async function runInitialIndex(
+  directory: string,
+  output: InitCommandOutput,
+): Promise<number> {
+  await prepareCompiledRuntime();
+  const { runIndex } = await import("./index.ts");
+  return runIndex(["-d", directory], undefined, output);
 }
 
 const DEFAULT_DEPENDENCIES: InitCommandDependencies = {
   initialize: initializeProject,
+  confirmIndex,
+  index: runInitialIndex,
 };
-
-function nextCommand(initialization: ProjectInitialization): string {
-  const stateOption = initialization.externalState
-    ? ` --state-dir ${JSON.stringify(initialization.stateHost)}`
-    : "";
-  return `mimirs index source enable -d ${
-    JSON.stringify(initialization.root)
-  }${stateOption}`;
-}
 
 export async function runInit(
   args: string[],
@@ -98,23 +105,25 @@ export async function runInit(
   }
 
   try {
-    const initialization = await dependencies.initialize(
-      parsed.directory,
-      parsed.stateDirectory,
-    );
+    const initialization = await dependencies.initialize(parsed.directory);
     output.log(
       initialization.created
         ? `Initialized Mimirs for ${initialization.root}`
         : `Mimirs is already initialized for ${initialization.root}`,
     );
     output.log(`Config: ${initialization.configPath}`);
-    output.log(`Next: ${nextCommand(initialization)}`);
+    const shouldIndex = await (
+      dependencies.confirmIndex ?? DEFAULT_DEPENDENCIES.confirmIndex!
+    )();
+    if (shouldIndex) {
+      return (
+        dependencies.index ?? DEFAULT_DEPENDENCIES.index!
+      )(initialization.root, output);
+    }
+    output.log("Next: mimirs index");
     return 0;
   } catch (error) {
     output.error(error instanceof Error ? error.message : String(error));
-    return error instanceof ProjectDirectoryNotFoundError ||
-        error instanceof ProjectStateLocationError
-      ? 2
-      : 1;
+    return error instanceof ProjectDirectoryNotFoundError ? 2 : 1;
   }
 }

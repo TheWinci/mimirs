@@ -13,7 +13,7 @@ import {
 } from "../src/cli/commands/search.ts";
 import { openReadOnlyProjectSearch } from
   "../src/internals/search/read-only-project-search.ts";
-import { configureSourceIndex } from "../src/cli/commands/index.ts";
+import { indexProjectOnce } from "../src/cli/commands/index.ts";
 import type { Embedder } from "../src/internals/embeddings/embedder.ts";
 import {
   renderSegmentedSearchResults,
@@ -26,6 +26,8 @@ import { SOURCE_INDEX_SCHEMA_VERSION } from
   "../src/internals/storage/schema.ts";
 import { SourceIndex } from
   "../src/internals/storage/source-index.ts";
+import { initializeProject } from
+  "../src/internals/project/initialize.ts";
 
 const temporaryDirectories: string[] = [];
 
@@ -91,14 +93,12 @@ function dependencies(
   value: ProjectSearchResponse,
   state: {
       directory?: string;
-      stateDirectory?: string;
       request?: { query: string; maxResults: number };
     },
 ): SearchCommandDependencies {
   return {
-    search: async (directory, request, stateDirectory) => {
+    search: async (directory, request) => {
       state.directory = directory;
-      if (stateDirectory !== undefined) state.stateDirectory = stateDirectory;
       state.request = request;
       return value;
     },
@@ -113,7 +113,7 @@ describe("search CLI", () => {
     const root = await mkdtemp(join(tmpdir(), "mimirs-search-schema-"));
     temporaryDirectories.push(root);
     const databasePath = join(root, ".mimirs", "index.sqlite");
-    await mkdir(join(root, ".mimirs"));
+    await initializeProject(root);
     SourceIndex.open(databasePath).close();
     const database = new Database(databasePath, { strict: true });
     database.exec(`PRAGMA user_version = ${version}`);
@@ -126,7 +126,7 @@ describe("search CLI", () => {
       SOURCE_INDEX_SCHEMA_VERSION - 1,
     );
     await expect(openReadOnlyProjectSearch(root)).rejects.toThrow(
-      "run `mimirs index source enable -d .`",
+      "run `mimirs index -d .`",
     );
     const database = new Database(databasePath, { readonly: true, strict: true });
     expect(database.query<{ user_version: number }, []>(
@@ -134,7 +134,7 @@ describe("search CLI", () => {
     ).get()).toEqual({ user_version: SOURCE_INDEX_SCHEMA_VERSION - 1 });
     database.close();
     expect(await Bun.file(join(root, ".mimirs", "config.json")).exists())
-      .toBe(false);
+      .toBe(true);
   });
 
   test("directs newer read-only schemas through a Mimirs upgrade", async () => {
@@ -143,7 +143,7 @@ describe("search CLI", () => {
       "created by a newer Mimirs version; upgrade Mimirs",
     );
     expect(await Bun.file(join(root, ".mimirs", "config.json")).exists())
-      .toBe(false);
+      .toBe(true);
   });
 
   test("opens the owned database read-only without requiring status", async () => {
@@ -165,12 +165,10 @@ describe("search CLI", () => {
         return texts.map(() => new Float32Array([1, 0]));
       },
     };
-    await configureSourceIndex(root, true, { embedder });
+    await initializeProject(root);
+    await indexProjectOnce(root, { embedder });
     const databasePath = join(root, ".mimirs", "index.sqlite");
-    await Promise.all([
-      rm(join(root, ".mimirs", "status.json")),
-      rm(join(root, ".mimirs", "config.json")),
-    ]);
+    await rm(join(root, ".mimirs", "status.json"));
     const session = await openReadOnlyProjectSearch(root, { embedder });
     try {
       expect(session.sourceIndex.database.query<{ query_only: number }, []>(
@@ -185,7 +183,7 @@ describe("search CLI", () => {
     expect(await Bun.file(join(root, ".mimirs", "status.json")).exists())
       .toBe(false);
     expect(await Bun.file(join(root, ".mimirs", "config.json")).exists())
-      .toBe(false);
+      .toBe(true);
     expect(calls).toHaveLength(2);
   });
 
@@ -323,50 +321,11 @@ describe("search CLI", () => {
       maxResults: 1,
       directory: "-directory",
     });
-    expect(parseSearchArguments([
-      "-q",
-      "find alpha",
-      "--max-results",
-      "3",
-      "-d",
-      "repo",
-      "--state-dir",
-      "state",
-    ])).toEqual({
-      query: "find alpha",
-      maxResults: 3,
-      directory: "repo",
-      stateDirectory: "state",
-    });
-  });
-
-  test("forwards the selected state directory to the read-only session", async () => {
-    const state: {
-      directory?: string;
-      stateDirectory?: string;
-      request?: { query: string; maxResults: number };
-    } = {};
-    expect(await runSearch([
-      "-q",
-      "alpha",
-      "--max-results",
-      "1",
-      "-d",
-      "repo",
-      "--state-dir",
-      "state",
-    ], dependencies(response(), state), output())).toBe(0);
-    expect(state).toEqual({
-      directory: "repo",
-      stateDirectory: "state",
-      request: { query: "alpha", maxResults: 1 },
-    });
   });
 
   test("runs the shared session and keeps an empty result successful", async () => {
     const state: {
       directory?: string;
-      stateDirectory?: string;
       request?: { query: string; maxResults: number };
     } = {};
     const io = output();
@@ -442,8 +401,7 @@ describe("search CLI", () => {
       ["-q", "one", "--query", "two", "--max-results", "2"],
       ["-q", "query", "--max-results", "2", "one", "two"],
       ["-q", "--max-results", "2"],
-      ["-q", "query", "--max-results", "2", "--state-dir", ""],
-      ["-q", "query", "--max-results", "2", "--state-dir", "   "],
+      ["-q", "query", "--max-results", "2", "--state-dir", "state"],
     ];
     for (const args of cases) {
       let opened = false;

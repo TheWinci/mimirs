@@ -7,6 +7,8 @@ import type { Embedder, EmbeddingIdentity } from
   "../src/internals/embeddings/embedder.ts";
 import { ProjectDirectoryNotFoundError } from
   "../src/internals/project/analysis.ts";
+import { defaultIndexConfig } from
+  "../src/internals/indexing/config.ts";
 import { ProjectSearchSession } from
   "../src/internals/search/project-search.ts";
 import { indexProject } from
@@ -263,6 +265,7 @@ describe("project search session", () => {
         JSON.stringify({
           include: ["**/*"],
           exclude: ["beta.ts", "**/.mimirs/**"],
+          index: defaultIndexConfig(root).index,
         }),
       );
 
@@ -295,6 +298,7 @@ describe("project search session", () => {
         include: ["**/*.ts"],
         exclude: ["**/.mimirs/**"],
         generated: [],
+        index: defaultIndexConfig(root).index,
       }),
     );
     const session = await ProjectSearchSession.open(root, {
@@ -318,6 +322,7 @@ describe("project search session", () => {
           include: ["**/*.ts"],
           exclude: ["**/.mimirs/**"],
           generated: ["generated/**"],
+          index: defaultIndexConfig(root).index,
         }),
       );
       await session.refresh();

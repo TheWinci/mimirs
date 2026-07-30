@@ -11,7 +11,10 @@ import {
   type PreTrainedTokenizer,
 } from "@huggingface/transformers";
 
-import type { Embedder } from "./embedder.ts";
+import type {
+  Embedder,
+  EmbedOptions,
+} from "./embedder.ts";
 
 export const MINI_LM_MODEL = "Xenova/all-MiniLM-L6-v2";
 export const MINI_LM_REVISION =
@@ -389,6 +392,7 @@ export async function embedWithMiniLm(
  */
 export async function embedPathAveragedWithMiniLm(
   projectedTexts: readonly string[],
+  options: EmbedOptions = {},
 ): Promise<Float32Array[]> {
   if (projectedTexts.length === 0) return [];
   const plans = await preparePathAverageMiniLmInputs(projectedTexts);
@@ -403,8 +407,13 @@ export async function embedPathAveragedWithMiniLm(
     return index;
   }));
   const uniqueVectors: Float32Array[] = [];
-  for (const input of uniqueInputs) {
+  for (let index = 0; index < uniqueInputs.length; index++) {
+    const input = uniqueInputs[index]!;
     uniqueVectors.push((await embedFlat([input]))[0]!);
+    await options.onProgress?.({
+      completed: index + 1,
+      total: uniqueInputs.length,
+    });
   }
   return planIndexes.map((indexes) =>
     indexes.length === 1

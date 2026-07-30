@@ -52,10 +52,9 @@ export function isProcessAlive(pid: number): boolean {
 
 export async function readProjectIndexLock(
   directory: string,
-  stateDirectory?: string,
 ): Promise<ProjectIndexLockOwner | null> {
   try {
-    const path = projectLayout(directory, stateDirectory).lockPath;
+    const path = projectLayout(directory).lockPath;
     return parseLockRecord(await readFile(path, "utf8"));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
@@ -103,12 +102,11 @@ export async function tryAcquireProjectIndexLock(
   directory: string,
   instanceId: string,
   pid = process.pid,
-  stateDirectory?: string,
 ): Promise<ProjectIndexLock | null> {
   if (!INSTANCE_ID.test(instanceId)) {
     throw new Error("project index lock instanceId must contain only letters, numbers, _ or -");
   }
-  const layout = projectLayout(directory, stateDirectory);
+  const layout = projectLayout(directory);
   await ensureProjectState(layout);
   const path = layout.lockPath;
   await mkdir(layout.stateDirectory, { recursive: true });

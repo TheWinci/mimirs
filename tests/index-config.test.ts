@@ -1,14 +1,22 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  DEFAULT_INDEX_CONFIG,
   createDefaultIndexConfigIfMissing,
+  defaultIndexConfig,
   IndexConfigError,
   loadIndexConfig,
-  setIndexDomainEnabled,
+  loadInitializedIndexConfig,
+  ProjectNotInitializedError,
 } from "../src/internals/indexing/config.ts";
 
 const temporaryDirectories: string[] = [];
@@ -39,57 +47,55 @@ async function writeConfig(
 }
 
 describe("index config", () => {
-  test("atomically materializes complete defaults once", async () => {
+  test("atomically materializes absolute project defaults once", async () => {
     const directory = await temporaryProject();
+    const canonical = await realpath(directory);
     const created = await Promise.all([
       createDefaultIndexConfigIfMissing(directory),
       createDefaultIndexConfigIfMissing(directory),
     ]);
+
     expect(created.sort()).toEqual([false, true]);
     expect(await createDefaultIndexConfigIfMissing(directory)).toBe(false);
-    expect(await loadIndexConfig(directory)).toEqual(DEFAULT_INDEX_CONFIG);
-  });
-
-  test("enables and disables project-local domains idempotently", async () => {
-    const directory = await temporaryProject();
-    await setIndexDomainEnabled(directory, "source", false);
-    await setIndexDomainEnabled(directory, "source", false);
-    expect((await loadIndexConfig(directory)).index).toEqual({
-      source: { directories: [] },
-      history: { provider: "git", directories: [] },
-      conversations: { directories: [] },
-    });
-
-    await setIndexDomainEnabled(directory, "source", true);
-    await setIndexDomainEnabled(directory, "source", true);
+    expect(await loadIndexConfig(directory)).toEqual(defaultIndexConfig(directory));
     expect((await loadIndexConfig(directory)).index?.source.directories)
-      .toEqual(["."]);
+      .toEqual([canonical]);
   });
 
-  test("uses defaults without creating a config file", async () => {
+  test("uses in-memory defaults without pretending the project was initialized", async () => {
     const directory = await temporaryProject();
-    const config = await loadIndexConfig(directory);
 
-    expect(config).toEqual(DEFAULT_INDEX_CONFIG);
+    expect(await loadIndexConfig(directory)).toEqual(defaultIndexConfig(directory));
+    await expect(loadInitializedIndexConfig(directory))
+      .rejects.toBeInstanceOf(ProjectNotInitializedError);
     expect(await Bun.file(join(directory, ".mimirs", "config.json")).exists())
       .toBe(false);
   });
 
-  test("inherits omitted fields and respects explicit empty lists", async () => {
+  test("inherits omitted fields while retaining the absolute source", async () => {
     const directory = await temporaryProject();
-    await writeConfig(directory, { include: [] });
+    await writeConfig(directory, {
+      include: [],
+      index: {
+        source: { directories: [await realpath(directory)] },
+      },
+    });
     const config = await loadIndexConfig(directory);
 
     expect(config.include).toEqual([]);
-    expect(config.exclude).toEqual(DEFAULT_INDEX_CONFIG.exclude);
+    expect(config.exclude).toEqual(defaultIndexConfig(directory).exclude);
+    expect(config.index?.source.directories).toEqual([await realpath(directory)]);
   });
 
-  test("normalizes Windows path separators in patterns", async () => {
+  test("normalizes glob separators without rewriting the source path", async () => {
     const directory = await temporaryProject();
     await writeConfig(directory, {
       include: ["src\\**\\*.ts"],
       exclude: ["src\\generated\\**"],
       generated: ["src\\api\\generated\\**"],
+      index: {
+        source: { directories: [await realpath(directory)] },
+      },
     });
 
     expect(await loadIndexConfig(directory)).toEqual({
@@ -97,57 +103,32 @@ describe("index config", () => {
       exclude: ["src/generated/**"],
       generated: ["src/api/generated/**"],
       index: {
-        source: { directories: ["."] },
+        source: { directories: [await realpath(directory)] },
         history: { provider: "git", directories: [] },
         conversations: { directories: [] },
       },
     });
   });
 
-  test("keeps generated files searchable as an explicit ranking policy", async () => {
-    const directory = await temporaryProject();
-    await writeConfig(directory, {
-      generated: ["applyconfigurations/**", "**/*_generated.go"],
-    });
-
-    const config = await loadIndexConfig(directory);
-    expect(config.generated).toEqual([
-      "applyconfigurations/**",
-      "**/*_generated.go",
-    ]);
-    expect(config.include).toEqual(DEFAULT_INDEX_CONFIG.include);
-    expect(config.exclude).toEqual(DEFAULT_INDEX_CONFIG.exclude);
-  });
-
-  test("rejects malformed JSON instead of silently broadening discovery", async () => {
+  test("rejects malformed JSON and unknown fields", async () => {
     const directory = await temporaryProject();
     await writeConfig(directory, "{ not-json }");
-
     await expect(loadIndexConfig(directory)).rejects
       .toBeInstanceOf(IndexConfigError);
-    await expect(loadIndexConfig(directory)).rejects
-      .toThrow("invalid index config");
-  });
 
-  test("rejects unknown and mistyped fields", async () => {
-    const directory = await temporaryProject();
     await writeConfig(directory, { includes: ["**/*.ts"] });
     await expect(loadIndexConfig(directory)).rejects.toThrow("includes");
-
-    await writeConfig(directory, { include: "**/*.ts" });
-    await expect(loadIndexConfig(directory)).rejects.toThrow("include");
-
-    await writeConfig(directory, { generated: "**/generated/**" });
-    await expect(loadIndexConfig(directory)).rejects.toThrow("generated");
   });
 
-  test("restricts source indexing to zero or one project-root entry", async () => {
+  test("requires exactly one absolute source matching the project", async () => {
     const directory = await temporaryProject();
+    const other = await temporaryProject();
     for (const directories of [
+      [],
+      ["."],
       ["src"],
-      [".."],
-      [directory],
-      [".", "."],
+      [await realpath(other)],
+      [await realpath(directory), await realpath(directory)],
     ]) {
       await writeConfig(directory, {
         index: { source: { directories } },
@@ -157,15 +138,23 @@ describe("index config", () => {
       );
     }
 
-    await writeConfig(directory, {
-      index: { source: { directories: [] } },
+    await writeConfig(directory, { include: ["**/*"] });
+    await expect(loadIndexConfig(directory)).rejects.toThrow(
+      "index.source.directories",
+    );
+  });
+
+  test("accepts a symlink alias and returns its canonical source path", async () => {
+    const container = await temporaryProject();
+    const source = join(container, "source");
+    const alias = join(container, "alias");
+    await mkdir(source);
+    await symlink(source, alias, "dir");
+    await writeConfig(source, {
+      index: { source: { directories: [alias] } },
     });
-    expect((await loadIndexConfig(directory)).index?.source.directories)
-      .toEqual([]);
-    await writeConfig(directory, {
-      index: { source: { directories: ["./"] } },
-    });
-    expect((await loadIndexConfig(directory)).index?.source.directories)
-      .toEqual(["."]);
+
+    expect((await loadIndexConfig(alias)).index?.source.directories)
+      .toEqual([await realpath(source)]);
   });
 });

@@ -6,9 +6,21 @@ export interface EmbeddingIdentity {
   dimensions: number;
 }
 
+export interface EmbedProgress {
+  completed: number;
+  total: number;
+}
+
+export interface EmbedOptions {
+  onProgress?: (progress: EmbedProgress) => void | Promise<void>;
+}
+
 /** Provider-neutral batch interface used by the persistence coordinator. */
 export interface Embedder extends EmbeddingIdentity {
-  embed(texts: readonly string[]): Promise<readonly Float32Array[]>;
+  embed(
+    texts: readonly string[],
+    options?: EmbedOptions,
+  ): Promise<readonly Float32Array[]>;
 }
 
 export function sameEmbeddingIdentity(
