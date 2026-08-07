@@ -8,7 +8,6 @@ Commands:
   analyze  Analyze a multi-language project directory
   chunk    Analyze one source file (-f <file>, optionally --tree, --facts, or --windows)
   search   Search project source (-q <query> --max-results <n> [directory])
-  inspect  Start the future inspection dashboard
   index    Build once, watch for changes, or show index status
 `);
 }
@@ -41,11 +40,6 @@ async function main(): Promise<void> {
     case "index": {
       const { runIndex } = await import("./commands/index.ts");
       process.exitCode = await runIndex(args);
-      return;
-    }
-    case "inspect": {
-      const { inspect } = await import("./commands/inspect.ts");
-      inspect();
       return;
     }
     case undefined:

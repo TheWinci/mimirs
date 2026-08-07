@@ -52,8 +52,17 @@ const pathShort =
   "export function ping(): string { return 'pong'; }";
 const pathLong = "File: packages/server/handlers.ts\n" + longText;
 const pathPlans = await preparePathAverageMiniLmInputs([pathShort, pathLong]);
+const pathPlansWithoutOverlap = await preparePathAverageMiniLmInputs(
+  [pathLong],
+  0,
+);
 assert.equal(pathPlans[0]?.length, 1);
 assert.ok(pathPlans[1]!.length > 1);
+assert.ok(pathPlansWithoutOverlap[0]!.length <= pathPlans[1]!.length);
+await assert.rejects(
+  preparePathAverageMiniLmInputs([pathLong], 256),
+  /tokenWindowOverlap must be an integer from 0 to 255/,
+);
 for (const input of pathPlans.flat()) {
   assert.ok(input.startsWith("File: "));
   assert.ok(Array.from(tokenizer.encode(input)).length <= 256);
@@ -63,8 +72,20 @@ assert.ok(pathPlans[1]!.every((input) =>
 ));
 const pathAlone = await embedPathAveragedWithMiniLm([pathLong]);
 const pathGrouped = await embedPathAveragedWithMiniLm([pathShort, pathLong]);
+let observedNoOverlapInputs = 0;
+const pathWithoutOverlap = await embedPathAveragedWithMiniLm([pathLong], {
+  tokenWindowOverlap: 0,
+  onInferenceInputs: (count) => {
+    observedNoOverlapInputs += count;
+  },
+});
+assert.equal(
+  observedNoOverlapInputs,
+  new Set(pathPlansWithoutOverlap[0]).size,
+);
 assert.deepEqual(Array.from(pathAlone[0]!), Array.from(pathGrouped[1]!));
 assert.ok(Math.abs(magnitude(pathAlone[0]!) - 1) < 0.01);
+assert.ok(Math.abs(magnitude(pathWithoutOverlap[0]!) - 1) < 0.01);
 const rawQuery = await miniLmEmbedder.embed(["where is ping handled"]);
 const productionQuery = await miniLmPathAverageEmbedder.embed([
   "where is ping handled",

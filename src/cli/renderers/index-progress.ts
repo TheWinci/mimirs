@@ -2,6 +2,10 @@ import type { ProjectIndexProgress } from
   "../../internals/storage/project-index.ts";
 import type { EmbedSourceWindowsProgress } from
   "../../internals/storage/source-embeddings.ts";
+import type { EmbedFactDocumentsProgress } from
+  "../../internals/storage/fact-embeddings.ts";
+import type { EmbedRelationDocumentsProgress } from
+  "../../internals/storage/relation-embeddings.ts";
 
 export interface IndexProgressStream {
   readonly isTTY?: boolean;
@@ -14,7 +18,11 @@ export interface IndexProgressRendererOptions {
   now?: () => number;
 }
 
-type ProgressPhase = "indexing" | "embedding";
+type ProgressPhase =
+  | "indexing"
+  | "embedding"
+  | "fact-embedding"
+  | "relation-embedding";
 
 function percentage(completed: number, total: number): number {
   if (total === 0) return 100;
@@ -78,6 +86,26 @@ export class IndexProgressRenderer {
     );
   }
 
+  factEmbedding(progress: EmbedFactDocumentsProgress): void {
+    this.update(
+      "fact-embedding",
+      "Embedding facts",
+      progress.completed,
+      progress.total,
+      null,
+    );
+  }
+
+  relationEmbedding(progress: EmbedRelationDocumentsProgress): void {
+    this.update(
+      "relation-embedding",
+      "Embedding relations",
+      progress.completed,
+      progress.total,
+      null,
+    );
+  }
+
   finish(): void {
     if (!this.active) return;
     if (this.stream.isTTY) this.stream.write("\r\u001b[2K");
@@ -94,7 +122,7 @@ export class IndexProgressRenderer {
   ): void {
     const percent = percentage(completed, total);
     const detail = path ??
-      (phase === "embedding" && completed === 0 && total > 0
+      (phase.endsWith("embedding") && completed === 0 && total > 0
         ? "loading model / first batch…"
         : null);
     const phaseChanged = phase !== this.phase;

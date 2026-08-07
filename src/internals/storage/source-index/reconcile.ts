@@ -1,6 +1,10 @@
 import type { Database } from "bun:sqlite";
 
 import {
+  FACT_DOCUMENT_TABLE,
+  FACT_VECTOR_TABLE,
+  RELATION_DOCUMENT_TABLE,
+  RELATION_VECTOR_TABLE,
   SOURCE_EMBEDDING_DIRTY_GROUP_TABLE,
   SOURCE_EMBEDDING_INPUT_TABLE,
   SOURCE_VECTOR_TABLE,
@@ -45,6 +49,24 @@ export class FileReconciler {
              FROM source_windows w
              JOIN source_chunks c ON c.id = w.source_chunk_id
              WHERE c.file_id IN (SELECT value FROM json_each(?))
+           )`,
+        ).run(encodedFileIds);
+      }
+      if (tableExists(this.database, FACT_VECTOR_TABLE)) {
+        this.database.query(
+          `DELETE FROM ${FACT_VECTOR_TABLE}
+           WHERE document_id IN (
+             SELECT id FROM ${FACT_DOCUMENT_TABLE}
+             WHERE file_id IN (SELECT value FROM json_each(?))
+           )`,
+        ).run(encodedFileIds);
+      }
+      if (tableExists(this.database, RELATION_VECTOR_TABLE)) {
+        this.database.query(
+          `DELETE FROM ${RELATION_VECTOR_TABLE}
+           WHERE document_id IN (
+             SELECT id FROM ${RELATION_DOCUMENT_TABLE}
+             WHERE file_id IN (SELECT value FROM json_each(?))
            )`,
         ).run(encodedFileIds);
       }

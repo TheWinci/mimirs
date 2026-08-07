@@ -70,6 +70,78 @@ export interface SourceWindowEmbeddingWrite {
   effectiveInputHash?: string;
   pathDisambiguated?: boolean;
 }
+export interface IndexedFactDocument {
+  id: number;
+  path: string;
+  ownerChunkId: number | null;
+  startOffset: number;
+  text: string;
+  textHash: string;
+}
+export interface FactEmbeddingCursor {
+  path: string;
+  startOffset: number;
+  id: number;
+}
+export interface FactEmbeddingCandidate extends IndexedFactDocument {}
+export interface FactEmbeddingCandidatePage {
+  candidates: FactEmbeddingCandidate[];
+  nextCursor: FactEmbeddingCursor | null;
+}
+export interface FactEmbeddingWrite {
+  documentId: number;
+  textHash: string;
+  vector: Float32Array;
+}
+export interface SemanticFactCandidate extends IndexedFactDocument {
+  score: number;
+}
+export interface FactCandidateDiagnostics {
+  total: number;
+  embedded: number;
+  compatible: boolean;
+}
+export interface FactCandidateRead {
+  candidates: SemanticFactCandidate[];
+  diagnostics: FactCandidateDiagnostics;
+}
+export interface IndexedRelationDocument {
+  id: number;
+  path: string;
+  ownerChunkId: number | null;
+  startOffset: number;
+  direction: "incoming" | "outgoing";
+  relationKind: "import" | "re-export" | "call";
+  text: string;
+  textHash: string;
+}
+export interface RelationEmbeddingCursor {
+  path: string;
+  startOffset: number;
+  id: number;
+}
+export interface RelationEmbeddingCandidate extends IndexedRelationDocument {}
+export interface RelationEmbeddingCandidatePage {
+  candidates: RelationEmbeddingCandidate[];
+  nextCursor: RelationEmbeddingCursor | null;
+}
+export interface RelationEmbeddingWrite {
+  documentId: number;
+  textHash: string;
+  vector: Float32Array;
+}
+export interface SemanticRelationCandidate extends IndexedRelationDocument {
+  score: number;
+}
+export interface RelationCandidateDiagnostics {
+  total: number;
+  embedded: number;
+  compatible: boolean;
+}
+export interface RelationCandidateRead {
+  candidates: SemanticRelationCandidate[];
+  diagnostics: RelationCandidateDiagnostics;
+}
 export interface SemanticSourceChunk {
   id: number;
   kind: SourceChunkKind;

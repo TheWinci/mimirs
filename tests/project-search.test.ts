@@ -93,7 +93,14 @@ describe("project search session", () => {
         embeddings: { total: 2, embedded: 0, unchanged: 2, batches: 0 },
       });
       expect(session.sourceIndex.loadWindows("src/alpha.ts")[0]!.id).toBe(alphaId);
-      expect(embedder.calls.map((call) => call.length)).toEqual([2, 1, 1]);
+      expect(embedder.calls.map((call) => call.length)).toEqual([
+        2,
+        2,
+        1,
+        1,
+        1,
+        1,
+      ]);
     } finally {
       await session.close();
     }
@@ -112,7 +119,10 @@ describe("project search session", () => {
         embedded: 0,
         unchanged: 2,
       });
-      expect(reopenedEmbedder.calls).toEqual([["find beta"]]);
+      expect(reopenedEmbedder.calls).toEqual([
+        ["find beta"],
+        ["find beta"],
+      ]);
     } finally {
       await reopened.close();
     }

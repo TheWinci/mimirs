@@ -5,8 +5,14 @@ import type { Database } from "bun:sqlite";
  * model, revision, projection, normalization, or dimensions must bump it and
  * add a migration that drops the vector table.
  */
-export const SOURCE_INDEX_SCHEMA_VERSION = 12;
+export const SOURCE_INDEX_SCHEMA_VERSION = 14;
 export const SOURCE_VECTOR_TABLE = "source_window_vectors";
+export const FACT_DOCUMENT_TABLE = "fact_documents";
+export const FACT_VECTOR_TABLE = "fact_document_vectors";
+export const FACT_VECTOR_SPACE_TABLE = "fact_vector_space";
+export const RELATION_DOCUMENT_TABLE = "relation_documents";
+export const RELATION_VECTOR_TABLE = "relation_document_vectors";
+export const RELATION_VECTOR_SPACE_TABLE = "relation_vector_space";
 export const SOURCE_PROJECTION_VERSION_TABLE = "source_projection_versions";
 export const SOURCE_EMBEDDING_INPUT_TABLE = "source_window_embedding_inputs";
 export const SOURCE_EMBEDDING_DIRTY_GROUP_TABLE =
@@ -120,6 +126,60 @@ const SOURCE_SEARCH_SCHEMA = `
     content = '',
     contentless_delete = 1,
     tokenize = 'unicode61'
+  );
+`;
+
+const FACT_RETRIEVAL_SCHEMA = `
+  CREATE TABLE IF NOT EXISTS ${FACT_DOCUMENT_TABLE} (
+    id INTEGER PRIMARY KEY,
+    file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+    owner_chunk_id INTEGER REFERENCES source_chunks(id) ON DELETE CASCADE,
+    ordinal INTEGER NOT NULL CHECK (ordinal >= 0),
+    start_offset INTEGER NOT NULL CHECK (start_offset >= 0),
+    text TEXT NOT NULL,
+    text_hash TEXT NOT NULL,
+    UNIQUE(file_id, ordinal)
+  );
+
+  CREATE INDEX IF NOT EXISTS fact_documents_file_range
+    ON ${FACT_DOCUMENT_TABLE}(file_id, start_offset, id);
+
+  CREATE TABLE IF NOT EXISTS ${FACT_VECTOR_SPACE_TABLE} (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    model TEXT NOT NULL,
+    revision TEXT NOT NULL,
+    variant TEXT NOT NULL,
+    dimensions INTEGER NOT NULL CHECK (dimensions >= 1)
+  );
+`;
+
+const RELATION_RETRIEVAL_SCHEMA = `
+  CREATE TABLE IF NOT EXISTS ${RELATION_DOCUMENT_TABLE} (
+    id INTEGER PRIMARY KEY,
+    file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+    owner_chunk_id INTEGER REFERENCES source_chunks(id) ON DELETE CASCADE,
+    ordinal INTEGER NOT NULL CHECK (ordinal >= 0),
+    start_offset INTEGER NOT NULL CHECK (start_offset >= 0),
+    direction TEXT NOT NULL CHECK (direction IN ('incoming', 'outgoing')),
+    relation_kind TEXT NOT NULL
+      CHECK (relation_kind IN ('import', 're-export', 'call')),
+    text TEXT NOT NULL,
+    text_hash TEXT NOT NULL,
+    UNIQUE(file_id, ordinal)
+  );
+
+  CREATE INDEX IF NOT EXISTS relation_documents_file_range
+    ON ${RELATION_DOCUMENT_TABLE}(file_id, start_offset, id);
+
+  CREATE INDEX IF NOT EXISTS relation_documents_type
+    ON ${RELATION_DOCUMENT_TABLE}(direction, relation_kind, file_id);
+
+  CREATE TABLE IF NOT EXISTS ${RELATION_VECTOR_SPACE_TABLE} (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    model TEXT NOT NULL,
+    revision TEXT NOT NULL,
+    variant TEXT NOT NULL,
+    dimensions INTEGER NOT NULL CHECK (dimensions >= 1)
   );
 `;
 
@@ -237,6 +297,38 @@ export function createSourceVectorTable(
   database.query(
     `INSERT INTO source_vector_space(id, dimensions) VALUES (1, ?)`,
   ).run(dimensions);
+}
+
+/** Create the independent persisted vector store for fact documents. */
+export function createFactVectorTable(
+  database: Database,
+  dimensions: number,
+): void {
+  if (!Number.isSafeInteger(dimensions) || dimensions <= 0) {
+    throw new RangeError("fact vector dimensions must be a positive integer");
+  }
+  database.exec(`
+    CREATE VIRTUAL TABLE ${FACT_VECTOR_TABLE} USING vec0(
+      document_id INTEGER PRIMARY KEY,
+      embedding float[${dimensions}] distance_metric=cosine
+    );
+  `);
+}
+
+/** Create the independent persisted vector store for relationship documents. */
+export function createRelationVectorTable(
+  database: Database,
+  dimensions: number,
+): void {
+  if (!Number.isSafeInteger(dimensions) || dimensions <= 0) {
+    throw new RangeError("relation vector dimensions must be a positive integer");
+  }
+  database.exec(`
+    CREATE VIRTUAL TABLE ${RELATION_VECTOR_TABLE} USING vec0(
+      document_id INTEGER PRIMARY KEY,
+      embedding float[${dimensions}] distance_metric=cosine
+    );
+  `);
 }
 
 function migrateSourceVectors(database: Database): void {
@@ -414,6 +506,8 @@ export function migrateSourceIndex(database: Database): void {
     if (version < 9) retireActivePathProjection(database);
     if (version < 10) migrateMinimalVectorTable(database);
     if (version < 11) database.exec(SOURCE_EMBEDDING_INPUT_SCHEMA);
+    if (version < 13) database.exec(FACT_RETRIEVAL_SCHEMA);
+    if (version < 14) database.exec(RELATION_RETRIEVAL_SCHEMA);
     database.exec(SOURCE_PROJECTION_VERSION_SCHEMA);
     database.exec(`DELETE FROM ${SOURCE_PROJECTION_VERSION_TABLE}`);
     database.exec(`PRAGMA user_version = ${SOURCE_INDEX_SCHEMA_VERSION}`);

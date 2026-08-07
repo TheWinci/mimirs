@@ -25,6 +25,8 @@ export type ProjectIndexPhase =
   | "scanning"
   | "indexing"
   | "embedding"
+  | "fact-embedding"
+  | "relation-embedding"
   | null;
 
 export interface ProjectStatusError {
@@ -48,6 +50,10 @@ export interface ProjectIndexStatus {
   files: number | null;
   sourceChunks: number | null;
   embeddedWindows: number | null;
+  factDocuments: number | null;
+  embeddedFacts: number | null;
+  relationDocuments: number | null;
+  embeddedRelations: number | null;
   lastUpdatedAt: string | null;
   error: ProjectStatusError | null;
 }
@@ -95,6 +101,19 @@ function isPreparation(value: unknown): value is ProjectSearchPreparation {
   const preparation = value as Partial<ProjectSearchPreparation>;
   const index = preparation.index;
   const embeddings = preparation.embeddings;
+  const facts = preparation.facts;
+  const relations = preparation.relations;
+  const isPerspectiveSummary = (summary: typeof facts): boolean =>
+    !!summary && typeof summary.model === "string" &&
+    typeof summary.revision === "string" &&
+    typeof summary.variant === "string" &&
+    positiveInteger(summary.dimensions) &&
+    finiteNonNegativeInteger(summary.total) &&
+    finiteNonNegativeInteger(summary.embedded) &&
+    finiteNonNegativeInteger(summary.unchanged) &&
+    finiteNonNegativeInteger(summary.batches) &&
+    finiteNonNegativeInteger(summary.projectedFiles) &&
+    finiteNonNegativeInteger(summary.changedProjectionFiles);
   return !!index && typeof index.root === "string" &&
     finiteNonNegativeInteger(index.discovered) &&
     finiteNonNegativeInteger(index.indexed) &&
@@ -109,7 +128,8 @@ function isPreparation(value: unknown): value is ProjectSearchPreparation {
     finiteNonNegativeInteger(embeddings.total) &&
     finiteNonNegativeInteger(embeddings.embedded) &&
     finiteNonNegativeInteger(embeddings.unchanged) &&
-    finiteNonNegativeInteger(embeddings.batches);
+    finiteNonNegativeInteger(embeddings.batches) &&
+    isPerspectiveSummary(facts) && isPerspectiveSummary(relations);
 }
 
 function isConfig(value: unknown): value is IndexConfig {
@@ -156,7 +176,16 @@ function isDomainStatus(value: unknown): value is ProjectIndexDomainStatus {
     Array.isArray(status.directories) &&
     status.directories.every((directory) => typeof directory === "string") &&
     finiteNonNegativeInteger(status.generation) &&
-    (["ownership", "database", "scanning", "indexing", "embedding", null]
+    ([
+      "ownership",
+      "database",
+      "scanning",
+      "indexing",
+      "embedding",
+      "fact-embedding",
+      "relation-embedding",
+      null,
+    ]
       .includes(status.phase as ProjectIndexPhase)) &&
     (status.progress === null || (
       !!status.progress && finiteNonNegativeInteger(status.progress.completed) &&
@@ -195,6 +224,8 @@ function isIndexStatus(value: unknown): value is ProjectIndexStatus {
     "scanning",
     "indexing",
     "embedding",
+    "fact-embedding",
+    "relation-embedding",
     null,
   ];
   const nullableCount = (count: unknown): boolean =>
@@ -210,6 +241,10 @@ function isIndexStatus(value: unknown): value is ProjectIndexStatus {
       status.progress.completed <= status.progress.total
     )) && nullableCount(status.files) && nullableCount(status.sourceChunks) &&
     nullableCount(status.embeddedWindows) &&
+    nullableCount(status.factDocuments) &&
+    nullableCount(status.embeddedFacts) &&
+    nullableCount(status.relationDocuments) &&
+    nullableCount(status.embeddedRelations) &&
     (status.lastUpdatedAt === null || typeof status.lastUpdatedAt === "string") &&
     (status.error === null || (
       !!status.error && typeof status.error.code === "string" &&
@@ -326,6 +361,10 @@ export function initialProjectIndexStatus(): ProjectIndexStatus {
     files: null,
     sourceChunks: null,
     embeddedWindows: null,
+    factDocuments: null,
+    embeddedFacts: null,
+    relationDocuments: null,
+    embeddedRelations: null,
     lastUpdatedAt: null,
     error: null,
   };

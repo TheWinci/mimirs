@@ -166,6 +166,10 @@ function completedStatus(
     files: preparation.index.discovered,
     sourceChunks: null,
     embeddedWindows: preparation.embeddings.total,
+    factDocuments: preparation.facts.total,
+    embeddedFacts: preparation.facts.total,
+    relationDocuments: preparation.relations.total,
+    embeddedRelations: preparation.relations.total,
     lastUpdatedAt: new Date().toISOString(),
     error: partial
       ? {
@@ -244,6 +248,10 @@ class ProjectIndexer {
       index.files = this.session.sourceIndex.listFiles().length;
       index.sourceChunks = this.session.sourceIndex.countChunks();
       index.embeddedWindows = this.session.sourceIndex.countSemanticVectors();
+      index.factDocuments = this.session.sourceIndex.countFactDocuments();
+      index.embeddedFacts = this.session.sourceIndex.countFactVectors();
+      index.relationDocuments = this.session.sourceIndex.countRelationDocuments();
+      index.embeddedRelations = this.session.sourceIndex.countRelationVectors();
       const status = sharedStatus(
         this.root,
         this.lock.owner,
@@ -328,6 +336,14 @@ function withProgress(
       renderer.embedding(progress);
       await options.onEmbeddingProgress?.(progress);
     },
+    onFactEmbeddingProgress: async (progress) => {
+      renderer.factEmbedding(progress);
+      await options.onFactEmbeddingProgress?.(progress);
+    },
+    onRelationEmbeddingProgress: async (progress) => {
+      renderer.relationEmbedding(progress);
+      await options.onRelationEmbeddingProgress?.(progress);
+    },
   };
 }
 
@@ -387,12 +403,25 @@ export function renderIndexSummary(
         `${preparation.embeddings.unchanged} unchanged, ` +
         `${preparation.embeddings.batches} ` +
         (preparation.embeddings.batches === 1 ? "batch" : "batches"),
+      `  Facts: ${preparation.facts.total} total; ` +
+        `${preparation.facts.embedded} embedded, ` +
+        `${preparation.facts.unchanged} unchanged, ` +
+        `${preparation.facts.batches} ` +
+        (preparation.facts.batches === 1 ? "batch" : "batches"),
+      `  Relations: ${preparation.relations.total} total; ` +
+        `${preparation.relations.embedded} embedded, ` +
+        `${preparation.relations.unchanged} unchanged, ` +
+        `${preparation.relations.batches} ` +
+        (preparation.relations.batches === 1 ? "batch" : "batches"),
     );
   } else {
     lines.push(
       `  Files: ${status.files ?? 0}`,
       `  Chunks: ${status.sourceChunks ?? 0}`,
       `  Embeddings: ${status.embeddedWindows ?? 0}`,
+      `  Facts: ${status.embeddedFacts ?? 0}/${status.factDocuments ?? 0}`,
+      `  Relations: ${status.embeddedRelations ?? 0}/` +
+        `${status.relationDocuments ?? 0}`,
     );
   }
   lines.push(`  Duration: ${formatDuration(result.durationMs)}`);

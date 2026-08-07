@@ -73,6 +73,57 @@ function response(
         unchanged: 0,
         batches: 0,
       },
+      facts: {
+        model: "test/search",
+        revision: "1",
+        variant: "controlled|document:fact-scope:v1",
+        dimensions: 2,
+        total: 0,
+        embedded: 0,
+        unchanged: 0,
+        batches: 0,
+        projectedFiles: 0,
+        changedProjectionFiles: 0,
+      },
+      relations: {
+        model: "test/search",
+        revision: "1",
+        variant: "controlled|document:relation-edge:v1",
+        dimensions: 2,
+        total: 0,
+        embedded: 0,
+        unchanged: 0,
+        batches: 0,
+        projectedFiles: 0,
+        changedProjectionFiles: 0,
+      },
+    },
+    perspectives: {
+      facts: {
+        results: [],
+        diagnostics: {
+          total: 0,
+          embedded: 0,
+          compatible: true,
+          retrievedDocuments: 0,
+        },
+      },
+      relations: {
+        results: [],
+        diagnostics: {
+          total: 0,
+          embedded: 0,
+          compatible: true,
+          retrievedDocuments: 0,
+        },
+      },
+    },
+    perspectiveFusion: {
+      applied: false,
+      policy: null,
+      hydratedCandidates: 0,
+      omittedCandidates: 0,
+      contributions: [],
     },
     ...overrides,
   };
@@ -184,7 +235,7 @@ describe("search CLI", () => {
       .toBe(false);
     expect(await Bun.file(join(root, ".mimirs", "config.json")).exists())
       .toBe(true);
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(4);
   });
 
   test("renders exact window and parent citations with compact previews", () => {

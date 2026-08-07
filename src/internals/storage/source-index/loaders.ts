@@ -95,12 +95,10 @@ export class AnalysisLoader {
     roots.sort((left, right) => left.ordinal - right.ordinal);
     return roots.map((root) => {
       const rootText = rootTexts.get(root.id);
-      if (rootText === undefined) {
-        throw new Error(
-          `source index contains a chunk without windows: ${root.id}`,
-        );
-      }
-      return materializeChunk(root, root, rootText);
+      // A whitespace-only or otherwise non-retrievable structural chunk can
+      // legitimately project to zero source windows. Its graph identity and
+      // byte range still matter even though its text was not persisted.
+      return materializeChunk(root, root, rootText ?? "");
     });
   }
 

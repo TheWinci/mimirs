@@ -33,6 +33,16 @@ const TOKEN_WINDOW_OVERLAP = 32;
 const MODEL_INFERENCE_BATCH_SIZE = 32;
 const CACHE_DIRECTORY = join(homedir(), ".cache", "mimirs", "models");
 
+export interface PathAverageMiniLmOptions extends EmbedOptions {
+  /**
+   * Benchmark override for document subwindow overlap. Query inference and
+   * the production default remain fixed at 32 tokens.
+   */
+  tokenWindowOverlap?: number;
+  /** Observe the exact number of unique singleton model inputs. */
+  onInferenceInputs?: (count: number) => void;
+}
+
 env.cacheDir = CACHE_DIRECTORY;
 
 let extractor: FeatureExtractionPipeline | null = null;
@@ -236,6 +246,7 @@ function tokenizerPieces(
 function pathAverageWindows(
   projected: string,
   loadedTokenizer: PreTrainedTokenizer,
+  tokenWindowOverlap: number,
 ): string[] {
   const newline = projected.indexOf("\n");
   if (!projected.startsWith("File: ") || newline <= "File: ".length) {
@@ -287,7 +298,7 @@ function pathAverageWindows(
     if (endPiece === pieces.length) break;
     let next = endPiece;
     let overlap = 0;
-    while (next > startPiece && overlap < TOKEN_WINDOW_OVERLAP) {
+    while (next > startPiece && overlap < tokenWindowOverlap) {
       next--;
       overlap += pieces[next]!.tokens;
     }
@@ -392,10 +403,15 @@ export async function embedWithMiniLm(
  */
 export async function embedPathAveragedWithMiniLm(
   projectedTexts: readonly string[],
-  options: EmbedOptions = {},
+  options: PathAverageMiniLmOptions = {},
 ): Promise<Float32Array[]> {
   if (projectedTexts.length === 0) return [];
-  const plans = await preparePathAverageMiniLmInputs(projectedTexts);
+  const tokenWindowOverlap = options.tokenWindowOverlap ??
+    TOKEN_WINDOW_OVERLAP;
+  const plans = await preparePathAverageMiniLmInputs(
+    projectedTexts,
+    tokenWindowOverlap,
+  );
   const uniqueInputs: string[] = [];
   const inputIndex = new Map<string, number>();
   const planIndexes = plans.map((windows) => windows.map((window) => {
@@ -406,6 +422,7 @@ export async function embedPathAveragedWithMiniLm(
     inputIndex.set(window, index);
     return index;
   }));
+  options.onInferenceInputs?.(uniqueInputs.length);
   const uniqueVectors: Float32Array[] = [];
   for (let index = 0; index < uniqueInputs.length; index++) {
     const input = uniqueInputs[index]!;
@@ -425,11 +442,23 @@ export async function embedPathAveragedWithMiniLm(
 /** Expose deterministic final document inputs for correctness tests/profiling. */
 export async function preparePathAverageMiniLmInputs(
   projectedTexts: readonly string[],
+  tokenWindowOverlap = TOKEN_WINDOW_OVERLAP,
 ): Promise<string[][]> {
   if (projectedTexts.length === 0) return [];
+  if (
+    !Number.isSafeInteger(tokenWindowOverlap) ||
+    tokenWindowOverlap < 0 ||
+    tokenWindowOverlap >= MODEL_MAX_TOKENS
+  ) {
+    throw new RangeError(
+      `tokenWindowOverlap must be an integer from 0 to ${
+        MODEL_MAX_TOKENS - 1
+      }`,
+    );
+  }
   const loadedTokenizer = await getMiniLmTokenizer();
   return projectedTexts.map((text) =>
-    pathAverageWindows(text, loadedTokenizer)
+    pathAverageWindows(text, loadedTokenizer, tokenWindowOverlap)
   );
 }
 

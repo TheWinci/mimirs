@@ -91,6 +91,10 @@ function result(root = "/project"): ProjectIndexRefreshResult {
         files: 1,
         sourceChunks: 2,
         embeddedWindows: 2,
+        factDocuments: 1,
+        embeddedFacts: 1,
+        relationDocuments: 1,
+        embeddedRelations: 1,
         lastUpdatedAt: "2026-01-01T00:00:00.000Z",
         error: null,
       },
@@ -228,14 +232,14 @@ describe("index CLI", () => {
 
     expect((await indexProjectOnce(root, { embedder })).status.index.generation)
       .toBe(1);
-    expect(calls).toHaveLength(1);
+    expect(calls).toHaveLength(2);
     expect((await indexProjectOnce(root, { embedder })).status.index.generation)
       .toBe(2);
-    expect(calls).toHaveLength(1);
+    expect(calls).toHaveLength(2);
 
     await writeFile(join(root, "src", "alpha.ts"), "export const beta = true;\n");
     await indexProjectOnce(root, { embedder });
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(4);
     await rm(join(root, "src", "alpha.ts"));
     const final = await indexProjectOnce(root, { embedder });
     expect(final.status.index.files).toBe(1); // .gitignore remains discoverable.
@@ -288,6 +292,30 @@ describe("index CLI", () => {
         unchanged: 5,
         batches: 1,
       },
+      facts: {
+        model: "test/index",
+        revision: "1",
+        variant: "controlled|document:fact-scope:v1",
+        dimensions: 2,
+        total: 4,
+        embedded: 1,
+        unchanged: 3,
+        batches: 1,
+        projectedFiles: 3,
+        changedProjectionFiles: 1,
+      },
+      relations: {
+        model: "test/index",
+        revision: "1",
+        variant: "controlled|document:relation-edge:v1",
+        dimensions: 2,
+        total: 2,
+        embedded: 0,
+        unchanged: 2,
+        batches: 0,
+        projectedFiles: 3,
+        changedProjectionFiles: 0,
+      },
     };
 
     expect(renderIndexSummary(value)).toBe(
@@ -296,6 +324,8 @@ describe("index CLI", () => {
         "  Files: 3 total; 1 indexed, 2 unchanged, 0 failed\n" +
         "  Chunks: 2\n" +
         "  Embeddings: 8 total; 3 embedded, 5 unchanged, 1 batch\n" +
+        "  Facts: 4 total; 1 embedded, 3 unchanged, 1 batch\n" +
+        "  Relations: 2 total; 0 embedded, 2 unchanged, 0 batches\n" +
         "  Duration: 1.3s",
     );
   });

@@ -13,6 +13,7 @@ import type {
 } from "../../embeddings/embedder.ts";
 import type {
   AnalyzedSourceFile,
+  SourceRelationshipResult,
 } from "../../source/relationships.ts";
 import type {
   IndexedFile,
@@ -30,6 +31,14 @@ import type {
   NativeCandidateRead,
   NativeLexicalMode,
   NativeCandidateOptions,
+  FactEmbeddingCursor,
+  FactEmbeddingCandidatePage,
+  FactEmbeddingWrite,
+  FactCandidateRead,
+  RelationEmbeddingCursor,
+  RelationEmbeddingCandidatePage,
+  RelationEmbeddingWrite,
+  RelationCandidateRead,
 } from "../types.ts";
 import {
   createSourceIndexDatabase,
@@ -60,6 +69,14 @@ import {
 import {
   IndexCounts,
 } from "./counts.ts";
+import {
+  FactRepository,
+  type FactDocumentSyncSummary,
+} from "./facts.ts";
+import {
+  RelationRepository,
+  type RelationDocumentSyncSummary,
+} from "./relations.ts";
 export {
   sourceContentHash,
 } from "../encoding.ts";
@@ -82,6 +99,22 @@ export type {
   NativeCandidateRead,
   NativeLexicalMode,
   NativeCandidateOptions,
+  IndexedFactDocument,
+  FactEmbeddingCursor,
+  FactEmbeddingCandidate,
+  FactEmbeddingCandidatePage,
+  FactEmbeddingWrite,
+  SemanticFactCandidate,
+  FactCandidateDiagnostics,
+  FactCandidateRead,
+  IndexedRelationDocument,
+  RelationEmbeddingCursor,
+  RelationEmbeddingCandidate,
+  RelationEmbeddingCandidatePage,
+  RelationEmbeddingWrite,
+  SemanticRelationCandidate,
+  RelationCandidateDiagnostics,
+  RelationCandidateRead,
 } from "../types.ts";
 
 export {
@@ -102,6 +135,8 @@ export class SourceIndex {
   private readonly candidates: CandidateRepository;
   private readonly writer: FileWriter;
   private readonly counts: IndexCounts;
+  private readonly facts: FactRepository;
+  private readonly relations: RelationRepository;
 
   constructor(
     readonly database: Database,
@@ -112,6 +147,8 @@ export class SourceIndex {
     this.files = new FileRepository(database);
     this.embeddings = new EmbeddingRepository(database);
     this.counts = new IndexCounts(database);
+    this.facts = new FactRepository(database);
+    this.relations = new RelationRepository(database);
     this.loader = new AnalysisLoader(database, this.files, this.embeddings);
     this.candidates = new CandidateRepository(
       database,
@@ -190,6 +227,104 @@ export class SourceIndex {
 
   countSemanticVectors(): number {
     return this.embeddings.countVectors();
+  }
+
+  /** Rebuild deterministic fact documents from persisted raw analysis. */
+  synchronizeFactDocuments(): FactDocumentSyncSummary {
+    if (this.readOnly) {
+      throw new Error("read-only source index cannot synchronize fact documents");
+    }
+    return this.facts.synchronize(this.loader.loadFiles());
+  }
+
+  countFactDocuments(): number {
+    return this.facts.countDocuments();
+  }
+
+  countFactVectors(): number {
+    return this.facts.countVectors();
+  }
+
+  prepareFactEmbeddingSpace(identity: EmbeddingIdentity): void {
+    this.facts.prepareSpace(identity);
+  }
+
+  countFactEmbeddingCandidates(identity: EmbeddingIdentity): number {
+    return this.facts.countCandidates(identity);
+  }
+
+  readFactEmbeddingCandidatePage(
+    identity: EmbeddingIdentity,
+    limit: number,
+    after: FactEmbeddingCursor | null = null,
+  ): FactEmbeddingCandidatePage {
+    return this.facts.readCandidatePage(identity, limit, after);
+  }
+
+  storeFactEmbeddings(
+    identity: EmbeddingIdentity,
+    embeddings: readonly FactEmbeddingWrite[],
+  ): void {
+    this.facts.store(identity, embeddings);
+  }
+
+  /** Retrieve the independent semantic fact-document candidate pool. */
+  readFactCandidates(
+    identity: EmbeddingIdentity,
+    queryVector: Float32Array,
+    limit: number,
+  ): FactCandidateRead {
+    return this.facts.readCandidates(identity, queryVector, limit);
+  }
+
+  /** Rebuild deterministic relation documents from the resolved project graph. */
+  synchronizeRelationDocuments(
+    relationships: SourceRelationshipResult,
+  ): RelationDocumentSyncSummary {
+    if (this.readOnly) {
+      throw new Error("read-only source index cannot synchronize relation documents");
+    }
+    return this.relations.synchronize(this.loader.loadFiles(), relationships);
+  }
+
+  countRelationDocuments(): number {
+    return this.relations.countDocuments();
+  }
+
+  countRelationVectors(): number {
+    return this.relations.countVectors();
+  }
+
+  prepareRelationEmbeddingSpace(identity: EmbeddingIdentity): void {
+    this.relations.prepareSpace(identity);
+  }
+
+  countRelationEmbeddingCandidates(identity: EmbeddingIdentity): number {
+    return this.relations.countCandidates(identity);
+  }
+
+  readRelationEmbeddingCandidatePage(
+    identity: EmbeddingIdentity,
+    limit: number,
+    after: RelationEmbeddingCursor | null = null,
+  ): RelationEmbeddingCandidatePage {
+    return this.relations.readCandidatePage(identity, limit, after);
+  }
+
+  storeRelationEmbeddings(
+    identity: EmbeddingIdentity,
+    embeddings: readonly RelationEmbeddingWrite[],
+  ): void {
+    this.relations.store(identity, embeddings);
+  }
+
+  /** Retrieve the independent semantic relationship-document candidate pool. */
+  readRelationCandidates(
+    identity: EmbeddingIdentity,
+    queryVector: Float32Array,
+    limit: number,
+  ): RelationCandidateRead {
+    return this.relations.readCandidates(identity, queryVector, limit);
   }
 
   hasSemanticVectors(): boolean {

@@ -18,7 +18,7 @@ function stream(
 }
 
 describe("index progress renderer", () => {
-  test("renders an in-place two-phase progress bar for terminals", () => {
+  test("renders all indexing and embedding phases in place for terminals", () => {
     const output = stream(true);
     let now = 0;
     const renderer = new IndexProgressRenderer(output, {
@@ -42,6 +42,8 @@ describe("index progress renderer", () => {
     });
     renderer.embedding({ completed: 0, total: 10 });
     renderer.embedding({ completed: 10, total: 10 });
+    renderer.factEmbedding({ completed: 4, total: 4 });
+    renderer.relationEmbedding({ completed: 2, total: 2 });
     renderer.finish();
 
     expect(output.writes[0]).toContain("Scanning source files");
@@ -54,8 +56,12 @@ describe("index progress renderer", () => {
     expect(output.writes.some((value) =>
       value.includes("first batch")
     )).toBe(true);
+    expect(output.writes.some((value) => value.includes("Embedding facts")))
+      .toBe(true);
+    expect(output.writes.some((value) => value.includes("Embedding relations")))
+      .toBe(true);
     expect(output.writes.at(-1)).toBe("\r\u001b[2K");
-    expect(output.writes).toHaveLength(6);
+    expect(output.writes).toHaveLength(8);
   });
 
   test("emits only phase changes, ten-percent milestones, and completion when redirected", () => {
@@ -71,6 +77,8 @@ describe("index progress renderer", () => {
     renderer.indexing({ completed: 100, total: 100, path: "src/final.ts" });
     renderer.embedding({ completed: 80, total: 100 });
     renderer.embedding({ completed: 100, total: 100 });
+    renderer.factEmbedding({ completed: 5, total: 5 });
+    renderer.relationEmbedding({ completed: 3, total: 3 });
     renderer.finish();
 
     expect(output.writes).toEqual([
@@ -80,6 +88,8 @@ describe("index progress renderer", () => {
       "Indexing: 100/100 (100%) src/final.ts\n",
       "Embedding: 80/100 (80%)\n",
       "Embedding: 100/100 (100%)\n",
+      "Embedding facts: 5/5 (100%)\n",
+      "Embedding relations: 3/3 (100%)\n",
     ]);
   });
 });
