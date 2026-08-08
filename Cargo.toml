@@ -1,0 +1,12 @@
+[package]
+name = "mimirs"
+version = "2.0.0-alpha.0"
+edition = "2024"
+description = "Local-first RAG and project memory for AI coding agents"
+license = "Apache-2.0"
+repository = "https://github.com/TheWinci/mimirs"
+keywords = ["rag", "memory", "embeddings", "semantic-search"]
+categories = ["development-tools"]
+exclude = ["skills-lock.json", "logo.png", "/.agents", "/.claude"]
+
+[dependencies]
