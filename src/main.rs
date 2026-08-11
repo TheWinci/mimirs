@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 mod commands;
+mod config;
 
 /// mimirs CLI
 #[derive(Parser)]
@@ -14,11 +15,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     /// Create an initial config for mimirs in .mimirs folder.
-    Init {
-        /// Skip creating .gitignore file
-        #[arg(long)]
-        no_gitignore: bool,
-    },
+    Init,
 
     /// Index current directory with config defined in .mimirs folder.
     Index {
@@ -42,7 +39,7 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::Init { no_gitignore } => commands::init::run(no_gitignore)?,
+        Command::Init => commands::init::run()?,
         Command::Index { watch } => commands::index::run(watch)?,
         Command::Search { query, limit } => commands::search::run(&query, limit)?,
     }
