@@ -10,3 +10,5 @@ categories = ["development-tools"]
 exclude = ["skills-lock.json", "logo.png", "/.agents", "/.claude"]
 
 [dependencies]
+anyhow = "1.0.104"
+clap = { version = "4.6.6", features = ["derive"] }
