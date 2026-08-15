@@ -94,6 +94,11 @@ export function registerGitTools(server: McpServer, getDB: GetDB) {
         }
         if (statusEntries.length > 0) {
           const annotated = statusEntries.map(({ status, filePath }) => {
+            // KNOWN GAP: gitRoot comes from `rev-parse --show-toplevel`, which
+            // returns the realpath, while the index stores paths as the caller
+            // spelled them. Under a symlinked parent (macOS /var -> /private/var)
+            // the two never match and every file reports [not indexed]. Harmless
+            // for ordinary checkouts; fix by normalizing both sides at lookup.
             const absPath = resolve(gitRoot, filePath);
             const tag = ragDb.getFileByPath(absPath) != null ? "[indexed]" : "[not indexed]";
             return files_only ? `${filePath}  ${tag}` : `${status} ${filePath}  ${tag}`;
