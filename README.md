@@ -57,7 +57,9 @@ This creates the MCP server config, editor rules, `.mimirs/config.json`, and `.g
 
 ### 3. Set up your editor (manual reference)
 
-The mimirs MCP server runs over stdio. Every client needs the same three things: a `command` (`bunx`), `args` (`["mimirs@latest", "serve"]`), and a `RAG_PROJECT_DIR` env var pointing at your project root.
+The mimirs MCP server runs over stdio. Every client needs the same three things: a `command` (`bunx`), `args` (`["mimirs@^1", "serve"]`), and a `RAG_PROJECT_DIR` env var pointing at your project root.
+
+> **Why `@^1` and not `@latest`?** The range keeps you on 1.x, so bug fixes and new features still arrive automatically, but a future 2.0 with breaking changes never lands without you asking for it. To move up a major, edit the arg or re-run `bunx mimirs init`. If you already have `mimirs@latest` in a config, re-running `bunx mimirs init` rewrites it to `mimirs@^1`.
 
 > **"command not found: bunx" / server fails to start (but `bunx` works in your terminal)?** Editors launched from the Dock or a desktop launcher don't load your shell profile, so `~/.bun/bin` isn't on their PATH. Use the absolute path from `which bunx` as the `command` instead of the bare `bunx` in the snippets below. `bunx mimirs init` writes the absolute path automatically (re-run it to fix an existing config), and `bunx mimirs doctor` detects the problem.
 
@@ -69,7 +71,7 @@ The mimirs MCP server runs over stdio. Every client needs the same three things:
   "mcpServers": {
     "mimirs": {
       "command": "bunx",
-      "args": ["mimirs@latest", "serve"],
+      "args": ["mimirs@^1", "serve"],
       "env": {
         "RAG_PROJECT_DIR": "/absolute/path/to/your/project"
       }
@@ -87,7 +89,7 @@ The mimirs MCP server runs over stdio. Every client needs the same three things:
   "mcpServers": {
     "mimirs": {
       "command": "bunx",
-      "args": ["mimirs@latest", "serve"],
+      "args": ["mimirs@^1", "serve"],
       "env": {
         "RAG_PROJECT_DIR": "/absolute/path/to/your/project"
       }
@@ -107,7 +109,7 @@ Windsurf reads MCP servers from your home directory, not the project. JetBrains 
   "mcpServers": {
     "mimirs": {
       "command": "bunx",
-      "args": ["mimirs@latest", "serve"],
+      "args": ["mimirs@^1", "serve"],
       "env": {
         "RAG_PROJECT_DIR": "/absolute/path/to/your/project"
       }
@@ -125,7 +127,7 @@ Windsurf reads MCP servers from your home directory, not the project. JetBrains 
   "mcpServers": {
     "mimirs": {
       "command": "bunx",
-      "args": ["mimirs@latest", "serve"],
+      "args": ["mimirs@^1", "serve"],
       "env": {
         "RAG_PROJECT_DIR": "/absolute/path/to/your/project"
       }
@@ -146,7 +148,7 @@ VS Code's Copilot uses a `servers` map (not `mcpServers`) and a `type` field.
     "mimirs": {
       "type": "stdio",
       "command": "bunx",
-      "args": ["mimirs@latest", "serve"],
+      "args": ["mimirs@^1", "serve"],
       "env": {
         "RAG_PROJECT_DIR": "/absolute/path/to/your/project"
       }
@@ -164,7 +166,7 @@ Codex uses TOML, not JSON, and reads from `~/.codex/config.toml`. One block per 
 ```toml
 [mcp_servers.mimirs]
 command = "bunx"
-args = ["mimirs@latest", "serve"]
+args = ["mimirs@^1", "serve"]
 env = { RAG_PROJECT_DIR = "/absolute/path/to/your/project" }
 ```
 
@@ -173,7 +175,7 @@ Or, equivalently, with an expanded env table:
 ```toml
 [mcp_servers.mimirs]
 command = "bunx"
-args = ["mimirs@latest", "serve"]
+args = ["mimirs@^1", "serve"]
 
 [mcp_servers.mimirs.env]
 RAG_PROJECT_DIR = "/absolute/path/to/your/project"
@@ -190,7 +192,7 @@ If the project lives in a read-only mount, set `RAG_DB_DIR` to a writable locati
   "mcpServers": {
     "mimirs": {
       "command": "bunx",
-      "args": ["mimirs@latest", "serve"],
+      "args": ["mimirs@^1", "serve"],
       "env": {
         "RAG_PROJECT_DIR": "/read/only/project",
         "RAG_DB_DIR": "/home/me/.cache/mimirs/myproject"
@@ -220,7 +222,7 @@ bunx mimirs demo
 
 `init` is a convenience: it wires up your editor (MCP config, agent rules, `.gitignore`, `.mimirs/config.json`). It does **not** build the index, and nothing below needs it — the index and a default config are created automatically the first time you index or query.
 
-**1. Add the MCP server by hand.** Drop the snippet for your client from the [manual reference](#3-set-up-your-editor-manual-reference) above: `command: "bunx"`, `args: ["mimirs@latest", "serve"]`, and `RAG_PROJECT_DIR` pointing at your project root. That is the entire MCP setup.
+**1. Add the MCP server by hand.** Drop the snippet for your client from the [manual reference](#3-set-up-your-editor-manual-reference) above: `command: "bunx"`, `args: ["mimirs@^1", "serve"]`, and `RAG_PROJECT_DIR` pointing at your project root. That is the entire MCP setup.
 
 > Without `init` there's no agent-rules file, so your assistant won't know the tools exist. Either mention mimirs in your prompt, or copy the tool list from [CLAUDE.md](CLAUDE.md) into your editor's rules.
 

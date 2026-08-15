@@ -2,7 +2,7 @@ import { describe, test, expect, afterEach } from "bun:test";
 import { mkdtemp, rm, readFile, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { ensureAgentInstructions, ensureMcpJson, BLOCK_VERSION, INSTRUCTIONS_BLOCK } from "../../src/cli/setup";
+import { ensureAgentInstructions, ensureMcpJson, mcpConfigSnippet, resolveBunx, PACKAGE_SPEC, BLOCK_VERSION, INSTRUCTIONS_BLOCK } from "../../src/cli/setup";
 
 const dirs: string[] = [];
 async function projectDir(): Promise<string> {
@@ -127,12 +127,23 @@ describe("init: fenced + version-stamped instruction region", () => {
     // without a shell-profile PATH.
     expect(vscode.servers.mimirs.command).toMatch(/bunx(\.exe)?$/);
     expect(vscode.servers.mimirs.command).not.toBe("bunx");
-    expect(vscode.servers.mimirs.args).toEqual(["mimirs@latest", "serve"]);
+    // Major-range pin, not "@latest": a v2 release must not reach users
+    // who never opted in.
+    expect(PACKAGE_SPEC).toBe("mimirs@^1");
+    expect(vscode.servers.mimirs.args).toEqual([PACKAGE_SPEC, "serve"]);
     expect(vscode.mcpServers).toBeUndefined(); // VS Code uses `servers`, not the Claude schema
 
     // Claude's .mcp.json still uses the mcpServers schema
     const claude = JSON.parse(await readFile(join(dir, ".mcp.json"), "utf-8"));
     expect(claude.mcpServers.mimirs.command).toMatch(/bunx(\.exe)?$/);
+    expect(claude.mcpServers.mimirs.args).toEqual([PACKAGE_SPEC, "serve"]);
+  });
+
+  test("the copy-paste snippet carries the same pin", async () => {
+    const dir = await projectDir();
+    const snippet = JSON.parse(mcpConfigSnippet(dir));
+    expect(snippet.mimirs.args).toEqual([PACKAGE_SPEC, "serve"]);
+    expect(snippet.mimirs.args).not.toContain("mimirs@latest");
   });
 
   test("upsert upgrades an existing bare-bunx command to the absolute path", async () => {
@@ -163,5 +174,53 @@ describe("init: fenced + version-stamped instruction region", () => {
     // Second run: nothing left to change
     const again = await ensureMcpJson(dir, []);
     expect(again.find((a) => a.includes(".mcp.json"))).toBeUndefined();
+  });
+
+  test("upsert repins an existing mimirs@latest entry to the major range", async () => {
+    const dir = await projectDir();
+    const mcpPath = join(dir, ".mcp.json");
+    // Command is already absolute — the spec is the only thing left to migrate.
+    await writeFile(
+      mcpPath,
+      JSON.stringify({
+        mcpServers: {
+          mimirs: {
+            command: resolveBunx(),
+            args: ["mimirs@latest", "serve"],
+            env: { RAG_PROJECT_DIR: dir, CUSTOM: "kept" },
+          },
+        },
+      }) + "\n",
+    );
+
+    const actions = await ensureMcpJson(dir, []);
+    expect(actions.some((a) => a.includes("Updated mimirs") && a.includes(PACKAGE_SPEC))).toBe(true);
+
+    const claude = JSON.parse(await readFile(mcpPath, "utf-8"));
+    expect(claude.mcpServers.mimirs.args).toEqual([PACKAGE_SPEC, "serve"]);
+    expect(claude.mcpServers.mimirs.env.CUSTOM).toBe("kept");
+
+    // Second run: nothing left to change
+    const again = await ensureMcpJson(dir, []);
+    expect(again.find((a) => a.includes(".mcp.json"))).toBeUndefined();
+  });
+
+  test("upsert leaves a user's own pinned version alone", async () => {
+    const dir = await projectDir();
+    const mcpPath = join(dir, ".mcp.json");
+    await writeFile(
+      mcpPath,
+      JSON.stringify({
+        mcpServers: {
+          mimirs: { command: resolveBunx(), args: ["mimirs@1.6.0", "serve"], env: {} },
+        },
+      }) + "\n",
+    );
+
+    const actions = await ensureMcpJson(dir, []);
+    expect(actions.find((a) => a.includes(".mcp.json"))).toBeUndefined();
+
+    const claude = JSON.parse(await readFile(mcpPath, "utf-8"));
+    expect(claude.mcpServers.mimirs.args).toEqual(["mimirs@1.6.0", "serve"]);
   });
 });

@@ -214,7 +214,17 @@ export async function doctorCommand(args: string[]) {
     },
   ];
 
-  cli.log(`mimirs doctor — checking ${projectDir}\n`);
+  // Read from package.json, not npm_package_version — that env var is only set
+  // under `bun run` and is always undefined when launched via bunx.
+  // doctor makes no network call, so this reports the running version only.
+  let version = "unknown";
+  try {
+    version = (await import("../../../package.json")).default.version ?? "unknown";
+  } catch {
+    // keep "unknown" — a missing package.json must not fail the whole command
+  }
+
+  cli.log(`mimirs ${version} — doctor, checking ${projectDir}\n`);
 
   for (const check of checks) {
     try {

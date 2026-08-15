@@ -312,12 +312,17 @@ export function resolveBunx(): string {
   return candidates.find((p) => existsSync(p)) ?? "bunx";
 }
 
+// Pinned to the major range, not "latest": a published 2.0.0 would otherwise
+// reach every existing user on their next server start, with no opt-in. 1.x
+// fixes still arrive automatically; moving to v2 means re-running init.
+export const PACKAGE_SPEC = "mimirs@^1";
+
 export function mcpConfigSnippet(projectDir: string): string {
   const abs = resolve(projectDir);
   return JSON.stringify({
     "mimirs": {
       command: resolveBunx(),
-      args: ["mimirs@latest", "serve"],
+      args: [PACKAGE_SPEC, "serve"],
       env: { RAG_PROJECT_DIR: abs },
     },
   }, null, 2);
@@ -326,17 +331,34 @@ export function mcpConfigSnippet(projectDir: string): string {
 function mcpServerEntry(projectDir: string) {
   return {
     command: resolveBunx(),
-    args: ["mimirs@latest", "serve"],
+    args: [PACKAGE_SPEC, "serve"],
     env: { RAG_PROJECT_DIR: resolve(projectDir) },
   };
 }
 
 // An existing entry with a bare "bunx" command is the pre-fix shape that GUI
 // clients can't spawn — upgrade just the command, leave everything else alone.
-function upgradeBareBunx(existing: any, entry: any): boolean {
-  if (existing?.command !== "bunx" || entry.command === "bunx") return false;
+function upgradeBareBunx(existing: any, entry: any): string | null {
+  if (existing?.command !== "bunx" || entry.command === "bunx") return null;
   existing.command = entry.command;
-  return true;
+  return "absolute bunx path so GUI-launched editors find it";
+}
+
+// Configs written before the pin run "mimirs@latest" and would jump to v2 on
+// publish. Rewrite only that one arg; anything else the user set stays.
+function upgradePackageSpec(existing: any): string | null {
+  const args = existing?.args;
+  if (!Array.isArray(args)) return null;
+  const i = args.indexOf("mimirs@latest");
+  if (i === -1) return null;
+  args[i] = PACKAGE_SPEC;
+  return `pinned to ${PACKAGE_SPEC} so a v2 release is opt-in`;
+}
+
+// Returns the reasons for a rewrite, empty when the entry is already current.
+function migrateEntry(existing: any, entry: any): string[] {
+  return [upgradeBareBunx(existing, entry), upgradePackageSpec(existing)]
+    .filter((r): r is string => r !== null);
 }
 
 async function upsertMcpJson(mcpPath: string, entry: object): Promise<string | null> {
@@ -349,9 +371,10 @@ async function upsertMcpJson(mcpPath: string, entry: object): Promise<string | n
     }
     const existing = raw.mcpServers?.["mimirs"];
     if (existing) {
-      if (!upgradeBareBunx(existing, entry)) return null;
+      const reasons = migrateEntry(existing, entry);
+      if (reasons.length === 0) return null;
       await writeFile(mcpPath, JSON.stringify(raw, null, 2) + "\n");
-      return `Updated mimirs in ${mcpPath} (absolute bunx path so GUI-launched editors find it)`;
+      return `Updated mimirs in ${mcpPath} (${reasons.join("; ")})`;
     }
     raw.mcpServers = raw.mcpServers || {};
     raw.mcpServers["mimirs"] = entry;
@@ -379,9 +402,10 @@ async function upsertVscodeMcp(mcpPath: string, entry: object): Promise<string |
     }
     const existing = raw.servers?.["mimirs"];
     if (existing) {
-      if (!upgradeBareBunx(existing, vsEntry)) return null;
+      const reasons = migrateEntry(existing, vsEntry);
+      if (reasons.length === 0) return null;
       await writeFile(mcpPath, JSON.stringify(raw, null, 2) + "\n");
-      return `Updated mimirs in ${mcpPath} (absolute bunx path so GUI-launched editors find it)`;
+      return `Updated mimirs in ${mcpPath} (${reasons.join("; ")})`;
     }
     raw.servers = raw.servers || {};
     raw.servers["mimirs"] = vsEntry;
