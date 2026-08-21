@@ -94,15 +94,29 @@ New dependency needs a reason in the commit body.
 
 Run `cargo fmt` before every commit.
 
-## Current state
+## Plans
 
-The CLI has three subcommands: `init`, `index`, and `search`. Only `init` does
-real work. `index` and `search` print a placeholder line.
+`plans/README.md` indexes every plan and names the slice that comes next. The
+plan in `plans/current/` carries the decisions that explain the commits, so
+read it before proposing a slice. Do not restate a plan's contents here — this
+file holds the method, and the plan holds the work.
 
 ## Commits
 
-Use Conventional Commits. Write a terse subject and a short reason. One commit
-for each slice.
+Use Conventional Commits. One commit for each slice.
+
+The subject says what changed. The body says why, and only why. The diff
+already says what changed, so do not repeat the diff in prose.
+
+Do not write:
+
+- A list of the changed files or functions.
+- A restatement of the subject in a longer form.
+- A description of code that the reader can see in the diff.
+- A summary of the next slice or of future work.
+
+Write the body only when the reason is not obvious from the subject. If the
+subject carries the reason, omit the body.
 
 Do not add a `Co-Authored-By` trailer or any other attribution trailer. The
 author of the commit is the user.

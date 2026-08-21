@@ -1,6 +1,9 @@
 .agents/
 .claude/
 skills-lock.json
+.mimirs/
 
 .DS_Store
 target/
+
+plans/

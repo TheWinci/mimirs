@@ -4,7 +4,7 @@
 
 # mimirs
 
-**Local-first RAG with persistent project memory for AI coding agents.**
+**Local-first persistent project memory and semantic search with graph for AI coding agents.**
 
 </div>
 
