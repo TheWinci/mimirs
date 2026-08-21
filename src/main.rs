@@ -18,11 +18,7 @@ enum Command {
     Init,
 
     /// Index current directory with config defined in .mimirs folder.
-    Index {
-        /// Should watch and update scope defined in the config.
-        #[arg(long)]
-        watch: bool,
-    },
+    Index,
 
     /// Search query with limit.
     Search {
@@ -40,7 +36,7 @@ fn main() -> Result<()> {
 
     match cli.command {
         Command::Init => commands::init::run()?,
-        Command::Index { watch } => commands::index::run(watch)?,
+        Command::Index => commands::index::run()?,
         Command::Search { query, limit } => commands::search::run(&query, limit)?,
     }
 

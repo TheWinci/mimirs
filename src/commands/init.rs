@@ -4,7 +4,7 @@ use std::path::Path;
 
 use crate::config::Config;
 
-/// Contents written to `.mimirs/.gitignore`, making the directory ignore itself.
+/// Written to `.mimirs/.gitignore`, so the directory ignores itself.
 const IGNORE_CONTENTS: &str = "*\n";
 
 pub fn run() -> anyhow::Result<()> {
@@ -33,8 +33,7 @@ pub fn run() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Write `contents` to `path` when the file is absent, and report what happened.
-/// Leave a file that the user changed unchanged.
+/// Write `contents` only when `path` is absent, so an edit by the user stays.
 fn write_default(path: &Path, contents: &str, created_dir: bool) -> anyhow::Result<()> {
     match fs::read_to_string(path) {
         Ok(existing) if existing == contents => println!("{} already up to date", path.display()),
