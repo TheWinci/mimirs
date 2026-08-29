@@ -15,6 +15,9 @@ clap = { version = "4.6.6", features = ["derive"] }
 ignore = "0.4.33"
 serde = { version = "1.0.229", features = ["derive"] }
 toml = "1.1.4"
+rusqlite = { version = "0.40.2", default-features = false, features = ["bundled"] }
+sqlite-vec = "=0.1.9"
+rusqlite_migration = "2.6.0"
 
 [dev-dependencies]
 tempfile = "3.27.0"

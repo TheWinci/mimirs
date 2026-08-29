@@ -2,24 +2,28 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::Path;
 
-use crate::config::Config;
+use crate::{config::Config, storage};
 
 /// Written to `.mimirs/.gitignore`, so the directory ignores itself.
 const IGNORE_CONTENTS: &str = "*\n";
 
 pub fn run() -> anyhow::Result<()> {
-    let root = Path::new(".mimirs");
+    run_at(Path::new("."))
+}
 
-    let created_dir = match fs::create_dir(root) {
+fn run_at(project_root: &Path) -> anyhow::Result<()> {
+    let root = project_root.join(".mimirs");
+
+    let created_dir = match fs::create_dir(&root) {
         Ok(()) => {
             println!("{} created", root.display());
             true
         }
-        Err(e) if e.kind() == ErrorKind::AlreadyExists => {
+        Err(error) if error.kind() == ErrorKind::AlreadyExists => {
             println!("{} already exists", root.display());
             false
         }
-        Err(e) => return Err(e.into()),
+        Err(error) => return Err(error.into()),
     };
 
     write_default(&root.join(".gitignore"), IGNORE_CONTENTS, created_dir)?;
@@ -29,6 +33,17 @@ pub fn run() -> anyhow::Result<()> {
         &Config::default().to_toml()?,
         created_dir,
     )?;
+
+    let database_path = root.join("index.db");
+    let database_existed = database_path.try_exists()?;
+
+    let _connection = storage::open(&database_path)?;
+
+    if database_existed {
+        println!("{} already up to date", database_path.display());
+    } else {
+        println!("created {}", database_path.display());
+    }
 
     Ok(())
 }
@@ -51,3 +66,7 @@ fn write_default(path: &Path, contents: &str, created_dir: bool) -> anyhow::Resu
 
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/commands/init.rs"]
+mod tests;
