@@ -29,7 +29,7 @@ fn repeated_init_preserves_config_and_database_data() {
     let state = dir.path().join(".mimirs");
     let config_path = state.join("config.toml");
     let database_path = state.join("index.db");
-    let custom_config = "include = [\"src/**/*.rs\"]\nexclude = []\n";
+    let custom_config = "include = [\"**/*.md\"]\nexclude = []\n";
 
     run_at(dir.path()).unwrap();
 

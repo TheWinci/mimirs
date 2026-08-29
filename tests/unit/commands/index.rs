@@ -48,12 +48,25 @@ fn exclude_removes_a_directory() {
 }
 
 #[test]
-fn include_selects_one_extension() {
+fn default_include_selects_rust_files() {
+    let dir = tree(&[
+        ("a.txt", "hello"),
+        ("b.rs", "fn main() {}"),
+        ("src/lib.rs", "pub fn answer() -> u8 { 42 }"),
+    ]);
+
+    let walk = walk(dir.path(), &Config::default()).unwrap();
+
+    assert_eq!(walk.paths, ["b.rs", "src/lib.rs"]);
+}
+
+#[test]
+fn custom_include_selects_another_extension() {
     let dir = tree(&[("a.txt", "hello"), ("b.rs", "fn main() {}")]);
 
-    let walk = walk(dir.path(), &config(&["**/*.rs"], &[])).unwrap();
+    let walk = walk(dir.path(), &config(&["**/*.txt"], &[])).unwrap();
 
-    assert_eq!(walk.paths, ["b.rs"]);
+    assert_eq!(walk.paths, ["a.txt"]);
 }
 
 #[test]
@@ -146,11 +159,11 @@ fn a_named_include_beats_gitignore() {
 
 #[test]
 fn the_index_is_never_walked() {
-    let dir = tree(&[("a.txt", "keep"), (".mimirs/config.toml", "include = []")]);
+    let dir = tree(&[("a.rs", "keep"), (".mimirs/leak.rs", "drop")]);
 
     let walk = walk(dir.path(), &Config::default()).unwrap();
 
-    assert_eq!(walk.paths, ["a.txt"]);
+    assert_eq!(walk.paths, ["a.rs"]);
 }
 
 #[test]
@@ -174,7 +187,12 @@ fn a_secret_is_never_walked() {
         (".npmrc", "//registry:_authToken=x"),
     ]);
 
-    let walk = walk(dir.path(), &Config::default()).unwrap();
+    let config = Config {
+        include: vec!["**/*".to_string()],
+        ..Config::default()
+    };
+
+    let walk = walk(dir.path(), &config).unwrap();
 
     assert_eq!(walk.paths, ["a.txt"]);
 }

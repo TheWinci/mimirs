@@ -17,7 +17,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            include: ["**/*"].map(String::from).to_vec(),
+            include: ["**/*.rs"].map(String::from).to_vec(),
             exclude: [
                 "**/.git/**",
                 "**/.mimirs/**",
