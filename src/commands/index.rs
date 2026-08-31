@@ -1,4 +1,3 @@
-use std::fs;
 use std::path::Path;
 
 use ignore::WalkBuilder;
@@ -99,13 +98,6 @@ fn walk(root: &Path, config: &Config) -> anyhow::Result<Walk> {
 
         // A directory, a symlink, and a device hold no text of their own.
         if !entry.file_type().is_some_and(|t| t.is_file()) {
-            continue;
-        }
-
-        // One call rejects the file the process cannot read and the file that is not UTF-8.
-        if let Err(e) = fs::read_to_string(entry.path()) {
-            walk.skipped += 1;
-            eprintln!("skipped: {}: {e}", entry.path().display());
             continue;
         }
 

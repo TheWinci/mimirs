@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 
 mod commands;
 mod config;
+mod source;
 mod storage;
 
 /// mimirs CLI

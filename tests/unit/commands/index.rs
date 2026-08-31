@@ -1,3 +1,4 @@
+use std::fs;
 use std::os::unix::fs::PermissionsExt;
 
 use tempfile::TempDir;
@@ -80,54 +81,26 @@ fn a_symlink_is_not_followed() {
 }
 
 #[test]
-fn an_unreadable_file_is_skipped() {
+fn an_unreadable_file_is_walked() {
     let dir = tree(&[("a.txt", "hello"), ("locked.txt", "secret")]);
     let locked = dir.path().join("locked.txt");
     fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
 
     let walk = walk(dir.path(), &config(&["**/*"], &[])).unwrap();
 
-    assert_eq!(walk.paths, ["a.txt"]);
-    assert_eq!(walk.skipped, 1);
+    assert_eq!(walk.paths, ["a.txt", "locked.txt"]);
+    assert_eq!(walk.skipped, 0);
 }
 
 #[test]
-fn an_undecodable_file_is_skipped() {
+fn an_undecodable_file_is_walked() {
     let dir = tree(&[("a.txt", "keep")]);
     // "zolc" in Windows-1250: not valid UTF-8.
     fs::write(dir.path().join("b.txt"), [0xbf, 0xf3, 0xb3, 0xe6]).unwrap();
 
     let walk = walk(dir.path(), &config(&["**/*"], &[])).unwrap();
 
-    assert_eq!(walk.paths, ["a.txt"]);
-    assert_eq!(walk.skipped, 1);
-}
-
-#[test]
-fn utf8_beyond_ascii_is_text() {
-    let dir = tree(&[]);
-    fs::write(
-        dir.path().join("pl.txt"),
-        "\u{017c}\u{00f3}\u{0142}\u{0107}",
-    )
-    .unwrap();
-    fs::write(dir.path().join("jp.txt"), "\u{65e5}\u{672c}\u{8a9e}").unwrap();
-
-    let walk = walk(dir.path(), &config(&["**/*"], &[])).unwrap();
-
-    assert_eq!(walk.paths, ["jp.txt", "pl.txt"]);
-    assert_eq!(walk.skipped, 0);
-}
-
-#[test]
-fn a_large_file_is_walked() {
-    let dir = tree(&[("a.txt", "hello")]);
-    let big = "x".repeat(8 * 1024 * 1024);
-    fs::write(dir.path().join("big.txt"), big).unwrap();
-
-    let walk = walk(dir.path(), &config(&["**/*"], &[])).unwrap();
-
-    assert_eq!(walk.paths, ["a.txt", "big.txt"]);
+    assert_eq!(walk.paths, ["a.txt", "b.txt"]);
     assert_eq!(walk.skipped, 0);
 }
 
