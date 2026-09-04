@@ -1,0 +1,14 @@
+results: 2
+time: 0.14 seconds
+
+result: 1/2
+similarity: 1.0000
+location: a.rs:1
+text: same score
+
+---
+
+result: 2/2
+similarity: 1.0000
+location: z.rs:1-3
+text:   café();  

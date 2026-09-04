@@ -94,22 +94,45 @@ pub fn open(path: &Path) -> anyhow::Result<OpenedDatabase> {
     open_at(path).with_context(|| format!("cannot open database {}", path.display()))
 }
 
+pub fn open_read_only(path: &Path) -> anyhow::Result<Connection> {
+    let read = || -> anyhow::Result<Connection> {
+        register_vec()?;
+        ensure!(
+            path.try_exists()?,
+            "index is missing; run mimirs init or mimirs index"
+        );
+        let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+        let found = validate_version(&connection)?;
+        ensure!(
+            found == SCHEMA_VERSION,
+            "index schema version {found} is older than supported version {SCHEMA_VERSION}; run mimirs init or mimirs index"
+        );
+        Ok(connection)
+    };
+    read().with_context(|| format!("cannot read database {}", path.display()))
+}
+
+fn validate_version(connection: &Connection) -> anyhow::Result<i64> {
+    let found: i64 = connection.pragma_query_value(None, "user_version", |row| row.get(0))?;
+    ensure!(
+        found <= SCHEMA_VERSION,
+        "database schema version {found} is newer than supported version {SCHEMA_VERSION}"
+    );
+    let schema = match found {
+        1 => SCHEMA_V1,
+        SCHEMA_VERSION => SCHEMA,
+        _ => anyhow::bail!("unknown database schema version {found}"),
+    };
+    validate_schema(connection, schema)?;
+    Ok(found)
+}
+
 fn open_at(path: &Path) -> anyhow::Result<OpenedDatabase> {
     register_vec()?;
     let outcome = if path.try_exists()? {
         // Inspect without allowing SQLite to modify an unrecognized database.
         let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
-        let found: i64 = connection.pragma_query_value(None, "user_version", |row| row.get(0))?;
-        ensure!(
-            found <= SCHEMA_VERSION,
-            "database schema version {found} is newer than supported version {SCHEMA_VERSION}"
-        );
-        let schema = match found {
-            1 => SCHEMA_V1,
-            SCHEMA_VERSION => SCHEMA,
-            _ => anyhow::bail!("unknown database schema version {found}"),
-        };
-        validate_schema(&connection, schema)?;
+        let found = validate_version(&connection)?;
         connection.close().map_err(|(_, error)| error)?;
         if found == SCHEMA_VERSION {
             OpenOutcome::Reused
@@ -147,8 +170,10 @@ fn open_at(path: &Path) -> anyhow::Result<OpenedDatabase> {
 
 mod reconcile;
 mod save;
+mod search;
 pub use reconcile::reconcile;
 pub use save::{save_file, validate_model};
+pub use search::{SearchResult, has_windows, nearest};
 
 #[cfg(test)]
 #[path = "../tests/unit/storage.rs"]

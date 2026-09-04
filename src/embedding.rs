@@ -1,5 +1,3 @@
-#![cfg_attr(not(test), expect(dead_code))]
-
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, ensure};
@@ -180,6 +178,7 @@ pub fn prepare_model() -> anyhow::Result<()> {
     production()?.prepare()
 }
 
+#[cfg(test)]
 pub fn cosine_similarity(left: &[f32], right: &[f32]) -> anyhow::Result<f32> {
     ensure!(!left.is_empty(), "cosine vectors cannot be empty");
     ensure!(
