@@ -1,10 +1,12 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
+mod chunk;
 mod commands;
 mod config;
 mod source;
 mod storage;
+mod window;
 
 /// mimirs CLI
 #[derive(Parser)]
