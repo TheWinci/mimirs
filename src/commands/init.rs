@@ -2,7 +2,7 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::Path;
 
-use crate::{config::Config, storage};
+use crate::{config::Config, embedding, storage};
 
 /// Written to `.mimirs/.gitignore`, so the directory ignores itself.
 const IGNORE_CONTENTS: &str = "*\n";
@@ -12,6 +12,13 @@ pub fn run() -> anyhow::Result<()> {
 }
 
 fn run_at(project_root: &Path) -> anyhow::Result<()> {
+    run_at_with_model(project_root, embedding::prepare_model)
+}
+
+fn run_at_with_model(
+    project_root: &Path,
+    mut prepare_model: impl FnMut() -> anyhow::Result<()>,
+) -> anyhow::Result<()> {
     let root = project_root.join(".mimirs");
 
     let created_dir = match fs::create_dir(&root) {
@@ -44,6 +51,10 @@ fn run_at(project_root: &Path) -> anyhow::Result<()> {
     } else {
         println!("created {}", database_path.display());
     }
+
+    eprintln!("preparing embedding model: {}", embedding::MODEL_NAME);
+    prepare_model()?;
+    println!("embedding model ready: {}", embedding::MODEL_NAME);
 
     Ok(())
 }

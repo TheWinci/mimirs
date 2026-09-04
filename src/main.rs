@@ -4,6 +4,7 @@ use clap::{Parser, Subcommand};
 mod chunk;
 mod commands;
 mod config;
+mod embedding;
 mod source;
 mod storage;
 mod window;
