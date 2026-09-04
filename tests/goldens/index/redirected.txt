@@ -1,0 +1,40 @@
+indexing: ROOT
+phase: walking
+file: -
+files_found: 0
+elapsed_time: 1.25 seconds
+indexing: ROOT
+phase: walking
+file: a.rs
+files_found: 1
+elapsed_time: 1.25 seconds
+indexing: ROOT
+phase: walking
+file: b.rs
+files_found: 2
+elapsed_time: 1.25 seconds
+created ROOT/.mimirs/index.db
+indexing: ROOT
+phase: indexing
+file: a.rs
+file_progress: 0% (0/0 windows)
+index_progress: 0% (0/2 files)
+elapsed_time: 1.25 seconds
+indexing: ROOT
+phase: indexing
+file: a.rs
+file_progress: 100% (2/2 windows)
+index_progress: 50% (1/2 files)
+elapsed_time: 1.25 seconds
+indexing: ROOT
+phase: indexing
+file: b.rs
+file_progress: 0% (0/0 windows)
+index_progress: 50% (1/2 files)
+elapsed_time: 1.25 seconds
+indexing: ROOT
+phase: indexing
+file: b.rs
+file_progress: 100% (0/0 windows)
+index_progress: 100% (2/2 files)
+elapsed_time: 1.25 seconds

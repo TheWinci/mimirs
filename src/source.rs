@@ -1,5 +1,3 @@
-#![cfg_attr(not(test), expect(dead_code))]
-
 use std::fs;
 use std::path::Path;
 

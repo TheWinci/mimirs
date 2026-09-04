@@ -1,0 +1,30 @@
+<ESC>[?7lindexing: root
+phase: walking
+file: -
+files_found: 0
+elapsed_time: 0.00 seconds
+<ESC>[?7h<ESC>[5F<ESC>[J<ESC>[?7lindexing: root
+phase: walking
+file: a.rs
+files_found: 1
+elapsed_time: 1.23 seconds
+<ESC>[?7h<ESC>[5F<ESC>[Jwalk_error: locked: Permission denied
+<ESC>[?7lindexing: root
+phase: indexing
+file: a.rs
+file_progress: 0% (0/0 windows)
+index_progress: 0% (0/1 files)
+elapsed_time: 2.47 seconds
+<ESC>[?7h<ESC>[6F<ESC>[J<ESC>[?7lindexing: root
+phase: indexing
+file: a.rs
+file_progress: 100% (256/257 windows)
+index_progress: 0% (0/1 files)
+elapsed_time: 3.70 seconds
+<ESC>[?7h<ESC>[6F<ESC>[J<ESC>[?7lindexing: root
+phase: indexing
+file: a.rs
+file_progress: 100% (257/257 windows)
+index_progress: 100% (1/1 files)
+elapsed_time: 4.94 seconds
+<ESC>[?7h<ESC>[6F<ESC>[J

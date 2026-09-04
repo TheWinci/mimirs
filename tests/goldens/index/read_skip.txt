@@ -1,0 +1,23 @@
+indexing: ROOT
+phase: walking
+file: -
+files_found: 0
+elapsed_time: 1.25 seconds
+indexing: ROOT
+phase: walking
+file: a.rs
+files_found: 1
+elapsed_time: 1.25 seconds
+indexing: ROOT
+phase: indexing
+file: a.rs
+file_progress: 0% (0/0 windows)
+index_progress: 0% (0/1 files)
+elapsed_time: 1.25 seconds
+skipped: source file a.rs is not valid UTF-8: invalid utf-8 sequence of 1 bytes from index 0
+indexing: ROOT
+phase: indexing
+file: a.rs
+file_progress: 100% (0/0 windows)
+index_progress: 100% (1/1 files)
+elapsed_time: 1.25 seconds

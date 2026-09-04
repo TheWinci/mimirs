@@ -1,0 +1,5 @@
+indexing: ROOT
+phase: walking
+file: -
+files_found: 0
+elapsed_time: 1.25 seconds

@@ -1,115 +1,155 @@
+use std::io::{self, IsTerminal, Write};
 use std::path::Path;
+use std::time::{Duration, Instant};
 
-use ignore::WalkBuilder;
-use ignore::overrides::{Override, OverrideBuilder};
+use anyhow::Context;
 
-use crate::config::Config;
+use crate::{chunk, config::Config, embedding, source, storage, window};
 
-#[derive(Debug, Default, PartialEq)]
-pub struct Walk {
-    /// Every path the walk accepted, relative to the root.
-    pub paths: Vec<String>,
-    pub skipped: usize,
-}
+mod progress;
+mod walk;
+
+use progress::Progress;
 
 pub fn run() -> anyhow::Result<()> {
-    let root = Path::new(".");
-    let config = Config::load(root)?;
+    let start = Instant::now();
+    let stderr = io::stderr();
+    let terminal = stderr.is_terminal();
+    run_at(
+        Path::new("."),
+        embedding::production,
+        &mut io::stdout().lock(),
+        &mut stderr.lock(),
+        terminal,
+        &|| start.elapsed(),
+    )
+}
 
-    let walk = walk(root, &config)?;
-
-    for path in &walk.paths {
-        println!("{path}");
-    }
-
-    println!(
-        "{} files walked, {} skipped",
-        walk.paths.len(),
-        walk.skipped
-    );
-
+fn run_at(
+    root: &Path,
+    make_embedder: impl FnOnce() -> anyhow::Result<embedding::Embedder>,
+    stdout: &mut dyn Write,
+    stderr: &mut dyn Write,
+    terminal: bool,
+    elapsed: &dyn Fn() -> Duration,
+) -> anyhow::Result<()> {
+    let mut progress = Progress::new(root, stderr, terminal, elapsed);
+    let result = index(root, make_embedder, &mut progress);
+    // Clear even on failure, before main prints the error.
+    let cleared = progress.clear();
+    let summary = result?;
+    cleared?;
+    writeln!(
+        stdout,
+        "indexed: {} files\nskipped: {} files\nwalk_errors: {}\ntime: {:.2} seconds",
+        summary.indexed,
+        summary.skipped,
+        summary.walk_errors,
+        elapsed().as_secs_f64(),
+    )?;
     Ok(())
 }
 
-/// A named `include` is a whitelist and beats `.gitignore`, as `git add -f` does.
-/// A catch-all says the opposite, so it adds no rule.
-fn selection(root: &Path, config: &Config) -> anyhow::Result<Override> {
-    let mut overrides = OverrideBuilder::new(root);
-
-    if !config.include.iter().any(|p| is_catch_all(p)) {
-        for pattern in &config.include {
-            // A gitignored directory is pruned before the walk looks inside.
-            for parent in literal_parents(pattern) {
-                overrides.add(&parent)?;
-            }
-            overrides.add(pattern)?;
-        }
-    }
-
-    for pattern in &config.exclude {
-        overrides.add(&format!("!{pattern}"))?;
-    }
-
-    Ok(overrides.build()?)
+#[derive(Default)]
+struct Summary {
+    indexed: usize,
+    skipped: usize,
+    walk_errors: usize,
 }
 
-/// `src/api/*.rs` names `src` and `src/api`. `*.rs` names none.
-fn literal_parents(pattern: &str) -> Vec<String> {
-    let mut parents = Vec::new();
-    let mut path = String::new();
-
-    for part in pattern.split('/').take_while(|p| !p.contains(['*', '?'])) {
-        if !path.is_empty() {
-            path.push('/');
-        }
-        path.push_str(part);
-        parents.push(path.clone());
+fn index(
+    root: &Path,
+    make_embedder: impl FnOnce() -> anyhow::Result<embedding::Embedder>,
+    progress: &mut Progress<'_>,
+) -> anyhow::Result<Summary> {
+    let config = Config::load(root)?;
+    progress.walking("-", 0)?;
+    let walk = walk::discover(root, &config, |file, found| progress.walking(file, found))?;
+    for error in &walk.errors {
+        progress.diagnostic(&format!("walk_error: {error}"))?;
     }
 
-    // A pattern with no wildcard names a file, not a directory.
-    if !pattern.contains(['*', '?']) {
-        parents.pop();
+    let database_path = root.join(".mimirs/index.db");
+    let mut database = storage::open(&database_path)?;
+    if database.outcome != storage::OpenOutcome::Reused {
+        progress.diagnostic(&database.outcome.message(&database_path))?;
     }
+    let mut embedder = make_embedder()?;
+    storage::validate_model(
+        &database.connection,
+        embedder.model_name(),
+        embedder.dimension(),
+    )?;
+    embedder.prepare()?;
 
-    parents
-}
-
-fn is_catch_all(pattern: &str) -> bool {
-    matches!(pattern, "*" | "**" | "**/*")
-}
-
-fn walk(root: &Path, config: &Config) -> anyhow::Result<Walk> {
-    let entries = WalkBuilder::new(root)
-        .overrides(selection(root, config)?)
-        // A dotfile is configuration, which is what an agent asks about.
-        .hidden(false)
-        .build();
-    let mut walk = Walk::default();
-
-    for entry in entries {
-        let entry = match entry {
-            Ok(entry) => entry,
-            Err(e) => {
-                walk.skipped += 1;
-                eprintln!("skipped: {e}");
+    let mut summary = Summary {
+        walk_errors: walk.errors.len(),
+        ..Summary::default()
+    };
+    let mut successful = Vec::new();
+    let total = walk.paths.len();
+    for (attempt, path) in walk.paths.iter().enumerate() {
+        progress.indexing(path, (0, 0), (attempt, total), false)?;
+        let source = match source::read(root, path) {
+            Ok(source) => source,
+            Err(error) => {
+                progress.diagnostic(&format!("skipped: {error:#}"))?;
+                summary.skipped += 1;
+                progress.indexing(path, (0, 0), (attempt + 1, total), true)?;
                 continue;
             }
         };
-
-        // A directory, a symlink, and a device hold no text of their own.
-        if !entry.file_type().is_some_and(|t| t.is_file()) {
-            continue;
+        let chunks = chunk::of(&source);
+        let windows = chunks.iter().flat_map(window::of).collect::<Vec<_>>();
+        let texts = windows
+            .iter()
+            .map(|window| window.text.clone())
+            .collect::<Vec<_>>();
+        if progress.is_terminal() {
+            progress.indexing(path, (0, windows.len()), (attempt, total), false)?;
         }
-
-        let relative = entry.path().strip_prefix(root).unwrap_or(entry.path());
-        walk.paths.push(relative.to_string_lossy().into_owned());
+        // The embedder callback cannot return errors. Save an output error and
+        // propagate it before committing this file.
+        let mut output_error = None;
+        let vectors = embedder
+            .embed_documents(&texts, |completed, count| {
+                if progress.is_terminal() && output_error.is_none() {
+                    output_error = progress
+                        .indexing(path, (completed, count), (attempt, total), false)
+                        .err();
+                }
+            })
+            .with_context(|| format!("cannot embed source file {path}"))?;
+        if let Some(error) = output_error {
+            return Err(error.into());
+        }
+        storage::save_file(
+            &mut database.connection,
+            &source,
+            &chunks,
+            &windows,
+            &vectors,
+            embedder.model_name(),
+            embedder.dimension(),
+        )?;
+        successful.push(path.as_str());
+        summary.indexed += 1;
+        progress.indexing(
+            path,
+            (windows.len(), windows.len()),
+            (attempt + 1, total),
+            true,
+        )?;
     }
-
-    walk.paths.sort();
-
-    Ok(walk)
+    storage::reconcile(
+        &mut database.connection,
+        &successful,
+        embedder.model_name(),
+        embedder.dimension(),
+    )?;
+    Ok(summary)
 }
 
 #[cfg(test)]
-#[path = "../../tests/unit/commands/index.rs"]
+#[path = "../../tests/unit/commands/index_run.rs"]
 mod tests;

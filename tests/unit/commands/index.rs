@@ -34,7 +34,7 @@ fn every_file_is_walked() {
         walk,
         Walk {
             paths: vec!["a.txt".to_string(), "src/b.rs".to_string()],
-            skipped: 0,
+            errors: vec![],
         }
     );
 }
@@ -89,7 +89,7 @@ fn an_unreadable_file_is_walked() {
     let walk = walk(dir.path(), &config(&["**/*"], &[])).unwrap();
 
     assert_eq!(walk.paths, ["a.txt", "locked.txt"]);
-    assert_eq!(walk.skipped, 0);
+    assert!(walk.errors.is_empty());
 }
 
 #[test]
@@ -101,7 +101,7 @@ fn an_undecodable_file_is_walked() {
     let walk = walk(dir.path(), &config(&["**/*"], &[])).unwrap();
 
     assert_eq!(walk.paths, ["a.txt", "b.txt"]);
-    assert_eq!(walk.skipped, 0);
+    assert!(walk.errors.is_empty());
 }
 
 /// `ignore` reads a `.gitignore` only inside a git repository.
@@ -175,4 +175,14 @@ fn a_bad_glob_is_an_error() {
     let dir = tree(&[("a.txt", "hello")]);
 
     assert!(walk(dir.path(), &config(&["["], &[])).is_err());
+}
+
+#[test]
+fn malformed_ignore_rules_are_reported_alongside_accepted_files() {
+    let dir = tree(&[("a.rs", "source")]);
+    gitignore(&dir, "[z-a]\n");
+    let walk = walk(dir.path(), &config(&["**/*"], &["**/.git/**"])).unwrap();
+    assert!(walk.paths.iter().any(|path| path == "a.rs"));
+    assert_eq!(walk.errors.len(), 1);
+    assert!(walk.errors[0].contains(".gitignore"));
 }

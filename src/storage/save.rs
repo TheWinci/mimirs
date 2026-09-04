@@ -1,9 +1,7 @@
-#![cfg_attr(not(test), expect(dead_code))]
-
 use std::collections::HashMap;
 
 use anyhow::{Context, ensure};
-use rusqlite::{Connection, OptionalExtension, Transaction, params};
+use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::{chunk::Chunk, embedding, source::SourceFile, window::Window};
 
@@ -56,7 +54,13 @@ pub fn save_file(
         }
 
         let transaction = connection.transaction()?;
-        validate_metadata(&transaction, model_name, dimension)?;
+        if !validate_model(&transaction, model_name, dimension)? {
+            transaction.execute(
+                "INSERT INTO index_metadata(key, value)
+                 VALUES ('embedding_model', ?1), ('embedding_dimension', ?2)",
+                params![model_name, dimension.to_string()],
+            )?;
+        }
         transaction.execute(
             "INSERT INTO files(path) VALUES (?1) ON CONFLICT(path) DO NOTHING",
             [&source.path],
@@ -119,13 +123,18 @@ pub fn save_file(
     save().with_context(|| format!("cannot save source file {}", source.path))
 }
 
-fn validate_metadata(
-    transaction: &Transaction<'_>,
+/// Validate without stamping. Return whether this index already has a model.
+pub fn validate_model(
+    connection: &Connection,
     model: &str,
     dimension: usize,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<bool> {
+    ensure!(
+        model == embedding::MODEL_NAME && dimension == embedding::DIMENSION,
+        "unsupported embedding model {model} with dimension {dimension}"
+    );
     let read = |key| -> rusqlite::Result<Option<String>> {
-        transaction
+        connection
             .query_row(
                 "SELECT value FROM index_metadata WHERE key = ?1",
                 [key],
@@ -137,18 +146,14 @@ fn validate_metadata(
     let stored_dimension = read("embedding_dimension")?;
     match (stored_model, stored_dimension) {
         (None, None) => {
-            let populated: bool = transaction.query_row(
+            let populated: bool = connection.query_row(
                 "SELECT EXISTS(SELECT 1 FROM files) OR EXISTS(SELECT 1 FROM chunks)
                  OR EXISTS(SELECT 1 FROM windows) OR EXISTS(SELECT 1 FROM window_embeddings)",
                 [],
                 |row| row.get(0),
             )?;
             ensure!(!populated, "populated index is missing embedding metadata");
-            transaction.execute(
-                "INSERT INTO index_metadata(key, value)
-                 VALUES ('embedding_model', ?1), ('embedding_dimension', ?2)",
-                params![model, dimension.to_string()],
-            )?;
+            return Ok(false);
         }
         (Some(stored_model), Some(stored_dimension)) => {
             let stored_dimension: usize = stored_dimension
@@ -161,5 +166,5 @@ fn validate_metadata(
         }
         _ => anyhow::bail!("index is missing an embedding metadata key"),
     }
-    Ok(())
+    Ok(true)
 }

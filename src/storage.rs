@@ -145,15 +145,10 @@ fn open_at(path: &Path) -> anyhow::Result<OpenedDatabase> {
     })
 }
 
+mod reconcile;
 mod save;
-#[cfg_attr(
-    not(test),
-    expect(
-        unused_imports,
-        reason = "the index command will consume storage in the next slice"
-    )
-)]
-pub use save::save_file;
+pub use reconcile::reconcile;
+pub use save::{save_file, validate_model};
 
 #[cfg(test)]
 #[path = "../tests/unit/storage.rs"]

@@ -1,5 +1,3 @@
-#![cfg_attr(not(test), expect(dead_code))]
-
 use crate::chunk::Chunk;
 
 #[derive(Debug, PartialEq, Eq)]

@@ -1,0 +1,11 @@
+indexing: ROOT
+phase: walking
+file: -
+files_found: 0
+elapsed_time: 1.25 seconds
+indexing: ROOT
+phase: walking
+file: a.rs
+files_found: 1
+elapsed_time: 1.25 seconds
+created ROOT/.mimirs/index.db
