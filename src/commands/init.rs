@@ -42,15 +42,9 @@ fn run_at_with_model(
     )?;
 
     let database_path = root.join("index.db");
-    let database_existed = database_path.try_exists()?;
-
-    let _connection = storage::open(&database_path)?;
-
-    if database_existed {
-        println!("{} already up to date", database_path.display());
-    } else {
-        println!("created {}", database_path.display());
-    }
+    let database = storage::open(&database_path)?;
+    println!("{}", database.outcome.message(&database_path));
+    drop(database.connection);
 
     eprintln!("preparing embedding model: {}", embedding::MODEL_NAME);
     prepare_model()?;

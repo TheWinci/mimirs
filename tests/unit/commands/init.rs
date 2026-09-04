@@ -37,7 +37,7 @@ fn repeated_init_preserves_config_and_database_data() {
     fs::write(&config_path, custom_config).unwrap();
 
     {
-        let connection = crate::storage::open(&database_path).unwrap();
+        let connection = crate::storage::open(&database_path).unwrap().connection;
         connection
             .execute(
                 "INSERT INTO index_metadata (key, value) VALUES (?1, ?2)",
@@ -50,7 +50,7 @@ fn repeated_init_preserves_config_and_database_data() {
 
     assert_eq!(fs::read_to_string(config_path).unwrap(), custom_config);
 
-    let connection = crate::storage::open(&database_path).unwrap();
+    let connection = crate::storage::open(&database_path).unwrap().connection;
     let marker: String = connection
         .query_row(
             "SELECT value FROM index_metadata WHERE key = ?1",
@@ -93,4 +93,46 @@ fn model_preparation_failure_keeps_initialized_project_state_and_its_cause() {
     let state = dir.path().join(".mimirs");
     assert!(state.join("config.toml").is_file());
     assert!(state.join("index.db").is_file());
+}
+
+#[test]
+fn init_rebuilds_v1_and_prepares_model_after_preserving_config() {
+    let dir = TempDir::new().unwrap();
+    run_at_with_model(dir.path(), || Ok(())).unwrap();
+    let state = dir.path().join(".mimirs");
+    let path = state.join("index.db");
+    fs::write(state.join("config.toml"), "custom configuration").unwrap();
+    fs::remove_file(&path).unwrap();
+    let connection = rusqlite::Connection::open(&path).unwrap();
+    connection
+        .execute_batch(include_str!("../../../src/storage/schema_v1.sql"))
+        .unwrap();
+    connection
+        .execute_batch("PRAGMA user_version = 1; INSERT INTO files VALUES (1, 'old.rs');")
+        .unwrap();
+    drop(connection);
+    let mut prepared = false;
+    run_at_with_model(dir.path(), || {
+        let connection = crate::storage::open(&path)?.connection;
+        assert_eq!(
+            connection
+                .query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))
+                .unwrap(),
+            2
+        );
+        assert_eq!(
+            connection
+                .query_row("SELECT count(*) FROM files", [], |row| row.get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+        prepared = true;
+        Ok(())
+    })
+    .unwrap();
+    assert!(prepared);
+    assert_eq!(
+        fs::read_to_string(state.join("config.toml")).unwrap(),
+        "custom configuration"
+    );
 }
