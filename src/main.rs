@@ -2,14 +2,12 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 mod analysis;
-mod chunk;
 mod commands;
 mod config;
 mod embedding;
 mod retrieval;
 mod source;
 mod storage;
-mod window;
 
 /// mimirs CLI
 #[derive(Parser)]
@@ -24,15 +22,15 @@ enum Command {
     /// Create an initial config for mimirs in .mimirs folder.
     Init,
 
-    /// Inspect Rust syntax without project setup.
+    /// Inspect source and available syntax analysis without project setup.
     Inspect {
         file: std::path::PathBuf,
         /// Read saved analysis without reading the current source.
         #[arg(long)]
         stored: bool,
-        /// Preview evidence descriptions without loading an embedding model.
+        /// Preview raw source chunks and their context without loading a model.
         #[arg(long)]
-        documents: bool,
+        source_chunks: bool,
     },
 
     /// Index current directory with config defined in .mimirs folder.
@@ -56,8 +54,8 @@ fn main() -> Result<()> {
         Command::Inspect {
             file,
             stored,
-            documents,
-        } => commands::inspect::run(&file, stored, documents),
+            source_chunks,
+        } => commands::inspect::run(&file, stored, source_chunks),
         Command::Init => commands::init::run(),
         Command::Index => commands::index::run(),
         Command::Search { query, limit } => commands::search::run(&query, limit),

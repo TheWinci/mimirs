@@ -11,22 +11,10 @@ fn documents_roundtrip_rollback_and_cleanup() {
         text: "/// Hi\nfn f() { g(); g(); }".into(),
     })
     .unwrap();
-    let descriptions =
-        crate::retrieval::render::render(&crate::retrieval::project(&analysis).unwrap());
-    let documents: Vec<_> = descriptions
-        .into_iter()
-        .map(|d| Document {
-            owner: d.owner,
-            part: 0,
-            text: d
-                .facts
-                .iter()
-                .map(|c| c.text.as_str())
-                .collect::<Vec<_>>()
-                .join("\n"),
-            evidence: d.facts.into_iter().flat_map(|c| c.evidence).collect(),
-        })
-        .collect();
+    let budget =
+        crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
+    let policy = crate::storage::policy::document_policy(&budget);
+    let documents = crate::retrieval::source::documents(&analysis, &budget).unwrap();
     let vectors = vec![vec![1.0; DIMENSION]; documents.len()];
     save(
         &mut db,
@@ -34,11 +22,11 @@ fn documents_roundtrip_rollback_and_cleanup() {
         Batch {
             documents: &documents,
             vectors: &vectors,
-            policy: "test",
+            policy: &policy,
         },
     )
     .unwrap();
-    assert_eq!(load(&db, "a.rs", "test").unwrap(), documents);
+    assert_eq!(load(&db, "a.rs", &policy).unwrap(), documents);
     let mut invalid = documents.clone();
     invalid[0].evidence[0].span.end = 999;
     assert!(
@@ -48,23 +36,23 @@ fn documents_roundtrip_rollback_and_cleanup() {
             Batch {
                 documents: &invalid,
                 vectors: &vectors,
-                policy: "test"
+                policy: &policy
             }
         )
         .is_err()
     );
-    assert_eq!(load(&db, "a.rs", "test").unwrap(), documents);
+    assert_eq!(load(&db, "a.rs", &policy).unwrap(), documents);
     save(
         &mut db,
         &analysis,
         Batch {
             documents: &[],
             vectors: &[],
-            policy: "test",
+            policy: &policy,
         },
     )
     .unwrap();
-    assert!(load(&db, "a.rs", "test").unwrap().is_empty());
+    assert!(load(&db, "a.rs", &policy).unwrap().is_empty());
     assert_eq!(
         db.query_row("SELECT count(*) FROM document_embeddings", [], |r| r
             .get::<_, i64>(0))
@@ -77,7 +65,7 @@ fn documents_roundtrip_rollback_and_cleanup() {
         Batch {
             documents: &documents,
             vectors: &vectors,
-            policy: "test",
+            policy: &policy,
         },
     )
     .unwrap();
@@ -99,18 +87,13 @@ fn search_collapses_many_parts_and_retains_indexed_evidence() {
     let budget =
         crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
     let policy = crate::storage::policy::document_policy(&budget);
-    crate::storage::policy::configure(&mut db, crate::storage::policy::Mode::Facts, Some(&policy))
-        .unwrap();
+    crate::storage::policy::configure(&mut db, &policy).unwrap();
     let analysis = crate::analysis::extract(crate::source::SourceFile {
         path: "deleted.rs".into(),
         text: "fn same() {}\nmod m { fn same() {} }".into(),
     })
     .unwrap();
-    let base = budget
-        .split(&crate::retrieval::render::render(
-            &crate::retrieval::project(&analysis).unwrap(),
-        ))
-        .unwrap();
+    let base = crate::retrieval::source::documents(&analysis, &budget).unwrap();
     let mut documents = Vec::new();
     for part in 0..80 {
         let mut d = base[0].clone();
@@ -142,16 +125,10 @@ fn search_collapses_many_parts_and_retains_indexed_evidence() {
     let hits = crate::storage::nearest(&db, &query, 3).unwrap();
     assert_eq!(hits.len(), 3);
     assert_eq!(hits[0].similarity, 1.0);
-    let owners: std::collections::HashSet<_> = hits
-        .iter()
-        .map(|h| h.indexed.as_ref().unwrap().owner)
-        .collect();
+    let owners: std::collections::HashSet<_> = hits.iter().map(|h| h.indexed.owner).collect();
     assert_eq!(owners.len(), 3);
     assert_eq!(hits[0].line_end, 1);
-    assert!(
-        hits.iter()
-            .all(|h| !h.indexed.as_ref().unwrap().spans.is_empty())
-    );
+    assert!(hits.iter().all(|h| !h.indexed.spans.is_empty()));
     db.execute(
         "UPDATE retrieval_documents SET policy='broken' WHERE ordinal=0",
         [],
@@ -161,7 +138,7 @@ fn search_collapses_many_parts_and_retains_indexed_evidence() {
 }
 
 #[test]
-fn policy_rejects_missing_vectors_and_mixed_raw_rust() {
+fn policy_rejects_missing_vectors_and_processing() {
     let dir = tempfile::tempdir().unwrap();
     let mut db = crate::storage::open(&dir.path().join("index.db"))
         .unwrap()
@@ -169,18 +146,13 @@ fn policy_rejects_missing_vectors_and_mixed_raw_rust() {
     let budget =
         crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
     let policy = crate::storage::policy::document_policy(&budget);
-    crate::storage::policy::configure(&mut db, crate::storage::policy::Mode::Facts, Some(&policy))
-        .unwrap();
+    crate::storage::policy::configure(&mut db, &policy).unwrap();
     let analysis = crate::analysis::extract(crate::source::SourceFile {
         path: "a.rs".into(),
         text: "fn a() {}".into(),
     })
     .unwrap();
-    let docs = budget
-        .split(&crate::retrieval::render::render(
-            &crate::retrieval::project(&analysis).unwrap(),
-        ))
-        .unwrap();
+    let docs = crate::retrieval::source::documents(&analysis, &budget).unwrap();
     save(
         &mut db,
         &analysis,
@@ -193,15 +165,6 @@ fn policy_rejects_missing_vectors_and_mixed_raw_rust() {
     .unwrap();
     db.execute("DELETE FROM document_embeddings", []).unwrap();
     assert!(crate::storage::policy::read(&db).is_err());
-    let chunks = crate::chunk::of(&analysis.source);
-    crate::storage::save_file(
-        &mut db,
-        &analysis.source,
-        &chunks,
-        &[],
-        &[],
-        Some(&analysis),
-    )
-    .unwrap();
+    db.execute("DELETE FROM retrieval_processing", []).unwrap();
     assert!(crate::storage::policy::read(&db).is_err());
 }

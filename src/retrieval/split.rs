@@ -1,8 +1,6 @@
-use super::render::{Clause, Description, Evidence};
+use super::Evidence;
 use anyhow::{Context, Result, ensure};
 use tokenizers::Tokenizer;
-
-pub const TOKEN_POLICY: &str = "fact-boundaries-1";
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Document {
@@ -47,7 +45,7 @@ impl TokenBudget {
             .len())
     }
 
-    fn prefix_end(&self, prefix: &str, text: &str, limit: usize) -> Result<usize> {
+    pub(super) fn prefix_end(&self, prefix: &str, text: &str, limit: usize) -> Result<usize> {
         let encoding = self
             .tokenizer
             .encode(text, false)
@@ -75,74 +73,5 @@ impl TokenBudget {
         }
         ensure!(best > 0, "one token cannot fit with entity context");
         Ok(best)
-    }
-
-    pub fn split(&self, descriptions: &[Description]) -> Result<Vec<Document>> {
-        let mut output = Vec::new();
-        for description in descriptions {
-            let mut clauses: Vec<&Clause> = description.facts.iter().collect();
-            let identity = if self.count(&description.identity.text)? <= self.limit / 2 {
-                description.identity.text.clone()
-            } else {
-                clauses.insert(0, &description.identity);
-                let end = self.prefix_end("", &description.identity.text, self.limit / 4)?;
-                format!("{} …", &description.identity.text[..end])
-            };
-            let mut part = 0;
-            let mut text = identity.clone();
-            let mut evidence = description.identity.evidence.clone();
-            for clause in clauses {
-                let mut remaining = clause.text.as_str();
-                while !remaining.is_empty() {
-                    let combined = format!("{text}\n{remaining}");
-                    if self.count(&combined)? <= self.limit {
-                        text = combined;
-                        evidence.extend(clause.evidence.clone());
-                        break;
-                    }
-                    if text != identity {
-                        output.push(Document {
-                            owner: description.owner,
-                            part,
-                            text,
-                            evidence,
-                        });
-                        part += 1;
-                        text = identity.clone();
-                        evidence = description.identity.evidence.clone();
-                        continue;
-                    }
-                    let prefix = format!("{identity}\n");
-                    let end = self.prefix_end(&prefix, remaining, self.limit)?;
-                    text = format!("{prefix}{}", &remaining[..end]);
-                    evidence.extend(clause.evidence.clone());
-                    remaining = &remaining[end..];
-                    output.push(Document {
-                        owner: description.owner,
-                        part,
-                        text,
-                        evidence,
-                    });
-                    part += 1;
-                    text = identity.clone();
-                    evidence = description.identity.evidence.clone();
-                }
-            }
-            if text != identity || part == 0 {
-                output.push(Document {
-                    owner: description.owner,
-                    part,
-                    text,
-                    evidence,
-                });
-            }
-        }
-        for document in &output {
-            ensure!(
-                self.count(&document.text)? <= self.limit,
-                "document exceeds tokenizer limit"
-            );
-        }
-        Ok(output)
     }
 }

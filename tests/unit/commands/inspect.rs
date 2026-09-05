@@ -23,6 +23,8 @@ fn stored_inspection_matches_direct_and_never_reads_changed_or_deleted_source() 
     drop(db);
     let before = fs::read(&database).unwrap();
     let direct = report_at(root, Path::new("./a.rs"), false).unwrap();
+    assert!(direct.contains("relation:"));
+    let preview = serde_json::to_value(crate::retrieval::source::chunks(&a).unwrap()).unwrap();
     for file in [PathBuf::from("a.rs"), root.join("a.rs")] {
         assert_eq!(report_at(root, &file, true).unwrap(), direct);
     }
@@ -37,6 +39,11 @@ fn stored_inspection_matches_direct_and_never_reads_changed_or_deleted_source() 
             .contains("no stored")
     );
     assert!(report_at(root, Path::new("../a.rs"), true).is_err());
+    let stored = load_at(root, Path::new("a.rs"), true).unwrap();
+    assert_eq!(
+        serde_json::to_value(crate::retrieval::source::chunks(&stored).unwrap()).unwrap(),
+        preview
+    );
     assert_eq!(fs::read(database).unwrap(), before);
 }
 

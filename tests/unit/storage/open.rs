@@ -58,10 +58,13 @@ fn a_new_database_reaches_the_current_schema() {
 
     for table in [
         "files",
-        "chunks",
-        "windows",
+        "source_snapshots",
+        "entities",
+        "analysis_records",
+        "retrieval_documents",
+        "retrieval_processing",
         "index_metadata",
-        "window_embeddings",
+        "document_embeddings",
     ] {
         assert_schema_table(&connection, table);
     }
@@ -70,7 +73,7 @@ fn a_new_database_reaches_the_current_schema() {
         .query_row(
             "SELECT sql
              FROM sqlite_schema
-             WHERE name = 'window_embeddings'",
+             WHERE name = 'document_embeddings'",
             [],
             |row| row.get(0),
         )
@@ -234,7 +237,7 @@ fn unknown_or_damaged_databases_are_unchanged() {
                         .unwrap(),
                     "missing_table" => connection
                         .execute_batch(&format!(
-                            "{SCHEMA} PRAGMA user_version = 2; DROP TABLE chunks;"
+                            "{SCHEMA} PRAGMA user_version = 2; DROP TABLE retrieval_documents;"
                         ))
                         .unwrap(),
                     "wrong_vec" => connection
@@ -283,40 +286,33 @@ fn rebuild_refuses_to_leave_a_sqlite_journal_behind() {
 }
 
 #[test]
-fn only_vec0_stores_vectors_and_windows_have_only_chunk_locations() {
+fn only_document_vectors_are_stored() {
     let dir = TempDir::new().unwrap();
     let connection = open(&dir.path().join("index.db")).unwrap().connection;
-    let columns = |table: &str| -> Vec<String> {
-        connection
-            .prepare(&format!("PRAGMA table_info({table})"))
-            .unwrap()
-            .query_map([], |row| row.get(1))
-            .unwrap()
-            .collect::<rusqlite::Result<_>>()
-            .unwrap()
-    };
-    assert_eq!(columns("files"), ["id", "path"]);
-    assert_eq!(
-        columns("chunks"),
-        [
-            "id",
-            "file_id",
-            "ordinal",
-            "text",
-            "byte_start",
-            "byte_end",
-            "line_start",
-            "line_end"
-        ]
-    );
-    assert_eq!(columns("windows"), ["id", "chunk_id", "ordinal", "text"]);
-    assert_eq!(columns("index_metadata"), ["key", "value"]);
-    assert!(columns("window_embeddings").contains(&"embedding".into()));
+    for obsolete in ["chunks", "windows", "window_embeddings", "file_processing"] {
+        let found: bool = connection
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?1)",
+                [obsolete],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(!found, "{obsolete}");
+    }
+    assert_schema_table(&connection, "document_embeddings");
 }
 
 #[test]
 fn pre_revision_schemas_rebuild_only_on_writable_open() {
-    for (schema, version) in [(SCHEMA_V5, 5), (SCHEMA_V6, 6)] {
+    for (schema, version) in [
+        (SCHEMA_V1, 1),
+        (SCHEMA_V2, 2),
+        (SCHEMA_V3, 3),
+        (SCHEMA_V4, 4),
+        (SCHEMA_V5, 5),
+        (SCHEMA_V6, 6),
+        (SCHEMA_V7, 7),
+    ] {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("index.db");
         register_vec().unwrap();

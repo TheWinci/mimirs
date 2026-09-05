@@ -47,9 +47,21 @@ fn save(connection: &mut Connection, path: &str, text: &str, vectors: &[Vec<f32>
         path: path.to_owned(),
         text: text.to_owned(),
     };
-    let chunks = crate::chunk::of(&source);
-    let windows = crate::window::of(&chunks[0]);
-    storage::save_file(connection, &source, &chunks, &windows, vectors, None).unwrap();
+    let analysis = crate::analysis::extract(source).unwrap();
+    let budget =
+        crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
+    let docs = crate::retrieval::source::documents(&analysis, &budget).unwrap();
+    let policy = storage::policy::document_policy(&budget);
+    storage::documents::save(
+        connection,
+        &analysis,
+        storage::documents::Batch {
+            documents: &docs,
+            vectors,
+            policy: &policy,
+        },
+    )
+    .unwrap();
 }
 
 fn execute(
@@ -83,7 +95,7 @@ fn search_golden_preserves_stored_text_and_ignores_source_and_config_changes() {
     save(
         &mut connection,
         "z.rs",
-        "  café();  \n\nother",
+        "fn café() {}\nfn other() {}",
         &[vector(1.0, 0.0), vector(-1.0, 0.0)],
     );
     save(&mut connection, "a.rs", "same score", &[vector(1.0, 0.0)]);
@@ -171,7 +183,7 @@ fn bad_databases_fail_before_embedding_and_remain_unchanged() {
             "newer" => connection.pragma_update(None, "user_version", 99).unwrap(),
             "unknown" => connection.pragma_update(None, "user_version", 0).unwrap(),
             "schema" => connection.execute_batch("DROP TABLE index_metadata").unwrap(),
-            "foreign_key" => connection.execute_batch("PRAGMA foreign_keys = OFF; INSERT INTO chunks VALUES (1, 99, 0, '', 0, 0, 1, 1)").unwrap(),
+            "foreign_key" => connection.execute_batch("PRAGMA foreign_keys = OFF; INSERT INTO source_snapshots VALUES (99, 'old', '')").unwrap(),
             _ => {},
         }
         drop(connection);
@@ -269,54 +281,60 @@ fn embedding_failures_leave_stdout_empty_and_preserve_the_index() {
 }
 
 /// Uses the per-user model cache and downloads MiniLM if needed. Run with:
-/// `cargo test real_minilm_search_retrieves_rust_window -- --ignored --nocapture`
+/// `cargo test real_minilm_search_retrieves_indexed_source -- --ignored --nocapture`
 #[test]
 #[ignore = "loads or downloads the MiniLM model"]
-fn real_minilm_search_retrieves_rust_window() {
+fn real_minilm_search_retrieves_indexed_source() {
     let (dir, mut connection) = project();
     let source = SourceFile {
         path: "src/lib.rs".to_owned(),
         text: "// Read the configuration file from disk.\nfn read_config(path: &str) -> std::io::Result<String> { std::fs::read_to_string(path) }\n// Sort numbers in ascending order.\nfn sort_numbers(values: &mut [i32]) { values.sort(); }".to_owned(),
     };
-    let chunks = crate::chunk::of(&source);
-    let windows = crate::window::of(&chunks[0]);
-    let texts = windows
-        .iter()
-        .map(|window| window.text.clone())
-        .collect::<Vec<_>>();
+    let analysis = crate::analysis::extract(source).unwrap();
     let mut embedder = embedding::production().unwrap();
+    let budget = embedder.token_budget().unwrap();
+    let policy = storage::policy::document_policy(&budget);
+    let docs = crate::retrieval::source::documents(&analysis, &budget).unwrap();
+    let texts: Vec<_> = docs.iter().map(|d| d.text.clone()).collect();
     let vectors = embedder.embed_documents(&texts, |_, _| Ok(())).unwrap();
-    storage::save_file(&mut connection, &source, &chunks, &windows, &vectors, None).unwrap();
+    storage::documents::save(
+        &mut connection,
+        &analysis,
+        storage::documents::Batch {
+            documents: &docs,
+            vectors: &vectors,
+            policy: &policy,
+        },
+    )
+    .unwrap();
     drop(connection);
     let (result, output) = execute(dir.path(), "read configuration from a file", 1, || {
         Ok(embedder)
     });
     result.unwrap();
+    // Ordinary comments stay ownerless source chunks; this smoke test verifies
+    // file discovery and saved source, not a guaranteed entity rank.
     assert!(output.contains("location: src/lib.rs:1-4"), "{output}");
+    assert!(output.contains("source: indexed snapshot") && output.contains("evidence: Source"));
     assert!(
-        output.contains("text: // Read the configuration file from disk."),
+        output.contains("// Read the configuration file from disk."),
         "{output}"
     );
 }
 
 #[test]
-fn facts_search_forwards_distilled_query_and_reads_deleted_snapshot() {
+fn source_search_forwards_distilled_query_and_reads_deleted_snapshot() {
     let (dir, mut connection) = project();
     let budget =
         crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
     let policy = storage::policy::document_policy(&budget);
-    storage::policy::configure(&mut connection, storage::policy::Mode::Facts, Some(&policy))
-        .unwrap();
+    storage::policy::configure(&mut connection, &policy).unwrap();
     let analysis = crate::analysis::extract(SourceFile {
         path: "deleted.rs".into(),
         text: "/// Expire sessions.\nfn expire_sessions() {}".into(),
     })
     .unwrap();
-    let docs = budget
-        .split(&crate::retrieval::render::render(
-            &crate::retrieval::project(&analysis).unwrap(),
-        ))
-        .unwrap();
+    let docs = crate::retrieval::source::documents(&analysis, &budget).unwrap();
     storage::documents::save(
         &mut connection,
         &analysis,
@@ -336,6 +354,6 @@ fn facts_search_forwards_distilled_query_and_reads_deleted_snapshot() {
     assert_eq!(*calls.borrow(), [vec![query.to_owned()]]);
     assert!(output.contains("location: deleted.rs:2"));
     assert!(output.contains("source: indexed snapshot"));
-    assert!(output.contains("Documentation: /// Expire sessions."));
-    assert!(output.contains("evidence: Fact"));
+    assert!(output.contains("/// Expire sessions."));
+    assert!(output.contains("evidence: Source"));
 }

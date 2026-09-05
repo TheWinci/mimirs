@@ -84,7 +84,29 @@ pub struct Analysis {
     pub scopes: Vec<Scope>,
 }
 
+pub fn is_rust(path: &str) -> bool {
+    std::path::Path::new(path)
+        .extension()
+        .is_some_and(|ext| ext == "rs")
+}
+
+/// Text snapshots have source coverage but no inferred syntax records.
 pub fn extract(source: SourceFile) -> Result<Analysis> {
+    if !is_rust(&source.path) {
+        let span = LineIndex::new(&source.text).span(0, source.text.len());
+        return Ok(Analysis {
+            source,
+            diagnostics: Vec::new(),
+            entities: Vec::new(),
+            facts: Vec::new(),
+            scopes: vec![Scope {
+                kind: "file".into(),
+                span,
+                parent: None,
+                owner: None,
+            }],
+        });
+    }
     let mut parser = Parser::new();
     parser
         .set_language(&tree_sitter_rust::LANGUAGE.into())
@@ -167,7 +189,9 @@ pub fn report(analysis: &Analysis) -> String {
         "file: {}\nsource: {} bytes\nparse: {}\n",
         analysis.source.path,
         analysis.source.text.len(),
-        if analysis.diagnostics.is_empty() {
+        if !is_rust(&analysis.source.path) {
+            "not parsed (text fallback)"
+        } else if analysis.diagnostics.is_empty() {
             "complete"
         } else {
             "incomplete"

@@ -31,7 +31,8 @@ Everything runs on your machine. No API keys, no code leaves the repo.
 
 ## Status
 
-`2.0.0-alpha.0` is an early Rust rewrite and is not usable yet.
+`2.0.0-alpha.0` is an early Rust rewrite with a working indexing and search CLI.
+MCP serving is not implemented yet.
 
 The stable release is the TypeScript implementation on npm:
 
@@ -44,60 +45,76 @@ npm install -g mimirs
 Apache-2.0
 ## Rust indexing and retrieval
 
-Build the Rust CLI with `cargo build`. In a project, run `mimirs init`, then
-`mimirs index`. The default config includes Rust files. Indexing runs the local
-MiniLM embedding model; its first use can download model files. Both policies
-load Qdrant/all-MiniLM-L6-v2-onnx at immutable revision
-`5f1b8cd78bc4fb444dd171e59b18f3a3af89a079`.
-
-The caller prepares the search query. Distill the request into a short description
-of the relevant behavior or symptom. Preserve identifiers and constraints supplied
-in the request. Remove unrelated conversation and avoid guessed internal names.
-Mimirs embeds the supplied query directly, without an internal LLM rewrite.
-
 ```sh
+cargo build
+mimirs init
+mimirs index
 mimirs search 'valid_username check for trailing newline' --limit 5
 ```
 
-Raw nonblank source lines remain the default embedding input. To try descriptions
-of extracted Rust facts and written relations, set this in `.mimirs/config.toml`
-and run `mimirs index`:
+Run these commands from the project root. Fresh config includes Rust files;
+customize `include` and `exclude` in `.mimirs/config.toml` for other text files.
+`init` preserves an existing config. The first model use can download files;
+indexing and search then use the local cache.
 
-```toml
-retrieval = "facts"
-```
+Tree-sitter identifies Rust items for embedding. Small functions and methods
+stay whole, including attached docs and attributes, with a short file and
+containing type/module prefix. Modules, impls, and traits contribute their own
+source around child items without duplicating the child bodies. Imports,
+comments, macro bodies, and incomplete source remain searchable. Embedding
+inputs preserve source spellings, operators, and literals. Ordinary comments
+outside items stay separate and can rank ahead of the code they describe; Rust
+doc comments attach to their item.
 
-Set `retrieval = "raw"` and reindex to return to raw inputs. Search follows the
-stored index policy, even if config changes before indexing. Policy changes clear
-old output before replacement. A failed replacement cannot expose the file's old
-facts or vectors. Recognized older alpha database schemas rebuild on writable
-open; read-only inspection and search require a current schema.
+Large items split on source lines, repeating their signature. A single oversized
+line splits at tokenizer and UTF-8 boundaries. Every complete input, including
+context and special tokens, fits the backend's 512-token limit. File context
+and repeated signatures each use at most a quarter of that budget. These are
+initial splitting limits, not measured optima.
 
-Facts descriptions include entity identity, written signatures, attached docs,
-comments owned by that entity, and syntax occurrences. They split at clause
-boundaries to fit the backend tokenizer limit, retaining source evidence for each
-part. Calls and references remain unresolved. There is no type inference, macro
-expansion, cross-file call graph, or generated behavior summary. Rust files without
-extracted evidence produce no facts documents. Custom non-Rust includes keep raw
-line embeddings.
+Included files without a supported parser use paragraph chunks and the same
+token-limited splitting. They receive no inferred syntax facts. A physical line
+is a split boundary for overflow, not an embedding unit.
 
-Facts search returns one result per entity, using its best matching document
-score. It includes the matching description, indexed snapshot hash, entity lines,
-and evidence byte ranges. It can expand candidate retrieval to 4096 documents per
-vector table; exceptionally many duplicate parts can yield fewer results than
-requested. Entity ordinals identify only that saved snapshot.
+Rust indexing also stores entities, facts, scopes, diagnostics, and the source
+snapshot. That structured analysis stays separate from embedding text. Syntax
+relations describe ownership, containment, and written occurrences; calls and
+references remain unresolved. Search does not traverse a dependency graph or
+rank by those relations. There is no type inference or macro expansion.
 
 ```sh
-mimirs inspect src/example.rs --documents
+mimirs inspect src/example.rs
+mimirs inspect src/example.rs --source-chunks
 mimirs inspect src/example.rs --stored
-mimirs inspect src/example.rs --stored --documents
+mimirs inspect src/example.rs --stored --source-chunks
 ```
 
-The first command previews descriptions without a model. The stored forms read
-saved source and facts, so they work after the current source changes or disappears.
-Stored descriptions are rendered from the indexed analysis; token-split matching
-inputs appear in search results. Exact source remains in the index as evidence.
+Inspection needs no model. The plain form reports analysis and syntax relations;
+`--source-chunks` previews source chunks before token splitting. Stored forms
+use the indexed snapshot even after the working file changes or disappears.
+Included unsupported text can also be inspected and is identified as text fallback.
 
-Facts currently remain an explicit option because the initial Rust comparison
-showed retrieval regressions. See [the reproducible comparison](benchmarks/retrieval/README.md)
-for requests, results, costs, and limitations.
+Search returns each entity's best matching document, with the exact embedded
+text, indexed snapshot hash, entity location, and source evidence ranges.
+Ownerless source blocks group into one result per file. Candidate retrieval can
+expand to 4,096 documents; many parts belonging to the same entity can yield
+fewer results than requested. Entity ordinals identify only the saved snapshot.
+A failed replacement cannot return that file's old source or vectors.
+
+The caller prepares the query. Distill the request into a short description of
+the relevant behavior or symptom, preserving supplied identifiers and constraints.
+Mimirs embeds the query directly. Both documents and queries use MiniLM from
+Qdrant/all-MiniLM-L6-v2-onnx at revision
+`5f1b8cd78bc4fb444dd171e59b18f3a3af89a079`.
+
+### Updating an existing alpha index
+
+Source chunks are the single embedding strategy. Remove the obsolete `retrieval`
+key from `.mimirs/config.toml`, preserving your `include` and `exclude` rules,
+then run `mimirs index`. Recognized older alpha indexes rebuild when opened for
+writing. Search and stored inspection reject them with reindex guidance.
+The old `inspect --documents` facts-description preview has been removed.
+
+This simplifies the implementation without establishing a general retrieval
+quality improvement. The five development queries and source-fidelity audit are
+recorded in the [retrieval check](benchmarks/retrieval/README.md).

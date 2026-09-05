@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::Context;
 
-use crate::{chunk, config::Config, embedding, source, storage, window};
+use crate::{config::Config, embedding, source, storage};
 
 mod progress;
 mod walk;
@@ -96,17 +96,9 @@ fn index_with(
     storage::validate_model(&database.connection)?;
     embedder.prepare()?;
 
-    let budget = if config.retrieval == storage::policy::Mode::Facts {
-        Some(embedder.token_budget()?)
-    } else {
-        None
-    };
-    let document_policy = budget.as_ref().map(storage::policy::document_policy);
-    storage::policy::configure(
-        &mut database.connection,
-        config.retrieval,
-        document_policy.as_deref(),
-    )?;
+    let budget = embedder.token_budget()?;
+    let document_policy = storage::policy::document_policy(&budget);
+    storage::policy::configure(&mut database.connection, &document_policy)?;
 
     let mut summary = Summary {
         walk_errors: walk.errors.len(),
@@ -125,56 +117,23 @@ fn index_with(
                 continue;
             }
         };
-        let hash = storage::processing::source_hash(&source.text);
-        let rust = Path::new(path).extension().is_some_and(|ext| ext == "rs");
-        if storage::processing::reusable(&database.connection, &source, &hash, rust)?
-            && (!rust
-                || document_policy.as_ref().is_none_or(|policy| {
-                    storage::documents::load(&database.connection, path, policy).is_ok()
-                }))
-        {
+        if storage::processing::reusable(&database.connection, &source, &document_policy)? {
             successful.push(path.as_str());
             summary.unchanged += 1;
             progress.indexing(path, (0, 0), (attempt + 1, total), true)?;
             continue;
         }
         storage::invalidate(&mut database.connection, path)?;
-        let analysis = if rust {
-            Some(
-                extract(source::SourceFile {
-                    path: source.path.clone(),
-                    text: source.text.clone(),
-                })
-                .with_context(|| format!("cannot analyze source file {path}"))?,
-            )
-        } else {
-            None
-        };
-        if let Some(analysis) = &analysis {
-            for diagnostic in &analysis.diagnostics {
-                progress.diagnostic(&format!(
-                    "syntax: {path}:{}:{} {}",
-                    diagnostic.span.line_start, diagnostic.column, diagnostic.kind
-                ))?;
-            }
+        let analysis =
+            extract(source).with_context(|| format!("cannot analyze source file {path}"))?;
+        for diagnostic in &analysis.diagnostics {
+            progress.diagnostic(&format!(
+                "syntax: {path}:{}:{} {}",
+                diagnostic.span.line_start, diagnostic.column, diagnostic.kind
+            ))?;
         }
-        let chunks = chunk::of(&source);
-        let windows = chunks.iter().flat_map(window::of).collect::<Vec<_>>();
-        let documents = if let (Some(analysis), Some(budget)) = (&analysis, &budget) {
-            Some(budget.split(&crate::retrieval::render::render(
-                &crate::retrieval::project(analysis)?,
-            ))?)
-        } else {
-            None
-        };
-        let texts = if let Some(documents) = &documents {
-            documents.iter().map(|d| d.text.clone()).collect::<Vec<_>>()
-        } else {
-            windows
-                .iter()
-                .map(|window| window.text.clone())
-                .collect::<Vec<_>>()
-        };
+        let documents = crate::retrieval::source::documents(&analysis, &budget)?;
+        let texts: Vec<_> = documents.iter().map(|d| d.text.clone()).collect();
         if progress.is_terminal() {
             progress.indexing(path, (0, texts.len()), (attempt, total), false)?;
         }
@@ -186,29 +145,16 @@ fn index_with(
                 Ok(())
             })
             .with_context(|| format!("cannot embed source file {path}"))?;
-        if let (Some(analysis), Some(documents), Some(policy)) =
-            (&analysis, &documents, &document_policy)
-        {
-            storage::documents::save(
-                &mut database.connection,
-                analysis,
-                storage::documents::Batch {
-                    documents,
-                    vectors: &vectors,
-                    policy,
-                },
-            )?;
-            progress.diagnostic(&format!("documents: {path}: {}", documents.len()))?;
-        } else {
-            storage::save_file(
-                &mut database.connection,
-                &source,
-                &chunks,
-                &windows,
-                &vectors,
-                analysis.as_ref(),
-            )?;
-        }
+        storage::documents::save(
+            &mut database.connection,
+            &analysis,
+            storage::documents::Batch {
+                documents: &documents,
+                vectors: &vectors,
+                policy: &document_policy,
+            },
+        )?;
+        progress.diagnostic(&format!("documents: {path}: {}", documents.len()))?;
         successful.push(path.as_str());
         summary.indexed += 1;
         progress.indexing(path, (texts.len(), texts.len()), (attempt + 1, total), true)?;

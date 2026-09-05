@@ -5,13 +5,13 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 
-pub fn run(file: &Path, stored: bool, documents: bool) -> anyhow::Result<()> {
+pub fn run(file: &Path, stored: bool, source_chunks: bool) -> anyhow::Result<()> {
     let root = std::env::current_dir().context("cannot find current directory")?;
     io::stdout().lock().write_all(
-        if documents {
-            serde_json::to_string_pretty(&crate::retrieval::render::render(
-                &crate::retrieval::project(&load_at(&root, file, stored)?)?,
-            ))?
+        if source_chunks {
+            serde_json::to_string_pretty(&crate::retrieval::source::chunks(&load_at(
+                &root, file, stored,
+            )?)?)?
         } else {
             report_at(&root, file, stored)?
         }
@@ -21,15 +21,23 @@ pub fn run(file: &Path, stored: bool, documents: bool) -> anyhow::Result<()> {
 }
 
 fn report_at(root: &Path, file: &Path, stored: bool) -> anyhow::Result<String> {
-    Ok(analysis::report(&load_at(root, file, stored)?))
+    let analysis = load_at(root, file, stored)?;
+    let projection = crate::retrieval::project(&analysis)?;
+    let mut report = analysis::report(projection.analysis);
+    for relation in &projection.relations {
+        report.push_str(&format!(
+            "relation: {:?} {:?} {:?} bytes {}..{}\n",
+            relation.from,
+            relation.kind,
+            relation.target,
+            relation.evidence.start,
+            relation.evidence.end
+        ));
+    }
+    Ok(report)
 }
 
 fn load_at(root: &Path, file: &Path, stored: bool) -> anyhow::Result<analysis::Analysis> {
-    ensure!(
-        file.extension().is_some_and(|ext| ext == "rs"),
-        "unsupported Rust source file {}",
-        file.display()
-    );
     let full = normalize(&root.join(file));
     let relative = full.strip_prefix(root);
     ensure!(
@@ -46,7 +54,7 @@ fn load_at(root: &Path, file: &Path, stored: bool) -> anyhow::Result<analysis::A
         let transaction = connection.unchecked_transaction()?;
         storage::analysis::load(&transaction, path)
             .with_context(|| format!("cannot inspect stored source {path}"))?
-            .with_context(|| format!("no stored Rust analysis for {path}; run mimirs index"))?
+            .with_context(|| format!("no stored source analysis for {path}; run mimirs index"))?
     } else {
         analysis::extract(source::read(root, path)?)
             .with_context(|| format!("cannot analyze {}", file.display()))?

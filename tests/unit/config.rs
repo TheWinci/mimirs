@@ -41,3 +41,24 @@ fn from_toml_accepts_the_default() {
 
     assert_eq!(config.include, ["**/*.rs"]);
 }
+
+#[test]
+fn obsolete_retrieval_keys_have_actionable_guidance() {
+    for value in ["\"raw\"", "\"facts\"", "\"source\"", "false"] {
+        let text =
+            format!("include = [\"src/**\"]\nexclude = [\"private/**\"]\nretrieval = {value}\n");
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join(".mimirs")).unwrap();
+        let path = dir.path().join(".mimirs/config.toml");
+        std::fs::write(&path, &text).unwrap();
+        let error = format!("{:#}", Config::load(dir.path()).unwrap_err());
+        assert!(
+            error.contains("`retrieval` is obsolete")
+                && error.contains("remove this key")
+                && error.contains("mimirs index"),
+            "{error}"
+        );
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), text);
+    }
+    assert!(!Config::default().to_toml().unwrap().contains("retrieval"));
+}

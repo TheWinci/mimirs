@@ -2,10 +2,10 @@
 use crate::analysis::{Analysis, Span};
 use anyhow::Result;
 
-pub const PROJECTION_VERSION: &str = "syntax-relations-1";
-
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Record {
+    /// A byte range in the saved source, including text outside extracted items.
+    Source,
     File,
     Entity(usize),
     Fact(usize),
@@ -141,6 +141,12 @@ pub fn project(analysis: &Analysis) -> Result<Projection<'_>> {
 #[path = "../tests/unit/retrieval.rs"]
 mod tests;
 
-pub mod render;
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Evidence {
+    pub record: Record,
+    pub span: Span,
+}
 
 pub mod split;
+
+pub mod source;

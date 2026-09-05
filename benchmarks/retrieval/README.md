@@ -1,70 +1,50 @@
-# Rust retrieval comparison
+# Source-chunk retrieval check
 
-The September 5, 2026 comparison keeps raw retrieval as the default. Facts
-produce precise entity locations and source evidence, but these five requests
-show two regressions and one improvement in expected-file rank.
+The CLI embeds tree-sitter source chunks for Rust and paragraph chunks for
+included unsupported text. Facts remain structured analysis. The raw-line and
+facts-description embedding modes have been removed to reduce scope.
 
-| Request | Raw file rank | Initial facts rank | Current facts rank |
-| --- | ---: | ---: | ---: |
-| Stop batches when progress fails | 1 | 1 | 1 |
-| Reuse complete unchanged output | 5 | 6 | 8 |
-| Reject unknown database schemas | 1 | 1 | 1 |
-| Record written method-call receivers | 2 | 14 | 4 |
-| Remove deleted-file vectors | 2 | 1 | 1 |
-
-Ranks count unique files among up to 64 returned hits. Either listed target file
-counts for deletion, whose work spans storage and reconciliation. This compares
-file discovery only; raw results have whole-file locations, while facts results
-have entity locations. Five self-authored requests in one Rust repository do not
-establish general retrieval quality. Queries were written from the requests and
-kept unchanged before adding target labels. The author knew this repository;
-this was not a blinded user study or a held-out benchmark.
-
-Both runs used the same 26 Rust source files from commit `425fbbe`, excluding
-unit tests, and the cached Qdrant MiniLM model revision recorded in `results.json`.
-The model/tokenizer files were hashed before and after the comparison. Initial
-indexing took 11.13 seconds for raw and 26.03 seconds for facts on this machine.
-These are single runs with a cached model, not controlled throughput measurements.
-
-`examples.txt` retains exact leading results for three requests, including the
-poor method-call match. The facts result for that request is a progress reporter's
-`diagnostic` method. Repeated generic words such as "method", "written", and
-"unresolved" may contribute, but this run does not isolate their effect. Extraction
-also omits match-arm literal values from descriptions, losing useful evidence
-about grammar names such as `field_expression`. Query 2 retrieves embedding code
-before the processing checks. Precise provenance does not guarantee relevance.
-
-Reproduce with the checkout's built binary and the model snapshot actually used
-by its production cache:
+The fixed corpus is 26 Rust source files from `425fbbe`. The same five prepared
+queries, expected files, and pinned MiniLM model are retained. This is a regression
+check on development requests, not a held-out evaluation or a general quality claim.
 
 ```sh
 cargo build
 python3 benchmarks/retrieval/compare.py \
   --binary target/debug/mimirs \
   --model-snapshot /path/to/models--Qdrant--all-MiniLM-L6-v2-onnx/snapshots/5f1b8cd78bc4fb444dd171e59b18f3a3af89a079 \
-  --output /tmp/mimirs-retrieval-comparison
+  --output /tmp/mimirs-source-check
 ```
 
-The script creates temporary projects and preserves full CLI outputs in the
-chosen output directory. `results.json` records this run's corpus, query, binary,
-and model hashes. Reproduction with changed rendering or extraction is a new
-experiment. Keep query preparation fixed when comparing document policies.
+The script creates temporary projects, indexes source chunks, and saves the full
+CLI outputs, `source-inputs.json`, and `report.json` in the output directory.
+It hashes the corpus, queries, binary, model files, and exact embedding inputs.
+An input audit verifies that every non-whitespace source byte occurs in exactly
+one primary source fragment, all byte and line ranges match, each document ends
+with its source fragment, and repeated signatures match the recorded evidence.
+The indexer checks complete input lengths with the production tokenizer.
 
-Next relevance work should test whether retaining selected literal evidence and
-reducing repetitive clauses helps these failures, then use fresh requests to
-check for regressions. Do not retune the existing queries or invent resolved
-relations to improve scores.
+Search results group documents by entity, with ownerless blocks grouped by file.
+Ranks count unique files among up to 64 returned hits. File rank does not establish
+that a result contains enough evidence to solve the task. Indexing times come
+from single cached-model runs and are not controlled performance measurements.
 
-A repeat after pinning the model revision and recording it in schema-7 metadata
-is in `pinned-results.json`. It preserves every expected-file rank above and the
-same model artifact hashes. The explicit parity test also checks every embedding
-coordinate within `1e-6` and exact tokenizer configuration equality against the
-previous loader. This verifies the loading change; it is not new relevance evidence.
+The [historical comparisons](HISTORY.md), their JSON reports, and exact leading
+[source examples](source-examples.txt) retain the earlier experiment. In that run,
+source used 246 vectors versus 2,585 raw lines; it improved two expected-file ranks,
+regressed one, and tied two. Keeping source as the only strategy is a scope choice.
 
-`closure-results.json` records the final renderer correction. Extracted closure
-scopes now prevent bodies inside wrapped arguments or chained callees from
-entering call descriptions. Written method names and nested call occurrences
-remain. This changes inputs in 17 corpus files and reduces documents from 343
-to 338. With unchanged queries, raw ranks remain 1, 5, 1, 2, 2; current facts
-ranks are 1, 8, 1, 4, 1. Raw therefore remains the default. The original results
-and examples above remain available to distinguish the measured representations.
+## Single-strategy verification
+
+[source-only-results.json](source-only-results.json) records the schema-8 run.
+It produced the same 246 inputs and exact input hash as the earlier source run,
+with unchanged expected-file ranks of `1, 7, 1, 1, 1`. The model files, corpus,
+and queries also have identical hashes. The audit checked all 26 files and 30
+repeated signatures, with complete non-whitespace coverage and exact source bytes
+and line ranges. Indexing took 12.06 seconds in this single cached-model run.
+
+This verifies that removing the alternate modes preserved the measured Rust
+source representation. It does not establish quality on new repositories or
+languages. Ordinary comments outside items remain ownerless chunks; a model can
+rank such a comment above the corresponding function. Explicit Rust doc comments
+stay attached to their item.

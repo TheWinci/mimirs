@@ -8,6 +8,14 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params};
 // Bump when parser, grammar, or extraction changes alter saved output.
 pub const ANALYSIS_VERSION: &str = "tree-sitter-0.27.0/rust-0.24.2/extractor-2";
 
+fn version(path: &str) -> &'static str {
+    if crate::analysis::is_rust(path) {
+        ANALYSIS_VERSION
+    } else {
+        "text-snapshot-1"
+    }
+}
+
 fn validate_span(source: &str, span: &Span, lines: &LineIndex) -> Result<()> {
     ensure!(
         source.get(span.start..span.end).is_some(),
@@ -57,7 +65,11 @@ pub fn write(transaction: &Transaction<'_>, file_id: i64, analysis: &Analysis) -
     transaction.execute("DELETE FROM source_snapshots WHERE file_id = ?1", [file_id])?;
     transaction.execute(
         "INSERT INTO source_snapshots VALUES (?1, ?2, ?3)",
-        params![file_id, ANALYSIS_VERSION, analysis.source.text],
+        params![
+            file_id,
+            version(&analysis.source.path),
+            analysis.source.text
+        ],
     )?;
     for (id, entity) in analysis.entities.iter().enumerate() {
         transaction.execute(
@@ -89,12 +101,12 @@ pub fn load_entities(
     path: &str,
 ) -> Result<Option<(SourceFile, Vec<Entity>)>> {
     let row = connection.query_row("SELECT s.file_id, s.analysis_version, s.source FROM source_snapshots s JOIN files f ON f.id = s.file_id WHERE f.path = ?1", [path], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))).optional()?;
-    let Some((file_id, version, text)) = row else {
+    let Some((file_id, stored_version, text)) = row else {
         return Ok(None);
     };
     ensure!(
-        version == ANALYSIS_VERSION,
-        "unsupported stored analysis version {version}"
+        stored_version == version(path),
+        "unsupported stored analysis version {stored_version}"
     );
     let mut statement = connection.prepare("SELECT ordinal, kind, name, byte_start, byte_end, line_start, line_end, parent FROM entities WHERE file_id = ?1 ORDER BY ordinal")?;
     let mut rows = statement.query([file_id])?;

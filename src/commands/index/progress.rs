@@ -40,13 +40,13 @@ impl<'a> Progress<'a> {
     pub(super) fn indexing(
         &mut self,
         file: &str,
-        windows: (usize, usize),
+        documents: (usize, usize),
         files: (usize, usize),
         finished: bool,
     ) -> io::Result<()> {
         self.render(&format!(
-            "indexing: {}\nphase: indexing\nfile: {}\nfile_progress: {}% ({}/{} windows)\nindex_progress: {}% ({}/{} files)\nelapsed_time: {:.2} seconds\n",
-            self.root, plain(file), percent(windows, finished), windows.0, windows.1,
+            "indexing: {}\nphase: indexing\nfile: {}\nfile_progress: {}% ({}/{} documents)\nindex_progress: {}% ({}/{} files)\nelapsed_time: {:.2} seconds\n",
+            self.root, plain(file), percent(documents, finished), documents.0, documents.1,
             percent(files, finished), files.0, files.1, (self.elapsed)().as_secs_f64(),
         ))
     }

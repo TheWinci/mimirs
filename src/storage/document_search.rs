@@ -45,11 +45,7 @@ pub fn nearest(
             let key = (path.clone(), document.owner);
             if let Some(&position) = positions.get(&key) {
                 let hit: &mut SearchResult = &mut results[position];
-                let evidence = &mut hit
-                    .indexed
-                    .as_mut()
-                    .context("missing indexed evidence")?
-                    .spans;
+                let evidence = &mut hit.indexed.spans;
                 for span in &document.evidence {
                     if !evidence.contains(span) {
                         evidence.push(span.clone());
@@ -73,21 +69,12 @@ pub fn nearest(
                 line_end: span.line_end as i64,
                 text: document.text.clone(),
                 similarity,
-                indexed: Some(IndexedEvidence {
+                indexed: IndexedEvidence {
                     owner: document.owner,
                     snapshot_hash: super::processing::source_hash(&analysis.source.text),
                     spans,
-                }),
+                },
             });
-        }
-        let raw = super::search::nearest_raw(connection, query, k)?;
-        let raw_count = raw.len();
-        let raw_frontier = raw.last().map(|hit| hit.similarity);
-        let mut files = std::collections::HashSet::new();
-        for hit in raw {
-            if files.insert(hit.path.clone()) {
-                results.push(hit);
-            }
         }
         results.sort_by(|a, b| {
             b.similarity
@@ -97,10 +84,9 @@ pub fn nearest(
         });
         let threshold = results.get(limit - 1).map(|hit| hit.similarity);
         let complete = threshold.is_some_and(|score| {
-            (document_count < k || document_frontier.is_none_or(|frontier| score >= frontier))
-                && (raw_count < k || raw_frontier.is_none_or(|frontier| score >= frontier))
+            document_count < k || document_frontier.is_none_or(|frontier| score >= frontier)
         });
-        if complete || k == CANDIDATE_LIMIT || (document_count < k && raw_count < k) {
+        if complete || k == CANDIDATE_LIMIT || document_count < k {
             results.truncate(limit);
             return Ok(results);
         }

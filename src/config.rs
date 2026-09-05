@@ -12,14 +12,11 @@ pub struct Config {
     /// Applied after `include`.
     #[serde(default)]
     pub exclude: Vec<String>,
-    #[serde(default)]
-    pub retrieval: crate::storage::policy::Mode,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
-            retrieval: crate::storage::policy::Mode::Raw,
             include: ["**/*.rs"].map(String::from).to_vec(),
             exclude: [
                 "**/.git/**",
@@ -66,7 +63,13 @@ impl Config {
     }
 
     fn from_toml(text: &str) -> anyhow::Result<Self> {
-        let config: Self = toml::from_str(text)?;
+        let value: toml::Value = toml::from_str(text)?;
+        if value.get("retrieval").is_some() {
+            bail!(
+                "`retrieval` is obsolete; remove this key from .mimirs/config.toml, keep include/exclude, and run `mimirs index` to rebuild using source chunks"
+            );
+        }
+        let config: Self = value.try_into()?;
 
         if config.include.is_empty() {
             bail!("`include` is empty, so no file matches");

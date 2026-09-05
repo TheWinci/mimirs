@@ -42,3 +42,30 @@ fn stored_cli_reports_missing_index_without_creating_state() {
     assert!(String::from_utf8_lossy(&output.stderr).contains("index is missing"));
     assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 0);
 }
+
+#[test]
+fn source_chunk_preview_preserves_code_without_a_model_or_project() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = "/// Reject newlines.\nfn valid(name: &str) -> bool { !name.ends_with('\\n') }";
+    fs::write(dir.path().join("file.rs"), source).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_mimirs"))
+        .args(["inspect", "file.rs", "--source-chunks"])
+        .current_dir(&dir)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let chunks: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(chunks[0]["text"], source);
+    assert_eq!(chunks[0]["context"], "file.rs");
+    assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1);
+    let conflict = Command::new(env!("CARGO_BIN_EXE_mimirs"))
+        .args(["inspect", "file.rs", "--source-chunks", "--documents"])
+        .current_dir(&dir)
+        .output()
+        .unwrap();
+    assert!(!conflict.status.success());
+}

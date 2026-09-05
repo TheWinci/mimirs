@@ -106,7 +106,7 @@ fn connection(dir: &TempDir) -> Connection {
 }
 
 fn files(dir: &TempDir) -> Vec<(String, String)> {
-    connection(dir).prepare("SELECT f.path, c.text FROM files f JOIN chunks c ON c.file_id = f.id ORDER BY f.path, c.ordinal")
+    connection(dir).prepare("SELECT f.path, s.source FROM files f JOIN source_snapshots s ON s.file_id=f.id ORDER BY f.path")
         .unwrap().query_map([], |row| Ok((row.get(0)?, row.get(1)?))).unwrap()
         .collect::<rusqlite::Result<_>>().unwrap()
 }
@@ -115,9 +115,9 @@ fn counts(dir: &TempDir) -> Vec<i64> {
     let db = connection(dir);
     [
         "files",
-        "chunks",
-        "windows",
-        "window_embeddings",
+        "source_snapshots",
+        "retrieval_documents",
+        "document_embeddings",
         "index_metadata",
     ]
     .iter()
@@ -143,46 +143,31 @@ fn redirected_output_and_stored_relationships_match_the_contract() {
     );
     assert_eq!(stderr, include_str!("../../goldens/index/redirected.txt"));
     assert_eq!(calls.borrow().preparations, 1);
-    assert_eq!(calls.borrow().batches, [vec!["first", "  second  "]]);
-    assert_eq!(counts(&dir), [2, 2, 2, 2, 3]);
+    assert_eq!(
+        calls.borrow().batches,
+        [vec!["a.rs\nfirst\n\n  second  \n"]]
+    );
+    assert_eq!(counts(&dir), [2, 2, 1, 1, 3]);
     let db = connection(&dir);
-    let rows: Vec<(String, i64, i64, String, Vec<u8>)> = db
-        .prepare(
-            "SELECT f.path, c.ordinal, w.ordinal, w.text, e.embedding
-         FROM files f JOIN chunks c ON c.file_id=f.id JOIN windows w ON w.chunk_id=c.id
-         JOIN window_embeddings e ON e.window_id=w.id ORDER BY f.path, c.ordinal, w.ordinal",
-        )
-        .unwrap()
-        .query_map([], |row| {
-            Ok((
-                row.get(0)?,
-                row.get(1)?,
-                row.get(2)?,
-                row.get(3)?,
-                row.get(4)?,
-            ))
-        })
-        .unwrap()
-        .collect::<rusqlite::Result<_>>()
-        .unwrap();
-    assert_eq!(rows.len(), 2);
-    for (ordinal, (path, chunk, window, text, vector)) in rows.iter().enumerate() {
-        assert_eq!(path, "a.rs");
-        assert_eq!(*chunk, 0);
-        assert_eq!(*window, ordinal as i64);
-        assert_eq!(vector.len(), DIMENSION * 4);
-        assert_eq!(
-            f32::from_ne_bytes(vector[..4].try_into().unwrap()),
-            text.len() as f32
-        );
-    }
+    let (text, vector): (String, Vec<u8>) = db.query_row(
+        "SELECT d.text, e.embedding FROM retrieval_documents d JOIN document_embeddings e ON e.document_id=d.id", [],
+        |r| Ok((r.get(0)?, r.get(1)?))).unwrap();
+    assert_eq!(vector.len(), DIMENSION * 4);
+    assert_eq!(
+        f32::from_ne_bytes(vector[..4].try_into().unwrap()),
+        text.len() as f32
+    );
+    let snapshot = storage::analysis::load(&db, "a.rs").unwrap().unwrap();
+    assert_eq!(snapshot.source.text, "first\n\n  second  \n");
     run(&dir, backend(), false).0.unwrap();
-    assert_eq!(counts(&dir), [2, 2, 2, 2, 3]);
+    assert_eq!(counts(&dir), [2, 2, 1, 1, 3]);
 }
 
 #[test]
 fn batches_update_only_terminal_progress() {
-    let text = "line\n".repeat(257);
+    let text = (0..257)
+        .map(|n| format!("fn f{n}() {{}}\n"))
+        .collect::<String>();
     for terminal in [false, true] {
         let dir = project(&[("a.rs", &text)]);
         let model = backend();
@@ -198,7 +183,7 @@ fn batches_update_only_terminal_progress() {
                 .collect::<Vec<_>>(),
             [256, 1]
         );
-        assert_eq!(stderr.contains("100% (256/257 windows)"), terminal);
+        assert_eq!(stderr.contains("100% (256/257 documents)"), terminal);
         assert_eq!(stderr.contains("\x1b["), terminal);
         assert!(stderr.contains("index_progress: 100% (1/1 files)"));
         if terminal {
@@ -236,7 +221,7 @@ fn read_skips_finish_and_empty_runs_clear_stored_files() {
 }
 
 #[test]
-fn fresh_empty_index_records_mode_without_model() {
+fn fresh_empty_index_records_policy_without_model() {
     let dir = project(&[]);
     run(&dir, backend(), false).0.unwrap();
     assert_eq!(counts(&dir), [0, 0, 0, 0, 1]);
@@ -300,7 +285,7 @@ fn embedding_failure_preserves_earlier_commits_and_omits_cleanup() {
     fs::write(dir.path().join("b.rs"), "fail").unwrap();
     fs::remove_file(dir.path().join("stale.rs")).unwrap();
     let mut model = backend();
-    model.fail_on = Some("fail".into());
+    model.fail_on = Some("b.rs\nfail".into());
     let (result, stdout, stderr) = run(&dir, model, true);
     assert!(format!("{:#}", result.unwrap_err()).contains("cannot embed source file b.rs"));
     assert!(stdout.is_empty());
@@ -322,7 +307,7 @@ fn progress_failure_keeps_prior_commits_and_stops_before_save_or_cleanup() {
 
     impl Write for ClosedProgress {
         fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-            let batch = b"256/257 windows";
+            let batch = b"256/257 documents";
             if bytes.windows(batch.len()).any(|part| part == batch) {
                 return Err(io::Error::new(
                     io::ErrorKind::BrokenPipe,
@@ -340,7 +325,13 @@ fn progress_failure_keeps_prior_commits_and_stops_before_save_or_cleanup() {
     let dir = project(&[("a.rs", "old a"), ("b.rs", "old b"), ("stale.rs", "stale")]);
     run(&dir, backend(), false).0.unwrap();
     fs::write(dir.path().join("a.rs"), "new a").unwrap();
-    fs::write(dir.path().join("b.rs"), "line\n".repeat(257)).unwrap();
+    fs::write(
+        dir.path().join("b.rs"),
+        (0..257)
+            .map(|n| format!("fn f{n}() {{}}\n"))
+            .collect::<String>(),
+    )
+    .unwrap();
     fs::remove_file(dir.path().join("stale.rs")).unwrap();
     let model = backend();
     let calls = Rc::clone(&model.calls);
@@ -412,7 +403,7 @@ fn corrupt_model_metadata_aborts_even_without_files() {
 
 #[test]
 fn save_and_cleanup_errors_fail_without_losing_prior_rows() {
-    for (table, operation) in [("chunks", "INSERT"), ("files", "DELETE")] {
+    for (table, operation) in [("retrieval_documents", "INSERT"), ("files", "DELETE")] {
         let dir = project(&[("a.rs", "old"), ("stale.rs", "stale")]);
         run(&dir, backend(), false).0.unwrap();
         fs::remove_file(dir.path().join("stale.rs")).unwrap();
@@ -532,8 +523,11 @@ fn extraction_shares_one_read_and_mixed_types_keep_embedding_inputs() {
         },
     )
     .unwrap();
-    assert_eq!((reads.get(), parses.get(), summary.indexed), (2, 1, 2));
-    assert_eq!(calls.borrow().batches, [vec!["fn f() {}"], vec!["plain"]]);
+    assert_eq!((reads.get(), parses.get(), summary.indexed), (2, 2, 2));
+    assert_eq!(
+        calls.borrow().batches,
+        [vec!["a.rs\nfn f() {}"], vec!["b.txt\nplain"]]
+    );
     let db = connection(&dir);
     assert_eq!(
         storage::analysis::load(&db, "a.rs")
@@ -543,7 +537,9 @@ fn extraction_shares_one_read_and_mixed_types_keep_embedding_inputs() {
             .text,
         "fn f() {}"
     );
-    assert!(storage::analysis::load(&db, "b.txt").unwrap().is_none());
+    let text = storage::analysis::load(&db, "b.txt").unwrap().unwrap();
+    assert!(text.entities.is_empty() && text.facts.is_empty());
+    assert!(crate::analysis::report(&text).contains("not parsed"));
 }
 
 #[test]
@@ -645,7 +641,7 @@ fn content_hash_detects_same_length_edit_with_same_timestamp() {
     let (result, stdout, _) = run(&dir, model, false);
     result.unwrap();
     assert!(stdout.starts_with("indexed: 1 files\nunchanged: 1 files\nskipped: 0 files\n"));
-    assert_eq!(calls.borrow().batches, [vec!["fn new() {}"]]);
+    assert_eq!(calls.borrow().batches, [vec!["a.rs\nfn new() {}"]]);
     assert_eq!(
         storage::analysis::load(&connection(&dir), "a.rs")
             .unwrap()
@@ -661,12 +657,12 @@ fn stale_versions_and_missing_output_force_reprocessing() {
     let dir = project(&[("a.rs", "fn f() {}")]);
     run(&dir, backend(), false).0.unwrap();
     for mutation in [
-        "UPDATE file_processing SET extraction_version='old'",
-        "UPDATE file_processing SET window_version='old'",
+        "UPDATE source_snapshots SET analysis_version='old'",
+        "UPDATE index_metadata SET value='old' WHERE key='document_policy'",
         "DELETE FROM analysis_records",
-        "DELETE FROM entities",
-        "DELETE FROM window_embeddings",
-        "DELETE FROM file_processing",
+        "UPDATE entities SET byte_end=999",
+        "DELETE FROM document_embeddings",
+        "DELETE FROM retrieval_processing",
     ] {
         connection(&dir).execute(mutation, []).unwrap();
         let model = backend();
@@ -682,133 +678,105 @@ fn stale_versions_and_missing_output_force_reprocessing() {
 }
 
 #[test]
-fn facts_index_embeds_descriptions_reuses_and_switches_policy() {
-    let dir = project(&[
-        (
-            "a.rs",
-            "/// Remove expired sessions.\nfn expire() { retain(); }",
-        ),
-        ("empty.rs", " \n"),
-    ]);
-    let config_path = dir.path().join(".mimirs/config.toml");
-    let mut config = Config {
-        retrieval: storage::policy::Mode::Facts,
+fn failed_source_replacement_cannot_return_old_code() {
+    let dir = project(&[("a.rs", "fn old() {}")]);
+    let config = Config {
         ..Config::default()
     };
-    fs::write(&config_path, config.to_toml().unwrap()).unwrap();
-    let first = backend();
-    let calls = first.calls.clone();
-    run(&dir, first, false).0.unwrap();
-    let inputs: Vec<_> = calls.borrow().batches.iter().flatten().cloned().collect();
+    fs::write(
+        dir.path().join(".mimirs/config.toml"),
+        config.to_toml().unwrap(),
+    )
+    .unwrap();
+    run(&dir, backend(), false).0.unwrap();
+    fs::write(dir.path().join("a.rs"), "fn new() {}").unwrap();
+    let mut failing = backend();
+    failing.fail_on = Some("a.rs\nfn new() {}".into());
+    assert!(run(&dir, failing, false).0.is_err());
+    let db = connection(&dir);
+    assert!(storage::analysis::load(&db, "a.rs").unwrap().is_none());
     assert!(
-        inputs
-            .iter()
-            .any(|s| s.contains("Documentation: /// Remove expired sessions."))
-    );
-    assert!(inputs.iter().all(|s| !s.contains("{ retain(); }")));
-    let second = backend();
-    let calls = second.calls.clone();
-    let (_, stdout, _) = run(&dir, second, false);
-    assert!(stdout.contains("unchanged: 2 files"));
-    assert!(calls.borrow().batches.is_empty());
-    let db = storage::open_read_only(&dir.path().join(".mimirs/index.db")).unwrap();
-    let (_, policy) = storage::policy::read(&db).unwrap();
-    assert!(
-        storage::documents::load(&db, "empty.rs", policy.as_deref().unwrap())
+        storage::nearest(&db, &vec![1.0; DIMENSION], 10)
             .unwrap()
             .is_empty()
     );
     drop(db);
-    config.retrieval = storage::policy::Mode::Raw;
-    fs::write(&config_path, config.to_toml().unwrap()).unwrap();
     run(&dir, backend(), false).0.unwrap();
-    let db = storage::open_read_only(&dir.path().join(".mimirs/index.db")).unwrap();
-    assert_eq!(
-        storage::policy::read(&db).unwrap().0,
-        storage::policy::Mode::Raw
-    );
-    assert_eq!(
-        db.query_row("SELECT count(*) FROM document_embeddings", [], |r| r
-            .get::<_, i64>(0))
-            .unwrap(),
-        0
-    );
-}
-
-#[test]
-fn facts_failure_invalidates_old_output_and_mixed_files_keep_raw_inputs() {
-    let dir = project(&[("a.rs", "fn old() {}"), ("b.txt", "plain text")]);
-    let config = Config {
-        retrieval: storage::policy::Mode::Facts,
-        include: vec!["**/*.rs".into(), "**/*.txt".into()],
-        ..Config::default()
-    };
-    fs::write(
-        dir.path().join(".mimirs/config.toml"),
-        config.to_toml().unwrap(),
-    )
-    .unwrap();
-    let first = backend();
-    let calls = first.calls.clone();
-    run(&dir, first, false).0.unwrap();
+    fs::remove_file(dir.path().join("a.rs")).unwrap();
+    run(&dir, backend(), false).0.unwrap();
     assert!(
-        calls
-            .borrow()
-            .batches
-            .iter()
-            .flatten()
-            .any(|t| t == "plain text")
-    );
-    let changed = "fn new() {}";
-    fs::write(dir.path().join("a.rs"), changed).unwrap();
-    let analysis = crate::analysis::extract(source::SourceFile {
-        path: "a.rs".into(),
-        text: changed.into(),
-    })
-    .unwrap();
-    let budget =
-        crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
-    let documents = budget
-        .split(&crate::retrieval::render::render(
-            &crate::retrieval::project(&analysis).unwrap(),
-        ))
-        .unwrap();
-    let mut failing = backend();
-    failing.fail_on = Some(documents[0].text.clone());
-    assert!(run(&dir, failing, false).0.is_err());
-    let db = storage::open_read_only(&dir.path().join(".mimirs/index.db")).unwrap();
-    assert!(storage::analysis::load(&db, "a.rs").unwrap().is_none());
-    assert_eq!(
-        db.query_row("SELECT count(*) FROM document_embeddings", [], |r| r
-            .get::<_, i64>(0))
-            .unwrap(),
-        0
+        storage::nearest(&connection(&dir), &vec![1.0; DIMENSION], 10)
+            .unwrap()
+            .is_empty()
     );
 }
 
 #[test]
-fn facts_index_repairs_a_missing_vector_before_reuse() {
-    let dir = project(&[("a.rs", "fn a() {}")]);
-    let config = Config {
-        retrieval: storage::policy::Mode::Facts,
-        ..Config::default()
-    };
-    fs::write(
-        dir.path().join(".mimirs/config.toml"),
-        config.to_toml().unwrap(),
-    )
-    .unwrap();
+fn obsolete_config_fails_before_opening_or_rebuilding_an_index() {
+    let dir = project(&[("a.rs", "fn old() {}")]);
     run(&dir, backend(), false).0.unwrap();
-    let db = storage::open(&dir.path().join(".mimirs/index.db"))
-        .unwrap()
-        .connection;
-    db.execute("DELETE FROM document_embeddings", []).unwrap();
-    assert!(storage::policy::read(&db).is_err());
-    drop(db);
-    let repair = backend();
-    let calls = repair.calls.clone();
-    run(&dir, repair, false).0.unwrap();
-    assert!(!calls.borrow().batches.is_empty());
-    let db = storage::open_read_only(&dir.path().join(".mimirs/index.db")).unwrap();
-    storage::policy::read(&db).unwrap();
+    let db_path = dir.path().join(".mimirs/index.db");
+    let before = fs::read(&db_path).unwrap();
+    let config_path = dir.path().join(".mimirs/config.toml");
+    let original = fs::read_to_string(&config_path).unwrap();
+    fs::write(&config_path, format!("{original}\nretrieval = \"raw\"\n")).unwrap();
+    let result = run_at(
+        dir.path(),
+        || panic!("created model"),
+        &mut Vec::new(),
+        &mut Vec::new(),
+        false,
+        &|| Duration::ZERO,
+    );
+    assert!(format!("{:#}", result.unwrap_err()).contains("remove this key"));
+    assert_eq!(fs::read(&db_path).unwrap(), before);
+}
+
+#[test]
+fn previous_modes_rebuild_to_source_and_keep_custom_includes() {
+    for mode in ["raw", "facts", "source"] {
+        let dir = project(&[("a.rs", "fn f() {}"), ("b.txt", "first\nsecond\n\nthird")]);
+        let config_path = dir.path().join(".mimirs/config.toml");
+        let config = "include = [\"**/*.rs\", \"**/*.txt\"]\nexclude = [\"private/**\"]\n";
+        fs::write(&config_path, config).unwrap();
+        drop(storage::open(&dir.path().join("register.db")).unwrap());
+        let db = connection(&dir);
+        db.execute_batch(include_str!("../../../src/storage/schema_v7.sql"))
+            .unwrap();
+        db.pragma_update(None, "user_version", 7).unwrap();
+        db.execute(
+            "INSERT INTO index_metadata VALUES ('retrieval_mode', ?1)",
+            [mode],
+        )
+        .unwrap();
+        drop(db);
+        let before = fs::read(dir.path().join(".mimirs/index.db")).unwrap();
+        assert!(
+            format!(
+                "{:#}",
+                storage::open_read_only(&dir.path().join(".mimirs/index.db")).unwrap_err()
+            )
+            .contains("mimirs index")
+        );
+        assert_eq!(
+            fs::read(dir.path().join(".mimirs/index.db")).unwrap(),
+            before
+        );
+        let model = backend();
+        let calls = model.calls.clone();
+        let (result, stdout, stderr) = run(&dir, model, false);
+        result.unwrap();
+        assert!(stdout.starts_with("indexed: 2 files"));
+        assert!(stderr.contains("rebuilt"));
+        assert_eq!(
+            calls.borrow().batches,
+            [
+                vec!["a.rs\nfn f() {}"],
+                vec!["b.txt\nfirst\nsecond\n", "b.txt\nthird"]
+            ]
+        );
+        assert_eq!(fs::read_to_string(config_path).unwrap(), config);
+        let (_, stdout, _) = run(&dir, backend(), false);
+        assert!(stdout.contains("unchanged: 2 files"));
+    }
 }

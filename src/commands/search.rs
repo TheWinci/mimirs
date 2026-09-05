@@ -36,7 +36,7 @@ fn run_at(
     // Keep metadata, the empty check, and retrieval in one read snapshot.
     let transaction = connection.transaction()?;
     storage::validate_model(&transaction)?;
-    let (_, document_policy) = storage::policy::read(&transaction)?;
+    let document_policy = storage::policy::read(&transaction)?;
     let results = if storage::has_content(&transaction)? {
         let mut embedder = make_embedder()?;
         if let Some(policy) = &document_policy {
@@ -79,34 +79,31 @@ fn write_results(
         if result.line_start != result.line_end {
             write!(stdout, "-{}", result.line_end)?;
         }
-        if let Some(indexed) = &result.indexed {
+        let indexed = &result.indexed;
+        writeln!(
+            stdout,
+            "\nsource: indexed snapshot {}",
+            indexed.snapshot_hash
+        )?;
+        writeln!(
+            stdout,
+            "owner: {}",
+            indexed
+                .owner
+                .map_or_else(|| "file".into(), |id| format!("e{id}"))
+        )?;
+        for evidence in &indexed.spans {
             writeln!(
                 stdout,
-                "\nsource: indexed snapshot {}",
-                indexed.snapshot_hash
+                "evidence: {:?} bytes {}..{} lines {}..{}",
+                evidence.record,
+                evidence.span.start,
+                evidence.span.end,
+                evidence.span.line_start,
+                evidence.span.line_end
             )?;
-            writeln!(
-                stdout,
-                "owner: {}",
-                indexed
-                    .owner
-                    .map_or_else(|| "file".into(), |id| format!("e{id}"))
-            )?;
-            for evidence in &indexed.spans {
-                writeln!(
-                    stdout,
-                    "evidence: {:?} bytes {}..{} lines {}..{}",
-                    evidence.record,
-                    evidence.span.start,
-                    evidence.span.end,
-                    evidence.span.line_start,
-                    evidence.span.line_end
-                )?;
-            }
-            writeln!(stdout, "text: {}", result.text)?;
-        } else {
-            writeln!(stdout, "\ntext: {}", result.text)?;
         }
+        writeln!(stdout, "text: {}", result.text)?;
     }
 
     Ok(())

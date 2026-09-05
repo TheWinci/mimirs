@@ -14,15 +14,37 @@ pub struct Batch<'a> {
 }
 
 pub fn save(connection: &mut Connection, analysis: &Analysis, batch: Batch<'_>) -> Result<()> {
-    super::save::replace_file(
-        connection,
-        &analysis.source,
-        &[],
-        &[],
-        &[],
-        Some(analysis),
-        Some(batch),
-    )
+    validate(analysis, batch.documents)?;
+    super::policy::validate(batch.policy)?;
+    let tx = connection.transaction()?;
+    if !super::validate_model(&tx)? {
+        tx.execute("INSERT INTO index_metadata VALUES ('embedding_model', ?1), ('embedding_dimension', ?2)", params![crate::embedding::model_identity(), DIMENSION.to_string()])?;
+    }
+    let stored = super::metadata(&tx, "document_policy")?;
+    ensure!(
+        stored
+            .as_deref()
+            .is_none_or(|policy| policy == batch.policy),
+        "mixed document policies"
+    );
+    tx.execute(
+        "INSERT INTO index_metadata VALUES ('document_policy', ?1) ON CONFLICT(key) DO NOTHING",
+        [batch.policy],
+    )?;
+    tx.execute(
+        "INSERT INTO files(path) VALUES (?1) ON CONFLICT(path) DO NOTHING",
+        [&analysis.source.path],
+    )?;
+    let file_id: i64 = tx.query_row(
+        "SELECT id FROM files WHERE path=?1",
+        [&analysis.source.path],
+        |r| r.get(0),
+    )?;
+    super::delete_file_embeddings(&tx, file_id)?;
+    super::analysis::write(&tx, file_id, analysis)?;
+    write(&tx, file_id, analysis, batch)?;
+    tx.commit()?;
+    Ok(())
 }
 
 pub fn validate(analysis: &Analysis, documents: &[Document]) -> Result<()> {
@@ -52,6 +74,7 @@ pub fn validate(analysis: &Analysis, documents: &[Document]) -> Result<()> {
                 "invalid evidence line span"
             );
             let valid = match evidence.record {
+                Record::Source => true, // UTF-8 bounds and source line spans were checked above.
                 Record::File => *span == analysis.scopes[0].span,
                 Record::Entity(id) => analysis.entities.get(id).is_some_and(|e| e.span == *span),
                 Record::Fact(id) => analysis

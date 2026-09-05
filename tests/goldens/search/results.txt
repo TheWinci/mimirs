@@ -4,11 +4,19 @@ time: 0.14 seconds
 result: 1/2
 similarity: 1.0000
 location: a.rs:1
-text: same score
+source: indexed snapshot 563889f889c1764a18db612dc5e168c06d38d94d521fac2d2e943036ecd3dd81
+owner: file
+evidence: Source bytes 0..10 lines 1..1
+text: a.rs
+same score
 
 ---
 
 result: 2/2
 similarity: 1.0000
-location: z.rs:1-3
-text:   café();  
+location: z.rs:1
+source: indexed snapshot 50e14fcb1c1545e6c1bce03793c6e8dfc1e1d31f38a5e2ae0877b00c1d4b1f01
+owner: e0
+evidence: Source bytes 0..13 lines 1..1
+text: z.rs
+fn café() {}

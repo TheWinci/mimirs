@@ -26,11 +26,20 @@ fn vector(x: f32, y: f32) -> Vec<f32> {
 }
 
 fn save_text(connection: &mut Connection, path: &str, text: &str) -> anyhow::Result<()> {
-    let source = source(path, text);
-    let chunks = crate::chunk::of(&source);
-    let windows = crate::window::of(&chunks[0]);
-    let vectors = vec![vector(1.0, 0.0); windows.len()];
-    save_file(connection, &source, &chunks, &windows, &vectors, None)
+    let analysis = crate::analysis::extract(source(path, text))?;
+    let budget = crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512))?;
+    let policy = policy::document_policy(&budget);
+    let documents = crate::retrieval::source::documents(&analysis, &budget)?;
+    let vectors = vec![vector(1.0, 0.0); documents.len()];
+    documents::save(
+        connection,
+        &analysis,
+        documents::Batch {
+            documents: &documents,
+            vectors: &vectors,
+            policy: &policy,
+        },
+    )
 }
 
 fn count(connection: &Connection, table: &str) -> i64 {
@@ -46,10 +55,13 @@ fn count(connection: &Connection, table: &str) -> i64 {
 fn snapshot(connection: &Connection) -> Vec<Vec<Vec<rusqlite::types::Value>>> {
     [
         "files",
-        "chunks",
-        "windows",
+        "source_snapshots",
+        "entities",
+        "analysis_records",
+        "retrieval_documents",
+        "retrieval_processing",
         "index_metadata",
-        "window_embeddings",
+        "document_embeddings",
     ]
     .iter()
     .map(|table| {
