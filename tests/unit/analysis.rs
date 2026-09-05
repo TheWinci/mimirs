@@ -244,3 +244,34 @@ fn imports_preserve_groups_and_declaration_references() {
     }
     assert!(members.last().unwrap().owner.is_some());
 }
+
+#[test]
+fn scopes_and_binding_patterns() {
+    let a = analyze(
+        "fn f(mut x: u8) { let x = x; let (ref a, mut b) = pair; let c = |z| z; for y in xs { if let Some(k) = y { use crate::X; } else { f(); } } match x { Some(v) | Other(v) => v, _ => 0 } }",
+    );
+    assert!(a.diagnostics.is_empty(), "{:?}", a.diagnostics);
+    let names: Vec<_> = a
+        .facts
+        .iter()
+        .filter(|f| f.kind == "binding")
+        .map(|f| &a.source.text[f.span.start..f.span.end])
+        .collect();
+    assert_eq!(names, ["x", "x", "a", "b", "c", "z", "y", "k", "v", "v"]);
+    for (id, scope) in a.scopes.iter().enumerate() {
+        if let Some(parent) = scope.parent {
+            assert!(parent < id);
+        }
+    }
+    let conditional = a.scopes.iter().find(|s| s.kind == "conditional").unwrap();
+    assert!(!a.source.text[conditional.span.start..conditional.span.end].contains("else"));
+    assert!(
+        a.facts
+            .iter()
+            .any(|f| f.evidence.iter().any(|e| e.role == "closure_initializer"))
+    );
+    for fact in &a.facts {
+        let scope = &a.scopes[fact.scope];
+        assert!(scope.span.start <= fact.span.start && scope.span.end >= fact.span.end);
+    }
+}

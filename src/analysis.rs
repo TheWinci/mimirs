@@ -6,6 +6,8 @@ use crate::source::SourceFile;
 mod entities;
 mod facts;
 mod imports;
+mod scopes;
+pub use scopes::Scope;
 mod signatures;
 pub use entities::Entity;
 pub use facts::Fact;
@@ -53,6 +55,7 @@ pub struct Analysis {
     pub diagnostics: Vec<Diagnostic>,
     pub entities: Vec<Entity>,
     pub facts: Vec<Fact>,
+    pub scopes: Vec<Scope>,
 }
 
 pub fn extract(source: SourceFile) -> Result<Analysis> {
@@ -71,6 +74,11 @@ pub fn extract(source: SourceFile) -> Result<Analysis> {
         &entities,
     ));
     facts.extend(imports::extract(tree.root_node(), &source.text, &entities));
+    let (scopes, bindings) = scopes::extract(tree.root_node(), &source.text, &entities);
+    facts.extend(bindings);
+    for fact in &mut facts {
+        fact.scope = scopes::containing(&scopes, &fact.span);
+    }
     facts.sort_by_key(|fact| (fact.span.start, fact.span.end));
     for id in 0..facts.len() {
         if facts[id].kind == "import_member" {
@@ -113,6 +121,7 @@ pub fn extract(source: SourceFile) -> Result<Analysis> {
                     diagnostics,
                     entities,
                     facts,
+                    scopes,
                 });
             }
         }
@@ -149,6 +158,20 @@ pub fn report(analysis: &Analysis) -> String {
                 .map_or_else(|| "file".into(), |id| format!("e{id}"))
         ));
     }
+    for (id, scope) in analysis.scopes.iter().enumerate() {
+        output.push_str(&format!(
+            "scope s{id}: {} bytes {}..{} parent {} owner {}\n",
+            scope.kind,
+            scope.span.start,
+            scope.span.end,
+            scope
+                .parent
+                .map_or_else(|| "none".into(), |id| format!("s{id}")),
+            scope
+                .owner
+                .map_or_else(|| "file".into(), |id| format!("e{id}"))
+        ));
+    }
     for (id, fact) in analysis.facts.iter().enumerate() {
         output.push_str(&format!(
             "fact f{id}: {} bytes {}..{} lines {}..{} owner {} text {:?}\n",
@@ -161,6 +184,7 @@ pub fn report(analysis: &Analysis) -> String {
                 .map_or_else(|| "file".into(), |id| format!("e{id}")),
             &analysis.source.text[fact.span.start..fact.span.end]
         ));
+        output.push_str(&format!("  scope s{}\n", fact.scope));
         if let Some(related) = fact.related {
             output.push_str(&format!("  related f{related}\n"));
         }

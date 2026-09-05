@@ -2,4 +2,8 @@ file: fixture.rs
 source: 9 bytes
 parse: complete
 entity e0: function Some("f") bytes 0..9 lines 1..1 parent file
+scope s0: file bytes 0..9 parent none owner file
+scope s1: item bytes 0..9 parent s0 owner e0
+scope s2: block bytes 7..9 parent s1 owner e0
 fact f0: signature bytes 0..7 lines 1..1 owner e0 text "fn f() "
+  scope s1

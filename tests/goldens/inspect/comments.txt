@@ -3,24 +3,42 @@ source: 221 bytes
 parse: complete
 entity e0: function Some("item") bytes 85..154 lines 8..11 parent file
 entity e1: module Some("other") bytes 210..220 lines 14..14 parent file
+scope s0: file bytes 0..221 parent none owner file
+scope s1: item bytes 85..154 parent s0 owner e0
+scope s2: block bytes 95..154 parent s1 owner e0
+scope s3: item bytes 210..220 parent s0 owner e1
 fact f0: doc bytes 0..15 lines 1..1 owner file text "//! File docs.\n"
+  scope s0
 fact f1: attribute bytes 15..35 lines 2..2 owner file text "#![allow(dead_code)]"
+  scope s0
   path bytes 18..23 text "allow"
   arguments bytes 23..34 text "(dead_code)"
 fact f2: comment bytes 36..47 lines 3..3 owner file text "// Section."
+  scope s0
 fact f3: doc bytes 48..63 lines 4..4 owner e0 text "/// Item docs.\n"
+  scope s0
 fact f4: attribute bytes 63..75 lines 5..5 owner e0 text "#[cfg(test)]"
+  scope s0
   path bytes 65..68 text "cfg"
   arguments bytes 68..74 text "(test)"
 fact f5: comment bytes 76..83 lines 6..6 owner file text "// Gap."
+  scope s0
 fact f6: signature bytes 85..95 lines 8..8 owner e0 text "fn item() "
+  scope s1
 fact f7: doc bytes 101..117 lines 9..9 owner e0 text "//! Inner docs.\n"
+  scope s2
 fact f8: comment bytes 121..152 lines 10..10 owner e0 text "/* nested /* comment */ here */"
+  scope s2
 fact f9: comment bytes 155..167 lines 11..11 owner file text "// Trailing."
+  scope s0
 fact f10: doc bytes 168..186 lines 12..12 owner e1 text "/** Other docs. */"
+  scope s0
 fact f11: attribute bytes 187..209 lines 13..13 owner e1 text "#[path = \"missing.rs\"]"
+  scope s0
   path bytes 189..193 text "path"
   arguments bytes 196..208 text "\"missing.rs\""
 fact f12: signature bytes 210..220 lines 14..14 owner e1 text "mod other;"
+  scope s3
 fact f13: module_external bytes 210..220 lines 14..14 owner e1 text "mod other;"
+  scope s3
   name bytes 214..219 text "other"

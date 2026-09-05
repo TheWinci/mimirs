@@ -1,3 +1,4 @@
 file: fixture.rs
 source: 0 bytes
 parse: complete
+scope s0: file bytes 0..0 parent none owner file

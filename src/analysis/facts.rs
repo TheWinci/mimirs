@@ -14,6 +14,7 @@ pub struct Fact {
     pub owner: Option<usize>,
     pub evidence: Vec<Evidence>,
     pub related: Option<usize>,
+    pub scope: usize,
 }
 
 impl Fact {
@@ -24,6 +25,7 @@ impl Fact {
             owner: owner(node, entities),
             evidence: Vec::new(),
             related: None,
+            scope: 0,
         }
     }
 
