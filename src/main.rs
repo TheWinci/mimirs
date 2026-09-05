@@ -24,7 +24,12 @@ enum Command {
     Init,
 
     /// Inspect Rust syntax without project setup.
-    Inspect { file: std::path::PathBuf },
+    Inspect {
+        file: std::path::PathBuf,
+        /// Read saved analysis without reading the current source.
+        #[arg(long)]
+        stored: bool,
+    },
 
     /// Index current directory with config defined in .mimirs folder.
     Index,
@@ -44,7 +49,7 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::Inspect { file } => commands::inspect::run(&file),
+        Command::Inspect { file, stored } => commands::inspect::run(&file, stored),
         Command::Init => commands::init::run(),
         Command::Index => commands::index::run(),
         Command::Search { query, limit } => commands::search::run(&query, limit),

@@ -234,6 +234,4 @@ fn delete_file_embeddings(transaction: &Transaction<'_>, file_id: i64) -> anyhow
 #[path = "../tests/unit/storage.rs"]
 mod tests;
 
-// These transaction helpers are connected to indexing in the following slice.
-#[allow(dead_code)]
 pub mod analysis;

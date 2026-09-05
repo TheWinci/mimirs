@@ -28,3 +28,17 @@ fn inspection_needs_no_project_and_does_not_write() {
         assert!(output.stdout.is_empty());
     }
 }
+
+#[test]
+fn stored_cli_reports_missing_index_without_creating_state() {
+    let dir = tempfile::tempdir().unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_mimirs"))
+        .args(["inspect", "deleted.rs", "--stored"])
+        .current_dir(&dir)
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("index is missing"));
+    assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 0);
+}
