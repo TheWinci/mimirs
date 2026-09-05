@@ -136,7 +136,7 @@ fn redirected_output_and_stored_relationships_match_the_contract() {
     result.unwrap();
     assert_eq!(
         stdout,
-        "indexed: 2 files\nskipped: 0 files\nwalk_errors: 0\ntime: 1.25 seconds\n"
+        "indexed: 2 files\nunchanged: 0 files\nskipped: 0 files\nwalk_errors: 0\ntime: 1.25 seconds\n"
     );
     assert_eq!(stderr, include_str!("../../goldens/index/redirected.txt"));
     assert_eq!(calls.borrow().preparations, 1);
@@ -213,7 +213,7 @@ fn read_skips_finish_and_empty_runs_clear_stored_files() {
     result.unwrap();
     assert_eq!(
         stdout,
-        "indexed: 0 files\nskipped: 1 files\nwalk_errors: 0\ntime: 1.25 seconds\n"
+        "indexed: 0 files\nunchanged: 0 files\nskipped: 1 files\nwalk_errors: 0\ntime: 1.25 seconds\n"
     );
     assert_eq!(stderr, include_str!("../../goldens/index/read_skip.txt"));
     assert_eq!(counts(&dir), [0, 0, 0, 0, 2]);
@@ -224,7 +224,7 @@ fn read_skips_finish_and_empty_runs_clear_stored_files() {
     result.unwrap();
     assert_eq!(
         stdout,
-        "indexed: 0 files\nskipped: 0 files\nwalk_errors: 0\ntime: 1.25 seconds\n"
+        "indexed: 0 files\nunchanged: 0 files\nskipped: 0 files\nwalk_errors: 0\ntime: 1.25 seconds\n"
     );
     assert_eq!(stderr, include_str!("../../goldens/index/empty.txt"));
     assert_eq!(calls.borrow().preparations, 1);
@@ -260,7 +260,7 @@ fn cleanup_removes_deleted_excluded_and_unreadable_files_with_vectors() {
     assert!(fs::read(dir.path().join("d.rs")).is_err());
     let (result, stdout, stderr) = run(&dir, backend(), false);
     result.unwrap();
-    assert!(stdout.starts_with("indexed: 1 files\nskipped: 1 files"));
+    assert!(stdout.starts_with("indexed: 0 files\nunchanged: 1 files\nskipped: 1 files"));
     assert!(stderr.contains("cannot read source file d.rs"));
     assert_eq!(files(&dir), [("a.rs".into(), "keep".into())]);
     assert_eq!(counts(&dir), [1, 1, 1, 1, 2]);
@@ -465,7 +465,11 @@ fn a_file_removed_after_discovery_is_a_read_skip() {
     model.prepare = Some(Box::new(move || Ok(fs::remove_file(&path)?)));
     let (result, stdout, stderr) = run(&dir, model, false);
     result.unwrap();
-    assert!(stdout.starts_with("indexed: 0 files\nskipped: 1 files\nwalk_errors: 0\n"));
+    assert!(
+        stdout.starts_with(
+            "indexed: 0 files\nunchanged: 0 files\nskipped: 1 files\nwalk_errors: 0\n"
+        )
+    );
     assert!(stderr.contains("cannot read source file a.rs"));
     assert!(stderr.contains("index_progress: 100% (1/1 files)"));
     assert_eq!(counts(&dir), [0, 0, 0, 0, 2]);
@@ -578,4 +582,98 @@ fn incomplete_and_empty_replacements_remove_old_facts() {
         assert_eq!(stderr.contains("syntax: a.rs:"), !a.diagnostics.is_empty());
     }
     assert_eq!(counts(&dir), [1, 1, 0, 0, 2]);
+}
+
+#[test]
+fn reuse_skips_parsing_and_inference_and_preserves_rows() {
+    let dir = project(&[("a.rs", "fn old() {}"), ("broken.rs", "fn (")]);
+    run(&dir, backend(), false).0.unwrap();
+    let original: Vec<(i64, String)> = connection(&dir)
+        .prepare("SELECT file_id, payload FROM analysis_records ORDER BY file_id")
+        .unwrap()
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+        .unwrap()
+        .collect::<rusqlite::Result<_>>()
+        .unwrap();
+    let model = backend();
+    let calls = Rc::clone(&model.calls);
+    let mut stderr = Vec::new();
+    let mut progress = Progress::new(dir.path(), &mut stderr, false, &|| Duration::ZERO);
+    let summary = index_with(
+        dir.path(),
+        || Ok(Embedder::new(model)),
+        &mut progress,
+        source::read,
+        |_| panic!("reused file parsed"),
+    )
+    .unwrap();
+    assert_eq!(
+        (summary.indexed, summary.unchanged, summary.skipped),
+        (0, 2, 0)
+    );
+    assert!(calls.borrow().batches.is_empty());
+    let saved: Vec<(i64, String)> = connection(&dir)
+        .prepare("SELECT file_id, payload FROM analysis_records ORDER BY file_id")
+        .unwrap()
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+        .unwrap()
+        .collect::<rusqlite::Result<_>>()
+        .unwrap();
+    assert_eq!(saved, original);
+    let (_, stdout, _) = run(&dir, backend(), false);
+    assert!(stdout.starts_with("indexed: 0 files\nunchanged: 2 files\nskipped: 0 files\n"));
+}
+
+#[test]
+fn content_hash_detects_same_length_edit_with_same_timestamp() {
+    let dir = project(&[("a.rs", "fn old() {}"), ("b.rs", "fn keep() {}")]);
+    run(&dir, backend(), false).0.unwrap();
+    let path = dir.path().join("a.rs");
+    let modified = fs::metadata(&path).unwrap().modified().unwrap();
+    fs::write(&path, "fn new() {}").unwrap();
+    fs::File::options()
+        .write(true)
+        .open(&path)
+        .unwrap()
+        .set_times(fs::FileTimes::new().set_modified(modified))
+        .unwrap();
+    let model = backend();
+    let calls = Rc::clone(&model.calls);
+    let (result, stdout, _) = run(&dir, model, false);
+    result.unwrap();
+    assert!(stdout.starts_with("indexed: 1 files\nunchanged: 1 files\nskipped: 0 files\n"));
+    assert_eq!(calls.borrow().batches, [vec!["fn new() {}"]]);
+    assert_eq!(
+        storage::analysis::load(&connection(&dir), "a.rs")
+            .unwrap()
+            .unwrap()
+            .source
+            .text,
+        "fn new() {}"
+    );
+}
+
+#[test]
+fn stale_versions_and_missing_output_force_reprocessing() {
+    let dir = project(&[("a.rs", "fn f() {}")]);
+    run(&dir, backend(), false).0.unwrap();
+    for mutation in [
+        "UPDATE file_processing SET extraction_version='old'",
+        "UPDATE file_processing SET window_version='old'",
+        "DELETE FROM analysis_records",
+        "DELETE FROM entities",
+        "DELETE FROM window_embeddings",
+        "DELETE FROM file_processing",
+    ] {
+        connection(&dir).execute(mutation, []).unwrap();
+        let model = backend();
+        let calls = Rc::clone(&model.calls);
+        let (result, stdout, _) = run(&dir, model, false);
+        result.unwrap();
+        assert!(
+            stdout.starts_with("indexed: 1 files\nunchanged: 0 files\n"),
+            "{mutation}: {stdout}"
+        );
+        assert_eq!(calls.borrow().batches.len(), 1, "{mutation}");
+    }
 }

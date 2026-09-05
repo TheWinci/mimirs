@@ -147,6 +147,14 @@ fn replace_file(
         )?;
         ordinals[chunk_position] += 1;
     }
+    super::processing::stamp(
+        &transaction,
+        file_id,
+        source,
+        analysis.is_some(),
+        chunks.len(),
+        windows.len(),
+    )?;
     transaction.commit()?;
     Ok(())
 }

@@ -41,8 +41,9 @@ fn run_at(
     cleared?;
     writeln!(
         stdout,
-        "indexed: {} files\nskipped: {} files\nwalk_errors: {}\ntime: {:.2} seconds",
+        "indexed: {} files\nunchanged: {} files\nskipped: {} files\nwalk_errors: {}\ntime: {:.2} seconds",
         summary.indexed,
+        summary.unchanged,
         summary.skipped,
         summary.walk_errors,
         elapsed().as_secs_f64(),
@@ -53,6 +54,7 @@ fn run_at(
 #[derive(Default)]
 struct Summary {
     indexed: usize,
+    unchanged: usize,
     skipped: usize,
     walk_errors: usize,
 }
@@ -111,8 +113,16 @@ fn index_with(
                 continue;
             }
         };
+        let hash = storage::processing::source_hash(&source.text);
+        let rust = Path::new(path).extension().is_some_and(|ext| ext == "rs");
+        if storage::processing::reusable(&database.connection, &source, &hash, rust)? {
+            successful.push(path.as_str());
+            summary.unchanged += 1;
+            progress.indexing(path, (0, 0), (attempt + 1, total), true)?;
+            continue;
+        }
         storage::invalidate(&mut database.connection, path)?;
-        let analysis = if Path::new(path).extension().is_some_and(|ext| ext == "rs") {
+        let analysis = if rust {
             Some(
                 extract(source::SourceFile {
                     path: source.path.clone(),

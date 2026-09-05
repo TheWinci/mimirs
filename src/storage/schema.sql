@@ -58,3 +58,12 @@ CREATE TABLE analysis_records (
     file_id INTEGER PRIMARY KEY REFERENCES source_snapshots(file_id) ON DELETE CASCADE,
     payload TEXT NOT NULL
 );
+
+CREATE TABLE file_processing (
+    file_id INTEGER PRIMARY KEY REFERENCES files(id) ON DELETE CASCADE,
+    source_hash TEXT NOT NULL,
+    extraction_version TEXT,
+    window_version TEXT NOT NULL,
+    chunk_count INTEGER NOT NULL CHECK (chunk_count >= 0),
+    window_count INTEGER NOT NULL CHECK (window_count >= 0)
+);
