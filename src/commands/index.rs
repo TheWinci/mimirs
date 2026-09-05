@@ -96,6 +96,18 @@ fn index_with(
     storage::validate_model(&database.connection)?;
     embedder.prepare()?;
 
+    let budget = if config.retrieval == storage::policy::Mode::Facts {
+        Some(embedder.token_budget()?)
+    } else {
+        None
+    };
+    let document_policy = budget.as_ref().map(storage::policy::document_policy);
+    storage::policy::configure(
+        &mut database.connection,
+        config.retrieval,
+        document_policy.as_deref(),
+    )?;
+
     let mut summary = Summary {
         walk_errors: walk.errors.len(),
         ..Summary::default()
@@ -115,7 +127,12 @@ fn index_with(
         };
         let hash = storage::processing::source_hash(&source.text);
         let rust = Path::new(path).extension().is_some_and(|ext| ext == "rs");
-        if storage::processing::reusable(&database.connection, &source, &hash, rust)? {
+        if storage::processing::reusable(&database.connection, &source, &hash, rust)?
+            && (!rust
+                || document_policy.as_ref().is_none_or(|policy| {
+                    storage::documents::load(&database.connection, path, policy).is_ok()
+                }))
+        {
             successful.push(path.as_str());
             summary.unchanged += 1;
             progress.indexing(path, (0, 0), (attempt + 1, total), true)?;
@@ -143,12 +160,23 @@ fn index_with(
         }
         let chunks = chunk::of(&source);
         let windows = chunks.iter().flat_map(window::of).collect::<Vec<_>>();
-        let texts = windows
-            .iter()
-            .map(|window| window.text.clone())
-            .collect::<Vec<_>>();
+        let documents = if let (Some(analysis), Some(budget)) = (&analysis, &budget) {
+            Some(budget.split(&crate::retrieval::render::render(
+                &crate::retrieval::project(analysis)?,
+            ))?)
+        } else {
+            None
+        };
+        let texts = if let Some(documents) = &documents {
+            documents.iter().map(|d| d.text.clone()).collect::<Vec<_>>()
+        } else {
+            windows
+                .iter()
+                .map(|window| window.text.clone())
+                .collect::<Vec<_>>()
+        };
         if progress.is_terminal() {
-            progress.indexing(path, (0, windows.len()), (attempt, total), false)?;
+            progress.indexing(path, (0, texts.len()), (attempt, total), false)?;
         }
         let vectors = embedder
             .embed_documents(&texts, |completed, count| {
@@ -158,7 +186,20 @@ fn index_with(
                 Ok(())
             })
             .with_context(|| format!("cannot embed source file {path}"))?;
-        if let Some(analysis) = &analysis {
+        if let (Some(analysis), Some(documents), Some(policy)) =
+            (&analysis, &documents, &document_policy)
+        {
+            storage::documents::save(
+                &mut database.connection,
+                analysis,
+                storage::documents::Batch {
+                    documents,
+                    vectors: &vectors,
+                    policy,
+                },
+            )?;
+            progress.diagnostic(&format!("documents: {path}: {}", documents.len()))?;
+        } else if let Some(analysis) = &analysis {
             storage::save_file_with_analysis(
                 &mut database.connection,
                 &source,
@@ -178,12 +219,7 @@ fn index_with(
         }
         successful.push(path.as_str());
         summary.indexed += 1;
-        progress.indexing(
-            path,
-            (windows.len(), windows.len()),
-            (attempt + 1, total),
-            true,
-        )?;
+        progress.indexing(path, (texts.len(), texts.len()), (attempt + 1, total), true)?;
     }
     storage::reconcile(&mut database.connection, &successful)?;
     Ok(summary)

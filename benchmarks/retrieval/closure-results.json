@@ -1,0 +1,231 @@
+{
+  "source_revision": "425fbbeae8cd2f0c21dbefe27c89543a30ff7387",
+  "binary_sha256": "5b602f00df7426ceb7ddc202b62f5066a1835d98bf723caa43b992330f58108f",
+  "model_revision": "5f1b8cd78bc4fb444dd171e59b18f3a3af89a079",
+  "model_files_sha256": {
+    "config.json": "1b4d8e2a3988377ed8b519a31d8d31025a25f1c5f8606998e8014111438efcd7",
+    "model.onnx": "bbd7b466f6d58e646fdc2bd5fd67b2f5e93c0b687011bd4548c420f7bd46f0c5",
+    "special_tokens_map.json": "5d5b662e421ea9fac075174bb0688ee0d9431699900b90662acd44b2a350503a",
+    "tokenizer.json": "da0e79933b9ed51798a3ae27893d3c5fa4a201126cef75586296df9b4d2c62a0",
+    "tokenizer_config.json": "bd2e06a5b20fd1b13ca988bedc8763d332d242381b4fbc98f8fead4524158f79"
+  },
+  "query_sha256": "78a056ec110137c8ea292a12d5e96ee354e2d5772323035a0700e9becf057c5a",
+  "result_limit": 64,
+  "file_count": 26,
+  "policies": {
+    "raw": {
+      "index_seconds": 11.14510662498651,
+      "index_summary": "indexed: 26 files\nunchanged: 0 files\nskipped: 0 files\nwalk_errors: 0\ntime: 11.13 seconds\n",
+      "metadata": {
+        "embedding_dimension": "384",
+        "embedding_model": "all-MiniLM-L6-v2@5f1b8cd78bc4fb444dd171e59b18f3a3af89a079",
+        "retrieval_mode": "raw"
+      },
+      "counts": {
+        "retrieval_documents": 0,
+        "windows": 2585
+      },
+      "queries": [
+        {
+          "request": "If the progress callback fails during document embedding, stop before starting the next batch.",
+          "query": "stop document embedding batches when progress callback fails",
+          "expected_files": [
+            "src/embedding.rs"
+          ],
+          "first_expected_file_rank": 1,
+          "top_five_files": [
+            "src/embedding.rs",
+            "src/commands/index.rs",
+            "src/storage.rs",
+            "src/storage/search.rs",
+            "src/commands/index/progress.rs"
+          ],
+          "returned_hits": 64,
+          "unique_files_in_returned_hits": 11,
+          "seconds": 0.15568845899542794
+        },
+        {
+          "request": "We should skip unchanged source files, but only when the saved extraction and embedding output is complete and current.",
+          "query": "reuse unchanged source files with complete current extraction and embedding output",
+          "expected_files": [
+            "src/storage/processing.rs"
+          ],
+          "first_expected_file_rank": 5,
+          "top_five_files": [
+            "src/storage/save.rs",
+            "src/commands/index.rs",
+            "src/analysis.rs",
+            "src/chunk.rs",
+            "src/storage/processing.rs"
+          ],
+          "returned_hits": 64,
+          "unique_files_in_returned_hits": 18,
+          "seconds": 0.16349412500858307
+        },
+        {
+          "request": "Before replacing an old database, verify that its schema belongs to mimirs. Never delete an unknown database.",
+          "query": "verify database schema before rebuilding an older index and reject unknown databases",
+          "expected_files": [
+            "src/storage.rs"
+          ],
+          "first_expected_file_rank": 1,
+          "top_five_files": [
+            "src/storage.rs",
+            "src/storage/save.rs",
+            "src/storage/reconcile.rs",
+            "src/commands/search.rs",
+            "src/storage/analysis.rs"
+          ],
+          "returned_hits": 64,
+          "unique_files_in_returned_hits": 8,
+          "seconds": 0.16074579101405106
+        },
+        {
+          "request": "Tree-sitter gives us written method calls. Find the code that records the receiver and method without resolving their types.",
+          "query": "record written method call receiver and method without type resolution",
+          "expected_files": [
+            "src/analysis/references.rs"
+          ],
+          "first_expected_file_rank": 2,
+          "top_five_files": [
+            "src/analysis/entities.rs",
+            "src/analysis/references.rs",
+            "src/commands/search.rs",
+            "src/commands/index/progress.rs",
+            "src/storage/save.rs"
+          ],
+          "returned_hits": 64,
+          "unique_files_in_returned_hits": 16,
+          "seconds": 0.15583979099756107
+        },
+        {
+          "request": "When an indexed source file is deleted, remove its vectors as well as its stored file data.",
+          "query": "remove vectors and stored data for deleted source files",
+          "expected_files": [
+            "src/storage/reconcile.rs",
+            "src/storage.rs"
+          ],
+          "first_expected_file_rank": 2,
+          "top_five_files": [
+            "src/storage/save.rs",
+            "src/storage.rs",
+            "src/storage/reconcile.rs",
+            "src/embedding.rs",
+            "src/chunk.rs"
+          ],
+          "returned_hits": 64,
+          "unique_files_in_returned_hits": 20,
+          "seconds": 0.15533808298641816
+        }
+      ]
+    },
+    "facts": {
+      "index_seconds": 25.965932124992833,
+      "index_summary": "indexed: 26 files\nunchanged: 0 files\nskipped: 0 files\nwalk_errors: 0\ntime: 25.94 seconds\n",
+      "metadata": {
+        "document_policy": "tree-sitter-0.27.0/rust-0.24.2/extractor-2|syntax-relations-1|evidence-clauses-2|fact-boundaries-1|all-MiniLM-L6-v2@5f1b8cd78bc4fb444dd171e59b18f3a3af89a079|512|5e7245596b76f5be39d612babeceb40d409602d50ca759645966ccdb4a2caa30",
+        "embedding_dimension": "384",
+        "embedding_model": "all-MiniLM-L6-v2@5f1b8cd78bc4fb444dd171e59b18f3a3af89a079",
+        "retrieval_mode": "facts"
+      },
+      "counts": {
+        "retrieval_documents": 338,
+        "windows": 0
+      },
+      "queries": [
+        {
+          "request": "If the progress callback fails during document embedding, stop before starting the next batch.",
+          "query": "stop document embedding batches when progress callback fails",
+          "expected_files": [
+            "src/embedding.rs"
+          ],
+          "first_expected_file_rank": 1,
+          "top_five_files": [
+            "src/embedding.rs",
+            "src/commands/index/progress.rs",
+            "src/storage.rs",
+            "src/commands/index.rs",
+            "src/storage/processing.rs"
+          ],
+          "returned_hits": 64,
+          "unique_files_in_returned_hits": 12,
+          "seconds": 0.3801301250059623
+        },
+        {
+          "request": "We should skip unchanged source files, but only when the saved extraction and embedding output is complete and current.",
+          "query": "reuse unchanged source files with complete current extraction and embedding output",
+          "expected_files": [
+            "src/storage/processing.rs"
+          ],
+          "first_expected_file_rank": 8,
+          "top_five_files": [
+            "src/embedding.rs",
+            "src/storage/save.rs",
+            "src/source.rs",
+            "src/analysis/references.rs",
+            "src/analysis.rs"
+          ],
+          "returned_hits": 64,
+          "unique_files_in_returned_hits": 21,
+          "seconds": 0.3653912079753354
+        },
+        {
+          "request": "Before replacing an old database, verify that its schema belongs to mimirs. Never delete an unknown database.",
+          "query": "verify database schema before rebuilding an older index and reject unknown databases",
+          "expected_files": [
+            "src/storage.rs"
+          ],
+          "first_expected_file_rank": 1,
+          "top_five_files": [
+            "src/storage.rs",
+            "src/storage/reconcile.rs",
+            "src/storage/analysis.rs",
+            "src/commands/index.rs",
+            "src/commands/search.rs"
+          ],
+          "returned_hits": 64,
+          "unique_files_in_returned_hits": 20,
+          "seconds": 0.38030679101939313
+        },
+        {
+          "request": "Tree-sitter gives us written method calls. Find the code that records the receiver and method without resolving their types.",
+          "query": "record written method call receiver and method without type resolution",
+          "expected_files": [
+            "src/analysis/references.rs"
+          ],
+          "first_expected_file_rank": 4,
+          "top_five_files": [
+            "src/commands/index/progress.rs",
+            "src/analysis/facts.rs",
+            "src/analysis/entities.rs",
+            "src/analysis/references.rs",
+            "src/analysis.rs"
+          ],
+          "returned_hits": 64,
+          "unique_files_in_returned_hits": 21,
+          "seconds": 0.3708233340003062
+        },
+        {
+          "request": "When an indexed source file is deleted, remove its vectors as well as its stored file data.",
+          "query": "remove vectors and stored data for deleted source files",
+          "expected_files": [
+            "src/storage/reconcile.rs",
+            "src/storage.rs"
+          ],
+          "first_expected_file_rank": 1,
+          "top_five_files": [
+            "src/storage.rs",
+            "src/storage/save.rs",
+            "src/storage/reconcile.rs",
+            "src/storage/analysis.rs",
+            "src/embedding.rs"
+          ],
+          "returned_hits": 64,
+          "unique_files_in_returned_hits": 21,
+          "seconds": 0.3784142909862567
+        }
+      ]
+    }
+  },
+  "corpus_sha256": "cebea6a75ff5e3f1861faeedbd214ca17e94673e6618630be2a350c3c58b2b3a"
+}

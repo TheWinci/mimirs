@@ -5,12 +5,7 @@ use rusqlite::{Connection, params};
 
 use super::validate_model;
 
-use crate::{
-    chunk::Chunk,
-    embedding::{DIMENSION, MODEL_NAME},
-    source::SourceFile,
-    window::Window,
-};
+use crate::{chunk::Chunk, embedding::DIMENSION, source::SourceFile, window::Window};
 
 /// Replace a file atomically. Borrowed object identities become database IDs
 /// only here; vectors correspond to windows by position.
@@ -32,17 +27,18 @@ pub fn save_file_with_analysis(
     vectors: &[Vec<f32>],
     analysis: Option<&crate::analysis::Analysis>,
 ) -> anyhow::Result<()> {
-    replace_file(connection, source, chunks, windows, vectors, analysis)
+    replace_file(connection, source, chunks, windows, vectors, analysis, None)
         .with_context(|| format!("cannot save source file {}", source.path))
 }
 
-fn replace_file(
+pub(super) fn replace_file(
     connection: &mut Connection,
     source: &SourceFile,
     chunks: &[Chunk<'_>],
     windows: &[Window<'_>],
     vectors: &[Vec<f32>],
     analysis: Option<&crate::analysis::Analysis>,
+    documents: Option<super::documents::Batch<'_>>,
 ) -> anyhow::Result<()> {
     ensure!(
         windows.len() == vectors.len(),
@@ -88,7 +84,7 @@ fn replace_file(
         transaction.execute(
             "INSERT INTO index_metadata(key, value)
              VALUES ('embedding_model', ?1), ('embedding_dimension', ?2)",
-            params![MODEL_NAME, DIMENSION.to_string()],
+            params![crate::embedding::model_identity(), DIMENSION.to_string()],
         )?;
     }
     transaction.execute(
@@ -155,6 +151,14 @@ fn replace_file(
         chunks.len(),
         windows.len(),
     )?;
+    if let Some(batch) = documents {
+        super::documents::write(
+            &transaction,
+            file_id,
+            analysis.context("documents require analysis")?,
+            batch,
+        )?;
+    }
     transaction.commit()?;
     Ok(())
 }

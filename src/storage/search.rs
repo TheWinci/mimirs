@@ -10,11 +10,23 @@ pub struct SearchResult {
     pub line_end: i64,
     pub text: String,
     pub similarity: f64,
+    pub indexed: Option<IndexedEvidence>,
 }
 
-pub fn has_windows(connection: &Connection) -> anyhow::Result<bool> {
+#[derive(Debug)]
+pub struct IndexedEvidence {
+    pub owner: Option<usize>,
+    pub snapshot_hash: String,
+    pub spans: Vec<crate::retrieval::render::Evidence>,
+}
+
+pub fn has_content(connection: &Connection) -> anyhow::Result<bool> {
     connection
-        .query_row("SELECT EXISTS(SELECT 1 FROM windows)", [], |row| row.get(0))
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM windows) OR EXISTS(SELECT 1 FROM retrieval_documents)",
+            [],
+            |row| row.get(0),
+        )
         .context("cannot check indexed windows")
 }
 
@@ -35,6 +47,17 @@ pub fn nearest(
         query.iter().all(|value| value.is_finite()),
         "query vector contains a non-finite value"
     );
+    if let (super::policy::Mode::Facts, Some(policy)) = super::policy::read(connection)? {
+        return super::document_search::nearest(connection, query, limit, &policy);
+    }
+    nearest_raw(connection, query, limit)
+}
+
+pub(super) fn nearest_raw(
+    connection: &Connection,
+    query: &[f32],
+    limit: usize,
+) -> anyhow::Result<Vec<SearchResult>> {
     let retrieve = || -> anyhow::Result<Vec<SearchResult>> {
         let bytes: Vec<u8> = query.iter().flat_map(|value| value.to_ne_bytes()).collect();
         // vec0 chooses the top K. Sort those matches after retrieval because
@@ -55,6 +78,7 @@ pub fn nearest(
                 line_end: row.get(2)?,
                 text: row.get(3)?,
                 similarity: row.get(4)?,
+                indexed: None,
             })
         })?;
         let mut results = rows.collect::<rusqlite::Result<Vec<_>>>()?;

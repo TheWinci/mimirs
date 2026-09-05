@@ -246,3 +246,37 @@ fn real_minilm_documents_and_queries_reuse_the_cache() {
     let mut second = Embedder::new(FastEmbedBackend::new(cache.path().to_owned()));
     assert_eq!(second.embed_query("entry point").unwrap().len(), DIMENSION);
 }
+
+#[test]
+#[ignore = "loads pinned and previously measured local models; run explicitly"]
+fn pinned_snapshot_preserves_measured_backend_embeddings() {
+    let cache = model_cache_dir().unwrap();
+    let mut previous = fastembed::TextEmbedding::try_new(
+        fastembed::TextInitOptions::new(fastembed::EmbeddingModel::AllMiniLML6V2)
+            .with_cache_dir(cache.clone())
+            .with_show_download_progress(false),
+    )
+    .unwrap();
+    let measured_revision =
+        std::fs::read_to_string(cache.join("models--Qdrant--all-MiniLM-L6-v2-onnx/refs/main"))
+            .unwrap();
+    assert_eq!(
+        measured_revision.trim(),
+        MODEL_REVISION,
+        "the previous backend no longer uses the measured snapshot"
+    );
+    let texts = vec![
+        "remove expired sessions".to_owned(),
+        "Rust function café. Calls written expression helper(value). Target unresolved.".to_owned(),
+    ];
+    let expected = previous.embed(&texts, None).unwrap();
+    let mut pinned = FastEmbedBackend::new(cache);
+    let actual = pinned.embed(&texts).unwrap();
+    for (a, b) in actual.iter().zip(&expected) {
+        assert!(a.iter().zip(b).all(|(x, y)| (x - y).abs() < 1e-6));
+    }
+    assert_eq!(
+        pinned.tokenizer().unwrap().to_string(false).unwrap(),
+        previous.tokenizer.to_string(false).unwrap()
+    );
+}

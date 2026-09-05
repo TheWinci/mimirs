@@ -5,15 +5,26 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 
-pub fn run(file: &Path, stored: bool) -> anyhow::Result<()> {
+pub fn run(file: &Path, stored: bool, documents: bool) -> anyhow::Result<()> {
     let root = std::env::current_dir().context("cannot find current directory")?;
-    io::stdout()
-        .lock()
-        .write_all(report_at(&root, file, stored)?.as_bytes())?;
+    io::stdout().lock().write_all(
+        if documents {
+            serde_json::to_string_pretty(&crate::retrieval::render::render(
+                &crate::retrieval::project(&load_at(&root, file, stored)?)?,
+            ))?
+        } else {
+            report_at(&root, file, stored)?
+        }
+        .as_bytes(),
+    )?;
     Ok(())
 }
 
 fn report_at(root: &Path, file: &Path, stored: bool) -> anyhow::Result<String> {
+    Ok(analysis::report(&load_at(root, file, stored)?))
+}
+
+fn load_at(root: &Path, file: &Path, stored: bool) -> anyhow::Result<analysis::Analysis> {
     ensure!(
         file.extension().is_some_and(|ext| ext == "rs"),
         "unsupported Rust source file {}",
@@ -40,7 +51,7 @@ fn report_at(root: &Path, file: &Path, stored: bool) -> anyhow::Result<String> {
         analysis::extract(source::read(root, path)?)
             .with_context(|| format!("cannot analyze {}", file.display()))?
     };
-    Ok(analysis::report(&analysis))
+    Ok(analysis)
 }
 
 fn normalize(path: &Path) -> PathBuf {

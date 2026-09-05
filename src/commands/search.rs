@@ -36,8 +36,15 @@ fn run_at(
     // Keep metadata, the empty check, and retrieval in one read snapshot.
     let transaction = connection.transaction()?;
     storage::validate_model(&transaction)?;
-    let results = if storage::has_windows(&transaction)? {
+    let (_, document_policy) = storage::policy::read(&transaction)?;
+    let results = if storage::has_content(&transaction)? {
         let mut embedder = make_embedder()?;
+        if let Some(policy) = &document_policy {
+            ensure!(
+                storage::policy::document_policy(&embedder.token_budget()?) == *policy,
+                "query tokenizer does not match indexed document policy; run mimirs index"
+            );
+        }
         let vector = embedder.embed_query(query)?;
         storage::nearest(&transaction, &vector, limit)?
     } else {
@@ -72,7 +79,34 @@ fn write_results(
         if result.line_start != result.line_end {
             write!(stdout, "-{}", result.line_end)?;
         }
-        writeln!(stdout, "\ntext: {}", result.text)?;
+        if let Some(indexed) = &result.indexed {
+            writeln!(
+                stdout,
+                "\nsource: indexed snapshot {}",
+                indexed.snapshot_hash
+            )?;
+            writeln!(
+                stdout,
+                "owner: {}",
+                indexed
+                    .owner
+                    .map_or_else(|| "file".into(), |id| format!("e{id}"))
+            )?;
+            for evidence in &indexed.spans {
+                writeln!(
+                    stdout,
+                    "evidence: {:?} bytes {}..{} lines {}..{}",
+                    evidence.record,
+                    evidence.span.start,
+                    evidence.span.end,
+                    evidence.span.line_start,
+                    evidence.span.line_end
+                )?;
+            }
+            writeln!(stdout, "text: {}", result.text)?;
+        } else {
+            writeln!(stdout, "\ntext: {}", result.text)?;
+        }
     }
 
     Ok(())

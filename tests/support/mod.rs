@@ -35,3 +35,36 @@ fn scalar_cosine_handles_known_vectors() {
     assert_eq!(cosine_similarity(&[1.0, 0.0], &[0.0, 1.0]).unwrap(), 0.0);
     assert_eq!(cosine_similarity(&[1.0, 0.0], &[-1.0, 0.0]).unwrap(), -1.0);
 }
+
+pub fn tokenizer(limit: usize) -> tokenizers::Tokenizer {
+    use tokenizers::{
+        TruncationParams, models::wordlevel::WordLevel, pre_tokenizers::whitespace::Whitespace,
+        processors::bert::BertProcessing,
+    };
+    let model = WordLevel::builder()
+        .vocab(
+            [
+                ("[UNK]".into(), 0),
+                ("[CLS]".into(), 1),
+                ("[SEP]".into(), 2),
+            ]
+            .into_iter()
+            .collect(),
+        )
+        .unk_token("[UNK]".into())
+        .build()
+        .unwrap();
+    let mut tokenizer = tokenizers::Tokenizer::new(model);
+    tokenizer.with_pre_tokenizer(Some(Whitespace));
+    tokenizer.with_post_processor(Some(BertProcessing::new(
+        ("[SEP]".into(), 2),
+        ("[CLS]".into(), 1),
+    )));
+    tokenizer
+        .with_truncation(Some(TruncationParams {
+            max_length: limit,
+            ..Default::default()
+        }))
+        .unwrap();
+    tokenizer
+}

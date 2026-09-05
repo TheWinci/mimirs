@@ -6,6 +6,7 @@ mod chunk;
 mod commands;
 mod config;
 mod embedding;
+mod retrieval;
 mod source;
 mod storage;
 mod window;
@@ -29,6 +30,9 @@ enum Command {
         /// Read saved analysis without reading the current source.
         #[arg(long)]
         stored: bool,
+        /// Preview evidence descriptions without loading an embedding model.
+        #[arg(long)]
+        documents: bool,
     },
 
     /// Index current directory with config defined in .mimirs folder.
@@ -36,7 +40,7 @@ enum Command {
 
     /// Search query with limit.
     Search {
-        /// Text that will be used to search the index.
+        /// Caller-distilled intent, preserving supplied identifiers and constraints.
         query: String,
 
         /// Number of top results to return.
@@ -49,7 +53,11 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::Inspect { file, stored } => commands::inspect::run(&file, stored),
+        Command::Inspect {
+            file,
+            stored,
+            documents,
+        } => commands::inspect::run(&file, stored, documents),
         Command::Init => commands::init::run(),
         Command::Index => commands::index::run(),
         Command::Search { query, limit } => commands::search::run(&query, limit),

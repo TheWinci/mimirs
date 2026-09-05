@@ -37,6 +37,7 @@ pub fn reconcile(connection: &mut Connection, successful: &[&str]) -> anyhow::Re
 /// Commit removal before processing so a failed replacement cannot expose stale facts.
 pub fn invalidate(connection: &mut Connection, path: &str) -> anyhow::Result<()> {
     let transaction = connection.transaction()?;
+    transaction.execute("DELETE FROM document_embeddings WHERE document_id IN (SELECT d.id FROM retrieval_documents d JOIN files f ON f.id = d.file_id WHERE f.path = ?1)", [path])?;
     transaction.execute("DELETE FROM window_embeddings WHERE window_id IN (SELECT w.id FROM windows w JOIN chunks c ON c.id = w.chunk_id JOIN files f ON f.id = c.file_id WHERE f.path = ?1)", [path])?;
     transaction.execute("DELETE FROM files WHERE path = ?1", [path])?;
     transaction

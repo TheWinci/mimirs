@@ -67,3 +67,29 @@ CREATE TABLE file_processing (
     chunk_count INTEGER NOT NULL CHECK (chunk_count >= 0),
     window_count INTEGER NOT NULL CHECK (window_count >= 0)
 );
+
+CREATE TABLE retrieval_documents (
+    id INTEGER PRIMARY KEY,
+    file_id INTEGER NOT NULL REFERENCES source_snapshots(file_id) ON DELETE CASCADE,
+    ordinal INTEGER NOT NULL CHECK (ordinal >= 0),
+    owner INTEGER,
+    kind TEXT NOT NULL CHECK (kind IN ('entity', 'file')),
+    part INTEGER NOT NULL CHECK (part >= 0),
+    policy TEXT NOT NULL,
+    text TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    evidence TEXT NOT NULL,
+    UNIQUE (file_id, ordinal),
+    FOREIGN KEY (file_id, owner) REFERENCES entities(file_id, ordinal)
+);
+
+CREATE VIRTUAL TABLE document_embeddings USING vec0(
+    document_id INTEGER PRIMARY KEY,
+    embedding FLOAT[384] distance_metric=cosine
+);
+
+CREATE TABLE retrieval_processing (
+    file_id INTEGER PRIMARY KEY REFERENCES source_snapshots(file_id) ON DELETE CASCADE,
+    policy TEXT NOT NULL,
+    document_count INTEGER NOT NULL CHECK (document_count >= 0)
+);
