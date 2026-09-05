@@ -89,3 +89,72 @@ fn descriptions_match_query_evidence_without_inferred_behavior() {
     assert!(!text.contains("session.expires > now"));
     assert!(!text.contains("resolves to"));
 }
+
+fn tokenizer(limit: usize) -> tokenizers::Tokenizer {
+    use tokenizers::{
+        TruncationParams, models::wordlevel::WordLevel, pre_tokenizers::whitespace::Whitespace,
+        processors::bert::BertProcessing,
+    };
+    let model = WordLevel::builder()
+        .vocab(
+            [
+                ("[UNK]".into(), 0),
+                ("[CLS]".into(), 1),
+                ("[SEP]".into(), 2),
+            ]
+            .into_iter()
+            .collect(),
+        )
+        .unk_token("[UNK]".into())
+        .build()
+        .unwrap();
+    let mut tokenizer = tokenizers::Tokenizer::new(model);
+    tokenizer.with_pre_tokenizer(Some(Whitespace));
+    tokenizer.with_post_processor(Some(BertProcessing::new(
+        ("[SEP]".into(), 2),
+        ("[CLS]".into(), 1),
+    )));
+    tokenizer
+        .with_truncation(Some(TruncationParams {
+            max_length: limit,
+            ..Default::default()
+        }))
+        .unwrap();
+    tokenizer
+}
+
+#[test]
+fn split_preserves_oversized_unicode_clauses_and_special_token_budget() {
+    let budget = split::TokenBudget::new(tokenizer(32)).unwrap();
+    assert_eq!(budget.count("hello").unwrap(), 3);
+    let analysis = extract("/// docs\nfn f() {}");
+    let mut descriptions = render::render(&project(&analysis).unwrap());
+    let content = "Café 東京 x ".repeat(300);
+    descriptions[0].facts.truncate(1);
+    descriptions[0].facts[0].text = content.clone();
+    let parts = budget.split(&descriptions).unwrap();
+    assert!(parts.len() > 1);
+    assert_eq!(parts, budget.split(&descriptions).unwrap());
+    let prefix = format!("{}\n", descriptions[0].identity.text);
+    let recovered: String = parts
+        .iter()
+        .map(|p| p.text.strip_prefix(&prefix).unwrap())
+        .collect();
+    assert_eq!(recovered, content);
+    for (id, part) in parts.iter().enumerate() {
+        assert_eq!(part.part, id);
+        assert!(budget.count(&part.text).unwrap() <= 32);
+        assert!(
+            part.evidence
+                .contains(&descriptions[0].facts[0].evidence[0])
+        );
+    }
+    descriptions[0].identity.text = "long identifier ".repeat(200);
+    assert!(
+        budget
+            .split(&descriptions)
+            .unwrap()
+            .iter()
+            .all(|d| budget.count(&d.text).unwrap() <= 32)
+    );
+}

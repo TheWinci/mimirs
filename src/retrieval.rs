@@ -142,3 +142,5 @@ pub fn project(analysis: &Analysis) -> Result<Projection<'_>> {
 mod tests;
 
 pub mod render;
+
+pub mod split;

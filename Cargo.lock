@@ -1183,6 +1183,7 @@ dependencies = [
  "sha2",
  "sqlite-vec",
  "tempfile",
+ "tokenizers",
  "toml",
  "tree-sitter",
  "tree-sitter-rust",

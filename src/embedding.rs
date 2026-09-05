@@ -13,6 +13,11 @@ pub trait Backend {
         Ok(())
     }
 
+    #[allow(dead_code)] // Connected to Rust indexing in S6.
+    fn tokenizer(&mut self) -> anyhow::Result<tokenizers::Tokenizer> {
+        anyhow::bail!("embedding backend does not expose a tokenizer")
+    }
+
     fn embed(&mut self, texts: &[String]) -> anyhow::Result<Vec<Vec<f32>>>;
 }
 
@@ -31,6 +36,11 @@ impl Embedder {
         self.backend
             .prepare()
             .with_context(|| format!("cannot prepare embedding model {MODEL_NAME}"))
+    }
+
+    #[allow(dead_code)] // Connected to Rust indexing in S6.
+    pub fn token_budget(&mut self) -> anyhow::Result<crate::retrieval::split::TokenBudget> {
+        crate::retrieval::split::TokenBudget::new(self.backend.tokenizer()?)
     }
 
     pub fn embed_documents(
@@ -128,6 +138,10 @@ impl Backend for FastEmbedBackend {
     fn prepare(&mut self) -> anyhow::Result<()> {
         self.model()?;
         Ok(())
+    }
+
+    fn tokenizer(&mut self) -> anyhow::Result<tokenizers::Tokenizer> {
+        Ok(self.model()?.tokenizer.clone())
     }
 
     fn embed(&mut self, texts: &[String]) -> anyhow::Result<Vec<Vec<f32>>> {
