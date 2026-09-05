@@ -1,3 +1,4 @@
 file: fixture.rs
 source: 9 bytes
 parse: complete
+entity e0: function Some("f") bytes 0..9 lines 1..1

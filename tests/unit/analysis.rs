@@ -41,3 +41,48 @@ fn diagnostic_goldens() {
         assert_eq!(report(&analyze(source)), golden);
     }
 }
+
+#[test]
+fn declarations_retain_exact_evidence_and_order() {
+    let text = include_str!("../fixtures/rust/declarations.rs");
+    let a = analyze(text);
+    assert!(a.diagnostics.is_empty(), "{:?}", a.diagnostics);
+    for kind in [
+        "module", "struct", "field", "union", "enum", "variant", "trait", "impl", "type", "const",
+        "static", "macro", "function",
+    ] {
+        assert!(a.entities.iter().any(|e| e.kind == kind), "{kind}");
+    }
+    assert!(
+        a.entities
+            .windows(2)
+            .all(|es| es[0].span.start <= es[1].span.start)
+    );
+    assert_eq!(
+        a.entities
+            .iter()
+            .filter(|e| e.name.as_deref() == Some("same"))
+            .count(),
+        2
+    );
+    assert!(
+        !a.entities
+            .iter()
+            .any(|e| e.name.as_deref() == Some("hidden"))
+    );
+    assert!(
+        a.entities
+            .iter()
+            .any(|e| e.name.as_deref() == Some("Work for Café"))
+    );
+    assert_eq!(
+        a.entities
+            .iter()
+            .filter(|e| e.kind == "field" && e.name.is_none())
+            .count(),
+        3
+    );
+    for e in a.entities {
+        assert!(!text[e.span.start..e.span.end].is_empty());
+    }
+}

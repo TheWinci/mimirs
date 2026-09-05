@@ -3,6 +3,9 @@ use tree_sitter::{Node, Parser};
 
 use crate::source::SourceFile;
 
+mod entities;
+pub use entities::Entity;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Span {
     pub start: usize,
@@ -44,6 +47,7 @@ pub struct Diagnostic {
 pub struct Analysis {
     pub source: SourceFile,
     pub diagnostics: Vec<Diagnostic>,
+    pub entities: Vec<Entity>,
 }
 
 pub fn extract(source: SourceFile) -> Result<Analysis> {
@@ -54,6 +58,7 @@ pub fn extract(source: SourceFile) -> Result<Analysis> {
     let tree = parser
         .parse(&source.text, None)
         .context("Rust parser returned no tree")?;
+    let entities = entities::extract(tree.root_node(), &source.text);
     let mut diagnostics = Vec::new();
     let mut cursor = tree.walk();
     loop {
@@ -80,6 +85,7 @@ pub fn extract(source: SourceFile) -> Result<Analysis> {
                 return Ok(Analysis {
                     source,
                     diagnostics,
+                    entities,
                 });
             }
         }
@@ -97,6 +103,17 @@ pub fn report(analysis: &Analysis) -> String {
             "incomplete"
         }
     );
+    for (id, entity) in analysis.entities.iter().enumerate() {
+        output.push_str(&format!(
+            "entity e{id}: {} {:?} bytes {}..{} lines {}..{}\n",
+            entity.kind,
+            entity.name,
+            entity.span.start,
+            entity.span.end,
+            entity.span.line_start,
+            entity.span.line_end
+        ));
+    }
     for diagnostic in &analysis.diagnostics {
         output.push_str(&format!(
             "diagnostic: {} bytes {}..{} lines {}..{} column {}\n",
