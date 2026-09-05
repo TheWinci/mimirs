@@ -1,13 +1,14 @@
 use crate::{
-    analysis::{Analysis, Entity, Span},
+    analysis::{Analysis, Entity, LineIndex, Span},
     source::SourceFile,
 };
 use anyhow::{Context, Result, ensure};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 
-pub const ANALYSIS_VERSION: &str = "rust-0.24.2/extractor-1";
+// Bump when parser, grammar, or extraction changes alter saved output.
+pub const ANALYSIS_VERSION: &str = "tree-sitter-0.27.0/rust-0.24.2/extractor-2";
 
-pub fn validate_span(source: &str, span: &Span) -> Result<()> {
+fn validate_span(source: &str, span: &Span, lines: &LineIndex) -> Result<()> {
     ensure!(
         source.get(span.start..span.end).is_some(),
         "invalid source span {}..{}",
@@ -15,15 +16,16 @@ pub fn validate_span(source: &str, span: &Span) -> Result<()> {
         span.end
     );
     ensure!(
-        *span == Span::at(source, span.start, span.end),
+        *span == lines.span(span.start, span.end),
         "invalid source line range"
     );
     Ok(())
 }
 
 pub fn validate_entities(source: &str, entities: &[Entity]) -> Result<()> {
+    let lines = LineIndex::new(source);
     for (id, entity) in entities.iter().enumerate() {
-        validate_span(source, &entity.span)?;
+        validate_span(source, &entity.span, &lines)?;
         if id > 0 {
             ensure!(
                 entities[id - 1].span.start <= entity.span.start,
@@ -128,6 +130,7 @@ pub fn load_entities(
 
 pub fn validate(analysis: &Analysis) -> Result<()> {
     let source = &analysis.source.text;
+    let lines = LineIndex::new(source);
     validate_entities(source, &analysis.entities)?;
     let owner = |id: Option<usize>| -> Result<()> {
         ensure!(
@@ -138,7 +141,7 @@ pub fn validate(analysis: &Analysis) -> Result<()> {
     };
     ensure!(!analysis.scopes.is_empty(), "missing file scope");
     for (id, scope) in analysis.scopes.iter().enumerate() {
-        validate_span(source, &scope.span)?;
+        validate_span(source, &scope.span, &lines)?;
         owner(scope.owner)?;
         if id == 0 {
             ensure!(
@@ -160,7 +163,7 @@ pub fn validate(analysis: &Analysis) -> Result<()> {
         }
     }
     for (id, fact) in analysis.facts.iter().enumerate() {
-        validate_span(source, &fact.span)?;
+        validate_span(source, &fact.span, &lines)?;
         owner(fact.owner)?;
         if id > 0 {
             ensure!(
@@ -193,13 +196,12 @@ pub fn validate(analysis: &Analysis) -> Result<()> {
             );
         }
         for evidence in &fact.evidence {
-            validate_span(source, &evidence.span)?;
+            validate_span(source, &evidence.span, &lines)?;
         }
     }
     for diagnostic in &analysis.diagnostics {
-        validate_span(source, &diagnostic.span)?;
-        let before = &source[..diagnostic.span.start];
-        let column = before.len() - before.rfind('\n').map_or(0, |i| i + 1) + 1;
+        validate_span(source, &diagnostic.span, &lines)?;
+        let column = lines.column(diagnostic.span.start);
         ensure!(diagnostic.column == column, "invalid diagnostic column");
     }
     Ok(())

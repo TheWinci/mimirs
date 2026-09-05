@@ -33,11 +33,8 @@ pub(super) fn extract(
             }
         })
         .collect();
-    let is_excluded = |node: Node<'_>| {
-        excluded
-            .iter()
-            .any(|s| s.start <= node.start_byte() && s.end >= node.end_byte())
-    };
+    let excluded = merge_ranges(excluded.into_iter().map(|s| (s.start, s.end)).collect());
+    let is_excluded = |node| covered(node, &excluded);
     for &node in &nodes {
         if is_excluded(node) {
             continue;
@@ -93,6 +90,19 @@ pub(super) fn extract(
             output.push(fact);
         }
     }
+    let callee_names = merge_ranges(
+        output
+            .iter()
+            .flat_map(|fact| fact.evidence.iter())
+            .filter(|e| {
+                matches!(
+                    e.role.as_str(),
+                    "name_call" | "path_call" | "path" | "method"
+                )
+            })
+            .map(|e| (e.span.start, e.span.end))
+            .collect(),
+    );
     for node in nodes {
         if is_excluded(node) || node.is_missing() {
             continue;
@@ -112,16 +122,28 @@ pub(super) fn extract(
         }) {
             continue;
         }
-        if output.iter().any(|f| {
-            f.evidence.iter().any(|e| {
-                matches!(e.role.as_str(), "callee" | "path")
-                    && e.span.start <= node.start_byte()
-                    && e.span.end >= node.end_byte()
-            })
-        }) {
+        if covered(node, &callee_names) {
             continue;
         }
         output.push(Fact::new(kind, node, source, entities));
     }
     output
+}
+
+fn merge_ranges(mut spans: Vec<(usize, usize)>) -> Vec<(usize, usize)> {
+    spans.sort_unstable();
+    let mut merged: Vec<(usize, usize)> = Vec::new();
+    for (start, end) in spans {
+        if let Some(last) = merged.last_mut().filter(|last| last.1 >= start) {
+            last.1 = last.1.max(end);
+        } else {
+            merged.push((start, end));
+        }
+    }
+    merged
+}
+
+fn covered(node: Node<'_>, spans: &[(usize, usize)]) -> bool {
+    let end = spans.partition_point(|&(start, _)| start <= node.start_byte());
+    end > 0 && node.end_byte() <= spans[end - 1].1
 }

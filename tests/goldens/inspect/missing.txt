@@ -9,6 +9,7 @@ fact f0: signature bytes 0..7 lines 1..1 owner e0 text "fn f() "
   scope s1
 fact f1: binding bytes 13..14 lines 1..1 owner e0 text "x"
   scope s2
+  declaration bytes 9..18 text "let x = 1"
   let bytes 13..14 text "x"
   pattern_candidate bytes 13..14 text "x"
   initializer bytes 17..18 text "1"

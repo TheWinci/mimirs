@@ -1,16 +1,18 @@
-use super::{Entity, Fact, Span, facts};
+use super::{Entity, Fact, facts};
 use tree_sitter::Node;
 
-pub(super) fn extract(root: Node<'_>, source: &str, entities: &[Entity]) -> Vec<Fact> {
+pub(super) fn extract(
+    root: Node<'_>,
+    source: &str,
+    entities: &[Entity],
+    lines: &super::LineIndex,
+) -> Vec<Fact> {
     let mut output = Vec::new();
     for node in facts::nodes(root) {
         if super::entities::kind(node).is_none() {
             continue;
         }
-        let Some(owner) = entities
-            .iter()
-            .position(|e| e.span.start == node.start_byte() && e.span.end == node.end_byte())
-        else {
+        let Some(owner) = facts::exact_entity(node, entities) else {
             continue;
         };
         if entities[owner].kind == "macro" {
@@ -28,7 +30,7 @@ pub(super) fn extract(root: Node<'_>, source: &str, entities: &[Entity]) -> Vec<
             .map_or(node.end_byte(), |body| body.start_byte());
         let mut fact = Fact::new("signature", node, source, entities);
         fact.owner = Some(owner);
-        fact.span = Span::at(source, node.start_byte(), end);
+        fact.span = lines.span(node.start_byte(), end);
         let mut stack = vec![node];
         while let Some(part) = stack.pop() {
             if part.start_byte() >= end || part.end_byte() > end && part != node {
@@ -83,6 +85,13 @@ pub(super) fn extract(root: Node<'_>, source: &str, entities: &[Entity]) -> Vec<
         }
         if entities[owner].kind == "field" && entities[owner].name.is_none() {
             fact.add("type", Some(node), source);
+            if let Some(visibility) = node
+                .prev_named_sibling()
+                .filter(|n| n.kind() == "visibility_modifier")
+            {
+                fact.add("visibility", Some(visibility), source);
+                fact.span = lines.span(visibility.start_byte(), end);
+            }
         }
         fact.evidence.sort_by_key(|e| (e.span.start, e.span.end));
         output.push(fact);

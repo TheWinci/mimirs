@@ -40,7 +40,8 @@ impl Fact {
 }
 
 pub(super) fn owner(node: Node<'_>, entities: &[Entity]) -> Option<usize> {
-    entities
+    let end = entities.partition_point(|e| e.span.start <= node.start_byte());
+    entities[..end]
         .iter()
         .rposition(|e| e.span.start <= node.start_byte() && e.span.end >= node.end_byte())
 }
@@ -84,15 +85,13 @@ pub(super) fn extract(root: Node<'_>, source: &str, entities: &[Entity]) -> Vec<
         if outer {
             let mut next = node.next_named_sibling();
             while let Some(sibling) = next {
-                if let Some(id) = entities.iter().position(|e| {
-                    e.span.start == sibling.start_byte() && e.span.end == sibling.end_byte()
-                }) {
+                if let Some(id) = exact_entity(sibling, entities) {
                     fact.owner = Some(id);
                     break;
                 }
                 if !matches!(
                     sibling.kind(),
-                    "line_comment" | "block_comment" | "attribute_item"
+                    "line_comment" | "block_comment" | "attribute_item" | "visibility_modifier"
                 ) {
                     break;
                 }
@@ -109,4 +108,13 @@ pub(super) fn extract(root: Node<'_>, source: &str, entities: &[Entity]) -> Vec<
         facts.push(fact);
     }
     facts
+}
+
+pub(super) fn exact_entity(node: Node<'_>, entities: &[Entity]) -> Option<usize> {
+    let start = entities.partition_point(|e| e.span.start < node.start_byte());
+    entities[start..]
+        .iter()
+        .take_while(|e| e.span.start == node.start_byte())
+        .position(|e| e.span.end == node.end_byte())
+        .map(|id| start + id)
 }

@@ -22,24 +22,49 @@ pub struct Span {
 }
 
 impl Span {
-    pub fn at(source: &str, start: usize, end: usize) -> Self {
-        let line = |offset| {
-            source.as_bytes()[..offset]
-                .iter()
-                .filter(|&&b| b == b'\n')
-                .count()
-                + 1
-        };
+    fn of(node: Node<'_>, source: &str) -> Self {
+        let start = node.start_byte();
+        let end = node.end_byte();
         Self {
+            start,
+            end,
+            line_start: node.start_position().row + 1,
+            line_end: node.end_position().row
+                + usize::from(end == start || source.as_bytes()[end - 1] != b'\n'),
+        }
+    }
+}
+
+/// One newline index serves computed spans and storage validation.
+pub(crate) struct LineIndex {
+    starts: Vec<usize>,
+}
+
+impl LineIndex {
+    pub fn new(source: &str) -> Self {
+        let mut starts = vec![0];
+        starts.extend(
+            source
+                .bytes()
+                .enumerate()
+                .filter_map(|(i, byte)| (byte == b'\n').then_some(i + 1)),
+        );
+        Self { starts }
+    }
+
+    pub fn column(&self, offset: usize) -> usize {
+        let line = self.starts.partition_point(|&s| s <= offset) - 1;
+        offset - self.starts[line] + 1
+    }
+
+    pub fn span(&self, start: usize, end: usize) -> Span {
+        let line = |offset| self.starts.partition_point(|&s| s <= offset);
+        Span {
             start,
             end,
             line_start: line(start),
             line_end: line(if end > start { end - 1 } else { end }),
         }
-    }
-
-    fn of(node: Node<'_>, source: &str) -> Self {
-        Self::at(source, node.start_byte(), node.end_byte())
     }
 }
 
@@ -67,15 +92,17 @@ pub fn extract(source: SourceFile) -> Result<Analysis> {
     let tree = parser
         .parse(&source.text, None)
         .context("Rust parser returned no tree")?;
+    let lines = LineIndex::new(&source.text);
     let entities = entities::extract(tree.root_node(), &source.text);
     let mut facts = facts::extract(tree.root_node(), &source.text, &entities);
     facts.extend(signatures::extract(
         tree.root_node(),
         &source.text,
         &entities,
+        &lines,
     ));
     facts.extend(imports::extract(tree.root_node(), &source.text, &entities));
-    let (scopes, bindings) = scopes::extract(tree.root_node(), &source.text, &entities);
+    let (scopes, bindings) = scopes::extract(tree.root_node(), &source.text, &entities, &lines);
     facts.extend(bindings);
     facts.extend(references::extract(
         tree.root_node(),

@@ -329,3 +329,120 @@ fn calls_golden_and_recovery() {
             .any(|f| f.kind == "call" && &a.source.text[f.span.start..f.span.end] == "good()")
     );
 }
+
+#[test]
+fn audit_repository_sources() {
+    let mut dirs = vec![std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src")];
+    while let Some(dir) = dirs.pop() {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                dirs.push(path);
+            } else if path.extension().is_some_and(|e| e == "rs") {
+                let a = analyze(&std::fs::read_to_string(&path).unwrap());
+                assert!(
+                    a.diagnostics.is_empty(),
+                    "{}: {:?}",
+                    path.display(),
+                    a.diagnostics
+                );
+                crate::storage::analysis::validate(&a)
+                    .unwrap_or_else(|e| panic!("{}: {e:#}", path.display()));
+            }
+        }
+    }
+}
+
+#[test]
+fn tuple_metadata_and_guard_calls_survive_extraction() {
+    let a = analyze(
+        "struct S(/// docs\n#[cfg(test)] pub u8); fn f() { let S { ref mut field, other: x } = y; match x { Some(v) if pred(v) => f(v), _ => 0 } }",
+    );
+    let field = a.entities.iter().position(|e| e.kind == "field").unwrap();
+    assert!(
+        a.facts
+            .iter()
+            .any(|f| f.kind == "doc" && f.owner == Some(field))
+    );
+    assert!(
+        a.facts
+            .iter()
+            .any(|f| f.kind == "attribute" && f.owner == Some(field))
+    );
+    assert!(a.facts.iter().any(|f| f.kind == "signature"
+        && f.owner == Some(field)
+        && f.evidence.iter().any(|e| e.role == "visibility")));
+    assert!(
+        a.facts
+            .iter()
+            .any(|f| f.kind == "binding" && &a.source.text[f.span.start..f.span.end] == "field")
+    );
+    assert!(
+        a.facts
+            .iter()
+            .any(|f| f.kind == "call" && &a.source.text[f.span.start..f.span.end] == "pred(v)")
+    );
+    crate::storage::analysis::validate(&a).unwrap();
+}
+
+#[test]
+fn binding_markers_belong_to_each_pattern_branch() {
+    let a = analyze("fn f() { let (ref a, mut b) = pair; }");
+    for (name, marker) in [("a", "ref"), ("b", "mut")] {
+        let f = a
+            .facts
+            .iter()
+            .find(|f| f.kind == "binding" && &a.source.text[f.span.start..f.span.end] == name)
+            .unwrap();
+        let markers: Vec<_> = f
+            .evidence
+            .iter()
+            .filter(|e| e.role == "marker")
+            .map(|e| &a.source.text[e.span.start..e.span.end])
+            .collect();
+        assert_eq!(markers, [marker]);
+    }
+}
+
+#[test]
+fn parser_and_computed_spans_agree_on_crlf_and_unicode() {
+    for text in [
+        " \r\n",
+        "\r\n/// café\r\nfn café() { call(); }\r\n",
+        "fn f() { let x = 1 }\r\n",
+        "mod m { fn f() {} fn f() {} }",
+        "\n\n",
+    ] {
+        let a = analyze(text);
+        crate::storage::analysis::validate(&a).unwrap();
+        for fact in &a.facts {
+            assert_eq!(
+                fact.span,
+                LineIndex::new(text).span(fact.span.start, fact.span.end)
+            );
+        }
+    }
+}
+
+#[test]
+fn recovered_prefixes_keep_valid_owned_records() {
+    let text = include_str!("../fixtures/rust/declarations.rs");
+    for (end, _) in text.char_indices() {
+        let a = analyze(&text[..end]);
+        crate::storage::analysis::validate(&a).unwrap_or_else(|e| panic!("prefix {end}: {e:#}"));
+    }
+}
+
+#[test]
+fn callable_expression_arguments_and_receivers_remain_references() {
+    let a = analyze("fn f() { (factory(arg))(); receiver.method::<Type>(); }");
+    for name in ["arg", "receiver", "Type"] {
+        assert!(
+            a.facts.iter().any(
+                |f| matches!(f.kind.as_str(), "value_reference" | "type_reference")
+                    && &a.source.text[f.span.start..f.span.end] == name
+            ),
+            "{name}"
+        );
+    }
+}

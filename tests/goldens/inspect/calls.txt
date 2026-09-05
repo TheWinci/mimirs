@@ -33,14 +33,17 @@ fact f4: binding bytes 48..49 lines 2..2 owner e0 text "x"
   scope s1
   parameter bytes 48..49 text "x"
   pattern_candidate bytes 48..49 text "x"
+  declaration bytes 48..52 text "x: T"
 fact f5: binding bytes 64..69 lines 3..3 owner e0 text "local"
   scope s2
+  declaration bytes 60..82 text "let local = |arg| arg;"
   let bytes 64..69 text "local"
   pattern_candidate bytes 64..69 text "local"
-  initializer bytes 72..81 text "|arg| arg"
   closure_initializer bytes 72..81 text "|arg| arg"
+  initializer bytes 72..81 text "|arg| arg"
 fact f6: binding bytes 73..76 lines 3..3 owner e0 text "arg"
   scope s3
+  declaration bytes 72..77 text "|arg|"
   closure bytes 73..76 text "arg"
   pattern_candidate bytes 73..76 text "arg"
 fact f7: value_reference bytes 78..81 lines 3..3 owner e0 text "arg"
@@ -50,7 +53,9 @@ fact f8: call bytes 87..117 lines 4..4 owner e0 text "local(x.method::<T>(nested
   callee bytes 87..92 text "local"
   name_call bytes 87..92 text "local"
   argument bytes 93..116 text "x.method::<T>(nested())"
-fact f9: call bytes 93..116 lines 4..4 owner e0 text "x.method::<T>(nested())"
+fact f9: value_reference bytes 93..94 lines 4..4 owner e0 text "x"
+  scope s2
+fact f10: call bytes 93..116 lines 4..4 owner e0 text "x.method::<T>(nested())"
   scope s2
   callee bytes 93..106 text "x.method::<T>"
   method_call bytes 93..101 text "x.method"
@@ -58,11 +63,13 @@ fact f9: call bytes 93..116 lines 4..4 owner e0 text "x.method::<T>(nested())"
   method bytes 95..101 text "method"
   generics bytes 103..106 text "<T>"
   argument bytes 107..115 text "nested()"
-fact f10: call bytes 107..115 lines 4..4 owner e0 text "nested()"
+fact f11: type_reference bytes 104..105 lines 4..4 owner e0 text "T"
+  scope s2
+fact f12: call bytes 107..115 lines 4..4 owner e0 text "nested()"
   scope s2
   callee bytes 107..113 text "nested"
   name_call bytes 107..113 text "nested"
-fact f11: macro_invocation bytes 123..144 lines 5..5 owner e0 text "opaque!(not_a_call())"
+fact f13: macro_invocation bytes 123..144 lines 5..5 owner e0 text "opaque!(not_a_call())"
   scope s2
   path bytes 123..129 text "opaque"
   tokens bytes 130..144 text "(not_a_call())"
