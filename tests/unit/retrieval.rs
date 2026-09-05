@@ -58,3 +58,34 @@ fn projection_rejects_invalid_owners() {
     analysis.facts[0].owner = Some(999);
     assert!(project(&analysis).is_err());
 }
+
+#[test]
+fn descriptions_match_query_evidence_without_inferred_behavior() {
+    let analysis = extract(include_str!("../fixtures/retrieval/sessions.rs"));
+    let projection = project(&analysis).unwrap();
+    let documents = render::render(&projection);
+    assert_eq!(documents, render::render(&projection));
+    let cases: serde_json::Value =
+        serde_json::from_str(include_str!("../fixtures/retrieval/queries.json")).unwrap();
+    for case in cases.as_array().unwrap() {
+        let owner = analysis
+            .entities
+            .iter()
+            .position(|e| e.name.as_deref() == case["entity"].as_str())
+            .unwrap();
+        let document = documents.iter().find(|d| d.owner == Some(owner)).unwrap();
+        assert!(
+            document
+                .facts
+                .iter()
+                .any(|c| c.text == case["document_clause"].as_str().unwrap())
+        );
+        for clause in &document.facts {
+            assert!(!clause.evidence.is_empty());
+        }
+    }
+    assert!(render::render(&project(&extract(" \n")).unwrap()).is_empty());
+    let text = serde_json::to_string(&documents).unwrap();
+    assert!(!text.contains("session.expires > now"));
+    assert!(!text.contains("resolves to"));
+}

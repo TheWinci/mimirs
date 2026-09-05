@@ -140,3 +140,5 @@ pub fn project(analysis: &Analysis) -> Result<Projection<'_>> {
 #[cfg(test)]
 #[path = "../tests/unit/retrieval.rs"]
 mod tests;
+
+pub mod render;

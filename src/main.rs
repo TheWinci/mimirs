@@ -31,6 +31,9 @@ enum Command {
         /// Read saved analysis without reading the current source.
         #[arg(long)]
         stored: bool,
+        /// Preview evidence descriptions without loading an embedding model.
+        #[arg(long)]
+        documents: bool,
     },
 
     /// Index current directory with config defined in .mimirs folder.
@@ -51,7 +54,11 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::Inspect { file, stored } => commands::inspect::run(&file, stored),
+        Command::Inspect {
+            file,
+            stored,
+            documents,
+        } => commands::inspect::run(&file, stored, documents),
         Command::Init => commands::init::run(),
         Command::Index => commands::index::run(),
         Command::Search { query, limit } => commands::search::run(&query, limit),
