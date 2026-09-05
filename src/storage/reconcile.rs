@@ -33,3 +33,14 @@ pub fn reconcile(connection: &mut Connection, successful: &[&str]) -> anyhow::Re
     };
     cleanup().context("cannot reconcile indexed files")
 }
+
+/// Commit removal before processing so a failed replacement cannot expose stale facts.
+pub fn invalidate(connection: &mut Connection, path: &str) -> anyhow::Result<()> {
+    let transaction = connection.transaction()?;
+    transaction.execute("DELETE FROM window_embeddings WHERE window_id IN (SELECT w.id FROM windows w JOIN chunks c ON c.id = w.chunk_id JOIN files f ON f.id = c.file_id WHERE f.path = ?1)", [path])?;
+    transaction.execute("DELETE FROM files WHERE path = ?1", [path])?;
+    transaction
+        .commit()
+        .with_context(|| format!("cannot invalidate source file {path}"))?;
+    Ok(())
+}

@@ -62,6 +62,22 @@ fn index(
     make_embedder: impl FnOnce() -> anyhow::Result<embedding::Embedder>,
     progress: &mut Progress<'_>,
 ) -> anyhow::Result<Summary> {
+    index_with(
+        root,
+        make_embedder,
+        progress,
+        source::read,
+        crate::analysis::extract,
+    )
+}
+
+fn index_with(
+    root: &Path,
+    make_embedder: impl FnOnce() -> anyhow::Result<embedding::Embedder>,
+    progress: &mut Progress<'_>,
+    read: impl Fn(&Path, &str) -> anyhow::Result<source::SourceFile>,
+    extract: impl Fn(source::SourceFile) -> anyhow::Result<crate::analysis::Analysis>,
+) -> anyhow::Result<Summary> {
     let config = Config::load(root)?;
     progress.walking("-", 0)?;
     let walk = walk::discover(root, &config, |file, found| progress.walking(file, found))?;
@@ -86,7 +102,7 @@ fn index(
     let total = walk.paths.len();
     for (attempt, path) in walk.paths.iter().enumerate() {
         progress.indexing(path, (0, 0), (attempt, total), false)?;
-        let source = match source::read(root, path) {
+        let source = match read(root, path) {
             Ok(source) => source,
             Err(error) => {
                 progress.diagnostic(&format!("skipped: {error:#}"))?;
@@ -95,6 +111,26 @@ fn index(
                 continue;
             }
         };
+        storage::invalidate(&mut database.connection, path)?;
+        let analysis = if Path::new(path).extension().is_some_and(|ext| ext == "rs") {
+            Some(
+                extract(source::SourceFile {
+                    path: source.path.clone(),
+                    text: source.text.clone(),
+                })
+                .with_context(|| format!("cannot analyze source file {path}"))?,
+            )
+        } else {
+            None
+        };
+        if let Some(analysis) = &analysis {
+            for diagnostic in &analysis.diagnostics {
+                progress.diagnostic(&format!(
+                    "syntax: {path}:{}:{} {}",
+                    diagnostic.span.line_start, diagnostic.column, diagnostic.kind
+                ))?;
+            }
+        }
         let chunks = chunk::of(&source);
         let windows = chunks.iter().flat_map(window::of).collect::<Vec<_>>();
         let texts = windows
@@ -112,13 +148,24 @@ fn index(
                 Ok(())
             })
             .with_context(|| format!("cannot embed source file {path}"))?;
-        storage::save_file(
-            &mut database.connection,
-            &source,
-            &chunks,
-            &windows,
-            &vectors,
-        )?;
+        if let Some(analysis) = &analysis {
+            storage::save_file_with_analysis(
+                &mut database.connection,
+                &source,
+                &chunks,
+                &windows,
+                &vectors,
+                Some(analysis),
+            )?;
+        } else {
+            storage::save_file(
+                &mut database.connection,
+                &source,
+                &chunks,
+                &windows,
+                &vectors,
+            )?;
+        }
         successful.push(path.as_str());
         summary.indexed += 1;
         progress.indexing(

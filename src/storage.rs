@@ -11,8 +11,8 @@ use crate::embedding::{DIMENSION, MODEL_NAME};
 mod reconcile;
 mod save;
 mod search;
-pub use reconcile::reconcile;
-pub use save::save_file;
+pub use reconcile::{invalidate, reconcile};
+pub use save::{save_file, save_file_with_analysis};
 pub use search::{SearchResult, has_windows, nearest};
 
 static VEC_REGISTRATION: OnceLock<Result<(), String>> = OnceLock::new();

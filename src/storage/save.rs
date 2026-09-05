@@ -21,7 +21,18 @@ pub fn save_file(
     windows: &[Window<'_>],
     vectors: &[Vec<f32>],
 ) -> anyhow::Result<()> {
-    replace_file(connection, source, chunks, windows, vectors)
+    save_file_with_analysis(connection, source, chunks, windows, vectors, None)
+}
+
+pub fn save_file_with_analysis(
+    connection: &mut Connection,
+    source: &SourceFile,
+    chunks: &[Chunk<'_>],
+    windows: &[Window<'_>],
+    vectors: &[Vec<f32>],
+    analysis: Option<&crate::analysis::Analysis>,
+) -> anyhow::Result<()> {
+    replace_file(connection, source, chunks, windows, vectors, analysis)
         .with_context(|| format!("cannot save source file {}", source.path))
 }
 
@@ -31,6 +42,7 @@ fn replace_file(
     chunks: &[Chunk<'_>],
     windows: &[Window<'_>],
     vectors: &[Vec<f32>],
+    analysis: Option<&crate::analysis::Analysis>,
 ) -> anyhow::Result<()> {
     ensure!(
         windows.len() == vectors.len(),
@@ -64,6 +76,13 @@ fn replace_file(
         );
     }
 
+    if let Some(analysis) = analysis {
+        ensure!(
+            analysis.source == *source,
+            "analysis does not match indexed source"
+        );
+        super::analysis::validate(analysis)?;
+    }
     let transaction = connection.transaction()?;
     if !validate_model(&transaction)? {
         transaction.execute(
@@ -84,6 +103,11 @@ fn replace_file(
     // vec0 has no foreign key cascade. Remove its rows before the window IDs.
     super::delete_file_embeddings(&transaction, file_id)?;
     transaction.execute("DELETE FROM chunks WHERE file_id = ?1", [file_id])?;
+
+    transaction.execute("DELETE FROM source_snapshots WHERE file_id = ?1", [file_id])?;
+    if let Some(analysis) = analysis {
+        super::analysis::write(&transaction, file_id, analysis)?;
+    }
 
     let mut chunk_ids = Vec::with_capacity(chunks.len());
     for (ordinal, chunk) in chunks.iter().enumerate() {

@@ -306,7 +306,6 @@ fn embedding_failure_preserves_earlier_commits_and_omits_cleanup() {
         files(&dir),
         [
             ("a.rs".into(), "new a".into()),
-            ("b.rs".into(), "old b".into()),
             ("stale.rs".into(), "stale".into())
         ]
     );
@@ -374,7 +373,6 @@ fn progress_failure_keeps_prior_commits_and_stops_before_save_or_cleanup() {
         files(&dir),
         [
             ("a.rs".into(), "new a".into()),
-            ("b.rs".into(), "old b".into()),
             ("stale.rs".into(), "stale".into()),
         ]
     );
@@ -428,15 +426,17 @@ fn save_and_cleanup_errors_fail_without_losing_prior_rows() {
         assert!(format!("{:#}", result.unwrap_err()).contains("forced failure"));
         assert!(stdout.is_empty());
         assert!(stderr.ends_with("\x1b[6F\x1b[J"));
-        let expected = if operation == "INSERT" { "old" } else { "new" };
-        assert_eq!(
-            files(&dir),
-            [
-                ("a.rs".into(), expected.into()),
-                ("stale.rs".into(), "stale".into())
+        let expected = if operation == "INSERT" {
+            vec![("stale.rs".into(), "stale".into())]
+        } else {
+            vec![
+                ("a.rs".into(), "old".into()),
+                ("stale.rs".into(), "stale".into()),
             ]
-        );
-        assert_eq!(counts(&dir), [2, 2, 2, 2, 2]);
+        };
+        assert_eq!(files(&dir), expected);
+        let count = if operation == "INSERT" { 1 } else { 2 };
+        assert_eq!(counts(&dir), [count, count, count, count, 2]);
     }
 }
 
@@ -494,4 +494,88 @@ fn unknown_schema_fails_before_model_creation() {
     assert!(stdout.is_empty());
     assert!(stderr.ends_with(b"\x1b[5F\x1b[J"));
     assert_eq!(fs::read(&path).unwrap(), before);
+}
+
+#[test]
+fn extraction_shares_one_read_and_mixed_types_keep_embedding_inputs() {
+    use std::cell::Cell;
+    let dir = project(&[("a.rs", "fn f() {}"), ("b.txt", "plain")]);
+    fs::write(
+        dir.path().join(".mimirs/config.toml"),
+        "include = [\"**/*.rs\", \"**/*.txt\"]\nexclude = []\n",
+    )
+    .unwrap();
+    let reads = Cell::new(0);
+    let parses = Cell::new(0);
+    let mut stderr = Vec::new();
+    let mut progress = Progress::new(dir.path(), &mut stderr, false, &|| Duration::ZERO);
+    let model = backend();
+    let calls = Rc::clone(&model.calls);
+    let summary = index_with(
+        dir.path(),
+        || Ok(Embedder::new(model)),
+        &mut progress,
+        |root, path| {
+            reads.set(reads.get() + 1);
+            source::read(root, path)
+        },
+        |source| {
+            parses.set(parses.get() + 1);
+            crate::analysis::extract(source)
+        },
+    )
+    .unwrap();
+    assert_eq!((reads.get(), parses.get(), summary.indexed), (2, 1, 2));
+    assert_eq!(calls.borrow().batches, [vec!["fn f() {}"], vec!["plain"]]);
+    let db = connection(&dir);
+    assert_eq!(
+        storage::analysis::load(&db, "a.rs")
+            .unwrap()
+            .unwrap()
+            .source
+            .text,
+        "fn f() {}"
+    );
+    assert!(storage::analysis::load(&db, "b.txt").unwrap().is_none());
+}
+
+#[test]
+fn fatal_parser_error_removes_previous_analysis_and_vectors() {
+    let dir = project(&[("a.rs", "fn old() {}")]);
+    run(&dir, backend(), false).0.unwrap();
+    fs::write(dir.path().join("a.rs"), "fn changed() {}").unwrap();
+    let mut stderr = Vec::new();
+    let mut progress = Progress::new(dir.path(), &mut stderr, false, &|| Duration::ZERO);
+    let result = index_with(
+        dir.path(),
+        || Ok(Embedder::new(backend())),
+        &mut progress,
+        source::read,
+        |_| anyhow::bail!("parser failed"),
+    );
+    assert!(format!("{:#}", result.err().unwrap()).contains("parser failed"));
+    assert_eq!(counts(&dir), [0, 0, 0, 0, 2]);
+    assert!(
+        storage::analysis::load(&connection(&dir), "a.rs")
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[test]
+fn incomplete_and_empty_replacements_remove_old_facts() {
+    let dir = project(&[("a.rs", "fn old() {}")]);
+    run(&dir, backend(), false).0.unwrap();
+    for text in ["fn broken(", " \r\n", ""] {
+        fs::write(dir.path().join("a.rs"), text).unwrap();
+        let (result, _, stderr) = run(&dir, backend(), false);
+        result.unwrap();
+        let a = storage::analysis::load(&connection(&dir), "a.rs")
+            .unwrap()
+            .unwrap();
+        assert_eq!(a.source.text, text);
+        assert!(!a.entities.iter().any(|e| e.name.as_deref() == Some("old")));
+        assert_eq!(stderr.contains("syntax: a.rs:"), !a.diagnostics.is_empty());
+    }
+    assert_eq!(counts(&dir), [1, 1, 0, 0, 2]);
 }

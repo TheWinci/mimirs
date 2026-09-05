@@ -36,7 +36,11 @@ pub(super) fn extract(
             } else {
                 node.end_byte()
             };
-            let span = Span::at(source, node.start_byte(), end);
+            let span = if kind == "file" {
+                Span::at(source, 0, source.len())
+            } else {
+                Span::at(source, node.start_byte(), end)
+            };
             let parent = scopes
                 .iter()
                 .rposition(|s: &Scope| s.span.start <= span.start && s.span.end >= span.end);
