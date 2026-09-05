@@ -1,0 +1,23 @@
+[
+  {
+    "request": "Where do we remove sessions after their expiry time?",
+    "query": "remove sessions after their expiry time",
+    "entity": "expire_sessions",
+    "evidence": "/// Remove sessions whose expiry is at or before now.",
+    "document_clause": "Documentation: /// Remove sessions whose expiry is at or before now."
+  },
+  {
+    "request": "Find valid_username and its check for a trailing newline.",
+    "query": "valid_username check for trailing newline",
+    "entity": "valid_username",
+    "evidence": "name.ends_with('\\n')",
+    "document_clause": "Calls written expression name.ends_with('\\n'). Target unresolved."
+  },
+  {
+    "request": "I have a meeting later and the dashboard colors need work. Right now find where usernames ending with a newline are rejected.",
+    "query": "reject usernames ending with a newline",
+    "entity": "valid_username",
+    "evidence": "/// Reject usernames that end with a newline.",
+    "document_clause": "Documentation: /// Reject usernames that end with a newline."
+  }
+]

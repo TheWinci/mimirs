@@ -446,3 +446,26 @@ fn callable_expression_arguments_and_receivers_remain_references() {
         );
     }
 }
+
+#[test]
+fn retrieval_examples_have_owned_source_evidence() {
+    let analysis = super::extract(crate::source::SourceFile {
+        path: "sessions.rs".into(),
+        text: include_str!("../fixtures/retrieval/sessions.rs").into(),
+    })
+    .unwrap();
+    crate::storage::analysis::validate(&analysis).unwrap();
+    let cases: serde_json::Value =
+        serde_json::from_str(include_str!("../fixtures/retrieval/queries.json")).unwrap();
+    for case in cases.as_array().unwrap() {
+        let owner = analysis
+            .entities
+            .iter()
+            .position(|e| e.name.as_deref() == case["entity"].as_str())
+            .unwrap();
+        assert!(analysis.facts.iter().any(|f| f.owner == Some(owner)
+            && analysis.source.text[f.span.start..f.span.end].trim()
+                == case["evidence"].as_str().unwrap()));
+        assert_ne!(case["request"], case["query"]);
+    }
+}
