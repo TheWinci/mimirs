@@ -243,5 +243,6 @@ pub mod analysis;
 
 pub mod processing;
 
-#[allow(dead_code)] // Connected to indexing in S6 and search in S7.
 pub mod documents;
+
+pub mod policy;

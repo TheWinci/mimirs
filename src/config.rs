@@ -12,11 +12,14 @@ pub struct Config {
     /// Applied after `include`.
     #[serde(default)]
     pub exclude: Vec<String>,
+    #[serde(default)]
+    pub retrieval: crate::storage::policy::Mode,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
+            retrieval: crate::storage::policy::Mode::Raw,
             include: ["**/*.rs"].map(String::from).to_vec(),
             exclude: [
                 "**/.git/**",

@@ -6,7 +6,6 @@ mod chunk;
 mod commands;
 mod config;
 mod embedding;
-#[allow(dead_code)] // Used by indexing once the document pipeline is complete.
 mod retrieval;
 mod source;
 mod storage;

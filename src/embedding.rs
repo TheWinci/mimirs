@@ -13,7 +13,6 @@ pub trait Backend {
         Ok(())
     }
 
-    #[allow(dead_code)] // Connected to Rust indexing in S6.
     fn tokenizer(&mut self) -> anyhow::Result<tokenizers::Tokenizer> {
         anyhow::bail!("embedding backend does not expose a tokenizer")
     }
@@ -38,7 +37,6 @@ impl Embedder {
             .with_context(|| format!("cannot prepare embedding model {MODEL_NAME}"))
     }
 
-    #[allow(dead_code)] // Connected to Rust indexing in S6.
     pub fn token_budget(&mut self) -> anyhow::Result<crate::retrieval::split::TokenBudget> {
         crate::retrieval::split::TokenBudget::new(self.backend.tokenizer()?)
     }

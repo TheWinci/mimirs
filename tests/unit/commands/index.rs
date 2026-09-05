@@ -22,6 +22,9 @@ struct TestBackend {
 }
 
 impl Backend for TestBackend {
+    fn tokenizer(&mut self) -> anyhow::Result<tokenizers::Tokenizer> {
+        Ok(crate::test_support::tokenizer(512))
+    }
     fn prepare(&mut self) -> anyhow::Result<()> {
         self.calls.borrow_mut().preparations += 1;
         if let Some(prepare) = &mut self.prepare {
@@ -141,7 +144,7 @@ fn redirected_output_and_stored_relationships_match_the_contract() {
     assert_eq!(stderr, include_str!("../../goldens/index/redirected.txt"));
     assert_eq!(calls.borrow().preparations, 1);
     assert_eq!(calls.borrow().batches, [vec!["first", "  second  "]]);
-    assert_eq!(counts(&dir), [2, 2, 2, 2, 2]);
+    assert_eq!(counts(&dir), [2, 2, 2, 2, 3]);
     let db = connection(&dir);
     let rows: Vec<(String, i64, i64, String, Vec<u8>)> = db
         .prepare(
@@ -174,7 +177,7 @@ fn redirected_output_and_stored_relationships_match_the_contract() {
         );
     }
     run(&dir, backend(), false).0.unwrap();
-    assert_eq!(counts(&dir), [2, 2, 2, 2, 2]);
+    assert_eq!(counts(&dir), [2, 2, 2, 2, 3]);
 }
 
 #[test]
@@ -216,7 +219,7 @@ fn read_skips_finish_and_empty_runs_clear_stored_files() {
         "indexed: 0 files\nunchanged: 0 files\nskipped: 1 files\nwalk_errors: 0\ntime: 1.25 seconds\n"
     );
     assert_eq!(stderr, include_str!("../../goldens/index/read_skip.txt"));
-    assert_eq!(counts(&dir), [0, 0, 0, 0, 2]);
+    assert_eq!(counts(&dir), [0, 0, 0, 0, 3]);
     fs::remove_file(dir.path().join("a.rs")).unwrap();
     let model = backend();
     let calls = Rc::clone(&model.calls);
@@ -229,14 +232,14 @@ fn read_skips_finish_and_empty_runs_clear_stored_files() {
     assert_eq!(stderr, include_str!("../../goldens/index/empty.txt"));
     assert_eq!(calls.borrow().preparations, 1);
     assert!(calls.borrow().batches.is_empty());
-    assert_eq!(counts(&dir), [0, 0, 0, 0, 2]);
+    assert_eq!(counts(&dir), [0, 0, 0, 0, 3]);
 }
 
 #[test]
-fn fresh_empty_index_stays_unstamped() {
+fn fresh_empty_index_records_mode_without_model() {
     let dir = project(&[]);
     run(&dir, backend(), false).0.unwrap();
-    assert_eq!(counts(&dir), [0, 0, 0, 0, 0]);
+    assert_eq!(counts(&dir), [0, 0, 0, 0, 1]);
 }
 
 #[test]
@@ -263,11 +266,11 @@ fn cleanup_removes_deleted_excluded_and_unreadable_files_with_vectors() {
     assert!(stdout.starts_with("indexed: 0 files\nunchanged: 1 files\nskipped: 1 files"));
     assert!(stderr.contains("cannot read source file d.rs"));
     assert_eq!(files(&dir), [("a.rs".into(), "keep".into())]);
-    assert_eq!(counts(&dir), [1, 1, 1, 1, 2]);
+    assert_eq!(counts(&dir), [1, 1, 1, 1, 3]);
     fs::remove_file(dir.path().join("a.rs")).unwrap();
     fs::remove_file(dir.path().join("d.rs")).unwrap();
     run(&dir, backend(), false).0.unwrap();
-    assert_eq!(counts(&dir), [0, 0, 0, 0, 2]);
+    assert_eq!(counts(&dir), [0, 0, 0, 0, 3]);
 }
 
 #[test]
@@ -286,7 +289,7 @@ fn walk_errors_are_listed_after_discovery_and_do_not_block_cleanup() {
     assert!(stderr[error..].contains("locked"));
     assert!(stderr[error..].contains("Permission denied"));
     assert_eq!(files(&dir), [("a.rs".into(), "keep".into())]);
-    assert_eq!(counts(&dir), [1, 1, 1, 1, 2]);
+    assert_eq!(counts(&dir), [1, 1, 1, 1, 3]);
 }
 
 #[test]
@@ -436,7 +439,7 @@ fn save_and_cleanup_errors_fail_without_losing_prior_rows() {
         };
         assert_eq!(files(&dir), expected);
         let count = if operation == "INSERT" { 1 } else { 2 };
-        assert_eq!(counts(&dir), [count, count, count, count, 2]);
+        assert_eq!(counts(&dir), [count, count, count, count, 3]);
     }
 }
 
@@ -472,7 +475,7 @@ fn a_file_removed_after_discovery_is_a_read_skip() {
     );
     assert!(stderr.contains("cannot read source file a.rs"));
     assert!(stderr.contains("index_progress: 100% (1/1 files)"));
-    assert_eq!(counts(&dir), [0, 0, 0, 0, 2]);
+    assert_eq!(counts(&dir), [0, 0, 0, 0, 3]);
 }
 
 #[test]
@@ -558,7 +561,7 @@ fn fatal_parser_error_removes_previous_analysis_and_vectors() {
         |_| anyhow::bail!("parser failed"),
     );
     assert!(format!("{:#}", result.err().unwrap()).contains("parser failed"));
-    assert_eq!(counts(&dir), [0, 0, 0, 0, 2]);
+    assert_eq!(counts(&dir), [0, 0, 0, 0, 3]);
     assert!(
         storage::analysis::load(&connection(&dir), "a.rs")
             .unwrap()
@@ -581,7 +584,7 @@ fn incomplete_and_empty_replacements_remove_old_facts() {
         assert!(!a.entities.iter().any(|e| e.name.as_deref() == Some("old")));
         assert_eq!(stderr.contains("syntax: a.rs:"), !a.diagnostics.is_empty());
     }
-    assert_eq!(counts(&dir), [1, 1, 0, 0, 2]);
+    assert_eq!(counts(&dir), [1, 1, 0, 0, 3]);
 }
 
 #[test]
@@ -676,4 +679,109 @@ fn stale_versions_and_missing_output_force_reprocessing() {
         );
         assert_eq!(calls.borrow().batches.len(), 1, "{mutation}");
     }
+}
+
+#[test]
+fn facts_index_embeds_descriptions_reuses_and_switches_policy() {
+    let dir = project(&[
+        (
+            "a.rs",
+            "/// Remove expired sessions.\nfn expire() { retain(); }",
+        ),
+        ("empty.rs", " \n"),
+    ]);
+    let config_path = dir.path().join(".mimirs/config.toml");
+    let mut config = Config {
+        retrieval: storage::policy::Mode::Facts,
+        ..Config::default()
+    };
+    fs::write(&config_path, config.to_toml().unwrap()).unwrap();
+    let first = backend();
+    let calls = first.calls.clone();
+    run(&dir, first, false).0.unwrap();
+    let inputs: Vec<_> = calls.borrow().batches.iter().flatten().cloned().collect();
+    assert!(
+        inputs
+            .iter()
+            .any(|s| s.contains("Documentation: /// Remove expired sessions."))
+    );
+    assert!(inputs.iter().all(|s| !s.contains("{ retain(); }")));
+    let second = backend();
+    let calls = second.calls.clone();
+    let (_, stdout, _) = run(&dir, second, false);
+    assert!(stdout.contains("unchanged: 2 files"));
+    assert!(calls.borrow().batches.is_empty());
+    let db = storage::open_read_only(&dir.path().join(".mimirs/index.db")).unwrap();
+    let (_, policy) = storage::policy::read(&db).unwrap();
+    assert!(
+        storage::documents::load(&db, "empty.rs", policy.as_deref().unwrap())
+            .unwrap()
+            .is_empty()
+    );
+    drop(db);
+    config.retrieval = storage::policy::Mode::Raw;
+    fs::write(&config_path, config.to_toml().unwrap()).unwrap();
+    run(&dir, backend(), false).0.unwrap();
+    let db = storage::open_read_only(&dir.path().join(".mimirs/index.db")).unwrap();
+    assert_eq!(
+        storage::policy::read(&db).unwrap().0,
+        storage::policy::Mode::Raw
+    );
+    assert_eq!(
+        db.query_row("SELECT count(*) FROM document_embeddings", [], |r| r
+            .get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+}
+
+#[test]
+fn facts_failure_invalidates_old_output_and_mixed_files_keep_raw_inputs() {
+    let dir = project(&[("a.rs", "fn old() {}"), ("b.txt", "plain text")]);
+    let config = Config {
+        retrieval: storage::policy::Mode::Facts,
+        include: vec!["**/*.rs".into(), "**/*.txt".into()],
+        ..Config::default()
+    };
+    fs::write(
+        dir.path().join(".mimirs/config.toml"),
+        config.to_toml().unwrap(),
+    )
+    .unwrap();
+    let first = backend();
+    let calls = first.calls.clone();
+    run(&dir, first, false).0.unwrap();
+    assert!(
+        calls
+            .borrow()
+            .batches
+            .iter()
+            .flatten()
+            .any(|t| t == "plain text")
+    );
+    let changed = "fn new() {}";
+    fs::write(dir.path().join("a.rs"), changed).unwrap();
+    let analysis = crate::analysis::extract(source::SourceFile {
+        path: "a.rs".into(),
+        text: changed.into(),
+    })
+    .unwrap();
+    let budget =
+        crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
+    let documents = budget
+        .split(&crate::retrieval::render::render(
+            &crate::retrieval::project(&analysis).unwrap(),
+        ))
+        .unwrap();
+    let mut failing = backend();
+    failing.fail_on = Some(documents[0].text.clone());
+    assert!(run(&dir, failing, false).0.is_err());
+    let db = storage::open_read_only(&dir.path().join(".mimirs/index.db")).unwrap();
+    assert!(storage::analysis::load(&db, "a.rs").unwrap().is_none());
+    assert_eq!(
+        db.query_row("SELECT count(*) FROM document_embeddings", [], |r| r
+            .get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
 }

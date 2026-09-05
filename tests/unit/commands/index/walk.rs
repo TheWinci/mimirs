@@ -23,6 +23,7 @@ fn tree(files: &[(&str, &str)]) -> TempDir {
 
 fn config(include: &[&str], exclude: &[&str]) -> Config {
     Config {
+        retrieval: crate::storage::policy::Mode::Raw,
         include: include.iter().map(|s| s.to_string()).collect(),
         exclude: exclude.iter().map(|s| s.to_string()).collect(),
     }
@@ -165,6 +166,7 @@ fn a_secret_is_never_walked() {
     ]);
 
     let config = Config {
+        retrieval: crate::storage::policy::Mode::Raw,
         include: vec!["**/*".to_string()],
         ..Config::default()
     };

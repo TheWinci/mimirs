@@ -90,42 +90,9 @@ fn descriptions_match_query_evidence_without_inferred_behavior() {
     assert!(!text.contains("resolves to"));
 }
 
-fn tokenizer(limit: usize) -> tokenizers::Tokenizer {
-    use tokenizers::{
-        TruncationParams, models::wordlevel::WordLevel, pre_tokenizers::whitespace::Whitespace,
-        processors::bert::BertProcessing,
-    };
-    let model = WordLevel::builder()
-        .vocab(
-            [
-                ("[UNK]".into(), 0),
-                ("[CLS]".into(), 1),
-                ("[SEP]".into(), 2),
-            ]
-            .into_iter()
-            .collect(),
-        )
-        .unk_token("[UNK]".into())
-        .build()
-        .unwrap();
-    let mut tokenizer = tokenizers::Tokenizer::new(model);
-    tokenizer.with_pre_tokenizer(Some(Whitespace));
-    tokenizer.with_post_processor(Some(BertProcessing::new(
-        ("[SEP]".into(), 2),
-        ("[CLS]".into(), 1),
-    )));
-    tokenizer
-        .with_truncation(Some(TruncationParams {
-            max_length: limit,
-            ..Default::default()
-        }))
-        .unwrap();
-    tokenizer
-}
-
 #[test]
 fn split_preserves_oversized_unicode_clauses_and_special_token_budget() {
-    let budget = split::TokenBudget::new(tokenizer(32)).unwrap();
+    let budget = split::TokenBudget::new(crate::test_support::tokenizer(32)).unwrap();
     assert_eq!(budget.count("hello").unwrap(), 3);
     let analysis = extract("/// docs\nfn f() {}");
     let mut descriptions = render::render(&project(&analysis).unwrap());
