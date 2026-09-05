@@ -20,6 +20,7 @@ file: a.rs
 file_progress: 0% (0/0 windows)
 index_progress: 0% (0/2 files)
 elapsed_time: 1.25 seconds
+syntax: a.rs:1:1 ERROR
 indexing: ROOT
 phase: indexing
 file: a.rs

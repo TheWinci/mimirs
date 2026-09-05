@@ -185,13 +185,13 @@ fn recognized_v1_is_rebuilt_and_open_reports_each_outcome() {
 
     let database = open(&path).unwrap();
     assert_eq!(database.outcome, OpenOutcome::Rebuilt);
-    assert_eq!(user_version(&database.connection), 2);
+    assert_eq!(user_version(&database.connection), SCHEMA_VERSION);
     assert_eq!(count(&database.connection, "files"), 0);
     assert_eq!(count(&database.connection, "index_metadata"), 0);
     assert_eq!(fs::read_to_string(config).unwrap(), "custom config");
     assert_eq!(
         database.outcome.message(Path::new("index.db")),
-        "rebuilt index.db for schema version 2"
+        format!("rebuilt index.db for schema version {SCHEMA_VERSION}")
     );
     drop(database);
     let database = open(&path).unwrap();
