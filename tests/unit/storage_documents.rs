@@ -194,7 +194,7 @@ fn policy_rejects_missing_vectors_and_mixed_raw_rust() {
     db.execute("DELETE FROM document_embeddings", []).unwrap();
     assert!(crate::storage::policy::read(&db).is_err());
     let chunks = crate::chunk::of(&analysis.source);
-    crate::storage::save_file_with_analysis(
+    crate::storage::save_file(
         &mut db,
         &analysis.source,
         &chunks,

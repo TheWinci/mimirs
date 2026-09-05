@@ -134,7 +134,7 @@ fn equal_chunks_keep_their_identity_and_local_window_order() {
         vector(-1.0, 0.0),
         vector(0.0, -1.0),
     ];
-    save_file(&mut connection, &source, &chunks, &windows, &vectors).unwrap();
+    save_file(&mut connection, &source, &chunks, &windows, &vectors, None).unwrap();
     let mut statement = connection.prepare("SELECT c.ordinal, w.ordinal, w.text, e.embedding FROM windows w JOIN chunks c ON c.id = w.chunk_id JOIN window_embeddings e ON e.window_id = w.id ORDER BY c.ordinal, w.ordinal").unwrap();
     let rows: Vec<(i64, i64, String, Vec<u8>)> = statement
         .query_map([], |row| {
@@ -206,7 +206,8 @@ fn invalid_inputs_leave_both_new_and_populated_indexes_unchanged() {
                 "non-finite",
             ),
         ] {
-            let error = save_file(&mut connection, &source, chunks, windows, &vectors).unwrap_err();
+            let error =
+                save_file(&mut connection, &source, chunks, windows, &vectors, None).unwrap_err();
             let message = format!("{error:#}");
             assert!(
                 message.contains("a.rs") && message.contains(cause),

@@ -13,7 +13,7 @@ fn nearest_matches_scalar_ranking_and_limit_boundaries() {
         vector(1.0, 1.0),
         vector(-1.0, 0.0),
     ];
-    save_file(&mut connection, &source, &chunks, &windows, &vectors).unwrap();
+    save_file(&mut connection, &source, &chunks, &windows, &vectors, None).unwrap();
     let query = vector(1.0, 0.0);
     let mut expected = vectors
         .iter()
@@ -72,6 +72,7 @@ fn nearest_joins_each_window_to_its_own_chunk() {
         &chunks,
         &windows,
         &[vector(0.0, 1.0), vector(1.0, 0.0)],
+        None,
     )
     .unwrap();
     let results = nearest(&connection, &vector(1.0, 0.0), 2).unwrap();
@@ -103,6 +104,7 @@ fn nearest_sorts_by_unrounded_score_before_path() {
             &chunks,
             &windows,
             &[vector(1.0, y)],
+            None,
         )
         .unwrap();
     }
@@ -143,7 +145,7 @@ fn vec0_ranking_matches_scalar_cosine() {
         vector(1.0, 1.0),
         vector(-1.0, 0.0),
     ];
-    save_file(&mut connection, &source, &chunks, &windows, &vectors).unwrap();
+    save_file(&mut connection, &source, &chunks, &windows, &vectors, None).unwrap();
     let query = vector(1.0, 0.0);
     let mut expected: Vec<_> = vectors
         .iter()

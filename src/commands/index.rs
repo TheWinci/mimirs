@@ -199,15 +199,6 @@ fn index_with(
                 },
             )?;
             progress.diagnostic(&format!("documents: {path}: {}", documents.len()))?;
-        } else if let Some(analysis) = &analysis {
-            storage::save_file_with_analysis(
-                &mut database.connection,
-                &source,
-                &chunks,
-                &windows,
-                &vectors,
-                Some(analysis),
-            )?;
         } else {
             storage::save_file(
                 &mut database.connection,
@@ -215,6 +206,7 @@ fn index_with(
                 &chunks,
                 &windows,
                 &vectors,
+                analysis.as_ref(),
             )?;
         }
         successful.push(path.as_str());

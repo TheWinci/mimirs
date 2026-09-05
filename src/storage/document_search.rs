@@ -12,7 +12,7 @@ pub fn nearest(
     limit: usize,
     policy: &str,
 ) -> Result<Vec<SearchResult>> {
-    let bytes: Vec<u8> = query.iter().flat_map(|v| v.to_ne_bytes()).collect();
+    let bytes = super::vector_bytes(query);
     let mut k = limit.saturating_mul(4).clamp(16, CANDIDATE_LIMIT);
     loop {
         let mut statement = connection.prepare("SELECT f.path, d.ordinal, 1.0-e.distance FROM document_embeddings e JOIN retrieval_documents d ON d.id=e.document_id JOIN files f ON f.id=d.file_id WHERE e.embedding MATCH ?1 AND k=?2 ORDER BY e.distance")?;

@@ -89,10 +89,9 @@ pub(super) fn write(
         );
         tx.execute("INSERT INTO retrieval_documents(file_id, ordinal, owner, kind, part, policy, text, content_hash, evidence) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)", params![file_id, ordinal as i64, document.owner.map(|id| id as i64), if document.owner.is_some() { "entity" } else { "file" }, document.part as i64, batch.policy, document.text, source_hash(&document.text), serde_json::to_string(&document.evidence)?])?;
         let id = tx.last_insert_rowid();
-        let bytes: Vec<u8> = vector.iter().flat_map(|v| v.to_ne_bytes()).collect();
         tx.execute(
             "INSERT INTO document_embeddings(document_id, embedding) VALUES (?1, ?2)",
-            params![id, bytes],
+            params![id, super::vector_bytes(vector)],
         )?;
     }
     tx.execute(

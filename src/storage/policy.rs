@@ -1,5 +1,5 @@
 use anyhow::{Result, ensure};
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{Connection, params};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -31,17 +31,8 @@ pub fn document_policy(budget: &crate::retrieval::split::TokenBudget) -> String 
 }
 
 pub fn read(connection: &Connection) -> Result<(Mode, Option<String>)> {
-    let read = |key| {
-        connection
-            .query_row(
-                "SELECT value FROM index_metadata WHERE key=?1",
-                [key],
-                |r| r.get::<_, String>(0),
-            )
-            .optional()
-    };
-    let mode = read("retrieval_mode")?;
-    let policy = read("document_policy")?;
+    let mode = super::metadata(connection, "retrieval_mode")?;
+    let policy = super::metadata(connection, "document_policy")?;
     let documents: bool = connection.query_row(
         "SELECT EXISTS(SELECT 1 FROM retrieval_processing) OR EXISTS(SELECT 1 FROM retrieval_documents) OR EXISTS(SELECT 1 FROM document_embeddings)",
         [],
@@ -90,20 +81,8 @@ pub fn configure(connection: &mut Connection, mode: Mode, policy: Option<&str>) 
     let tx = connection.transaction()?;
     // Read the old strings without accepting them for retrieval. A policy version
     // update must still allow indexing to replace the obsolete output.
-    let old_mode: Option<String> = tx
-        .query_row(
-            "SELECT value FROM index_metadata WHERE key='retrieval_mode'",
-            [],
-            |r| r.get(0),
-        )
-        .optional()?;
-    let old_policy: Option<String> = tx
-        .query_row(
-            "SELECT value FROM index_metadata WHERE key='document_policy'",
-            [],
-            |r| r.get(0),
-        )
-        .optional()?;
+    let old_mode = super::metadata(&tx, "retrieval_mode")?;
+    let old_policy = super::metadata(&tx, "document_policy")?;
     let name = if mode == Mode::Facts { "facts" } else { "raw" };
     if old_mode.as_deref().unwrap_or("raw") != name || old_policy.as_deref() != policy {
         tx.execute("DELETE FROM document_embeddings", [])?;

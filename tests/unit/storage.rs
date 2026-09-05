@@ -30,7 +30,7 @@ fn save_text(connection: &mut Connection, path: &str, text: &str) -> anyhow::Res
     let chunks = crate::chunk::of(&source);
     let windows = crate::window::of(&chunks[0]);
     let vectors = vec![vector(1.0, 0.0); windows.len()];
-    save_file(connection, &source, &chunks, &windows, &vectors)
+    save_file(connection, &source, &chunks, &windows, &vectors, None)
 }
 
 fn count(connection: &Connection, table: &str) -> i64 {

@@ -49,7 +49,7 @@ fn save(connection: &mut Connection, path: &str, text: &str, vectors: &[Vec<f32>
     };
     let chunks = crate::chunk::of(&source);
     let windows = crate::window::of(&chunks[0]);
-    storage::save_file(connection, &source, &chunks, &windows, vectors).unwrap();
+    storage::save_file(connection, &source, &chunks, &windows, vectors, None).unwrap();
 }
 
 fn execute(
@@ -286,7 +286,7 @@ fn real_minilm_search_retrieves_rust_window() {
         .collect::<Vec<_>>();
     let mut embedder = embedding::production().unwrap();
     let vectors = embedder.embed_documents(&texts, |_, _| Ok(())).unwrap();
-    storage::save_file(&mut connection, &source, &chunks, &windows, &vectors).unwrap();
+    storage::save_file(&mut connection, &source, &chunks, &windows, &vectors, None).unwrap();
     drop(connection);
     let (result, output) = execute(dir.path(), "read configuration from a file", 1, || {
         Ok(embedder)

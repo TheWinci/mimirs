@@ -59,7 +59,7 @@ pub(super) fn nearest_raw(
     limit: usize,
 ) -> anyhow::Result<Vec<SearchResult>> {
     let retrieve = || -> anyhow::Result<Vec<SearchResult>> {
-        let bytes: Vec<u8> = query.iter().flat_map(|value| value.to_ne_bytes()).collect();
+        let bytes = super::vector_bytes(query);
         // vec0 chooses the top K. Sort those matches after retrieval because
         // its MATCH query only supports ORDER BY distance, without tie-breakers.
         let mut statement = connection.prepare(

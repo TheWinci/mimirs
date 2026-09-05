@@ -12,7 +12,7 @@ mod reconcile;
 mod save;
 mod search;
 pub use reconcile::{invalidate, reconcile};
-pub use save::{save_file, save_file_with_analysis};
+pub use save::save_file;
 pub use search::{SearchResult, has_content, nearest};
 
 static VEC_REGISTRATION: OnceLock<Result<(), String>> = OnceLock::new();
@@ -79,17 +79,8 @@ pub fn open_read_only(path: &Path) -> anyhow::Result<Connection> {
 
 /// Validate without stamping. Return whether this index already has a model.
 pub fn validate_model(connection: &Connection) -> anyhow::Result<bool> {
-    let read = |key| -> rusqlite::Result<Option<String>> {
-        connection
-            .query_row(
-                "SELECT value FROM index_metadata WHERE key = ?1",
-                [key],
-                |row| row.get(0),
-            )
-            .optional()
-    };
-    let stored_model = read("embedding_model")?;
-    let stored_dimension = read("embedding_dimension")?;
+    let stored_model = metadata(connection, "embedding_model")?;
+    let stored_dimension = metadata(connection, "embedding_dimension")?;
     match (stored_model, stored_dimension) {
         (None, None) => {
             let populated: bool = connection.query_row(
@@ -113,6 +104,23 @@ pub fn validate_model(connection: &Connection) -> anyhow::Result<bool> {
         _ => anyhow::bail!("index is missing an embedding metadata key"),
     }
     Ok(true)
+}
+
+fn metadata(connection: &Connection, key: &str) -> rusqlite::Result<Option<String>> {
+    connection
+        .query_row(
+            "SELECT value FROM index_metadata WHERE key = ?1",
+            [key],
+            |row| row.get(0),
+        )
+        .optional()
+}
+
+fn vector_bytes(vector: &[f32]) -> Vec<u8> {
+    vector
+        .iter()
+        .flat_map(|value| value.to_ne_bytes())
+        .collect()
 }
 
 fn open_at(path: &Path) -> anyhow::Result<OpenedDatabase> {

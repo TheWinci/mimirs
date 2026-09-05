@@ -15,16 +15,6 @@ pub fn save_file(
     chunks: &[Chunk<'_>],
     windows: &[Window<'_>],
     vectors: &[Vec<f32>],
-) -> anyhow::Result<()> {
-    save_file_with_analysis(connection, source, chunks, windows, vectors, None)
-}
-
-pub fn save_file_with_analysis(
-    connection: &mut Connection,
-    source: &SourceFile,
-    chunks: &[Chunk<'_>],
-    windows: &[Window<'_>],
-    vectors: &[Vec<f32>],
     analysis: Option<&crate::analysis::Analysis>,
 ) -> anyhow::Result<()> {
     replace_file(connection, source, chunks, windows, vectors, analysis, None)
@@ -133,13 +123,9 @@ pub(super) fn replace_file(
             ],
         )?;
         let window_id = transaction.last_insert_rowid();
-        let bytes: Vec<u8> = vector
-            .iter()
-            .flat_map(|value| value.to_ne_bytes())
-            .collect();
         transaction.execute(
             "INSERT INTO window_embeddings(window_id, embedding) VALUES (?1, ?2)",
-            params![window_id, bytes],
+            params![window_id, super::vector_bytes(vector)],
         )?;
         ordinals[chunk_position] += 1;
     }
