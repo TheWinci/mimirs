@@ -5,12 +5,7 @@ use rusqlite::{Connection, params};
 
 use super::validate_model;
 
-use crate::{
-    chunk::Chunk,
-    embedding::{DIMENSION, MODEL_NAME},
-    source::SourceFile,
-    window::Window,
-};
+use crate::{chunk::Chunk, embedding::DIMENSION, source::SourceFile, window::Window};
 
 /// Replace a file atomically. Borrowed object identities become database IDs
 /// only here; vectors correspond to windows by position.
@@ -89,7 +84,7 @@ pub(super) fn replace_file(
         transaction.execute(
             "INSERT INTO index_metadata(key, value)
              VALUES ('embedding_model', ?1), ('embedding_dimension', ?2)",
-            params![MODEL_NAME, DIMENSION.to_string()],
+            params![crate::embedding::model_identity(), DIMENSION.to_string()],
         )?;
     }
     transaction.execute(

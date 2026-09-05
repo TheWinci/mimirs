@@ -11,12 +11,13 @@ pub enum Mode {
 
 pub fn document_prefix() -> String {
     format!(
-        "{}|{}|{}|{}|{}|",
+        "{}|{}|{}|{}|{}@{}|",
         super::analysis::ANALYSIS_VERSION,
         crate::retrieval::PROJECTION_VERSION,
         crate::retrieval::render::RENDER_VERSION,
         crate::retrieval::split::TOKEN_POLICY,
-        crate::embedding::MODEL_NAME
+        crate::embedding::MODEL_NAME,
+        crate::embedding::MODEL_REVISION
     )
 }
 

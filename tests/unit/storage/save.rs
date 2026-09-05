@@ -74,7 +74,7 @@ fn empty_files_store_chunks_and_stamp_the_model() {
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(model, crate::embedding::MODEL_NAME);
+        assert_eq!(model, crate::embedding::model_identity());
         assert_eq!(dimension, "384");
         let stored: (String, i64, i64, i64, i64) = connection
             .query_row(

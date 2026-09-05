@@ -54,3 +54,9 @@ Next relevance work should test whether retaining selected literal evidence and
 reducing repetitive clauses helps these failures, then use fresh requests to
 check for regressions. Do not retune the existing queries or invent resolved
 relations to improve scores.
+
+A repeat after pinning the model revision and recording it in schema-7 metadata
+is in `pinned-results.json`. It preserves every expected-file rank above and the
+same model artifact hashes. The explicit parity test also checks every embedding
+coordinate within `1e-6` and exact tokenizer configuration equality against the
+previous loader. This verifies the loading change; it is not new relevance evidence.

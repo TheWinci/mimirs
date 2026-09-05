@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import sqlite3
 import tempfile
 import time
 
@@ -51,6 +52,10 @@ def main():
             report["corpus_sha256"] = corpus_hash.hexdigest()
             stdout, stderr, seconds = command([str(binary), "index"], root)
             (output / f"{policy}-index.txt").write_text(stdout + stderr)
+            index_summary = stdout
+            with sqlite3.connect(f"file:{root / '.mimirs/index.db'}?mode=ro", uri=True) as database:
+                metadata = dict(database.execute("SELECT key, value FROM index_metadata"))
+                counts = {table: database.execute(f"SELECT count(*) FROM {table}").fetchone()[0] for table in ["retrieval_documents", "windows"]}
             rows = []
             for number, (case, expected) in enumerate(zip(cases, targets)):
                 stdout, stderr, elapsed = command([str(binary), "search", case["query"], "--limit", "64"], root)
@@ -59,7 +64,7 @@ def main():
                 unique = list(dict.fromkeys(paths))
                 rank = next((index + 1 for index, path in enumerate(unique) if path in expected), None)
                 rows.append({**case, "expected_files": expected, "first_expected_file_rank": rank, "top_five_files": unique[:5], "returned_hits": len(paths), "unique_files_in_returned_hits": len(unique), "seconds": elapsed})
-            report["policies"][policy] = {"index_seconds": seconds, "index_summary": stdout if not rows else (output / f"{policy}-index.txt").read_text().split("created ")[0], "queries": rows}
+            report["policies"][policy] = {"index_seconds": seconds, "index_summary": index_summary, "metadata": metadata, "counts": counts, "queries": rows}
     after = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted(args.model_snapshot.iterdir()) if path.is_file()}
     if artifacts != after:
         raise RuntimeError("model artifacts changed during comparison")

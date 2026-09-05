@@ -2,9 +2,17 @@ use std::path::PathBuf;
 
 use anyhow::{Context, ensure};
 use directories::BaseDirs;
-use fastembed::{EmbeddingModel, TextEmbedding, TextInitOptions};
+use fastembed::{
+    InitOptionsUserDefined, Pooling, TextEmbedding, TokenizerFiles, UserDefinedEmbeddingModel,
+};
 
 pub const MODEL_NAME: &str = "all-MiniLM-L6-v2";
+pub const MODEL_REVISION: &str = "5f1b8cd78bc4fb444dd171e59b18f3a3af89a079";
+pub const MODEL_REPOSITORY: &str = "Qdrant/all-MiniLM-L6-v2-onnx";
+pub fn model_identity() -> String {
+    format!("{MODEL_NAME}@{MODEL_REVISION}")
+}
+
 pub const DIMENSION: usize = 384;
 const DOCUMENT_BATCH_SIZE: usize = 256;
 
@@ -117,12 +125,33 @@ impl FastEmbedBackend {
 
     fn model(&mut self) -> anyhow::Result<&mut TextEmbedding> {
         if self.model.is_none() {
-            let options = TextInitOptions::new(EmbeddingModel::AllMiniLML6V2)
+            let api = hf_hub::api::sync::ApiBuilder::new()
                 .with_cache_dir(self.cache_dir.clone())
-                .with_show_download_progress(false);
+                .with_progress(false)
+                .build()?;
+            let repo = api.repo(hf_hub::Repo::with_revision(
+                MODEL_REPOSITORY.into(),
+                hf_hub::RepoType::Model,
+                MODEL_REVISION.into(),
+            ));
+            let read =
+                |name: &str| -> anyhow::Result<Vec<u8>> { Ok(std::fs::read(repo.get(name)?)?) };
+            let files = TokenizerFiles {
+                tokenizer_file: read("tokenizer.json")?,
+                config_file: read("config.json")?,
+                special_tokens_map_file: read("special_tokens_map.json")?,
+                tokenizer_config_file: read("tokenizer_config.json")?,
+            };
+            let model = UserDefinedEmbeddingModel::new(read("model.onnx")?, files)
+                .with_pooling(Pooling::Mean);
             self.model = Some(
-                TextEmbedding::try_new(options)
-                    .with_context(|| format!("cannot initialize embedding model {MODEL_NAME}"))?,
+                TextEmbedding::try_new_from_user_defined(
+                    model,
+                    InitOptionsUserDefined::new().with_max_length(512),
+                )
+                .with_context(|| {
+                    format!("cannot initialize embedding model {MODEL_NAME}@{MODEL_REVISION}")
+                })?,
             );
         }
 

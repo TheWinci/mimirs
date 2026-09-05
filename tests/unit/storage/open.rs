@@ -315,19 +315,21 @@ fn only_vec0_stores_vectors_and_windows_have_only_chunk_locations() {
 }
 
 #[test]
-fn schema_five_rebuilds_only_on_writable_open() {
-    let dir = TempDir::new().unwrap();
-    let path = dir.path().join("index.db");
-    register_vec().unwrap();
-    let db = Connection::open(&path).unwrap();
-    db.execute_batch(SCHEMA_V5).unwrap();
-    db.pragma_update(None, "user_version", 5).unwrap();
-    drop(db);
-    let bytes = std::fs::read(&path).unwrap();
-    assert!(open_read_only(&path).is_err());
-    assert_eq!(bytes, std::fs::read(&path).unwrap());
-    assert_eq!(
-        super::super::open(&path).unwrap().outcome,
-        OpenOutcome::Rebuilt
-    );
+fn pre_revision_schemas_rebuild_only_on_writable_open() {
+    for (schema, version) in [(SCHEMA_V5, 5), (SCHEMA_V6, 6)] {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("index.db");
+        register_vec().unwrap();
+        let db = Connection::open(&path).unwrap();
+        db.execute_batch(schema).unwrap();
+        db.pragma_update(None, "user_version", version).unwrap();
+        drop(db);
+        let bytes = std::fs::read(&path).unwrap();
+        assert!(open_read_only(&path).is_err());
+        assert_eq!(bytes, std::fs::read(&path).unwrap());
+        assert_eq!(
+            super::super::open(&path).unwrap().outcome,
+            OpenOutcome::Rebuilt
+        );
+    }
 }

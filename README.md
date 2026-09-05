@@ -46,7 +46,9 @@ Apache-2.0
 
 Build the Rust CLI with `cargo build`. In a project, run `mimirs init`, then
 `mimirs index`. The default config includes Rust files. Indexing runs the local
-MiniLM embedding model; its first use can download model files.
+MiniLM embedding model; its first use can download model files. Both policies
+load Qdrant/all-MiniLM-L6-v2-onnx at immutable revision
+`5f1b8cd78bc4fb444dd171e59b18f3a3af89a079`.
 
 The caller prepares the search query. Distill the request into a short description
 of the relevant behavior or symptom. Preserve identifiers and constraints supplied
