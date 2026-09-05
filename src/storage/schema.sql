@@ -53,3 +53,8 @@ CREATE TABLE entities (
     FOREIGN KEY (file_id, parent) REFERENCES entities(file_id, ordinal)
         DEFERRABLE INITIALLY DEFERRED
 );
+
+CREATE TABLE analysis_records (
+    file_id INTEGER PRIMARY KEY REFERENCES source_snapshots(file_id) ON DELETE CASCADE,
+    payload TEXT NOT NULL
+);

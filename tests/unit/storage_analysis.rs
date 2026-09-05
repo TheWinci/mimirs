@@ -83,3 +83,59 @@ fn v2_indexes_are_recognized_and_rebuilt() {
         crate::storage::OpenOutcome::Rebuilt
     );
 }
+
+#[test]
+fn all_fixtures_round_trip_complete_reports() {
+    let (_dir, mut connection) = database();
+    for text in [
+        "",
+        "fn f() { let x = 1 }",
+        "fn (",
+        "fn café() {}\r\n",
+        include_str!("../fixtures/rust/declarations.rs"),
+        include_str!("../fixtures/rust/comments.rs"),
+        include_str!("../fixtures/rust/calls.rs"),
+    ] {
+        let a = analysis(text);
+        let tx = connection.transaction().unwrap();
+        write(&tx, 1, &a).unwrap();
+        tx.commit().unwrap();
+        let stored = load(&connection, "a.rs").unwrap().unwrap();
+        assert_eq!(
+            crate::analysis::report(&stored),
+            crate::analysis::report(&a)
+        );
+        assert_eq!(stored, a);
+    }
+}
+
+#[test]
+fn invalid_facts_and_forced_save_failure_leave_no_mixed_snapshot() {
+    let (_dir, mut connection) = database();
+    let original = analysis("fn old() {}");
+    let tx = connection.transaction().unwrap();
+    write(&tx, 1, &original).unwrap();
+    tx.commit().unwrap();
+    for change in 0..5 {
+        let mut a = analysis("use crate::{A}; fn changed() {}");
+        match change {
+            0 => a.facts[0].owner = Some(999),
+            1 => a.facts[0].scope = 999,
+            2 => a.facts[1].related = Some(999),
+            3 => a.scopes[1].parent = Some(1),
+            _ => a.facts[0].evidence[0].span.end = 999,
+        }
+        let tx = connection.transaction().unwrap();
+        assert!(write(&tx, 1, &a).is_err());
+    }
+    connection.execute_batch("CREATE TRIGGER fail BEFORE INSERT ON analysis_records BEGIN SELECT RAISE(ABORT, 'forced'); END;").unwrap();
+    {
+        let tx = connection.transaction().unwrap();
+        assert!(write(&tx, 1, &analysis("fn changed() {}")).is_err());
+    }
+    assert_eq!(load(&connection, "a.rs").unwrap().unwrap(), original);
+    connection
+        .execute("UPDATE analysis_records SET payload = 'broken'", [])
+        .unwrap();
+    assert!(load(&connection, "a.rs").is_err());
+}

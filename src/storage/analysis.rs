@@ -43,7 +43,7 @@ pub fn validate_entities(source: &str, entities: &[Entity]) -> Result<()> {
 }
 
 pub fn write(transaction: &Transaction<'_>, file_id: i64, analysis: &Analysis) -> Result<()> {
-    validate_entities(&analysis.source.text, &analysis.entities)?;
+    validate(analysis)?;
     let path: String =
         transaction.query_row("SELECT path FROM files WHERE id = ?1", [file_id], |r| {
             r.get(0)
@@ -73,6 +73,12 @@ pub fn write(transaction: &Transaction<'_>, file_id: i64, analysis: &Analysis) -
             ],
         )?;
     }
+    let payload =
+        serde_json::to_string(&(&analysis.facts, &analysis.scopes, &analysis.diagnostics))?;
+    transaction.execute(
+        "INSERT INTO analysis_records VALUES (?1, ?2)",
+        params![file_id, payload],
+    )?;
     Ok(())
 }
 
@@ -118,6 +124,103 @@ pub fn load_entities(
         },
         entities,
     )))
+}
+
+pub fn validate(analysis: &Analysis) -> Result<()> {
+    let source = &analysis.source.text;
+    validate_entities(source, &analysis.entities)?;
+    let owner = |id: Option<usize>| -> Result<()> {
+        ensure!(
+            id.is_none_or(|id| id < analysis.entities.len()),
+            "invalid entity owner"
+        );
+        Ok(())
+    };
+    ensure!(!analysis.scopes.is_empty(), "missing file scope");
+    for (id, scope) in analysis.scopes.iter().enumerate() {
+        validate_span(source, &scope.span)?;
+        owner(scope.owner)?;
+        if id == 0 {
+            ensure!(
+                scope.kind == "file"
+                    && scope.parent.is_none()
+                    && scope.owner.is_none()
+                    && scope.span.start == 0
+                    && scope.span.end == source.len(),
+                "invalid file scope"
+            );
+        } else {
+            let parent = scope.parent.context("scope has no parent")?;
+            ensure!(parent < id, "invalid scope parent");
+            let span = &analysis.scopes[parent].span;
+            ensure!(
+                span.start <= scope.span.start && span.end >= scope.span.end,
+                "scope escapes parent"
+            );
+        }
+    }
+    for (id, fact) in analysis.facts.iter().enumerate() {
+        validate_span(source, &fact.span)?;
+        owner(fact.owner)?;
+        if id > 0 {
+            ensure!(
+                analysis.facts[id - 1].span.start <= fact.span.start,
+                "facts are out of source order"
+            );
+        }
+        let scope = analysis
+            .scopes
+            .get(fact.scope)
+            .context("invalid fact scope")?;
+        ensure!(
+            scope.span.start <= fact.span.start && scope.span.end >= fact.span.end,
+            "fact escapes scope"
+        );
+        ensure!(
+            fact.related
+                .is_none_or(|r| r < analysis.facts.len() && r != id),
+            "invalid related fact"
+        );
+        if fact.kind == "import_member" {
+            let related = fact.related.context("import member has no declaration")?;
+            ensure!(
+                analysis.facts[related].kind == "import"
+                    && fact
+                        .evidence
+                        .iter()
+                        .any(|e| e.role == "declaration" && e.span == analysis.facts[related].span),
+                "invalid import declaration"
+            );
+        }
+        for evidence in &fact.evidence {
+            validate_span(source, &evidence.span)?;
+        }
+    }
+    for diagnostic in &analysis.diagnostics {
+        validate_span(source, &diagnostic.span)?;
+        let before = &source[..diagnostic.span.start];
+        let column = before.len() - before.rfind('\n').map_or(0, |i| i + 1) + 1;
+        ensure!(diagnostic.column == column, "invalid diagnostic column");
+    }
+    Ok(())
+}
+
+pub fn load(connection: &Connection, path: &str) -> Result<Option<Analysis>> {
+    let Some((source, entities)) = load_entities(connection, path)? else {
+        return Ok(None);
+    };
+    let payload: String = connection.query_row("SELECT r.payload FROM analysis_records r JOIN files f ON f.id = r.file_id WHERE f.path = ?1", [path], |row| row.get(0)).context("missing stored analysis records")?;
+    let (facts, scopes, diagnostics) =
+        serde_json::from_str(&payload).context("invalid stored analysis payload")?;
+    let analysis = Analysis {
+        source,
+        entities,
+        facts,
+        scopes,
+        diagnostics,
+    };
+    validate(&analysis).context("invalid stored analysis")?;
+    Ok(Some(analysis))
 }
 
 #[cfg(test)]

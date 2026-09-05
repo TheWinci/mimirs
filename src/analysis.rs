@@ -13,7 +13,7 @@ mod signatures;
 pub use entities::Entity;
 pub use facts::Fact;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Span {
     pub start: usize,
     pub end: usize,
@@ -43,7 +43,7 @@ impl Span {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Diagnostic {
     pub kind: String,
     pub span: Span,

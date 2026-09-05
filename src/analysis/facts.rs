@@ -1,13 +1,13 @@
 use super::{Entity, Span};
 use tree_sitter::Node;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Evidence {
     pub role: String,
     pub span: Span,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Fact {
     pub kind: String,
     pub span: Span,

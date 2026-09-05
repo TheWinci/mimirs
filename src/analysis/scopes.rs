@@ -1,7 +1,7 @@
 use super::{Entity, Fact, Span, facts};
 use tree_sitter::Node;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Scope {
     pub kind: String,
     pub span: Span,
