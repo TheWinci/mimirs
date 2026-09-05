@@ -6,6 +6,7 @@ pub struct Entity {
     pub kind: String,
     pub name: Option<String>,
     pub span: Span,
+    pub parent: Option<usize>,
 }
 
 pub(super) fn kind(node: Node<'_>) -> Option<&'static str> {
@@ -41,9 +42,18 @@ pub(super) fn spelling(node: Node<'_>, source: &str) -> Option<String> {
 
 pub(super) fn extract(root: Node<'_>, source: &str) -> Vec<Entity> {
     let mut entities = Vec::new();
-    let mut stack = vec![root];
-    while let Some(node) = stack.pop() {
-        if let Some(kind) = kind(node) {
+    let mut stack = vec![(root, None)];
+    while let Some((node, mut parent)) = stack.pop() {
+        if let Some(mut kind) = kind(node) {
+            if kind == "function"
+                && node.parent().is_some_and(|p| {
+                    p.kind() == "declaration_list"
+                        && p.parent()
+                            .is_some_and(|p| matches!(p.kind(), "impl_item" | "trait_item"))
+                })
+            {
+                kind = "method";
+            }
             let name = if kind == "impl" {
                 node.child_by_field_name("type")
                     .and_then(|n| spelling(n, source))
@@ -60,14 +70,16 @@ pub(super) fn extract(root: Node<'_>, source: &str) -> Vec<Entity> {
                 kind: kind.into(),
                 name,
                 span: Span::of(node, source),
+                parent,
             });
+            parent = Some(entities.len() - 1);
         }
         if matches!(node.kind(), "macro_definition" | "token_tree") {
             continue;
         }
         let mut cursor = node.walk();
         let children: Vec<_> = node.named_children(&mut cursor).collect();
-        stack.extend(children.into_iter().rev());
+        stack.extend(children.into_iter().rev().map(|child| (child, parent)));
     }
     entities
 }

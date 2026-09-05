@@ -104,14 +104,22 @@ pub fn report(analysis: &Analysis) -> String {
         }
     );
     for (id, entity) in analysis.entities.iter().enumerate() {
+        let mut ancestor = entity.parent;
+        while let Some(parent) = ancestor {
+            output.push_str("  ");
+            ancestor = analysis.entities[parent].parent;
+        }
         output.push_str(&format!(
-            "entity e{id}: {} {:?} bytes {}..{} lines {}..{}\n",
+            "entity e{id}: {} {:?} bytes {}..{} lines {}..{} parent {}\n",
             entity.kind,
             entity.name,
             entity.span.start,
             entity.span.end,
             entity.span.line_start,
-            entity.span.line_end
+            entity.span.line_end,
+            entity
+                .parent
+                .map_or_else(|| "file".into(), |id| format!("e{id}"))
         ));
     }
     for diagnostic in &analysis.diagnostics {

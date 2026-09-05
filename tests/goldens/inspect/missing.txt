@@ -1,5 +1,5 @@
 file: fixture.rs
 source: 20 bytes
 parse: incomplete
-entity e0: function Some("f") bytes 0..20 lines 1..1
+entity e0: function Some("f") bytes 0..20 lines 1..1 parent file
 diagnostic: missing ; bytes 18..18 lines 1..1 column 19

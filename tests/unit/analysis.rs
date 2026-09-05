@@ -86,3 +86,31 @@ fn declarations_retain_exact_evidence_and_order() {
         assert!(!text[e.span.start..e.span.end].is_empty());
     }
 }
+
+#[test]
+fn lexical_parents_and_methods() {
+    let a = analyze(include_str!("../fixtures/rust/declarations.rs"));
+    for (id, e) in a.entities.iter().enumerate() {
+        if let Some(parent) = e.parent {
+            assert!(parent < id);
+            let p = &a.entities[parent];
+            assert!(p.span.start <= e.span.start && p.span.end >= e.span.end);
+        }
+    }
+    let inner = a
+        .entities
+        .iter()
+        .find(|e| e.name.as_deref() == Some("inner"))
+        .unwrap();
+    assert_eq!(inner.kind, "function");
+    assert_eq!(a.entities[inner.parent.unwrap()].kind, "method");
+    assert_eq!(a.entities.iter().filter(|e| e.kind == "method").count(), 2);
+    let a = analyze("mod m { struct X {} struct X {} fn broken(");
+    assert_eq!(
+        a.entities
+            .iter()
+            .filter(|e| e.name.as_deref() == Some("X"))
+            .count(),
+        2
+    );
+}
