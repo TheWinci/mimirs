@@ -59,11 +59,6 @@ fn is_catch_all(pattern: &str) -> bool {
     matches!(pattern, "*" | "**" | "**/*")
 }
 
-#[cfg(test)]
-fn walk(root: &Path, config: &Config) -> anyhow::Result<Walk> {
-    discover(root, config, |_, _| Ok(()))
-}
-
 pub(super) fn discover(
     root: &Path,
     config: &Config,
@@ -108,5 +103,5 @@ pub(super) fn discover(
 }
 
 #[cfg(test)]
-#[path = "../../../tests/unit/commands/index.rs"]
+#[path = "../../../tests/unit/commands/index/walk.rs"]
 mod tests;

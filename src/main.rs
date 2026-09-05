@@ -40,10 +40,12 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::Init => commands::init::run()?,
-        Command::Index => commands::index::run()?,
-        Command::Search { query, limit } => commands::search::run(&query, limit)?,
+        Command::Init => commands::init::run(),
+        Command::Index => commands::index::run(),
+        Command::Search { query, limit } => commands::search::run(&query, limit),
     }
-
-    Ok(())
 }
+
+#[cfg(test)]
+#[path = "../tests/support/mod.rs"]
+mod test_support;

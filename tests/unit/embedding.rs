@@ -1,4 +1,4 @@
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::io;
 use std::path::Path;
 use std::rc::Rc;
@@ -38,26 +38,10 @@ impl Backend for ReplyBackend {
 }
 
 #[test]
-fn identity_is_independent_of_the_backend() {
-    let calls = Rc::new(RefCell::new(Vec::new()));
-    let embedder = Embedder::new(RecordingBackend { calls });
-
-    assert_eq!(embedder.model_name(), "all-MiniLM-L6-v2");
-    assert_eq!(embedder.dimension(), 384);
-}
-
-#[test]
-fn one_lazy_backend_is_reused_for_documents_and_queries() {
-    let creations = Rc::new(Cell::new(0));
-    let calls = Rc::new(RefCell::new(Vec::new()));
-    let factory_creations = Rc::clone(&creations);
-    let factory_calls = Rc::clone(&calls);
-    let mut embedder = Embedder::lazy(move || {
-        factory_creations.set(factory_creations.get() + 1);
-        Ok(Box::new(RecordingBackend {
-            calls: Rc::clone(&factory_calls),
-        }))
-    });
+fn empty_documents_do_not_load_the_model_or_report_progress() {
+    let dir = TempDir::new().unwrap();
+    let cache = dir.path().join("models");
+    let mut embedder = Embedder::new(FastEmbedBackend::new(cache.clone()));
 
     assert!(
         embedder
@@ -65,33 +49,22 @@ fn one_lazy_backend_is_reused_for_documents_and_queries() {
             .unwrap()
             .is_empty()
     );
-    assert_eq!(creations.get(), 0);
-
-    embedder.embed_query("1").unwrap();
-    embedder
-        .embed_documents(&["2".to_owned()], |_, _| {})
-        .unwrap();
-
-    assert_eq!(creations.get(), 1);
-    assert_eq!(calls.borrow().len(), 2);
+    assert!(!cache.exists());
 }
 
 #[test]
-fn explicit_preparation_initializes_the_lazy_backend_once() {
-    let creations = Rc::new(Cell::new(0));
-    let factory_creations = Rc::clone(&creations);
-    let mut embedder = Embedder::lazy(move || {
-        factory_creations.set(factory_creations.get() + 1);
-        Ok(Box::new(RecordingBackend {
-            calls: Rc::new(RefCell::new(Vec::new())),
-        }))
+fn documents_and_queries_use_the_same_backend() {
+    let calls = Rc::new(RefCell::new(Vec::new()));
+    let mut embedder = Embedder::new(RecordingBackend {
+        calls: Rc::clone(&calls),
     });
 
-    embedder.prepare().unwrap();
-    embedder.prepare().unwrap();
     embedder.embed_query("1").unwrap();
+    embedder
+        .embed_documents(&["2".to_owned()], |_, _| Ok(()))
+        .unwrap();
 
-    assert_eq!(creations.get(), 1);
+    assert_eq!(*calls.borrow(), [vec!["1"], vec!["2"]]);
 }
 
 #[test]
@@ -106,6 +79,7 @@ fn documents_keep_order_across_256_item_batches_and_report_progress() {
     let vectors = embedder
         .embed_documents(&texts, |completed, total| {
             progress.push((completed, total));
+            Ok(())
         })
         .unwrap();
 
@@ -188,7 +162,19 @@ fn embedding_errors_keep_the_operation_and_cause() {
 
 #[test]
 fn preparation_errors_keep_the_operation_and_cause() {
-    let mut embedder = Embedder::lazy(|| Err(io::Error::other("model files are corrupt").into()));
+    struct BrokenBackend;
+
+    impl Backend for BrokenBackend {
+        fn prepare(&mut self) -> anyhow::Result<()> {
+            Err(io::Error::other("model files are corrupt").into())
+        }
+
+        fn embed(&mut self, _: &[String]) -> anyhow::Result<Vec<Vec<f32>>> {
+            panic!("preparation must not embed text")
+        }
+    }
+
+    let mut embedder = Embedder::new(BrokenBackend);
 
     let error = embedder.prepare().unwrap_err();
     let message = format!("{error:#}");
@@ -208,10 +194,25 @@ fn cache_path_is_outside_the_project_and_names_mimirs_models() {
 }
 
 #[test]
-fn scalar_cosine_handles_known_vectors() {
-    assert_eq!(cosine_similarity(&[1.0, 0.0], &[1.0, 0.0]).unwrap(), 1.0);
-    assert_eq!(cosine_similarity(&[1.0, 0.0], &[0.0, 1.0]).unwrap(), 0.0);
-    assert_eq!(cosine_similarity(&[1.0, 0.0], &[-1.0, 0.0]).unwrap(), -1.0);
+fn progress_errors_stop_before_the_next_batch_and_keep_the_cause() {
+    let calls = Rc::new(RefCell::new(Vec::new()));
+    let mut embedder = Embedder::new(RecordingBackend {
+        calls: Rc::clone(&calls),
+    });
+    let texts = vec!["1".to_owned(); 257];
+
+    let error = embedder
+        .embed_documents(&texts, |completed, total| {
+            assert_eq!((completed, total), (256, 257));
+            Err(io::Error::new(io::ErrorKind::BrokenPipe, "progress output closed").into())
+        })
+        .unwrap_err();
+
+    assert_eq!(calls.borrow().len(), 1);
+    assert_eq!(
+        error.downcast_ref::<io::Error>().unwrap().kind(),
+        io::ErrorKind::BrokenPipe
+    );
 }
 
 /// Downloads the real model. Run with:
@@ -220,10 +221,13 @@ fn scalar_cosine_handles_known_vectors() {
 #[ignore = "downloads the MiniLM model"]
 fn real_minilm_documents_and_queries_reuse_the_cache() {
     let cache = TempDir::new().unwrap();
-    let mut first = production_at(cache.path()).unwrap();
+    let mut first = Embedder::new(FastEmbedBackend::new(cache.path().to_owned()));
+
+    first.prepare().unwrap();
+    first.prepare().unwrap();
 
     let documents = first
-        .embed_documents(&["fn main() {}".to_owned()], |_, _| {})
+        .embed_documents(&["fn main() {}".to_owned()], |_, _| Ok(()))
         .unwrap();
     let query = first.embed_query("entry point").unwrap();
 
@@ -239,6 +243,6 @@ fn real_minilm_documents_and_queries_reuse_the_cache() {
     assert!(cache.path().read_dir().unwrap().next().is_some());
 
     drop(first);
-    let mut second = production_at(cache.path()).unwrap();
+    let mut second = Embedder::new(FastEmbedBackend::new(cache.path().to_owned()));
     assert_eq!(second.embed_query("entry point").unwrap().len(), DIMENSION);
 }

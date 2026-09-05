@@ -1,12 +1,12 @@
 use crate::chunk::Chunk;
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct Window<'chunk, 'source> {
-    pub chunk: &'chunk Chunk<'source>,
+pub struct Window<'a> {
+    pub chunk: &'a Chunk<'a>,
     pub text: String,
 }
 
-pub fn of<'chunk, 'source>(chunk: &'chunk Chunk<'source>) -> Vec<Window<'chunk, 'source>> {
+pub fn of<'a>(chunk: &'a Chunk<'a>) -> Vec<Window<'a>> {
     chunk
         .text
         .lines()

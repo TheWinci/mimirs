@@ -5,15 +5,10 @@ use rusqlite::Connection;
 
 /// Keep exactly the successfully indexed paths. vec0 needs explicit deletion;
 /// foreign keys remove the relational children after their file is removed.
-pub fn reconcile(
-    connection: &mut Connection,
-    successful: &[&str],
-    model: &str,
-    dimension: usize,
-) -> anyhow::Result<()> {
+pub fn reconcile(connection: &mut Connection, successful: &[&str]) -> anyhow::Result<()> {
     let mut cleanup = || -> anyhow::Result<()> {
         let transaction = connection.transaction()?;
-        super::validate_model(&transaction, model, dimension)?;
+        super::validate_model(&transaction)?;
         let keep: HashSet<&str> = successful.iter().copied().collect();
         let stale = {
             let mut statement = transaction.prepare("SELECT id, path FROM files")?;
@@ -30,11 +25,7 @@ pub fn reconcile(
             stale
         };
         for id in stale {
-            transaction.execute(
-                "DELETE FROM window_embeddings WHERE window_id IN (
-                    SELECT w.id FROM windows w JOIN chunks c ON c.id = w.chunk_id WHERE c.file_id = ?1
-                )", [id],
-            )?;
+            super::delete_file_embeddings(&transaction, id)?;
             transaction.execute("DELETE FROM files WHERE id = ?1", [id])?;
         }
         transaction.commit()?;

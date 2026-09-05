@@ -17,16 +17,8 @@ pub fn of(source: &SourceFile) -> Vec<Chunk<'_>> {
         byte_start: 0,
         byte_end: source.text.len(),
         line_start: 1,
-        line_end: last_source_line(&source.text),
+        line_end: source.text.lines().count().max(1),
     }]
-}
-
-fn last_source_line(text: &str) -> usize {
-    let bytes_before_last = &text.as_bytes()[..text.len().saturating_sub(1)];
-    1 + bytes_before_last
-        .iter()
-        .filter(|&&byte| byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

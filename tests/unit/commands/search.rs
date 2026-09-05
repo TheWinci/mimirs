@@ -6,7 +6,7 @@ use rusqlite::Connection;
 use tempfile::TempDir;
 
 use super::*;
-use crate::embedding::{Backend, DIMENSION, Embedder, MODEL_NAME};
+use crate::embedding::{Backend, DIMENSION, Embedder};
 use crate::source::SourceFile;
 
 struct FixedBackend {
@@ -46,10 +46,7 @@ fn save(connection: &mut Connection, path: &str, text: &str, vectors: &[Vec<f32>
     };
     let chunks = crate::chunk::of(&source);
     let windows = crate::window::of(&chunks[0]);
-    storage::save_file(
-        connection, &source, &chunks, &windows, vectors, MODEL_NAME, DIMENSION,
-    )
-    .unwrap();
+    storage::save_file(connection, &source, &chunks, &windows, vectors).unwrap();
 }
 
 fn execute(
@@ -113,7 +110,7 @@ fn empty_indexes_skip_embedder_creation() {
     for state in 0..3 {
         match state {
             1 => save(&mut connection, "blank.rs", " \n\t", &[]),
-            2 => storage::reconcile(&mut connection, &[], MODEL_NAME, DIMENSION).unwrap(),
+            2 => storage::reconcile(&mut connection, &[]).unwrap(),
             _ => {}
         }
         for limit in [1, 4096] {
@@ -285,17 +282,8 @@ fn real_minilm_search_retrieves_rust_window() {
         .map(|window| window.text.clone())
         .collect::<Vec<_>>();
     let mut embedder = embedding::production().unwrap();
-    let vectors = embedder.embed_documents(&texts, |_, _| {}).unwrap();
-    storage::save_file(
-        &mut connection,
-        &source,
-        &chunks,
-        &windows,
-        &vectors,
-        MODEL_NAME,
-        DIMENSION,
-    )
-    .unwrap();
+    let vectors = embedder.embed_documents(&texts, |_, _| Ok(())).unwrap();
+    storage::save_file(&mut connection, &source, &chunks, &windows, &vectors).unwrap();
     drop(connection);
     let (result, output) = execute(dir.path(), "read configuration from a file", 1, || {
         Ok(embedder)

@@ -8,16 +8,12 @@ use crate::{config::Config, embedding, storage};
 const IGNORE_CONTENTS: &str = "*\n";
 
 pub fn run() -> anyhow::Result<()> {
-    run_at(Path::new("."))
+    run_at(Path::new("."), || embedding::production()?.prepare())
 }
 
-fn run_at(project_root: &Path) -> anyhow::Result<()> {
-    run_at_with_model(project_root, embedding::prepare_model)
-}
-
-fn run_at_with_model(
+fn run_at(
     project_root: &Path,
-    mut prepare_model: impl FnMut() -> anyhow::Result<()>,
+    prepare_model: impl FnOnce() -> anyhow::Result<()>,
 ) -> anyhow::Result<()> {
     let root = project_root.join(".mimirs");
 

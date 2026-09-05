@@ -95,18 +95,17 @@ fn percent((done, total): (usize, usize), finished: bool) -> usize {
 // Paths and error messages can contain control characters. Keep every output
 // field on one line and reserve terminal controls for the renderer.
 fn plain(value: &str) -> String {
-    value
-        .chars()
-        .flat_map(|ch| {
-            if ch.is_control() {
-                ch.escape_default().collect::<Vec<_>>()
-            } else {
-                vec![ch]
-            }
-        })
-        .collect()
+    let mut text = String::with_capacity(value.len());
+    for ch in value.chars() {
+        if ch.is_control() {
+            text.extend(ch.escape_default());
+        } else {
+            text.push(ch);
+        }
+    }
+    text
 }
 
 #[cfg(test)]
-#[path = "../../../tests/unit/commands/index_progress.rs"]
+#[path = "../../../tests/unit/commands/index/progress.rs"]
 mod tests;

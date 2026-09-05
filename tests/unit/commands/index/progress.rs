@@ -24,7 +24,7 @@ fn terminal_redraws_preserve_diagnostics_and_round_elapsed_seconds() {
     progress.indexing("a.rs", (257, 257), (1, 1), true).unwrap();
     progress.clear().unwrap();
     let output = String::from_utf8(output).unwrap().replace('\x1b', "<ESC>");
-    assert_eq!(output, include_str!("../../goldens/index/terminal.txt"));
+    assert_eq!(output, include_str!("../../../goldens/index/terminal.txt"));
 }
 
 #[test]

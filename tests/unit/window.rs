@@ -8,7 +8,7 @@ fn source(text: &str) -> SourceFile {
     }
 }
 
-fn texts<'a>(windows: &'a [Window<'_, '_>]) -> Vec<&'a str> {
+fn texts<'a>(windows: &'a [Window<'_>]) -> Vec<&'a str> {
     windows.iter().map(|window| window.text.as_str()).collect()
 }
 

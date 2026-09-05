@@ -75,11 +75,7 @@ fn index(
         progress.diagnostic(&database.outcome.message(&database_path))?;
     }
     let mut embedder = make_embedder()?;
-    storage::validate_model(
-        &database.connection,
-        embedder.model_name(),
-        embedder.dimension(),
-    )?;
+    storage::validate_model(&database.connection)?;
     embedder.prepare()?;
 
     let mut summary = Summary {
@@ -108,29 +104,20 @@ fn index(
         if progress.is_terminal() {
             progress.indexing(path, (0, windows.len()), (attempt, total), false)?;
         }
-        // The embedder callback cannot return errors. Save an output error and
-        // propagate it before committing this file.
-        let mut output_error = None;
         let vectors = embedder
             .embed_documents(&texts, |completed, count| {
-                if progress.is_terminal() && output_error.is_none() {
-                    output_error = progress
-                        .indexing(path, (completed, count), (attempt, total), false)
-                        .err();
+                if progress.is_terminal() {
+                    progress.indexing(path, (completed, count), (attempt, total), false)?;
                 }
+                Ok(())
             })
             .with_context(|| format!("cannot embed source file {path}"))?;
-        if let Some(error) = output_error {
-            return Err(error.into());
-        }
         storage::save_file(
             &mut database.connection,
             &source,
             &chunks,
             &windows,
             &vectors,
-            embedder.model_name(),
-            embedder.dimension(),
         )?;
         successful.push(path.as_str());
         summary.indexed += 1;
@@ -141,15 +128,10 @@ fn index(
             true,
         )?;
     }
-    storage::reconcile(
-        &mut database.connection,
-        &successful,
-        embedder.model_name(),
-        embedder.dimension(),
-    )?;
+    storage::reconcile(&mut database.connection, &successful)?;
     Ok(summary)
 }
 
 #[cfg(test)]
-#[path = "../../tests/unit/commands/index_run.rs"]
+#[path = "../../tests/unit/commands/index.rs"]
 mod tests;

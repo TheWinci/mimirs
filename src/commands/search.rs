@@ -35,7 +35,7 @@ fn run_at(
     let mut connection = storage::open_read_only(&root.join(".mimirs/index.db"))?;
     // Keep metadata, the empty check, and retrieval in one read snapshot.
     let transaction = connection.transaction()?;
-    storage::validate_model(&transaction, embedding::MODEL_NAME, embedding::DIMENSION)?;
+    storage::validate_model(&transaction)?;
     let results = if storage::has_windows(&transaction)? {
         let mut embedder = make_embedder()?;
         let vector = embedder.embed_query(query)?;
