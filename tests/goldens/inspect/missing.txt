@@ -2,4 +2,5 @@ file: fixture.rs
 source: 20 bytes
 parse: incomplete
 entity e0: function Some("f") bytes 0..20 lines 1..1 parent file
+fact f0: signature bytes 0..7 lines 1..1 owner e0 text "fn f() "
 diagnostic: missing ; bytes 18..18 lines 1..1 column 19

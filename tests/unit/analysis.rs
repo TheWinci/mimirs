@@ -175,3 +175,40 @@ fn comments_golden() {
         include_str!("../goldens/inspect/comments.txt")
     );
 }
+
+#[test]
+fn signatures_keep_written_types_and_modifiers() {
+    let a = analyze(
+        "pub unsafe extern \"C\" fn f<'a, T: Clone>(x: &'a T) -> Result<T, ()> where T: Send { todo!() }\ntrait X { type Out: Copy; fn f(&mut self); }\nstruct S(pub u8);",
+    );
+    assert!(a.diagnostics.is_empty());
+    let signature = a.facts.iter().find(|f| f.kind == "signature").unwrap();
+    let evidence: Vec<_> = signature
+        .evidence
+        .iter()
+        .map(|e| (e.role.as_str(), &a.source.text[e.span.start..e.span.end]))
+        .collect();
+    for role in [
+        "visibility",
+        "modifiers",
+        "parameter",
+        "return_type",
+        "generics",
+        "lifetime_parameter",
+        "bounds",
+        "where",
+        "type_reference",
+    ] {
+        assert!(
+            evidence.iter().any(|(r, _)| *r == role),
+            "{role}: {evidence:?}"
+        );
+    }
+    assert!(evidence.contains(&("modifiers", "unsafe extern \"C\"")));
+    assert!(!a.source.text[signature.span.start..signature.span.end].contains("todo"));
+    assert!(
+        a.facts
+            .iter()
+            .any(|f| f.evidence.iter().any(|e| e.role == "receiver"))
+    );
+}

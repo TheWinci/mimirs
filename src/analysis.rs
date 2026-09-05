@@ -5,6 +5,7 @@ use crate::source::SourceFile;
 
 mod entities;
 mod facts;
+mod signatures;
 pub use entities::Entity;
 pub use facts::Fact;
 
@@ -62,7 +63,13 @@ pub fn extract(source: SourceFile) -> Result<Analysis> {
         .parse(&source.text, None)
         .context("Rust parser returned no tree")?;
     let entities = entities::extract(tree.root_node(), &source.text);
-    let facts = facts::extract(tree.root_node(), &source.text, &entities);
+    let mut facts = facts::extract(tree.root_node(), &source.text, &entities);
+    facts.extend(signatures::extract(
+        tree.root_node(),
+        &source.text,
+        &entities,
+    ));
+    facts.sort_by_key(|fact| (fact.span.start, fact.span.end));
     let mut diagnostics = Vec::new();
     let mut cursor = tree.walk();
     loop {
