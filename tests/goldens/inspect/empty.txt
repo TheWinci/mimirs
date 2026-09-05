@@ -1,0 +1,3 @@
+file: fixture.rs
+source: 0 bytes
+parse: complete

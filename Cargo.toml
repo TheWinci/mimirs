@@ -20,6 +20,8 @@ toml = "1.1.4"
 rusqlite = { version = "0.40.2", default-features = false, features = ["bundled"] }
 sqlite-vec = "=0.1.9"
 rusqlite_migration = "2.6.0"
+tree-sitter = "0.27.0"
+tree-sitter-rust = "0.24.2"
 
 [dev-dependencies]
 tempfile = "3.27.0"

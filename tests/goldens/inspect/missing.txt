@@ -1,0 +1,4 @@
+file: fixture.rs
+source: 20 bytes
+parse: incomplete
+diagnostic: missing ; bytes 18..18 lines 1..1 column 19
