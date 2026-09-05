@@ -22,3 +22,5 @@ fact f11: attribute bytes 187..209 lines 13..13 owner e1 text "#[path = \"missin
   path bytes 189..193 text "path"
   arguments bytes 196..208 text "\"missing.rs\""
 fact f12: signature bytes 210..220 lines 14..14 owner e1 text "mod other;"
+fact f13: module_external bytes 210..220 lines 14..14 owner e1 text "mod other;"
+  name bytes 214..219 text "other"

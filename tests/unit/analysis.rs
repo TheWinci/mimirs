@@ -212,3 +212,35 @@ fn signatures_keep_written_types_and_modifiers() {
             .any(|f| f.evidence.iter().any(|e| e.role == "receiver"))
     );
 }
+
+#[test]
+fn imports_preserve_groups_and_declaration_references() {
+    let a = analyze(
+        "pub(crate) use ::std::{self, io::{Read as R, *}, super::thing}; extern crate alloc as a; #[path = \"absent.rs\"] mod absent; mod inline { fn f() { use crate::X; } }",
+    );
+    assert!(a.diagnostics.is_empty(), "{:?}", a.diagnostics);
+    let members: Vec<_> = a
+        .facts
+        .iter()
+        .filter(|f| f.kind == "import_member")
+        .collect();
+    assert_eq!(members.len(), 5);
+    for member in &members {
+        assert_eq!(a.facts[member.related.unwrap()].kind, "import");
+    }
+    let aliased = members
+        .iter()
+        .find(|f| f.evidence.iter().any(|e| e.role == "alias"))
+        .unwrap();
+    let prefixes: Vec<_> = aliased
+        .evidence
+        .iter()
+        .filter(|e| e.role == "prefix")
+        .map(|e| &a.source.text[e.span.start..e.span.end])
+        .collect();
+    assert_eq!(prefixes, ["::std", "io"]);
+    for kind in ["extern_crate", "module_external", "module_inline"] {
+        assert!(a.facts.iter().any(|f| f.kind == kind));
+    }
+    assert!(members.last().unwrap().owner.is_some());
+}

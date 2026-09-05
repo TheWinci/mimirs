@@ -13,6 +13,7 @@ pub struct Fact {
     pub span: Span,
     pub owner: Option<usize>,
     pub evidence: Vec<Evidence>,
+    pub related: Option<usize>,
 }
 
 impl Fact {
@@ -22,6 +23,7 @@ impl Fact {
             span: Span::of(node, source),
             owner: owner(node, entities),
             evidence: Vec::new(),
+            related: None,
         }
     }
 

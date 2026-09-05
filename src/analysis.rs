@@ -5,6 +5,7 @@ use crate::source::SourceFile;
 
 mod entities;
 mod facts;
+mod imports;
 mod signatures;
 pub use entities::Entity;
 pub use facts::Fact;
@@ -69,7 +70,21 @@ pub fn extract(source: SourceFile) -> Result<Analysis> {
         &source.text,
         &entities,
     ));
+    facts.extend(imports::extract(tree.root_node(), &source.text, &entities));
     facts.sort_by_key(|fact| (fact.span.start, fact.span.end));
+    for id in 0..facts.len() {
+        if facts[id].kind == "import_member" {
+            facts[id].related = facts[id]
+                .evidence
+                .iter()
+                .find(|e| e.role == "declaration")
+                .and_then(|e| {
+                    facts
+                        .iter()
+                        .position(|f| f.kind == "import" && f.span == e.span)
+                });
+        }
+    }
     let mut diagnostics = Vec::new();
     let mut cursor = tree.walk();
     loop {
@@ -146,6 +161,9 @@ pub fn report(analysis: &Analysis) -> String {
                 .map_or_else(|| "file".into(), |id| format!("e{id}")),
             &analysis.source.text[fact.span.start..fact.span.end]
         ));
+        if let Some(related) = fact.related {
+            output.push_str(&format!("  related f{related}\n"));
+        }
         for evidence in &fact.evidence {
             output.push_str(&format!(
                 "  {} bytes {}..{} text {:?}\n",
