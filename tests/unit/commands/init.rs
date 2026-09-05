@@ -118,7 +118,7 @@ fn init_rebuilds_v1_and_prepares_model_after_preserving_config() {
             connection
                 .query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))
                 .unwrap(),
-            2
+            crate::storage::SCHEMA_VERSION
         );
         assert_eq!(
             connection

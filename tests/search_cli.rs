@@ -52,7 +52,7 @@ fn empty_search_prints_only_the_result_summary() {
     connection
         .execute_batch(include_str!("../src/storage/schema.sql"))
         .unwrap();
-    connection.pragma_update(None, "user_version", 2).unwrap();
+    connection.pragma_update(None, "user_version", 3).unwrap();
     drop(connection);
     let output = Command::new(env!("CARGO_BIN_EXE_mimirs"))
         .current_dir(dir.path())

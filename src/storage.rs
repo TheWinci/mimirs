@@ -19,9 +19,10 @@ static VEC_REGISTRATION: OnceLock<Result<(), String>> = OnceLock::new();
 
 // Alpha versions identify rebuilds, not positions in a migration list.
 // Keep rusqlite_migration for the baseline before database compatibility is promised.
-const SCHEMA_VERSION: i64 = 2;
+pub(crate) const SCHEMA_VERSION: i64 = 3;
 const SCHEMA: &str = include_str!("storage/schema.sql");
 // Used only to recognize old databases, never to upgrade their rows.
+const SCHEMA_V2: &str = include_str!("storage/schema_v2.sql");
 const SCHEMA_V1: &str = include_str!("storage/schema_v1.sql");
 
 #[derive(Debug, PartialEq, Eq)]
@@ -159,6 +160,7 @@ fn validate_version(connection: &Connection) -> anyhow::Result<i64> {
     );
     let schema = match found {
         1 => SCHEMA_V1,
+        2 => SCHEMA_V2,
         SCHEMA_VERSION => SCHEMA,
         _ => anyhow::bail!("unknown database schema version {found}"),
     };
@@ -229,3 +231,7 @@ fn delete_file_embeddings(transaction: &Transaction<'_>, file_id: i64) -> anyhow
 #[cfg(test)]
 #[path = "../tests/unit/storage.rs"]
 mod tests;
+
+// These transaction helpers are connected to indexing in the following slice.
+#[allow(dead_code)]
+pub mod analysis;
