@@ -32,17 +32,18 @@ pub fn save_file_with_analysis(
     vectors: &[Vec<f32>],
     analysis: Option<&crate::analysis::Analysis>,
 ) -> anyhow::Result<()> {
-    replace_file(connection, source, chunks, windows, vectors, analysis)
+    replace_file(connection, source, chunks, windows, vectors, analysis, None)
         .with_context(|| format!("cannot save source file {}", source.path))
 }
 
-fn replace_file(
+pub(super) fn replace_file(
     connection: &mut Connection,
     source: &SourceFile,
     chunks: &[Chunk<'_>],
     windows: &[Window<'_>],
     vectors: &[Vec<f32>],
     analysis: Option<&crate::analysis::Analysis>,
+    documents: Option<super::documents::Batch<'_>>,
 ) -> anyhow::Result<()> {
     ensure!(
         windows.len() == vectors.len(),
@@ -155,6 +156,14 @@ fn replace_file(
         chunks.len(),
         windows.len(),
     )?;
+    if let Some(batch) = documents {
+        super::documents::write(
+            &transaction,
+            file_id,
+            analysis.context("documents require analysis")?,
+            batch,
+        )?;
+    }
     transaction.commit()?;
     Ok(())
 }

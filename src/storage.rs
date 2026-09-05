@@ -19,9 +19,10 @@ static VEC_REGISTRATION: OnceLock<Result<(), String>> = OnceLock::new();
 
 // Alpha versions identify rebuilds, not positions in a migration list.
 // Keep rusqlite_migration for the baseline before database compatibility is promised.
-pub(crate) const SCHEMA_VERSION: i64 = 5;
+pub(crate) const SCHEMA_VERSION: i64 = 6;
 const SCHEMA: &str = include_str!("storage/schema.sql");
 // Used only to recognize old databases, never to upgrade their rows.
+const SCHEMA_V5: &str = include_str!("storage/schema_v5.sql");
 const SCHEMA_V4: &str = include_str!("storage/schema_v4.sql");
 const SCHEMA_V3: &str = include_str!("storage/schema_v3.sql");
 const SCHEMA_V2: &str = include_str!("storage/schema_v2.sql");
@@ -165,6 +166,7 @@ fn validate_version(connection: &Connection) -> anyhow::Result<i64> {
         2 => SCHEMA_V2,
         3 => SCHEMA_V3,
         4 => SCHEMA_V4,
+        5 => SCHEMA_V5,
         SCHEMA_VERSION => SCHEMA,
         _ => anyhow::bail!("unknown database schema version {found}"),
     };
@@ -223,6 +225,7 @@ fn register_vec() -> anyhow::Result<()> {
 
 // vec0 has no foreign key cascade. Call this before deleting a file's chunks.
 fn delete_file_embeddings(transaction: &Transaction<'_>, file_id: i64) -> anyhow::Result<()> {
+    transaction.execute("DELETE FROM document_embeddings WHERE document_id IN (SELECT id FROM retrieval_documents WHERE file_id = ?1)", [file_id])?;
     transaction.execute(
         "DELETE FROM window_embeddings WHERE window_id IN (
             SELECT w.id FROM windows w JOIN chunks c ON c.id = w.chunk_id WHERE c.file_id = ?1
@@ -239,3 +242,6 @@ mod tests;
 pub mod analysis;
 
 pub mod processing;
+
+#[allow(dead_code)] // Connected to indexing in S6 and search in S7.
+pub mod documents;
