@@ -1,0 +1,7 @@
+[
+  {"request": "If the progress callback fails during document embedding, stop before starting the next batch.", "query": "stop document embedding batches when progress callback fails"},
+  {"request": "We should skip unchanged source files, but only when the saved extraction and embedding output is complete and current.", "query": "reuse unchanged source files with complete current extraction and embedding output"},
+  {"request": "Before replacing an old database, verify that its schema belongs to mimirs. Never delete an unknown database.", "query": "verify database schema before rebuilding an older index and reject unknown databases"},
+  {"request": "Tree-sitter gives us written method calls. Find the code that records the receiver and method without resolving their types.", "query": "record written method call receiver and method without type resolution"},
+  {"request": "When an indexed source file is deleted, remove its vectors as well as its stored file data.", "query": "remove vectors and stored data for deleted source files"}
+]
