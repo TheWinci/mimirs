@@ -6,6 +6,7 @@ use crate::source::SourceFile;
 mod entities;
 mod facts;
 mod imports;
+mod references;
 mod scopes;
 pub use scopes::Scope;
 mod signatures;
@@ -76,6 +77,12 @@ pub fn extract(source: SourceFile) -> Result<Analysis> {
     facts.extend(imports::extract(tree.root_node(), &source.text, &entities));
     let (scopes, bindings) = scopes::extract(tree.root_node(), &source.text, &entities);
     facts.extend(bindings);
+    facts.extend(references::extract(
+        tree.root_node(),
+        &source.text,
+        &entities,
+        &facts,
+    ));
     for fact in &mut facts {
         fact.scope = scopes::containing(&scopes, &fact.span);
     }

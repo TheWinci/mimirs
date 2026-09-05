@@ -275,3 +275,57 @@ fn scopes_and_binding_patterns() {
         assert!(scope.span.start <= fact.span.start && scope.span.end >= fact.span.end);
     }
 }
+
+#[test]
+fn calls_and_uses_are_written_evidence() {
+    let a = analyze(
+        "fn f(x: T) { let local = |a| a; local(g()); x.first::<T>().second(h()); Type::new(); <T as Trait>::go(); (factory())(); m!(hidden(call())); let typed: Vec<U> = x as U; }",
+    );
+    assert!(a.diagnostics.is_empty(), "{:?}", a.diagnostics);
+    let calls: Vec<_> = a.facts.iter().filter(|f| f.kind == "call").collect();
+    assert_eq!(calls.len(), 9, "{calls:?}");
+    assert!(
+        !calls
+            .iter()
+            .any(|f| a.source.text[f.span.start..f.span.end].contains("hidden"))
+    );
+    for form in ["name_call", "path_call", "method_call", "expression_call"] {
+        assert!(
+            calls
+                .iter()
+                .any(|f| f.evidence.iter().any(|e| e.role == form)),
+            "{form}"
+        );
+    }
+    assert!(
+        calls
+            .iter()
+            .any(|f| f.evidence.iter().any(|e| e.role == "generics"))
+    );
+    assert!(a.facts.iter().any(|f| f.kind == "macro_invocation"));
+    assert!(
+        a.facts
+            .iter()
+            .any(|f| f.kind == "type_reference" && &a.source.text[f.span.start..f.span.end] == "U")
+    );
+    assert!(
+        !a.facts
+            .iter()
+            .any(|f| f.kind == "value_reference" && f.span.start < 12)
+    );
+}
+
+#[test]
+fn calls_golden_and_recovery() {
+    assert_eq!(
+        report(&analyze(include_str!("../fixtures/rust/calls.rs"))),
+        include_str!("../goldens/inspect/calls.txt")
+    );
+    let a = analyze("fn f() { good(); broken( }");
+    assert!(!a.diagnostics.is_empty());
+    assert!(
+        a.facts
+            .iter()
+            .any(|f| f.kind == "call" && &a.source.text[f.span.start..f.span.end] == "good()")
+    );
+}
