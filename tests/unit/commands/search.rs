@@ -16,6 +16,9 @@ struct FixedBackend {
 }
 
 impl Backend for FixedBackend {
+    fn tokenizer(&mut self) -> anyhow::Result<tokenizers::Tokenizer> {
+        Ok(crate::test_support::tokenizer(512))
+    }
     fn embed(&mut self, texts: &[String]) -> anyhow::Result<Vec<Vec<f32>>> {
         self.calls.borrow_mut().push(texts.to_vec());
         ensure!(!self.fail, "inference failed");
@@ -294,4 +297,45 @@ fn real_minilm_search_retrieves_rust_window() {
         output.contains("text: // Read the configuration file from disk."),
         "{output}"
     );
+}
+
+#[test]
+fn facts_search_forwards_distilled_query_and_reads_deleted_snapshot() {
+    let (dir, mut connection) = project();
+    let budget =
+        crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
+    let policy = storage::policy::document_policy(&budget);
+    storage::policy::configure(&mut connection, storage::policy::Mode::Facts, Some(&policy))
+        .unwrap();
+    let analysis = crate::analysis::extract(SourceFile {
+        path: "deleted.rs".into(),
+        text: "/// Expire sessions.\nfn expire_sessions() {}".into(),
+    })
+    .unwrap();
+    let docs = budget
+        .split(&crate::retrieval::render::render(
+            &crate::retrieval::project(&analysis).unwrap(),
+        ))
+        .unwrap();
+    storage::documents::save(
+        &mut connection,
+        &analysis,
+        storage::documents::Batch {
+            documents: &docs,
+            vectors: &vec![vector(1.0, 0.0); docs.len()],
+            policy: &policy,
+        },
+    )
+    .unwrap();
+    drop(connection);
+    let backend = fixed();
+    let calls = backend.calls.clone();
+    let query = "  expire_sessions after expiry time  ";
+    let (result, output) = execute(dir.path(), query, 5, || Ok(Embedder::new(backend)));
+    result.unwrap();
+    assert_eq!(*calls.borrow(), [vec![query.to_owned()]]);
+    assert!(output.contains("location: deleted.rs:2"));
+    assert!(output.contains("source: indexed snapshot"));
+    assert!(output.contains("Documentation: /// Expire sessions."));
+    assert!(output.contains("evidence: Fact"));
 }

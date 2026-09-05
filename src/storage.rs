@@ -13,7 +13,7 @@ mod save;
 mod search;
 pub use reconcile::{invalidate, reconcile};
 pub use save::{save_file, save_file_with_analysis};
-pub use search::{SearchResult, has_windows, nearest};
+pub use search::{SearchResult, has_content, nearest};
 
 static VEC_REGISTRATION: OnceLock<Result<(), String>> = OnceLock::new();
 
@@ -246,3 +246,5 @@ pub mod processing;
 pub mod documents;
 
 pub mod policy;
+
+mod document_search;

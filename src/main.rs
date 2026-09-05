@@ -40,7 +40,7 @@ enum Command {
 
     /// Search query with limit.
     Search {
-        /// Text that will be used to search the index.
+        /// Caller-distilled intent, preserving supplied identifiers and constraints.
         query: String,
 
         /// Number of top results to return.
