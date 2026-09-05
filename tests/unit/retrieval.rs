@@ -191,3 +191,54 @@ fn descriptions_match_readable_golden() {
         + "\n";
     assert_eq!(text, include_str!("../fixtures/retrieval/descriptions.txt"));
 }
+
+#[test]
+fn wrapped_and_async_closures_do_not_embed_their_bodies_as_call_arguments() {
+    for text in [
+        "fn f() { invoke((|x| x + 771)); }",
+        "fn f() { invoke((move |x| x + 771)); }",
+        "fn f() { invoke(async move |x: u64| x + 771); }",
+    ] {
+        let analysis = extract(text);
+        assert!(analysis.diagnostics.is_empty(), "{text}");
+        let descriptions = render::render(&project(&analysis).unwrap());
+        let facts: Vec<_> = descriptions
+            .iter()
+            .flat_map(|d| &d.facts)
+            .map(|c| c.text.as_str())
+            .collect();
+        assert!(
+            facts.contains(&"Calls written callee invoke. Target unresolved."),
+            "{facts:?}"
+        );
+        assert!(!facts.iter().any(|s| s.contains("771")), "{facts:?}");
+    }
+}
+
+#[test]
+fn a_closure_used_as_the_callee_does_not_embed_its_body() {
+    let analysis = extract("fn f() { (|x: u64| x + 771)(3); }");
+    assert!(analysis.diagnostics.is_empty());
+    let descriptions = render::render(&project(&analysis).unwrap());
+    let facts: Vec<_> = descriptions
+        .iter()
+        .flat_map(|d| &d.facts)
+        .map(|c| c.text.as_str())
+        .collect();
+    assert!(facts.contains(&"Calls a written expression. Target unresolved."));
+    assert!(!facts.iter().any(|s| s.contains("771")));
+}
+
+#[test]
+fn chained_calls_keep_written_methods_without_repeating_closure_bodies() {
+    let analysis = extract("fn f() { items.map(|x| x + 771).collect(); }");
+    let descriptions = render::render(&project(&analysis).unwrap());
+    let facts: Vec<_> = descriptions
+        .iter()
+        .flat_map(|d| &d.facts)
+        .map(|c| c.text.as_str())
+        .collect();
+    assert!(facts.contains(&"Calls written method collect. Target unresolved."));
+    assert!(facts.contains(&"Calls written callee items.map. Target unresolved."));
+    assert!(!facts.iter().any(|s| s.contains("771")));
+}

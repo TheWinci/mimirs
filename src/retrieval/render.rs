@@ -1,7 +1,7 @@
 use super::{Projection, Record, RelationKind, Target};
 use crate::analysis::Span;
 
-pub const RENDER_VERSION: &str = "evidence-clauses-1";
+pub const RENDER_VERSION: &str = "evidence-clauses-2";
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Evidence {
@@ -84,7 +84,11 @@ pub fn render(projection: &Projection<'_>) -> Vec<Description> {
                 "import_member" => continue, // Already represented by the full import; provenance below includes members.
                 "call" => {
                     // Closure/block arguments contain bodies. Retain only the callee in that case.
-                    if written.contains('{')
+                    if analysis.scopes.iter().any(|scope| {
+                        scope.kind == "closure"
+                            && scope.span.start >= fact.span.start
+                            && scope.span.end <= fact.span.end
+                    }) || written.contains('{')
                         || fact.evidence.iter().any(|e| {
                             e.role == "argument" && {
                                 let text = source[e.span.start..e.span.end].trim();
@@ -97,10 +101,26 @@ pub fn render(projection: &Projection<'_>) -> Vec<Description> {
                         let Some(callee) = fact.evidence.iter().find(|e| e.role == "callee") else {
                             continue;
                         };
-                        format!(
-                            "Calls written callee {}. Target unresolved.",
-                            &source[callee.span.start..callee.span.end]
-                        )
+                        let callee_text = &source[callee.span.start..callee.span.end];
+                        if callee_text.contains('{')
+                            || analysis.scopes.iter().any(|scope| {
+                                scope.kind == "closure"
+                                    && scope.span.start >= callee.span.start
+                                    && scope.span.end <= callee.span.end
+                            })
+                        {
+                            if let Some(method) = fact.evidence.iter().find(|e| e.role == "method")
+                            {
+                                format!(
+                                    "Calls written method {}. Target unresolved.",
+                                    &source[method.span.start..method.span.end]
+                                )
+                            } else {
+                                "Calls a written expression. Target unresolved.".into()
+                            }
+                        } else {
+                            format!("Calls written callee {callee_text}. Target unresolved.")
+                        }
                     } else {
                         format!("Calls written expression {written}. Target unresolved.")
                     }

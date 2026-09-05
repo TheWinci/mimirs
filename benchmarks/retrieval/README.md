@@ -4,13 +4,13 @@ The September 5, 2026 comparison keeps raw retrieval as the default. Facts
 produce precise entity locations and source evidence, but these five requests
 show two regressions and one improvement in expected-file rank.
 
-| Request | Raw file rank | Facts file rank |
-| --- | ---: | ---: |
-| Stop batches when progress fails | 1 | 1 |
-| Reuse complete unchanged output | 5 | 6 |
-| Reject unknown database schemas | 1 | 1 |
-| Record written method-call receivers | 2 | 14 |
-| Remove deleted-file vectors | 2 | 1 |
+| Request | Raw file rank | Initial facts rank | Current facts rank |
+| --- | ---: | ---: | ---: |
+| Stop batches when progress fails | 1 | 1 | 1 |
+| Reuse complete unchanged output | 5 | 6 | 8 |
+| Reject unknown database schemas | 1 | 1 | 1 |
+| Record written method-call receivers | 2 | 14 | 4 |
+| Remove deleted-file vectors | 2 | 1 | 1 |
 
 Ranks count unique files among up to 64 returned hits. Either listed target file
 counts for deletion, whose work spans storage and reconciliation. This compares
@@ -60,3 +60,11 @@ is in `pinned-results.json`. It preserves every expected-file rank above and the
 same model artifact hashes. The explicit parity test also checks every embedding
 coordinate within `1e-6` and exact tokenizer configuration equality against the
 previous loader. This verifies the loading change; it is not new relevance evidence.
+
+`closure-results.json` records the final renderer correction. Extracted closure
+scopes now prevent bodies inside wrapped arguments or chained callees from
+entering call descriptions. Written method names and nested call occurrences
+remain. This changes inputs in 17 corpus files and reduces documents from 343
+to 338. With unchanged queries, raw ranks remain 1, 5, 1, 2, 2; current facts
+ranks are 1, 8, 1, 4, 1. Raw therefore remains the default. The original results
+and examples above remain available to distinguish the measured representations.
