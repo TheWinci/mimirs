@@ -42,7 +42,7 @@ pub fn read(connection: &Connection) -> Result<(Mode, Option<String>)> {
     let mode = read("retrieval_mode")?;
     let policy = read("document_policy")?;
     let documents: bool = connection.query_row(
-        "SELECT EXISTS(SELECT 1 FROM retrieval_processing)",
+        "SELECT EXISTS(SELECT 1 FROM retrieval_processing) OR EXISTS(SELECT 1 FROM retrieval_documents) OR EXISTS(SELECT 1 FROM document_embeddings)",
         [],
         |r| r.get(0),
     )?;
@@ -64,6 +64,17 @@ pub fn read(connection: &Connection) -> Result<(Mode, Option<String>)> {
             );
             let mixed: bool = connection.query_row("SELECT EXISTS(SELECT 1 FROM retrieval_processing WHERE policy != ?1) OR EXISTS(SELECT 1 FROM retrieval_documents WHERE policy != ?1)", [value], |r| r.get(0))?;
             ensure!(!mixed, "mixed document policies");
+            let incomplete: bool = connection.query_row("SELECT
+                EXISTS(SELECT 1 FROM source_snapshots s LEFT JOIN retrieval_processing p ON p.file_id=s.file_id WHERE p.file_id IS NULL)
+                OR EXISTS(SELECT 1 FROM chunks c JOIN source_snapshots s ON s.file_id=c.file_id)
+                OR EXISTS(SELECT 1 FROM retrieval_processing p WHERE
+                    p.document_count != (SELECT count(*) FROM retrieval_documents d WHERE d.file_id=p.file_id)
+                    OR p.document_count != (SELECT count(*) FROM document_embeddings e JOIN retrieval_documents d ON d.id=e.document_id WHERE d.file_id=p.file_id))
+                OR EXISTS(SELECT 1 FROM document_embeddings e LEFT JOIN retrieval_documents d ON d.id=e.document_id WHERE d.id IS NULL)", [], |r| r.get(0))?;
+            ensure!(
+                !incomplete,
+                "incomplete or mixed Rust retrieval output; run mimirs index"
+            );
             Ok((Mode::Facts, policy))
         }
         _ => anyhow::bail!("unsupported retrieval mode"),

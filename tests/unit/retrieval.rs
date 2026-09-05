@@ -125,3 +125,69 @@ fn split_preserves_oversized_unicode_clauses_and_special_token_budget() {
             .all(|d| budget.count(&d.text).unwrap() <= 32)
     );
 }
+
+#[test]
+fn complete_inputs_fit_exactly_at_the_limit_then_split_one_token_over() {
+    let budget = split::TokenBudget::new(crate::test_support::tokenizer(32)).unwrap();
+    let analysis = extract("/// text\nfn f() {}");
+    let mut descriptions = render::render(&project(&analysis).unwrap());
+    let d = &mut descriptions[0];
+    d.facts.truncate(1);
+    let mut words = String::new();
+    while budget
+        .count(&format!("{}\n{}x", d.identity.text, words))
+        .unwrap()
+        <= 32
+    {
+        words.push_str("x ");
+    }
+    d.facts[0].text = words.clone();
+    let parts = budget.split(&descriptions).unwrap();
+    assert_eq!(parts.len(), 1);
+    assert_eq!(budget.count(&parts[0].text).unwrap(), 32);
+    descriptions[0].facts[0].text.push('x');
+    assert_eq!(budget.split(&descriptions).unwrap().len(), 2);
+}
+
+#[test]
+#[ignore = "loads the cached model or downloads it; run explicitly"]
+fn real_model_documents_never_rely_on_backend_truncation() {
+    let mut embedder = crate::embedding::production().unwrap();
+    let budget = embedder.token_budget().unwrap();
+    assert_eq!(budget.limit, 512);
+    assert_eq!(budget.count("hello").unwrap(), 3);
+    let source = format!(
+        "/// {}\nfn very_long_name() {{ helper(); }}",
+        "Café 東京 identifiers ".repeat(800)
+    );
+    let descriptions = render::render(&project(&extract(&source)).unwrap());
+    let parts = budget.split(&descriptions).unwrap();
+    assert!(parts.len() > 2);
+    assert!(parts.iter().all(|p| budget.count(&p.text).unwrap() <= 512));
+    let texts: Vec<_> = parts.into_iter().map(|p| p.text).collect();
+    assert_eq!(
+        embedder
+            .embed_documents(&texts, |_, _| Ok(()))
+            .unwrap()
+            .len(),
+        texts.len()
+    );
+}
+
+#[test]
+fn descriptions_match_readable_golden() {
+    let analysis = extract(include_str!("../fixtures/retrieval/sessions.rs"));
+    let descriptions = render::render(&project(&analysis).unwrap());
+    let text = descriptions
+        .iter()
+        .map(|d| {
+            std::iter::once(d.identity.text.as_str())
+                .chain(d.facts.iter().map(|c| c.text.as_str()))
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+        .collect::<Vec<_>>()
+        .join("\n\n")
+        + "\n";
+    assert_eq!(text, include_str!("../fixtures/retrieval/descriptions.txt"));
+}

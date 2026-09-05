@@ -159,3 +159,49 @@ fn search_collapses_many_parts_and_retains_indexed_evidence() {
     .unwrap();
     assert!(crate::storage::nearest(&db, &query, 3).is_err());
 }
+
+#[test]
+fn policy_rejects_missing_vectors_and_mixed_raw_rust() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut db = crate::storage::open(&dir.path().join("index.db"))
+        .unwrap()
+        .connection;
+    let budget =
+        crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
+    let policy = crate::storage::policy::document_policy(&budget);
+    crate::storage::policy::configure(&mut db, crate::storage::policy::Mode::Facts, Some(&policy))
+        .unwrap();
+    let analysis = crate::analysis::extract(crate::source::SourceFile {
+        path: "a.rs".into(),
+        text: "fn a() {}".into(),
+    })
+    .unwrap();
+    let docs = budget
+        .split(&crate::retrieval::render::render(
+            &crate::retrieval::project(&analysis).unwrap(),
+        ))
+        .unwrap();
+    save(
+        &mut db,
+        &analysis,
+        Batch {
+            documents: &docs,
+            vectors: &vec![vec![1.0; DIMENSION]; docs.len()],
+            policy: &policy,
+        },
+    )
+    .unwrap();
+    db.execute("DELETE FROM document_embeddings", []).unwrap();
+    assert!(crate::storage::policy::read(&db).is_err());
+    let chunks = crate::chunk::of(&analysis.source);
+    crate::storage::save_file_with_analysis(
+        &mut db,
+        &analysis.source,
+        &chunks,
+        &[],
+        &[],
+        Some(&analysis),
+    )
+    .unwrap();
+    assert!(crate::storage::policy::read(&db).is_err());
+}

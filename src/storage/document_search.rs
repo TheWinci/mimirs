@@ -61,8 +61,12 @@ pub fn nearest(
                 .owner
                 .map_or(&analysis.scopes[0].span, |id| &analysis.entities[id].span);
             positions.insert(key, results.len());
-            let mut spans = document.evidence.clone();
-            spans.dedup();
+            let mut spans = Vec::new();
+            for evidence in &document.evidence {
+                if !spans.contains(evidence) {
+                    spans.push(evidence.clone());
+                }
+            }
             results.push(SearchResult {
                 path,
                 line_start: span.line_start as i64,

@@ -785,3 +785,30 @@ fn facts_failure_invalidates_old_output_and_mixed_files_keep_raw_inputs() {
         0
     );
 }
+
+#[test]
+fn facts_index_repairs_a_missing_vector_before_reuse() {
+    let dir = project(&[("a.rs", "fn a() {}")]);
+    let config = Config {
+        retrieval: storage::policy::Mode::Facts,
+        ..Config::default()
+    };
+    fs::write(
+        dir.path().join(".mimirs/config.toml"),
+        config.to_toml().unwrap(),
+    )
+    .unwrap();
+    run(&dir, backend(), false).0.unwrap();
+    let db = storage::open(&dir.path().join(".mimirs/index.db"))
+        .unwrap()
+        .connection;
+    db.execute("DELETE FROM document_embeddings", []).unwrap();
+    assert!(storage::policy::read(&db).is_err());
+    drop(db);
+    let repair = backend();
+    let calls = repair.calls.clone();
+    run(&dir, repair, false).0.unwrap();
+    assert!(!calls.borrow().batches.is_empty());
+    let db = storage::open_read_only(&dir.path().join(".mimirs/index.db")).unwrap();
+    storage::policy::read(&db).unwrap();
+}

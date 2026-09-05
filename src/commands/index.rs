@@ -108,8 +108,6 @@ fn index_with(
         document_policy.as_deref(),
     )?;
 
-    storage::policy::read(&database.connection)?;
-
     let mut summary = Summary {
         walk_errors: walk.errors.len(),
         ..Summary::default()

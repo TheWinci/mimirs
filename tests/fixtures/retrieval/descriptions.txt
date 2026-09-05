@@ -1,0 +1,17 @@
+Rust function expire_sessions in file fixture.rs.
+Documentation: /// Remove sessions whose expiry is at or before now.
+Written signature: fn expire_sessions(now: u64)
+Binding candidate: now.
+Written value reference: sessions. Target unresolved.
+Calls written callee sessions.retain. Target unresolved.
+Binding candidate: session.
+Written value reference: session. Target unresolved.
+Written field reference: expires. Target unresolved.
+Written value reference: now. Target unresolved.
+
+Rust function valid_username in file fixture.rs.
+Documentation: /// Reject usernames that end with a newline.
+Written signature: fn valid_username(name: &str) -> bool
+Binding candidate: name.
+Written value reference: name. Target unresolved.
+Calls written expression name.ends_with('\n'). Target unresolved.
