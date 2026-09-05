@@ -114,3 +114,64 @@ fn lexical_parents_and_methods() {
         2
     );
 }
+
+#[test]
+fn explicit_documentation_ownership() {
+    let a = analyze(
+        "//! file\n// section\n/// docs\n#[cfg(test)]\n// gap\n\nfn f() { /* body /* nested */ */ } // trailing\n",
+    );
+    let f = a
+        .entities
+        .iter()
+        .position(|e| e.name.as_deref() == Some("f"))
+        .unwrap();
+    let text = |fact: &Fact| &a.source.text[fact.span.start..fact.span.end];
+    assert_eq!(
+        a.facts
+            .iter()
+            .find(|x| text(x).starts_with("///"))
+            .unwrap()
+            .owner,
+        Some(f)
+    );
+    assert_eq!(
+        a.facts
+            .iter()
+            .find(|x| x.kind == "attribute")
+            .unwrap()
+            .owner,
+        Some(f)
+    );
+    for prefix in ["//!", "// section", "// gap", "// trailing"] {
+        assert_eq!(
+            a.facts
+                .iter()
+                .find(|x| text(x).starts_with(prefix))
+                .unwrap()
+                .owner,
+            None
+        );
+    }
+    assert_eq!(
+        a.facts
+            .iter()
+            .find(|x| text(x).starts_with("/*"))
+            .unwrap()
+            .owner,
+        Some(f)
+    );
+    let attr = a.facts.iter().find(|x| x.kind == "attribute").unwrap();
+    assert_eq!(
+        &a.source.text[attr.evidence[0].span.start..attr.evidence[0].span.end],
+        "cfg"
+    );
+    assert_eq!(attr.evidence[1].role, "arguments");
+}
+
+#[test]
+fn comments_golden() {
+    assert_eq!(
+        report(&analyze(include_str!("../fixtures/rust/comments.rs"))),
+        include_str!("../goldens/inspect/comments.txt")
+    );
+}

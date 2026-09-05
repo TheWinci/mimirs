@@ -4,7 +4,9 @@ use tree_sitter::{Node, Parser};
 use crate::source::SourceFile;
 
 mod entities;
+mod facts;
 pub use entities::Entity;
+pub use facts::Fact;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Span {
@@ -48,6 +50,7 @@ pub struct Analysis {
     pub source: SourceFile,
     pub diagnostics: Vec<Diagnostic>,
     pub entities: Vec<Entity>,
+    pub facts: Vec<Fact>,
 }
 
 pub fn extract(source: SourceFile) -> Result<Analysis> {
@@ -59,6 +62,7 @@ pub fn extract(source: SourceFile) -> Result<Analysis> {
         .parse(&source.text, None)
         .context("Rust parser returned no tree")?;
     let entities = entities::extract(tree.root_node(), &source.text);
+    let facts = facts::extract(tree.root_node(), &source.text, &entities);
     let mut diagnostics = Vec::new();
     let mut cursor = tree.walk();
     loop {
@@ -86,6 +90,7 @@ pub fn extract(source: SourceFile) -> Result<Analysis> {
                     source,
                     diagnostics,
                     entities,
+                    facts,
                 });
             }
         }
@@ -121,6 +126,28 @@ pub fn report(analysis: &Analysis) -> String {
                 .parent
                 .map_or_else(|| "file".into(), |id| format!("e{id}"))
         ));
+    }
+    for (id, fact) in analysis.facts.iter().enumerate() {
+        output.push_str(&format!(
+            "fact f{id}: {} bytes {}..{} lines {}..{} owner {} text {:?}\n",
+            fact.kind,
+            fact.span.start,
+            fact.span.end,
+            fact.span.line_start,
+            fact.span.line_end,
+            fact.owner
+                .map_or_else(|| "file".into(), |id| format!("e{id}")),
+            &analysis.source.text[fact.span.start..fact.span.end]
+        ));
+        for evidence in &fact.evidence {
+            output.push_str(&format!(
+                "  {} bytes {}..{} text {:?}\n",
+                evidence.role,
+                evidence.span.start,
+                evidence.span.end,
+                &analysis.source.text[evidence.span.start..evidence.span.end]
+            ));
+        }
     }
     for diagnostic in &analysis.diagnostics {
         output.push_str(&format!(
