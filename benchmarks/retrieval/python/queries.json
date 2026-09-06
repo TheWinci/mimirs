@@ -1,0 +1,5 @@
+[
+  {"kind": "body", "query": "remove expired sessions using their expiration timestamp", "path": "sessions.py", "name": "expire", "parent": "SessionStore"},
+  {"kind": "documentation", "query": "remove control characters before writing terminal progress messages", "path": "terminal.py", "name": "sanitize_label", "parent": null},
+  {"kind": "method", "query": "restore session store from a JSON snapshot on disk", "path": "sessions.py", "name": "restore", "parent": "SessionStore"}
+]

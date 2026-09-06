@@ -53,16 +53,25 @@ fn exclude_removes_a_directory() {
 }
 
 #[test]
-fn default_include_selects_rust_files() {
+fn default_include_selects_rust_and_python_files() {
     let dir = tree(&[
         ("a.txt", "hello"),
         ("b.rs", "fn main() {}"),
+        ("app.py", "def main(): pass"),
+        ("stubs/app.pyi", "def main(): ..."),
+        (".venv/lib/site.py", "def dependency(): pass"),
+        ("venv/lib/site.py", "def dependency(): pass"),
+        ("src/__pycache__/generated.py", "pass"),
+        ("app.ts", "function main() {}"),
         ("src/lib.rs", "pub fn answer() -> u8 { 42 }"),
     ]);
 
     let walk = walk(dir.path(), &Config::default()).unwrap();
 
-    assert_eq!(walk.paths, ["b.rs", "src/lib.rs"]);
+    assert_eq!(
+        walk.paths,
+        ["app.py", "b.rs", "src/lib.rs", "stubs/app.pyi"]
+    );
 }
 
 #[test]

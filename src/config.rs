@@ -17,7 +17,9 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            include: ["**/*.rs"].map(String::from).to_vec(),
+            include: ["**/*.rs", "**/*.py", "**/*.pyi"]
+                .map(String::from)
+                .to_vec(),
             exclude: [
                 "**/.git/**",
                 "**/.mimirs/**",
@@ -26,6 +28,9 @@ impl Default for Config {
                 "**/dist/**",
                 "**/build/**",
                 "**/vendor/**",
+                "**/.venv/**",
+                "**/venv/**",
+                "**/__pycache__/**",
                 // Secrets: defence in depth for what git does not ignore.
                 "**/.env",
                 "**/.env.*",

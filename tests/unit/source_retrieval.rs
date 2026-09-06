@@ -267,27 +267,45 @@ fn real_model_source_inputs_preserve_bytes_without_truncation() {
     let mut embedder = crate::embedding::production().unwrap();
     let budget = embedder.token_budget().unwrap();
     assert_eq!(budget.limit, 512);
-    let source = format!(
-        "/// {}\nfn long() {{ helper(); }}",
-        "Café 東京 identifiers ".repeat(800)
-    );
-    let docs = documents(&extract(&source), &budget).unwrap();
-    assert!(docs.len() > 2);
-    let mut restored = String::new();
-    for doc in &docs {
-        assert!(budget.count(&doc.text).unwrap() <= 512);
-        let span = &doc.evidence[0].span;
-        restored.push_str(&source[span.start..span.end]);
+    for (path, source) in [
+        (
+            "long.rs",
+            format!(
+                "/// {}\nfn long() {{ helper(); }}",
+                "Café 東京 identifiers ".repeat(800)
+            ),
+        ),
+        (
+            "long.py",
+            format!(
+                "@decorate\nasync def long(value: str) -> str:\n    \"\"\"{}\"\"\"\n    return value",
+                "Café 東京 identifiers ".repeat(800)
+            ),
+        ),
+    ] {
+        let analysis = crate::analysis::extract(crate::source::SourceFile {
+            path: path.into(),
+            text: source.clone(),
+        })
+        .unwrap();
+        let docs = documents(&analysis, &budget).unwrap();
+        assert!(docs.len() > 2);
+        let mut restored = String::new();
+        for doc in &docs {
+            assert!(budget.count(&doc.text).unwrap() <= 512);
+            let span = &doc.evidence[0].span;
+            restored.push_str(&source[span.start..span.end]);
+        }
+        assert_eq!(restored, source);
+        let texts: Vec<_> = docs.into_iter().map(|d| d.text).collect();
+        assert_eq!(
+            embedder
+                .embed_documents(&texts, |_, _| Ok(()))
+                .unwrap()
+                .len(),
+            texts.len()
+        );
     }
-    assert_eq!(restored, source);
-    let texts: Vec<_> = docs.into_iter().map(|d| d.text).collect();
-    assert_eq!(
-        embedder
-            .embed_documents(&texts, |_, _| Ok(()))
-            .unwrap()
-            .len(),
-        texts.len()
-    );
 }
 
 #[test]

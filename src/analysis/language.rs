@@ -28,7 +28,7 @@ pub struct Language {
     pub chunking: Chunking,
 }
 
-const REGISTERED: &[Language] = &[super::rust::LANGUAGE];
+const REGISTERED: &[Language] = &[super::rust::LANGUAGE, super::python::LANGUAGE];
 
 pub fn for_path(path: &str) -> &'static Language {
     select(path, REGISTERED)

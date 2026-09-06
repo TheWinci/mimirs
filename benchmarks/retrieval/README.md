@@ -1,7 +1,7 @@
 # Source-chunk retrieval check
 
-The CLI embeds tree-sitter source chunks for Rust and paragraph chunks for
-included unsupported text. Facts remain structured analysis. The raw-line and
+The CLI embeds tree-sitter source chunks for Rust and Python, and paragraph
+chunks for included unsupported text. Facts remain structured analysis. The raw-line and
 facts-description embedding modes have been removed to reduce scope.
 
 The fixed corpus is 26 Rust source files from `425fbbe`. The same five prepared
@@ -58,3 +58,6 @@ matches, including all 30 repeated signatures. Analyzer registration and
 extension mappings now contribute to cache compatibility, while Rust source
 representation stays unchanged. Timing was collected alongside other model
 checks and is not a performance comparison.
+
+The [Python retrieval check](python/README.md) covers mixed Python/Rust source,
+stubs, named-owner ranking, and upgrades from Python fallback indexing.

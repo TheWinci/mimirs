@@ -39,7 +39,7 @@ fn from_toml_accepts_an_absent_exclude() {
 fn from_toml_accepts_the_default() {
     let config = Config::from_toml(&Config::default().to_toml().unwrap()).unwrap();
 
-    assert_eq!(config.include, ["**/*.rs"]);
+    assert_eq!(config.include, ["**/*.rs", "**/*.py", "**/*.pyi"]);
 }
 
 #[test]

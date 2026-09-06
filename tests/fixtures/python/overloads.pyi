@@ -1,0 +1,13 @@
+"""Stub declarations stay distinct even when names repeat."""
+from typing import overload
+
+@overload
+def read(value: str) -> str: ...
+@overload
+def read(value: bytes) -> bytes: ...
+
+class Reader:
+    @overload
+    def read(self, value: str) -> str: ...
+    @overload
+    def read(self, value: bytes) -> bytes: ...

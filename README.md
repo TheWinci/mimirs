@@ -43,7 +43,8 @@ npm install -g mimirs
 ## License
 
 Apache-2.0
-## Rust indexing and retrieval
+
+## Indexing and retrieval
 
 ```sh
 cargo build
@@ -52,8 +53,10 @@ mimirs index
 mimirs search 'valid_username check for trailing newline' --limit 5
 ```
 
-Run these commands from the project root. Fresh config includes Rust files;
-customize `include` and `exclude` in `.mimirs/config.toml` for other text files.
+Run these commands from the project root. Fresh config includes Rust `.rs` and
+Python `.py` and `.pyi` files. Common Python environment directories `.venv`,
+`venv`, and `__pycache__` are excluded. Customize `include` and `exclude` in
+`.mimirs/config.toml` for your project.
 `init` preserves an existing config. The first model use can download files;
 indexing and search then use the local cache.
 
@@ -65,6 +68,14 @@ comments, macro bodies, and incomplete source remain searchable. Embedding
 inputs preserve source spellings, operators, and literals. Ordinary comments
 outside items stay separate and can rank ahead of the code they describe; Rust
 doc comments attach to their item.
+
+Python classes partition around methods and nested classes. Functions and methods
+retain their bodies, decorators, and docstrings, including any nested definitions.
+Method inputs include the enclosing class name. Imports, assignments, and ordinary
+comments stay in surrounding source chunks. Stub overloads keep separate owners
+even when their names repeat. Python analysis stores declaration scopes,
+signatures, decorator and docstring facts, and parse diagnostics. It does not
+resolve imports or calls. No Python installation or language server is required.
 
 Large items split on source lines, repeating their signature. A single oversized
 line splits at tokenizer and UTF-8 boundaries. Every complete input, including
@@ -115,8 +126,18 @@ then run `mimirs index`. Recognized older alpha indexes rebuild when opened for
 writing. Search and stored inspection reject them with reindex guidance.
 Analyzer or language-mapping changes also require `mimirs index` to rebuild the
 index, including unchanged files previously handled as text fallback.
+
+To enable Python in an existing project, add `"**/*.py"` and `"**/*.pyi"` to
+`include` in `.mimirs/config.toml`, retain your other includes and exclusions, and
+run `mimirs index`. Add `"**/.venv/**"`, `"**/venv/**"`, and `"**/__pycache__/**"`
+to `exclude` if your config does not already exclude those directories. `init`
+preserves the contents of your existing config.
+
 The old `inspect --documents` facts-description preview has been removed.
 
 This simplifies the implementation without establishing a general retrieval
 quality improvement. The five development queries and source-fidelity audit are
 recorded in the [retrieval check](benchmarks/retrieval/README.md).
+
+The [Python retrieval check](benchmarks/retrieval/python/README.md) records the
+first Python source and mixed-language search verification.

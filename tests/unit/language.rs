@@ -9,7 +9,7 @@ fn dispatch_preserves_rust_and_text_fallback() {
         );
     }
     for path in [
-        "main.py",
+        "main.js",
         "main.RS",
         "notes.md",
         "README",
@@ -54,10 +54,11 @@ fn registration_and_mapping_changes_invalidate_identity() {
     .unwrap();
     assert_eq!(analysis.entities[0].name.as_deref(), Some("named"));
     let registered_identity = identity(&registered);
-    registered[1].extensions = &["other"];
+    registered.last_mut().unwrap().extensions = &["other"];
     assert_ne!(identity(&registered), registered_identity);
-    registered[1].extensions = &["test"];
-    registered[1].identity = "test/default/tree-sitter-0.27.0/rust-0.24.2/extractor-2";
+    registered.last_mut().unwrap().extensions = &["test"];
+    registered.last_mut().unwrap().identity =
+        "test/default/tree-sitter-0.27.0/rust-0.24.2/extractor-2";
     assert_ne!(identity(&registered), registered_identity);
     assert_eq!(identity(REGISTERED), original);
 }

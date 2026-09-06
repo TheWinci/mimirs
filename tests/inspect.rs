@@ -69,3 +69,39 @@ fn source_chunk_preview_preserves_code_without_a_model_or_project() {
         .unwrap();
     assert!(!conflict.status.success());
 }
+
+#[test]
+fn python_and_stubs_preview_decorated_methods_without_project_state() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = "class Café:\n    @classmethod\n    def make(cls): ...\n";
+    for path in ["example.py", "example.pyi"] {
+        fs::write(dir.path().join(path), source).unwrap();
+        let output = Command::new(env!("CARGO_BIN_EXE_mimirs"))
+            .args(["inspect", path, "--source-chunks"])
+            .current_dir(&dir)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let chunks: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        let method = chunks
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|chunk| chunk["owner"] == 1)
+            .unwrap();
+        assert_eq!(method["text"], "@classmethod\n    def make(cls): ...");
+        assert_eq!(method["context"], format!("{path} :: class Café"));
+        let report = Command::new(env!("CARGO_BIN_EXE_mimirs"))
+            .args(["inspect", path])
+            .current_dir(&dir)
+            .output()
+            .unwrap();
+        assert!(report.status.success());
+        assert!(String::from_utf8_lossy(&report.stdout).contains("parse: complete"));
+    }
+    assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 2);
+}

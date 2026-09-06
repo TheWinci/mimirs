@@ -4,6 +4,7 @@ use tree_sitter::Node;
 use crate::source::SourceFile;
 
 pub mod language;
+mod python;
 mod rust;
 mod text;
 

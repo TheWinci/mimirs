@@ -880,3 +880,80 @@ fn registering_an_analyzer_replaces_unchanged_fallback_documents() {
     assert!(stdout.starts_with("indexed: 0 files\nunchanged: 1 files\n"));
     assert!(calls.borrow().batches.is_empty());
 }
+
+#[test]
+fn python_and_rust_share_index_reuse_replacement_and_deletion() {
+    let dir = project(&[
+        (
+            "a.py",
+            "class Store:\n    def read(self):\n        \"\"\"Read state.\"\"\"\n        return self.state\n",
+        ),
+        ("api.pyi", "def read() -> str: ...\n"),
+        ("empty.py", ""),
+        ("keep.rs", "fn keep() {}"),
+    ]);
+    let config_path = dir.path().join(".mimirs/config.toml");
+    let original_config = fs::read(&config_path).unwrap();
+    run(&dir, backend(), false).0.unwrap();
+    let budget =
+        crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
+    let policy = storage::policy::document_policy(&budget);
+    for path in ["a.py", "api.pyi", "empty.py", "keep.rs"] {
+        let expected = crate::analysis::extract(source::read(dir.path(), path).unwrap()).unwrap();
+        let db = connection(&dir);
+        let stored = storage::analysis::load(&db, path).unwrap().unwrap();
+        assert_eq!(stored, expected);
+        assert_eq!(
+            storage::documents::load(&db, path, &policy).unwrap(),
+            crate::retrieval::source::documents(&expected, &budget).unwrap()
+        );
+    }
+    assert!(
+        storage::documents::load(&connection(&dir), "empty.py", &policy)
+            .unwrap()
+            .is_empty()
+    );
+    let model = backend();
+    let calls = Rc::clone(&model.calls);
+    let mut stderr = Vec::new();
+    let mut progress = Progress::new(dir.path(), &mut stderr, false, &|| Duration::ZERO);
+    let summary = index_with(
+        dir.path(),
+        || Ok(Embedder::new(model)),
+        &mut progress,
+        source::read,
+        |_| panic!("unchanged source parsed"),
+    )
+    .unwrap();
+    assert_eq!((summary.indexed, summary.unchanged), (0, 4));
+    assert!(calls.borrow().batches.is_empty());
+
+    fs::write(dir.path().join("a.py"), "def changed():\n    return 42\n").unwrap();
+    fs::remove_file(dir.path().join("api.pyi")).unwrap();
+    let (result, stdout, _) = run(&dir, backend(), false);
+    result.unwrap();
+    assert!(
+        stdout.starts_with("indexed: 1 files\nunchanged: 2 files\n"),
+        "{stdout}"
+    );
+    let db = connection(&dir);
+    assert!(storage::analysis::load(&db, "api.pyi").unwrap().is_none());
+    let updated = storage::analysis::load(&db, "a.py").unwrap().unwrap();
+    assert_eq!(updated.entities.len(), 1);
+    assert_eq!(updated.entities[0].name.as_deref(), Some("changed"));
+    drop(db);
+
+    fs::write(
+        dir.path().join("a.py"),
+        "def replacement():\n    return 99\n",
+    )
+    .unwrap();
+    let mut model = backend();
+    model.fail_on = Some("a.py\ndef replacement():\n    return 99".into());
+    assert!(run(&dir, model, false).0.is_err());
+    let db = connection(&dir);
+    assert!(storage::analysis::load(&db, "a.py").unwrap().is_none());
+    let hits = storage::nearest(&db, &vec![1.0; DIMENSION], 10).unwrap();
+    assert!(hits.iter().all(|hit| hit.path == "keep.rs"));
+    assert_eq!(fs::read(config_path).unwrap(), original_config);
+}
