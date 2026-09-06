@@ -1,9 +1,12 @@
-//! Source text grouped by Rust item, repeating signatures for split inputs.
+//! Source text grouped by language-owned declarations or fallback paragraphs.
 use super::{
     Evidence, Record,
     split::{Document, TokenBudget},
 };
-use crate::analysis::{Analysis, LineIndex, Span};
+use crate::analysis::{
+    Analysis, LineIndex, Span,
+    language::{Chunking, DeclarationRules},
+};
 use anyhow::{Result, ensure};
 use std::collections::HashMap;
 
@@ -18,28 +21,36 @@ pub struct Chunk {
     pub signature: Option<Span>,
 }
 
-/// Containers contribute their own source between child items. Function bodies,
-/// structs, and other items stay whole, including any nested declarations.
+/// Containers contribute their own source between child items. Function bodies
+/// and other leaves stay whole, including any nested declarations.
 pub fn chunks(analysis: &Analysis) -> Result<Vec<Chunk>> {
+    chunks_with(
+        analysis,
+        crate::analysis::language::for_path(&analysis.source.path).chunking,
+    )
+}
+
+fn chunks_with(analysis: &Analysis, chunking: Chunking) -> Result<Vec<Chunk>> {
     crate::storage::analysis::validate(analysis)?;
     let lines = LineIndex::new(&analysis.source.text);
     let mut chunks = Vec::new();
-    if !crate::analysis::is_rust(&analysis.source.path) {
+    let Chunking::Declarations(rules) = chunking else {
         let mut start = 0;
         let mut position = 0;
         for line in analysis.source.text.split_inclusive('\n') {
             if line.trim().is_empty() {
-                push(analysis, &lines, None, start, position, &mut chunks);
+                push(analysis, &lines, None, start, position, None, &mut chunks);
                 start = position + line.len();
             }
             position += line.len();
         }
-        push(analysis, &lines, None, start, position, &mut chunks);
+        push(analysis, &lines, None, start, position, None, &mut chunks);
         return Ok(chunks);
-    }
+    };
     partition(
         analysis,
         &lines,
+        &rules,
         None,
         0,
         analysis.source.text.len(),
@@ -51,16 +62,16 @@ pub fn chunks(analysis: &Analysis) -> Result<Vec<Chunk>> {
 fn partition(
     analysis: &Analysis,
     lines: &LineIndex,
+    rules: &DeclarationRules,
     owner: Option<usize>,
     start: usize,
     end: usize,
     output: &mut Vec<Chunk>,
 ) -> Result<()> {
     let container = owner.is_none_or(|id| {
-        matches!(
-            analysis.entities[id].kind.as_str(),
-            "module" | "impl" | "trait"
-        )
+        rules
+            .containers
+            .contains(&analysis.entities[id].kind.as_str())
     });
     let mut position = start;
     if container {
@@ -72,23 +83,32 @@ fn partition(
                 entity.span.start >= position && entity.span.end <= end,
                 "overlapping source chunk entities"
             );
-            // Outer docs and attributes precede the entity's parser span.
+            // The language identifies facts that attach before a declaration.
             let attached = analysis
                 .facts
                 .iter()
                 .filter(|fact| {
                     fact.owner == Some(id)
-                        && matches!(fact.kind.as_str(), "doc" | "attribute")
+                        && rules.leading_facts.contains(&fact.kind.as_str())
                         && fact.span.end <= entity.span.start
                 })
                 .map(|fact| fact.span.start)
                 .min()
                 .unwrap_or(entity.span.start);
             let child_start = attached.max(position);
-            push(analysis, lines, owner, position, child_start, output);
+            push(
+                analysis,
+                lines,
+                owner,
+                position,
+                child_start,
+                Some(rules.signature_fact),
+                output,
+            );
             partition(
                 analysis,
                 lines,
+                rules,
                 Some(id),
                 child_start,
                 entity.span.end,
@@ -97,7 +117,15 @@ fn partition(
             position = entity.span.end;
         }
     }
-    push(analysis, lines, owner, position, end, output);
+    push(
+        analysis,
+        lines,
+        owner,
+        position,
+        end,
+        Some(rules.signature_fact),
+        output,
+    );
     Ok(())
 }
 
@@ -107,6 +135,7 @@ fn push(
     owner: Option<usize>,
     start: usize,
     end: usize,
+    signature_fact: Option<&str>,
     output: &mut Vec<Chunk>,
 ) {
     let text = &analysis.source.text[start..end];
@@ -132,7 +161,7 @@ fn push(
         analysis
             .facts
             .iter()
-            .find(|fact| fact.owner == Some(id) && fact.kind == "signature")
+            .find(|fact| fact.owner == Some(id) && Some(fact.kind.as_str()) == signature_fact)
             .map(|fact| fact.span.clone())
     });
     output.push(Chunk {

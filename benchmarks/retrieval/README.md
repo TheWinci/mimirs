@@ -48,3 +48,13 @@ source representation. It does not establish quality on new repositories or
 languages. Ordinary comments outside items remain ownerless chunks; a model can
 rank such a comment above the corresponding function. Explicit Rust doc comments
 stay attached to their item.
+
+## Language dispatch verification
+
+[language-dispatch-results.json](language-dispatch-results.json) records the
+shared language dispatch run. All 246 embedding inputs, their exact hash, and
+the five query rankings match the source-only baseline. The source audit also
+matches, including all 30 repeated signatures. Analyzer registration and
+extension mappings now contribute to cache compatibility, while Rust source
+representation stays unchanged. Timing was collected alongside other model
+checks and is not a performance comparison.

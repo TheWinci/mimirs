@@ -1,13 +1,5 @@
-use super::Span;
+use super::{Entity, Span};
 use tree_sitter::Node;
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct Entity {
-    pub kind: String,
-    pub name: Option<String>,
-    pub span: Span,
-    pub parent: Option<usize>,
-}
 
 pub(super) fn kind(node: Node<'_>) -> Option<&'static str> {
     Some(match node.kind() {

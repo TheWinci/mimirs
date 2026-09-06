@@ -113,6 +113,8 @@ Source chunks are the single embedding strategy. Remove the obsolete `retrieval`
 key from `.mimirs/config.toml`, preserving your `include` and `exclude` rules,
 then run `mimirs index`. Recognized older alpha indexes rebuild when opened for
 writing. Search and stored inspection reject them with reindex guidance.
+Analyzer or language-mapping changes also require `mimirs index` to rebuild the
+index, including unchanged files previously handled as text fallback.
 The old `inspect --documents` facts-description preview has been removed.
 
 This simplifies the implementation without establishing a general retrieval

@@ -1,13 +1,5 @@
-use super::{Entity, Fact, Span, facts};
+use super::{Entity, Fact, Scope, Span, facts};
 use tree_sitter::Node;
-
-#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct Scope {
-    pub kind: String,
-    pub span: Span,
-    pub parent: Option<usize>,
-    pub owner: Option<usize>,
-}
 
 pub(super) fn extract(
     root: Node<'_>,

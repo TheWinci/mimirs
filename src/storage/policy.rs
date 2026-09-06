@@ -4,7 +4,7 @@ use rusqlite::Connection;
 fn document_prefix() -> String {
     format!(
         "{}|{}|{}|",
-        super::analysis::ANALYSIS_VERSION,
+        crate::analysis::language::registry_identity(),
         crate::retrieval::source::POLICY,
         crate::embedding::model_identity()
     )

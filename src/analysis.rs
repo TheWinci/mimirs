@@ -1,17 +1,43 @@
-use anyhow::{Context, Result};
-use tree_sitter::{Node, Parser};
+use anyhow::Result;
+use tree_sitter::Node;
 
 use crate::source::SourceFile;
 
-mod entities;
-mod facts;
-mod imports;
-mod references;
-mod scopes;
-pub use scopes::Scope;
-mod signatures;
-pub use entities::Entity;
-pub use facts::Fact;
+pub mod language;
+mod rust;
+mod text;
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct Entity {
+    pub kind: String,
+    pub name: Option<String>,
+    pub span: Span,
+    pub parent: Option<usize>,
+}
+
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Evidence {
+    pub role: String,
+    pub span: Span,
+}
+
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Fact {
+    pub kind: String,
+    pub span: Span,
+    pub owner: Option<usize>,
+    pub evidence: Vec<Evidence>,
+    pub related: Option<usize>,
+    pub scope: usize,
+}
+
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Scope {
+    pub kind: String,
+    pub span: Span,
+    pub parent: Option<usize>,
+    pub owner: Option<usize>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Span {
@@ -84,104 +110,8 @@ pub struct Analysis {
     pub scopes: Vec<Scope>,
 }
 
-pub fn is_rust(path: &str) -> bool {
-    std::path::Path::new(path)
-        .extension()
-        .is_some_and(|ext| ext == "rs")
-}
-
-/// Text snapshots have source coverage but no inferred syntax records.
 pub fn extract(source: SourceFile) -> Result<Analysis> {
-    if !is_rust(&source.path) {
-        let span = LineIndex::new(&source.text).span(0, source.text.len());
-        return Ok(Analysis {
-            source,
-            diagnostics: Vec::new(),
-            entities: Vec::new(),
-            facts: Vec::new(),
-            scopes: vec![Scope {
-                kind: "file".into(),
-                span,
-                parent: None,
-                owner: None,
-            }],
-        });
-    }
-    let mut parser = Parser::new();
-    parser
-        .set_language(&tree_sitter_rust::LANGUAGE.into())
-        .context("cannot initialize Rust parser")?;
-    let tree = parser
-        .parse(&source.text, None)
-        .context("Rust parser returned no tree")?;
-    let lines = LineIndex::new(&source.text);
-    let entities = entities::extract(tree.root_node(), &source.text);
-    let mut facts = facts::extract(tree.root_node(), &source.text, &entities);
-    facts.extend(signatures::extract(
-        tree.root_node(),
-        &source.text,
-        &entities,
-        &lines,
-    ));
-    facts.extend(imports::extract(tree.root_node(), &source.text, &entities));
-    let (scopes, bindings) = scopes::extract(tree.root_node(), &source.text, &entities, &lines);
-    facts.extend(bindings);
-    facts.extend(references::extract(
-        tree.root_node(),
-        &source.text,
-        &entities,
-        &facts,
-    ));
-    for fact in &mut facts {
-        fact.scope = scopes::containing(&scopes, &fact.span);
-    }
-    facts.sort_by_key(|fact| (fact.span.start, fact.span.end));
-    for id in 0..facts.len() {
-        if facts[id].kind == "import_member" {
-            facts[id].related = facts[id]
-                .evidence
-                .iter()
-                .find(|e| e.role == "declaration")
-                .and_then(|e| {
-                    facts
-                        .iter()
-                        .position(|f| f.kind == "import" && f.span == e.span)
-                });
-        }
-    }
-    let mut diagnostics = Vec::new();
-    let mut cursor = tree.walk();
-    loop {
-        let node = cursor.node();
-        if node.is_error() || node.is_missing() {
-            diagnostics.push(Diagnostic {
-                kind: if node.is_missing() {
-                    format!("missing {}", node.kind())
-                } else {
-                    "ERROR".into()
-                },
-                span: Span::of(node, &source.text),
-                column: node.start_position().column + 1,
-            });
-        }
-        if cursor.goto_first_child() {
-            continue;
-        }
-        loop {
-            if cursor.goto_next_sibling() {
-                break;
-            }
-            if !cursor.goto_parent() {
-                return Ok(Analysis {
-                    source,
-                    diagnostics,
-                    entities,
-                    facts,
-                    scopes,
-                });
-            }
-        }
-    }
+    (language::for_path(&source.path).extract)(source)
 }
 
 pub fn report(analysis: &Analysis) -> String {
@@ -189,7 +119,10 @@ pub fn report(analysis: &Analysis) -> String {
         "file: {}\nsource: {} bytes\nparse: {}\n",
         analysis.source.path,
         analysis.source.text.len(),
-        if !is_rust(&analysis.source.path) {
+        if matches!(
+            language::for_path(&analysis.source.path).chunking,
+            language::Chunking::Paragraphs
+        ) {
             "not parsed (text fallback)"
         } else if analysis.diagnostics.is_empty() {
             "complete"

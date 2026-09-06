@@ -780,3 +780,103 @@ fn previous_modes_rebuild_to_source_and_keep_custom_includes() {
         assert!(stdout.contains("unchanged: 2 files"));
     }
 }
+
+#[test]
+fn registering_an_analyzer_replaces_unchanged_fallback_documents() {
+    let dir = project(&[("a.rs", "fn first() {}\nfn second() {}")]);
+    // Simulate the stored output of a release whose registry had only fallback.
+    let mut analysis = crate::analysis::extract(source::SourceFile {
+        path: "a.txt".into(),
+        text: fs::read_to_string(dir.path().join("a.rs")).unwrap(),
+    })
+    .unwrap();
+    analysis.source.path = "a.rs".into();
+    let budget =
+        crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
+    let policy = storage::policy::document_policy(&budget);
+    let documents = crate::retrieval::source::documents(&analysis, &budget).unwrap();
+    assert_eq!(documents.len(), 1);
+    assert_eq!(documents[0].owner, None);
+    let mut db = storage::open(&dir.path().join(".mimirs/index.db"))
+        .unwrap()
+        .connection;
+    storage::documents::save(
+        &mut db,
+        &analysis,
+        storage::documents::Batch {
+            documents: &documents,
+            vectors: &[vec![1.0; DIMENSION]],
+            policy: &policy,
+        },
+    )
+    .unwrap();
+    let fallback = crate::analysis::language::for_path("a.txt");
+    let old_registry = format!(
+        "analyzers-1:{}",
+        serde_json::to_string(&[(fallback.extensions, fallback.identity)]).unwrap()
+    );
+    let old_policy = policy.replacen(
+        &crate::analysis::language::registry_identity(),
+        &old_registry,
+        1,
+    );
+    db.execute(
+        "UPDATE source_snapshots SET analysis_version=?1",
+        [fallback.identity],
+    )
+    .unwrap();
+    for sql in [
+        "UPDATE index_metadata SET value=?1 WHERE key='document_policy'",
+        "UPDATE retrieval_processing SET policy=?1",
+        "UPDATE retrieval_documents SET policy=?1",
+    ] {
+        db.execute(sql, [&old_policy]).unwrap();
+    }
+    assert!(!storage::processing::reusable(&db, &analysis.source, &policy).unwrap());
+    assert!(
+        storage::policy::read(&db)
+            .unwrap_err()
+            .to_string()
+            .contains("run mimirs index")
+    );
+    assert!(
+        storage::analysis::load(&db, "a.rs")
+            .unwrap_err()
+            .to_string()
+            .contains("run mimirs index")
+    );
+    drop(db);
+
+    let model = backend();
+    let calls = Rc::clone(&model.calls);
+    let (result, stdout, _) = run(&dir, model, false);
+    result.unwrap();
+    assert!(stdout.starts_with("indexed: 1 files\nunchanged: 0 files\n"));
+    assert_eq!(
+        calls.borrow().batches,
+        [vec!["a.rs\nfn first() {}", "a.rs\nfn second() {}"]]
+    );
+    let db = connection(&dir);
+    let stored = storage::analysis::load(&db, "a.rs").unwrap().unwrap();
+    assert_eq!(stored.source, analysis.source);
+    assert_eq!(stored.entities.len(), 2);
+    assert_eq!(
+        storage::documents::load(&db, "a.rs", &policy)
+            .unwrap()
+            .len(),
+        2
+    );
+    assert!(storage::processing::reusable(&db, &stored.source, &policy).unwrap());
+    assert_eq!(
+        db.query_row("SELECT count(*) FROM document_embeddings", [], |r| r
+            .get::<_, i64>(0))
+            .unwrap(),
+        2
+    );
+    let model = backend();
+    let calls = Rc::clone(&model.calls);
+    let (result, stdout, _) = run(&dir, model, false);
+    result.unwrap();
+    assert!(stdout.starts_with("indexed: 0 files\nunchanged: 1 files\n"));
+    assert!(calls.borrow().batches.is_empty());
+}

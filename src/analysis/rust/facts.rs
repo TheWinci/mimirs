@@ -1,21 +1,6 @@
-use super::{Entity, Span};
+use super::{Entity, Fact, Span};
+use crate::analysis::Evidence;
 use tree_sitter::Node;
-
-#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct Evidence {
-    pub role: String,
-    pub span: Span,
-}
-
-#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct Fact {
-    pub kind: String,
-    pub span: Span,
-    pub owner: Option<usize>,
-    pub evidence: Vec<Evidence>,
-    pub related: Option<usize>,
-    pub scope: usize,
-}
 
 impl Fact {
     pub(super) fn new(kind: &str, node: Node<'_>, source: &str, entities: &[Entity]) -> Self {

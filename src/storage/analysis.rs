@@ -5,17 +5,6 @@ use crate::{
 use anyhow::{Context, Result, ensure};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 
-// Bump when parser, grammar, or extraction changes alter saved output.
-pub const ANALYSIS_VERSION: &str = "tree-sitter-0.27.0/rust-0.24.2/extractor-2";
-
-fn version(path: &str) -> &'static str {
-    if crate::analysis::is_rust(path) {
-        ANALYSIS_VERSION
-    } else {
-        "text-snapshot-1"
-    }
-}
-
 fn validate_span(source: &str, span: &Span, lines: &LineIndex) -> Result<()> {
     ensure!(
         source.get(span.start..span.end).is_some(),
@@ -67,7 +56,7 @@ pub fn write(transaction: &Transaction<'_>, file_id: i64, analysis: &Analysis) -
         "INSERT INTO source_snapshots VALUES (?1, ?2, ?3)",
         params![
             file_id,
-            version(&analysis.source.path),
+            crate::analysis::language::for_path(&analysis.source.path).identity,
             analysis.source.text
         ],
     )?;
@@ -105,8 +94,8 @@ pub fn load_entities(
         return Ok(None);
     };
     ensure!(
-        stored_version == version(path),
-        "unsupported stored analysis version {stored_version}"
+        stored_version == crate::analysis::language::for_path(path).identity,
+        "unsupported stored analysis version {stored_version}; run mimirs index"
     );
     let mut statement = connection.prepare("SELECT ordinal, kind, name, byte_start, byte_end, line_start, line_end, parent FROM entities WHERE file_id = ?1 ORDER BY ordinal")?;
     let mut rows = statement.query([file_id])?;

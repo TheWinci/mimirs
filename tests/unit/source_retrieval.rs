@@ -289,3 +289,60 @@ fn real_model_source_inputs_preserve_bytes_without_truncation() {
         texts.len()
     );
 }
+
+#[test]
+fn declaration_rules_control_containers_attachment_and_signatures() {
+    let mut analysis = extract("mod C {\n#[inline]\nfn work() {}\nfn other() {}\n}");
+    // Use unfamiliar kinds to catch assumptions about Rust in shared chunking.
+    analysis.source.path = "example.test".into();
+    analysis.entities[0].kind = "class".into();
+    for fact in &mut analysis.facts {
+        if fact.kind == "attribute" {
+            fact.kind = "decorator".into();
+        }
+        if fact.kind == "signature" {
+            fact.kind = "header".into();
+        }
+    }
+    let rules = DeclarationRules {
+        containers: &["class"],
+        leading_facts: &["decorator"],
+        signature_fact: "header",
+    };
+    let chunks = chunks_with(&analysis, Chunking::Declarations(rules)).unwrap();
+    let method = chunks.iter().find(|chunk| chunk.owner == Some(1)).unwrap();
+    assert_eq!(method.text, "#[inline]\nfn work() {}");
+    assert_eq!(method.context, "example.test :: class C");
+    let signature = method.signature.as_ref().unwrap();
+    assert_eq!(
+        &analysis.source.text[signature.start..signature.end],
+        "fn work() "
+    );
+    let mut position = 0;
+    for chunk in &chunks {
+        assert!(chunk.span.start >= position);
+        assert!(
+            analysis.source.text[position..chunk.span.start]
+                .trim()
+                .is_empty()
+        );
+        assert_eq!(
+            chunk.text,
+            analysis.source.text[chunk.span.start..chunk.span.end]
+        );
+        position = chunk.span.end;
+    }
+    assert!(analysis.source.text[position..].trim().is_empty());
+    let leaves = chunks_with(
+        &analysis,
+        Chunking::Declarations(DeclarationRules {
+            containers: &[],
+            ..rules
+        }),
+    )
+    .unwrap();
+    assert_eq!(leaves.len(), 1);
+    assert_eq!(leaves[0].owner, Some(0));
+    assert!(leaves[0].text.contains("fn work()"));
+    assert!(leaves[0].text.contains("fn other()"));
+}

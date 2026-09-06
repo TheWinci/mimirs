@@ -53,3 +53,47 @@ fn missing_stored_database_creates_nothing() {
     assert!(report_at(dir.path(), Path::new("missing.rs"), true).is_err());
     assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 0);
 }
+
+#[test]
+fn stored_fallback_chunks_preserve_unicode_crlf_and_empty_snapshots() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    fs::create_dir(root.join(".mimirs")).unwrap();
+    let mut db = storage::open(&root.join(".mimirs/index.db"))
+        .unwrap()
+        .connection;
+    for (id, path, text) in [
+        (1, "notes.txt", "café\r\n\r\nsecond paragraph\r\n"),
+        (2, "empty.txt", ""),
+    ] {
+        fs::write(root.join(path), text).unwrap();
+        let a = analysis::extract(source::SourceFile {
+            path: path.into(),
+            text: text.into(),
+        })
+        .unwrap();
+        let tx = db.transaction().unwrap();
+        tx.execute(
+            "INSERT INTO files VALUES (?1, ?2)",
+            rusqlite::params![id, path],
+        )
+        .unwrap();
+        storage::analysis::write(&tx, id, &a).unwrap();
+        tx.commit().unwrap();
+        let direct = report_at(root, Path::new(path), false).unwrap();
+        let preview = serde_json::to_value(crate::retrieval::source::chunks(&a).unwrap()).unwrap();
+        assert_eq!(
+            preview.as_array().unwrap().len(),
+            if text.is_empty() { 0 } else { 2 }
+        );
+        assert_eq!(report_at(root, Path::new(path), true).unwrap(), direct);
+        fs::remove_file(root.join(path)).unwrap();
+        let stored = load_at(root, Path::new(path), true).unwrap();
+        assert_eq!(stored, a);
+        assert_eq!(report_at(root, Path::new(path), true).unwrap(), direct);
+        assert_eq!(
+            serde_json::to_value(crate::retrieval::source::chunks(&stored).unwrap()).unwrap(),
+            preview
+        );
+    }
+}
