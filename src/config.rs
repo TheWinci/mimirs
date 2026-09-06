@@ -21,9 +21,12 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             embedding_workers: None,
-            include: ["**/*.rs", "**/*.py", "**/*.pyi"]
-                .map(String::from)
-                .to_vec(),
+            include: [
+                "**/*.rs", "**/*.py", "**/*.pyi", "**/*.ts", "**/*.mts", "**/*.cts", "**/*.tsx",
+                "**/*.js", "**/*.mjs", "**/*.cjs", "**/*.jsx",
+            ]
+            .map(String::from)
+            .to_vec(),
             exclude: [
                 "**/.git/**",
                 "**/.mimirs/**",

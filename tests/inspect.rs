@@ -105,3 +105,28 @@ fn python_and_stubs_preview_decorated_methods_without_project_state() {
     }
     assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 2);
 }
+#[test]
+fn javascript_dialects_preview_wrapped_declarations_without_a_project() {
+    let dir = tempfile::tempdir().unwrap();
+    for extension in ["ts", "mts", "cts", "tsx", "js", "mjs", "cjs", "jsx"] {
+        let path = dir.path().join(format!("example.{extension}"));
+        std::fs::write(
+            &path,
+            "/** Render a greeting. */\nexport const greet = () => 'hello';\n",
+        )
+        .unwrap();
+        let output = std::process::Command::new(env!("CARGO_BIN_EXE_mimirs"))
+            .args(["inspect", path.to_str().unwrap(), "--source-chunks"])
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let text = String::from_utf8(output.stdout).unwrap();
+        assert!(text.contains("Render a greeting.") && text.contains("export const greet"));
+    }
+    assert!(!dir.path().join(".mimirs").exists());
+}

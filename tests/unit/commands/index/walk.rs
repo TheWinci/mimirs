@@ -54,7 +54,7 @@ fn exclude_removes_a_directory() {
 }
 
 #[test]
-fn default_include_selects_rust_and_python_files() {
+fn default_include_selects_delivered_languages() {
     let dir = tree(&[
         ("a.txt", "hello"),
         ("b.rs", "fn main() {}"),
@@ -64,6 +64,10 @@ fn default_include_selects_rust_and_python_files() {
         ("venv/lib/site.py", "def dependency(): pass"),
         ("src/__pycache__/generated.py", "pass"),
         ("app.ts", "function main() {}"),
+        ("view.tsx", "const View = () => <div/>;"),
+        ("app.js", "function main() {}"),
+        ("api.d.ts", "declare function main(): void;"),
+        ("node_modules/lib/index.js", "function ignored() {}"),
         ("src/lib.rs", "pub fn answer() -> u8 { 42 }"),
     ]);
 
@@ -71,7 +75,16 @@ fn default_include_selects_rust_and_python_files() {
 
     assert_eq!(
         walk.paths,
-        ["app.py", "b.rs", "src/lib.rs", "stubs/app.pyi"]
+        [
+            "api.d.ts",
+            "app.js",
+            "app.py",
+            "app.ts",
+            "b.rs",
+            "src/lib.rs",
+            "stubs/app.pyi",
+            "view.tsx"
+        ]
     );
 }
 

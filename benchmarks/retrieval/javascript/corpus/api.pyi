@@ -1,0 +1,6 @@
+from typing import overload
+
+@overload
+def encode(value: str) -> bytes: ...
+@overload
+def encode(value: bytes) -> bytes: ...

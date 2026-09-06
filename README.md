@@ -53,8 +53,10 @@ mimirs index
 mimirs search 'valid_username check for trailing newline' --limit 5
 ```
 
-Run these commands from the project root. Fresh config includes Rust `.rs` and
-Python `.py` and `.pyi` files. Common Python environment directories `.venv`,
+Run these commands from the project root. Fresh config includes Rust `.rs`,
+Python `.py` and `.pyi`, TypeScript `.ts`, `.mts`, `.cts`, and `.tsx`, and
+JavaScript `.js`, `.mjs`, `.cjs`, and `.jsx` files. This includes `.d.ts`
+declarations. `node_modules` and common Python environment directories `.venv`,
 `venv`, and `__pycache__` are excluded. Customize `include` and `exclude` in
 `.mimirs/config.toml` for your project.
 `init` preserves an existing config. The first model use can download files;
@@ -92,6 +94,17 @@ comments stay in surrounding source chunks. Stub overloads keep separate owners
 even when their names repeat. Python analysis stores declaration scopes,
 signatures, decorator and docstring facts, and parse diagnostics. It does not
 resolve imports or calls. No Python installation or language server is required.
+
+TypeScript and JavaScript classes and namespaces partition around declarations.
+Functions, methods, interfaces, aliases, enums, class fields, and module-level
+variable declarations keep their source bodies. Bound arrow functions and JSX
+stay in their initializer's chunk. Export and `declare` prefixes, decorators,
+and adjacent JSDoc comments stay with the declaration. Overloads have separate
+owners; anonymous exports, destructuring, and multi-binding declarations remain
+unnamed. Imports, re-exports, ordinary comments, and incomplete syntax stay
+searchable. Analysis records written names, containment, signatures, and parse
+diagnostics without resolving imports, calls, or types. The grammars ship in the
+binary. No Node.js installation or language server is required.
 
 Large items split on source lines, repeating their signature. A single oversized
 line splits at tokenizer and UTF-8 boundaries. Every complete input, including
@@ -183,6 +196,12 @@ run `mimirs index`. Add `"**/.venv/**"`, `"**/venv/**"`, and `"**/__pycache__/**
 to `exclude` if your config does not already exclude those directories. `init`
 preserves the contents of your existing config.
 
+To enable TypeScript and JavaScript in an existing project, add `"**/*.ts"`,
+`"**/*.mts"`, `"**/*.cts"`, `"**/*.tsx"`, `"**/*.js"`, `"**/*.mjs"`, `"**/*.cjs"`,
+and `"**/*.jsx"` to `include`. Retain your other rules, exclude
+`"**/node_modules/**"`, and run `mimirs index`. The new analyzer registry requires
+a rebuild of the index, including files already handled by Rust and Python.
+
 Fresh configs exclude only the root `/target/**` build directory. Older configs
 using `"**/target/**"` also exclude source directories such as `src/target/`.
 Replace that entry with `"/target/**"` to include nested source, then run
@@ -198,3 +217,6 @@ recorded in the [retrieval check](benchmarks/retrieval/README.md).
 
 The [Python retrieval check](benchmarks/retrieval/python/README.md) records the
 first Python source and mixed-language search verification.
+
+The [TypeScript and JavaScript retrieval check](benchmarks/retrieval/javascript/README.md)
+covers dialects, fallback upgrades, mixed-language indexing, and visible answers.

@@ -1065,6 +1065,96 @@ fn profiling_preserves_index_output_and_tracks_reuse_and_partial_failure() {
 }
 
 #[test]
+fn javascript_dialects_share_storage_reuse_and_failed_replacement() {
+    let dir = project(&[
+        (
+            "a.ts",
+            "/** Store labels. */\nexport class Store { read(value: string) { return value; } }\n",
+        ),
+        ("api.d.ts", "export declare function read(): string;\n"),
+        ("view.tsx", "export const View = () => <div>café</div>;\n"),
+        ("module.mjs", "export function read() { return 1; }\n"),
+        ("empty.js", ""),
+        ("keep.rs", "fn keep() {}"),
+        ("keep.py", "def keep(): pass\n"),
+    ]);
+    run(&dir, backend(), false).0.unwrap();
+    let budget =
+        crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
+    let policy = storage::policy::document_policy(&budget);
+    for path in [
+        "a.ts",
+        "api.d.ts",
+        "view.tsx",
+        "module.mjs",
+        "empty.js",
+        "keep.rs",
+        "keep.py",
+    ] {
+        let direct = crate::analysis::extract(source::read(dir.path(), path).unwrap()).unwrap();
+        let db = connection(&dir);
+        let stored = storage::analysis::load(&db, path).unwrap().unwrap();
+        assert_eq!(direct, stored);
+        assert_eq!(
+            storage::documents::load(&db, path, &policy).unwrap(),
+            crate::retrieval::source::documents(&direct, &budget).unwrap()
+        );
+    }
+    let model = backend();
+    let calls = model.calls.clone();
+    let mut stderr = Vec::new();
+    let mut progress = Progress::new(dir.path(), &mut stderr, false, &|| Duration::ZERO);
+    let summary = index_with(
+        dir.path(),
+        || Ok(Embedder::new(model)),
+        &mut progress,
+        source::read,
+        |_| panic!("unchanged source parsed"),
+    )
+    .unwrap();
+    assert_eq!((summary.indexed, summary.unchanged), (0, 7));
+    assert!(calls.borrow().batches.is_empty());
+    fs::remove_file(dir.path().join("module.mjs")).unwrap();
+    fs::write(
+        dir.path().join("a.ts"),
+        "export function changed() { return 42; }\n",
+    )
+    .unwrap();
+    let (result, stdout, _) = run(&dir, backend(), false);
+    result.unwrap();
+    assert!(stdout.starts_with("indexed: 1 files\nunchanged: 5 files\n"));
+    assert!(
+        storage::analysis::load(&connection(&dir), "module.mjs")
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(
+        storage::analysis::load(&connection(&dir), "a.ts")
+            .unwrap()
+            .unwrap()
+            .entities[0]
+            .name
+            .as_deref(),
+        Some("changed")
+    );
+    fs::write(dir.path().join("a.ts"), "export const replacement = 99;\n").unwrap();
+    let mut model = backend();
+    model.fail_on = Some("a.ts\nexport const replacement = 99;".into());
+    assert!(run(&dir, model, false).0.is_err());
+    assert!(
+        storage::analysis::load(&connection(&dir), "a.ts")
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        storage::nearest(&connection(&dir), &vec![1.0; DIMENSION], 10)
+            .unwrap()
+            .iter()
+            .all(|h| h.path != "a.ts")
+    );
+}
+
+#[test]
 fn failed_profile_retains_measurements_for_committed_and_failed_files() {
     let dir = project(&[("a.rs", "fn a() {}"), ("b.rs", "fn b() {}")]);
     let profile = Profiler::enabled();
