@@ -8,6 +8,7 @@ pub(super) struct Progress<'a> {
     terminal: bool,
     elapsed: &'a dyn Fn() -> Duration,
     lines: usize,
+    profile: crate::profiling::Profiler,
 }
 
 impl<'a> Progress<'a> {
@@ -23,7 +24,13 @@ impl<'a> Progress<'a> {
             terminal,
             elapsed,
             lines: 0,
+            profile: crate::profiling::Profiler::default(),
         }
+    }
+
+    pub(super) fn with_profile(mut self, profile: crate::profiling::Profiler) -> Self {
+        self.profile = profile;
+        self
     }
 
     pub(super) fn is_terminal(&self) -> bool {
@@ -31,6 +38,7 @@ impl<'a> Progress<'a> {
     }
 
     pub(super) fn walking(&mut self, file: &str, found: usize) -> io::Result<()> {
+        let _scope = self.profile.scope("progress_output");
         self.render(&format!(
             "indexing: {}\nphase: walking\nfile: {}\nfiles_found: {found}\nelapsed_time: {:.2} seconds\n",
             self.root, plain(file), (self.elapsed)().as_secs_f64(),
@@ -44,6 +52,7 @@ impl<'a> Progress<'a> {
         files: (usize, usize),
         finished: bool,
     ) -> io::Result<()> {
+        let _scope = self.profile.scope("progress_output");
         self.render(&format!(
             "indexing: {}\nphase: indexing\nfile: {}\nfile_progress: {}% ({}/{} documents)\nindex_progress: {}% ({}/{} files)\nelapsed_time: {:.2} seconds\n",
             self.root, plain(file), percent(documents, finished), documents.0, documents.1,
@@ -70,6 +79,7 @@ impl<'a> Progress<'a> {
     }
 
     pub(super) fn clear(&mut self) -> io::Result<()> {
+        let _scope = self.profile.scope("progress_output");
         if self.lines > 0 {
             write!(self.output, "\x1b[{}F\x1b[J", self.lines)?;
             self.lines = 0;
@@ -79,6 +89,7 @@ impl<'a> Progress<'a> {
     }
 
     pub(super) fn diagnostic(&mut self, message: &str) -> io::Result<()> {
+        let _scope = self.profile.scope("progress_output");
         self.clear()?;
         writeln!(self.output, "{}", plain(message))?;
         self.output.flush()

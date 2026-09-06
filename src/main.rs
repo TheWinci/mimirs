@@ -5,6 +5,7 @@ mod analysis;
 mod commands;
 mod config;
 mod embedding;
+mod profiling;
 mod retrieval;
 mod source;
 mod storage;
@@ -34,7 +35,14 @@ enum Command {
     },
 
     /// Index current directory with config defined in .mimirs folder.
-    Index,
+    Index {
+        /// Write exclusive phase timings and counters to a new JSON file.
+        #[arg(long)]
+        profile: Option<std::path::PathBuf>,
+        /// Use a separate embedding model cache for this run.
+        #[arg(long)]
+        model_cache: Option<std::path::PathBuf>,
+    },
 
     /// Search query with limit.
     Search {
@@ -57,7 +65,10 @@ fn main() -> Result<()> {
             source_chunks,
         } => commands::inspect::run(&file, stored, source_chunks),
         Command::Init => commands::init::run(),
-        Command::Index => commands::index::run(),
+        Command::Index {
+            profile,
+            model_cache,
+        } => commands::index::run(profile.as_deref(), model_cache),
         Command::Search { query, limit } => commands::search::run(&query, limit),
     }
 }

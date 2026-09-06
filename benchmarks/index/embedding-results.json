@@ -1,0 +1,75 @@
+{
+  "binary_sha256": "c70bcf63f832f87c2fb05a4a0631bce99adb6e6dccd96b49bb4d99ce06e6ff12",
+  "source_sha256": "cab18025faef6394b07b31fae151b945de7f724c144df82c92b2ce3b59cd407e",
+  "inputs_sha256": "7abbfafa19e9451b50fc9dfcd803ffd413b0a1a9ef9e069796e8fe42128abb26",
+  "runs": [
+    {
+      "batch_padded_tokens": 1200568,
+      "calls": 252,
+      "documents": 2817,
+      "embedding_seconds": 81.925176333,
+      "startup_seconds": 0.11335,
+      "threads": 0,
+      "tokens": 525449,
+      "label": "default",
+      "sampled": false,
+      "command": [
+        "/Users/winci/repos/mimirs/target/release/mimirs-embedding-probe",
+        "/private/tmp/mimirs-s6-profile/cached-model/models--Qdrant--all-MiniLM-L6-v2-onnx/snapshots/5f1b8cd78bc4fb444dd171e59b18f3a3af89a079",
+        "/private/tmp/mimirs-s6-probe/batches.json",
+        "0",
+        "/private/tmp/mimirs-s6-probe/default.bin"
+      ],
+      "max_component_difference": 0.0,
+      "vectors_sha256": "c599d0bce2523f5806b615d487d8d41a578915fe2bc5f0a336368b726df94c96"
+    },
+    {
+      "label": "threads-1",
+      "threads": 1,
+      "sampled": false,
+      "status": "stopped_after_exceeding_default",
+      "process_seconds_lower_bound": 270,
+      "note": "Stopped after over four minutes; already more than three times the default trial. No completed vectors to compare."
+    },
+    {
+      "batch_padded_tokens": 1200568,
+      "calls": 252,
+      "documents": 2817,
+      "embedding_seconds": 114.402598125,
+      "startup_seconds": 0.105219834,
+      "threads": 4,
+      "tokens": 525449,
+      "label": "threads-4",
+      "sampled": false,
+      "command": [
+        "/Users/winci/repos/mimirs/target/release/mimirs-embedding-probe",
+        "/private/tmp/mimirs-s6-profile/cached-model/models--Qdrant--all-MiniLM-L6-v2-onnx/snapshots/5f1b8cd78bc4fb444dd171e59b18f3a3af89a079",
+        "/private/tmp/mimirs-s6-probe/batches.json",
+        "4",
+        "/private/tmp/mimirs-s6-probe/threads-4.bin"
+      ],
+      "max_component_difference": 0.0,
+      "vectors_sha256": "c599d0bce2523f5806b615d487d8d41a578915fe2bc5f0a336368b726df94c96"
+    },
+    {
+      "batch_padded_tokens": 1200568,
+      "calls": 252,
+      "documents": 2817,
+      "embedding_seconds": 82.298007625,
+      "startup_seconds": 0.094421708,
+      "threads": 0,
+      "tokens": 525449,
+      "label": "default-sampled",
+      "sampled": true,
+      "command": [
+        "/Users/winci/repos/mimirs/target/release/mimirs-embedding-probe",
+        "/private/tmp/mimirs-s6-profile/cached-model/models--Qdrant--all-MiniLM-L6-v2-onnx/snapshots/5f1b8cd78bc4fb444dd171e59b18f3a3af89a079",
+        "/private/tmp/mimirs-s6-probe/batches.json",
+        "0",
+        "/private/tmp/mimirs-s6-probe/default-sampled.bin"
+      ],
+      "max_component_difference": 0.0,
+      "vectors_sha256": "c599d0bce2523f5806b615d487d8d41a578915fe2bc5f0a336368b726df94c96"
+    }
+  ]
+}

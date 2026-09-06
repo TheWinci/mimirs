@@ -122,6 +122,36 @@ Mimirs embeds the query directly. Both documents and queries use MiniLM from
 Qdrant/all-MiniLM-L6-v2-onnx at revision
 `5f1b8cd78bc4fb444dd171e59b18f3a3af89a079`.
 
+### Measuring indexing time
+
+```sh
+cargo build --release
+mimirs index --profile .mimirs/index-first.json
+mimirs index --profile .mimirs/index-reuse.json
+```
+
+`--profile` writes a new local JSON report and refuses to overwrite an existing
+file. Keep reports outside included source paths. The report records exclusive
+phase wall times, unassigned time, file/byte/document counts, embedding call
+sizes, and per-file costs. Per-file times overlap the aggregate phases; do not
+add them together. Nested work is subtracted from its enclosing phase.
+
+`model_assets` includes cache lookup or downloads and asset reads.
+`model_startup` measures tokenizer and ONNX session creation. `embedding`
+includes FastEmbed's internal tokenization, inference, and pooling. Batch counts
+refer to calls made by mimirs, not sampled CPU work. Timings stop before report
+serialization. Ordinary index output and saved embeddings keep their format.
+An index error writes `complete: false` and the error when the report can be
+saved. Abrupt process termination may prevent a report from being written.
+
+Use `--model-cache /path/to/separate-cache` to measure model acquisition without
+clearing the normal cache. `init` ordinarily prepares the model first, so a
+cold-cache index experiment includes work that a user may already have waited
+for during `init`. It does not measure package installation or compilation.
+
+The [index timing check](benchmarks/index/README.md) describes the controlled
+release-build scenarios and the evidence for the next optimization.
+
 ### Updating an existing alpha index
 
 Source chunks are the single embedding strategy. Remove the obsolete `retrieval`

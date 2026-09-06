@@ -957,3 +957,109 @@ fn python_and_rust_share_index_reuse_replacement_and_deletion() {
     assert!(hits.iter().all(|hit| hit.path == "keep.rs"));
     assert_eq!(fs::read(config_path).unwrap(), original_config);
 }
+
+#[test]
+fn profiling_preserves_index_output_and_tracks_reuse_and_partial_failure() {
+    let a = project(&[("a.rs", "fn a() {}"), ("b.py", "def b(): pass")]);
+    let b = project(&[("a.rs", "fn a() {}"), ("b.py", "def b(): pass")]);
+    let (plain, stdout, _) = run(&a, backend(), false);
+    plain.unwrap();
+    for iteration in 0..3 {
+        let profile = Profiler::enabled();
+        let mut output = Vec::new();
+        let mut diagnostics = Vec::new();
+        let mut model = backend();
+        if iteration == 2 {
+            fs::write(b.path().join("b.py"), "def replacement(): pass").unwrap();
+            model.prepare = Some(Box::new(|| anyhow::bail!("model unavailable")));
+        }
+        let result = run_at_profiled(
+            b.path(),
+            || Ok(Embedder::new(model)),
+            &mut output,
+            &mut diagnostics,
+            false,
+            &|| Duration::from_millis(1250),
+            &profile,
+        );
+        let report = profile
+            .finish(result.as_ref().err().map(ToString::to_string))
+            .unwrap();
+        if iteration == 2 {
+            assert!(!report.complete);
+            assert!(output.is_empty());
+            assert!(!report.counters.contains_key("files_indexed"));
+        } else {
+            result.unwrap();
+            assert!(report.complete);
+            assert_eq!(report.counters["files_read"], 2);
+            assert_eq!(report.files.len(), 2);
+            assert_eq!(files(&a), files(&b));
+            assert_eq!(counts(&a), counts(&b));
+            // Equal logical persisted content includes source, evidence and vectors.
+            for table in [
+                "source_snapshots",
+                "entities",
+                "analysis_records",
+                "retrieval_documents",
+                "document_embeddings",
+            ] {
+                let dump = |dir: &TempDir| {
+                    let db = connection(dir);
+                    let mut statement = db
+                        .prepare(&format!("SELECT * FROM {table} ORDER BY 1"))
+                        .unwrap();
+                    let columns = statement.column_count();
+                    statement
+                        .query_map([], |row| {
+                            (0..columns)
+                                .map(|i| row.get::<_, rusqlite::types::Value>(i))
+                                .collect::<rusqlite::Result<Vec<_>>>()
+                        })
+                        .unwrap()
+                        .collect::<rusqlite::Result<Vec<_>>>()
+                        .unwrap()
+                };
+                assert_eq!(dump(&a), dump(&b));
+            }
+            if iteration == 0 {
+                assert_eq!(output, stdout.as_bytes());
+                assert_eq!(report.counters["files_indexed"], 2);
+                assert_eq!(report.counters["embedding_calls"], 2);
+                assert_eq!(report.counters["embedding_documents"], 2);
+            } else {
+                assert_eq!(report.counters["files_reused"], 2);
+                assert!(!report.phases_seconds.contains_key("analysis"));
+                assert!(!report.phases_seconds.contains_key("embedding"));
+                assert!(!report.counters.contains_key("embedding_calls"));
+            }
+        }
+    }
+}
+
+#[test]
+fn failed_profile_retains_measurements_for_committed_and_failed_files() {
+    let dir = project(&[("a.rs", "fn a() {}"), ("b.rs", "fn b() {}")]);
+    let profile = Profiler::enabled();
+    let mut model = backend();
+    model.fail_on = Some("b.rs\nfn b() {}".into());
+    let result = run_at_profiled(
+        dir.path(),
+        || Ok(Embedder::new(model)),
+        &mut Vec::new(),
+        &mut Vec::new(),
+        false,
+        &|| Duration::ZERO,
+        &profile,
+    );
+    assert!(result.is_err());
+    let report = profile
+        .finish(result.err().map(|e| format!("{e:#}")))
+        .unwrap();
+    assert!(!report.complete);
+    assert!(report.error.unwrap().contains("inference failed"));
+    assert_eq!(report.counters["files_indexed"], 1);
+    assert_eq!(report.counters["embedding_calls"], 2);
+    assert_eq!(report.files.len(), 2);
+    assert_eq!(files(&dir), [("a.rs".into(), "fn a() {}".into())]);
+}

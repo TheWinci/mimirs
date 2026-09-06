@@ -1,3 +1,4 @@
+use crate::profiling::Profiler;
 use std::path::PathBuf;
 
 use anyhow::{Context, ensure};
@@ -30,13 +31,20 @@ pub trait Backend {
 
 pub struct Embedder {
     backend: Box<dyn Backend>,
+    profile: Profiler,
 }
 
 impl Embedder {
     pub fn new(backend: impl Backend + 'static) -> Self {
         Self {
             backend: Box::new(backend),
+            profile: Profiler::default(),
         }
+    }
+
+    pub fn with_profile(mut self, profile: Profiler) -> Self {
+        self.profile = profile;
+        self
     }
 
     pub fn prepare(&mut self) -> anyhow::Result<()> {
@@ -64,12 +72,15 @@ impl Embedder {
         for (batch_index, batch) in texts.chunks(DOCUMENT_BATCH_SIZE).enumerate() {
             let start = batch_index * DOCUMENT_BATCH_SIZE;
             let end = start + batch.len();
+            self.profile.batch(batch.len());
             let batch_vectors = self
-                .backend
-                .embed(batch)
+                .profile
+                .measure("embedding", || self.backend.embed(batch))
                 .with_context(|| format!("cannot embed documents {start}..{end}"))?;
 
-            validate(&batch_vectors, batch.len())?;
+            self.profile.measure("vector_validation", || {
+                validate(&batch_vectors, batch.len())
+            })?;
             vectors.extend(batch_vectors);
             progress(end, total)?;
         }
@@ -113,6 +124,7 @@ fn validate(vectors: &[Vec<f32>], expected_count: usize) -> anyhow::Result<()> {
 struct FastEmbedBackend {
     cache_dir: PathBuf,
     model: Option<TextEmbedding>,
+    profile: Profiler,
 }
 
 impl FastEmbedBackend {
@@ -120,6 +132,7 @@ impl FastEmbedBackend {
         Self {
             cache_dir,
             model: None,
+            profile: Profiler::default(),
         }
     }
 
@@ -129,13 +142,33 @@ impl FastEmbedBackend {
                 .with_cache_dir(self.cache_dir.clone())
                 .with_progress(false)
                 .build()?;
-            let repo = api.repo(hf_hub::Repo::with_revision(
+            let repository = hf_hub::Repo::with_revision(
                 MODEL_REPOSITORY.into(),
                 hf_hub::RepoType::Model,
                 MODEL_REVISION.into(),
-            ));
-            let read =
-                |name: &str| -> anyhow::Result<Vec<u8>> { Ok(std::fs::read(repo.get(name)?)?) };
+            );
+            let cached = hf_hub::Cache::new(self.cache_dir.clone()).repo(repository.clone());
+            let repo = api.repo(repository);
+            let read = |name: &str| -> anyhow::Result<Vec<u8>> {
+                self.profile.measure("model_assets", || {
+                    let present = cached.get(name).is_some();
+                    let path = repo.get(name)?;
+                    let bytes = std::fs::read(path)?;
+                    self.profile.count("model_asset_bytes", bytes.len());
+                    self.profile.count(
+                        if present {
+                            "model_assets_cached"
+                        } else {
+                            "model_assets_fetched"
+                        },
+                        1,
+                    );
+                    if !present {
+                        self.profile.count("model_fetched_bytes", bytes.len());
+                    }
+                    Ok(bytes)
+                })
+            };
             let files = TokenizerFiles {
                 tokenizer_file: read("tokenizer.json")?,
                 config_file: read("config.json")?,
@@ -145,13 +178,16 @@ impl FastEmbedBackend {
             let model = UserDefinedEmbeddingModel::new(read("model.onnx")?, files)
                 .with_pooling(Pooling::Mean);
             self.model = Some(
-                TextEmbedding::try_new_from_user_defined(
-                    model,
-                    InitOptionsUserDefined::new().with_max_length(512),
-                )
-                .with_context(|| {
-                    format!("cannot initialize embedding model {MODEL_NAME}@{MODEL_REVISION}")
-                })?,
+                self.profile
+                    .measure("model_startup", || {
+                        TextEmbedding::try_new_from_user_defined(
+                            model,
+                            InitOptionsUserDefined::new().with_max_length(512),
+                        )
+                    })
+                    .with_context(|| {
+                        format!("cannot initialize embedding model {MODEL_NAME}@{MODEL_REVISION}")
+                    })?,
             );
         }
 
@@ -182,7 +218,19 @@ fn model_cache_dir() -> anyhow::Result<PathBuf> {
 }
 
 pub fn production() -> anyhow::Result<Embedder> {
-    Ok(Embedder::new(FastEmbedBackend::new(model_cache_dir()?)))
+    production_profiled(None, Profiler::default())
+}
+
+pub fn production_profiled(
+    cache_dir: Option<PathBuf>,
+    profile: Profiler,
+) -> anyhow::Result<Embedder> {
+    let mut backend = FastEmbedBackend::new(match cache_dir {
+        Some(path) => path,
+        None => model_cache_dir()?,
+    });
+    backend.profile = profile.clone();
+    Ok(Embedder::new(backend).with_profile(profile))
 }
 
 #[cfg(test)]
