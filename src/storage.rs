@@ -259,3 +259,10 @@ mod document_search;
 // Candidate retrieval is connected to public search after grouping is ported.
 #[allow(dead_code)]
 pub mod lexical;
+
+#[allow(dead_code)]
+pub mod candidates;
+
+#[cfg(test)]
+#[path = "../benchmarks/versions/port-stage.rs"]
+mod port_stage;
