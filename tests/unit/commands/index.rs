@@ -11,6 +11,7 @@ use crate::embedding::{Backend, DIMENSION, Embedder};
 
 #[derive(Default)]
 struct Calls {
+    workers: Option<usize>,
     preparations: usize,
     batches: Vec<Vec<String>>,
 }
@@ -22,6 +23,10 @@ struct TestBackend {
 }
 
 impl Backend for TestBackend {
+    fn set_workers(&mut self, workers: usize) {
+        self.calls.borrow_mut().workers = Some(workers);
+    }
+
     fn tokenizer(&mut self) -> anyhow::Result<tokenizers::Tokenizer> {
         Ok(crate::test_support::tokenizer(512))
     }
@@ -59,6 +64,28 @@ fn backend() -> TestBackend {
         calls: Rc::new(RefCell::new(Calls::default())),
         fail_on: None,
         prepare: None,
+    }
+}
+
+#[test]
+fn worker_config_reaches_backend_and_does_not_invalidate_existing_documents() {
+    let dir = project(&[("a.rs", "fn a() {}")]);
+    let available = std::thread::available_parallelism().map_or(1, usize::from);
+    for (iteration, requested) in [2, 10000].into_iter().enumerate() {
+        let config = Config {
+            embedding_workers: std::num::NonZeroUsize::new(requested),
+            ..Config::default()
+        };
+        fs::write(
+            dir.path().join(".mimirs/config.toml"),
+            config.to_toml().unwrap(),
+        )
+        .unwrap();
+        let model = backend();
+        let calls = model.calls.clone();
+        run(&dir, model, false).0.unwrap();
+        assert_eq!(calls.borrow().workers, Some(requested.min(available)));
+        assert_eq!(calls.borrow().batches.len(), usize::from(iteration == 0));
     }
 }
 

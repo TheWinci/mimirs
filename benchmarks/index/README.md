@@ -143,3 +143,6 @@ profiled run. Saved document hashes, all frozen owner ranks, visible answer
 checks, and per-block evidence match the prior mixed-project retrieval baseline.
 [Embedding probe results](embedding-results.json) preserve the completed trials,
 the interrupted single-thread observation, and the separate sampled run.
+
+[Single-chunk experiments](single-chunks.md) test one existing source chunk per
+call, CPU thread counts, and persistent parallel workers within each file.

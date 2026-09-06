@@ -60,6 +60,22 @@ Python `.py` and `.pyi` files. Common Python environment directories `.venv`,
 `init` preserves an existing config. The first model use can download files;
 indexing and search then use the local cache.
 
+Indexing embeds one source chunk per call with a CPU budget for the whole worker
+pool. By default it uses one-third of available logical CPUs, rounded down, with
+at least one worker. Set an absolute maximum in `.mimirs/config.toml`:
+
+```toml
+embedding_workers = 3
+```
+
+Each worker uses one inference thread. Larger values are clamped to available
+CPUs; zero and non-integer values are invalid. Remove the entry to restore the
+automatic default. This controls concurrency, not a hard CPU percentage. Workers
+finish the current file before indexing moves on, and changing this setting
+does not require rebuilding unchanged files. Each active worker needs its own
+model session; sessions are created only as files need more workers and reused.
+Search embeds its single query with one worker.
+
 Tree-sitter identifies Rust items for embedding. Small functions and methods
 stay whole, including attached docs and attributes, with a short file and
 containing type/module prefix. Modules, impls, and traits contribute their own

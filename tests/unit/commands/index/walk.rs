@@ -25,6 +25,7 @@ fn config(include: &[&str], exclude: &[&str]) -> Config {
     Config {
         include: include.iter().map(|s| s.to_string()).collect(),
         exclude: exclude.iter().map(|s| s.to_string()).collect(),
+        ..Config::default()
     }
 }
 

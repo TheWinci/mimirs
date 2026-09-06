@@ -7,6 +7,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
+    /// Maximum concurrent single-threaded embedding workers. None selects one-third of CPUs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub embedding_workers: Option<std::num::NonZeroUsize>,
     #[serde(default)]
     pub include: Vec<String>,
     /// Applied after `include`.
@@ -17,6 +20,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            embedding_workers: None,
             include: ["**/*.rs", "**/*.py", "**/*.pyi"]
                 .map(String::from)
                 .to_vec(),
@@ -53,6 +57,13 @@ impl Default for Config {
 }
 
 impl Config {
+    pub fn resolved_embedding_workers(&self, available: usize) -> usize {
+        let available = available.max(1);
+        self.embedding_workers
+            .map_or((available / 3).max(1), usize::from)
+            .min(available)
+    }
+
     pub fn load(root: &Path) -> anyhow::Result<Self> {
         let path = root.join(".mimirs").join("config.toml");
 
@@ -84,7 +95,13 @@ impl Config {
     }
 
     pub fn to_toml(&self) -> anyhow::Result<String> {
-        Ok(toml::to_string_pretty(self)?)
+        let mut text = toml::to_string_pretty(self)?;
+        if self.embedding_workers.is_none() {
+            text.push_str(
+                "\n# Omit for one-third of available CPUs, minimum one.\n# embedding_workers = 3\n",
+            );
+        }
+        Ok(text)
     }
 }
 

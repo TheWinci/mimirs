@@ -165,7 +165,12 @@ fn index_with_profiled(
     if database.outcome != storage::OpenOutcome::Reused {
         progress.diagnostic(&database.outcome.message(&database_path))?;
     }
-    let mut embedder = make_embedder()?.with_profile(profile.clone());
+    let available = std::thread::available_parallelism().map_or(1, usize::from);
+    let workers = config.resolved_embedding_workers(available);
+    profile.count("embedding_worker_limit", workers);
+    let mut embedder = make_embedder()?
+        .with_workers(workers)
+        .with_profile(profile.clone());
     profile.measure("model_validation", || {
         storage::validate_model(&database.connection)
     })?;

@@ -17,7 +17,20 @@ pub fn model_identity() -> String {
 pub const DIMENSION: usize = 384;
 const DOCUMENT_BATCH_SIZE: usize = 256;
 
+mod pool;
+
 pub trait Backend {
+    fn set_workers(&mut self, _workers: usize) {}
+
+    fn embed_profiled(
+        &mut self,
+        texts: &[String],
+        profile: &Profiler,
+    ) -> anyhow::Result<Vec<Vec<f32>>> {
+        profile.batch(texts.len());
+        self.embed(texts)
+    }
+
     fn prepare(&mut self) -> anyhow::Result<()> {
         Ok(())
     }
@@ -35,6 +48,11 @@ pub struct Embedder {
 }
 
 impl Embedder {
+    pub fn with_workers(mut self, workers: usize) -> Self {
+        self.backend.set_workers(workers.max(1));
+        self
+    }
+
     pub fn new(backend: impl Backend + 'static) -> Self {
         Self {
             backend: Box::new(backend),
@@ -72,10 +90,11 @@ impl Embedder {
         for (batch_index, batch) in texts.chunks(DOCUMENT_BATCH_SIZE).enumerate() {
             let start = batch_index * DOCUMENT_BATCH_SIZE;
             let end = start + batch.len();
-            self.profile.batch(batch.len());
             let batch_vectors = self
                 .profile
-                .measure("embedding", || self.backend.embed(batch))
+                .measure("embedding", || {
+                    self.backend.embed_profiled(batch, &self.profile)
+                })
                 .with_context(|| format!("cannot embed documents {start}..{end}"))?;
 
             self.profile.measure("vector_validation", || {
@@ -123,7 +142,8 @@ fn validate(vectors: &[Vec<f32>], expected_count: usize) -> anyhow::Result<()> {
 
 struct FastEmbedBackend {
     cache_dir: PathBuf,
-    model: Option<TextEmbedding>,
+    models: Vec<TextEmbedding>,
+    workers: usize,
     profile: Profiler,
 }
 
@@ -131,13 +151,14 @@ impl FastEmbedBackend {
     fn new(cache_dir: PathBuf) -> Self {
         Self {
             cache_dir,
-            model: None,
+            models: Vec::new(),
+            workers: 1,
             profile: Profiler::default(),
         }
     }
 
-    fn model(&mut self) -> anyhow::Result<&mut TextEmbedding> {
-        if self.model.is_none() {
+    fn ensure_models(&mut self, count: usize) -> anyhow::Result<()> {
+        while self.models.len() < count {
             let api = hf_hub::api::sync::ApiBuilder::new()
                 .with_cache_dir(self.cache_dir.clone())
                 .with_progress(false)
@@ -177,12 +198,14 @@ impl FastEmbedBackend {
             };
             let model = UserDefinedEmbeddingModel::new(read("model.onnx")?, files)
                 .with_pooling(Pooling::Mean);
-            self.model = Some(
+            self.models.push(
                 self.profile
                     .measure("model_startup", || {
                         TextEmbedding::try_new_from_user_defined(
                             model,
-                            InitOptionsUserDefined::new().with_max_length(512),
+                            InitOptionsUserDefined::new()
+                                .with_max_length(512)
+                                .with_intra_threads(1),
                         )
                     })
                     .with_context(|| {
@@ -191,13 +214,46 @@ impl FastEmbedBackend {
             );
         }
 
-        self.model
-            .as_mut()
-            .context("embedding model is not initialized")
+        Ok(())
+    }
+
+    fn model(&mut self) -> anyhow::Result<&mut TextEmbedding> {
+        self.ensure_models(1)?;
+        Ok(&mut self.models[0])
+    }
+
+    fn embed_chunks(
+        &mut self,
+        texts: &[String],
+        profile: &Profiler,
+    ) -> anyhow::Result<Vec<Vec<f32>>> {
+        if texts.is_empty() {
+            return Ok(Vec::new());
+        }
+        let count = self.workers.min(texts.len());
+        self.ensure_models(count)?;
+        pool::embed(&mut self.models[..count], texts, profile, |model, text| {
+            let mut vectors = model.embed([text], Some(1))?;
+            validate(&vectors, 1)?;
+            Ok(vectors.remove(0))
+        })
     }
 }
 
 impl Backend for FastEmbedBackend {
+    fn set_workers(&mut self, workers: usize) {
+        self.workers = workers;
+        self.models.truncate(workers);
+    }
+
+    fn embed_profiled(
+        &mut self,
+        texts: &[String],
+        profile: &Profiler,
+    ) -> anyhow::Result<Vec<Vec<f32>>> {
+        self.embed_chunks(texts, profile)
+    }
+
     fn prepare(&mut self) -> anyhow::Result<()> {
         self.model()?;
         Ok(())
@@ -208,7 +264,7 @@ impl Backend for FastEmbedBackend {
     }
 
     fn embed(&mut self, texts: &[String]) -> anyhow::Result<Vec<Vec<f32>>> {
-        self.model()?.embed(texts, None).map_err(Into::into)
+        self.embed_chunks(texts, &Profiler::default())
     }
 }
 
@@ -225,6 +281,8 @@ pub fn production_profiled(
     cache_dir: Option<PathBuf>,
     profile: Profiler,
 ) -> anyhow::Result<Embedder> {
+    // Tokenization of a single input needs no additional global worker pool.
+    tokenizers::utils::parallelism::set_parallelism(false);
     let mut backend = FastEmbedBackend::new(match cache_dir {
         Some(path) => path,
         None => model_cache_dir()?,

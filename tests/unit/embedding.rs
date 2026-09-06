@@ -280,3 +280,26 @@ fn pinned_snapshot_preserves_measured_backend_embeddings() {
         previous.tokenizer.to_string(false).unwrap()
     );
 }
+
+#[test]
+#[ignore = "loads the real MiniLM model from the local cache"]
+fn real_workers_match_serial_vectors_and_load_sessions_only_when_needed() {
+    tokenizers::utils::parallelism::set_parallelism(false);
+    let mut backend = FastEmbedBackend::new(model_cache_dir().unwrap());
+    backend.set_workers(3);
+    backend.prepare().unwrap();
+    assert_eq!(backend.models.len(), 1);
+    let texts = vec![
+        "fn main() {}".to_owned(),
+        "Remove expired sessions from persistent storage.".repeat(35),
+        "class Café:\n    def close(self): pass".to_owned(),
+        "import os\nprint(os.environ)".to_owned(),
+    ];
+    let parallel = backend.embed(&texts).unwrap();
+    assert_eq!(backend.models.len(), 3);
+    backend.set_workers(1);
+    assert_eq!(backend.models.len(), 1);
+    let serial = backend.embed(&texts).unwrap();
+    assert_eq!(parallel, serial);
+    assert_eq!(backend.models.len(), 1);
+}

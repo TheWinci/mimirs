@@ -1,0 +1,501 @@
+{
+  "fresh": {
+    "command": [
+      "/Users/winci/repos/mimirs/target/release/mimirs",
+      "index",
+      "--profile",
+      "/tmp/mimirs-configured-index/fresh.json"
+    ],
+    "process_seconds": 66.47775954200188
+  },
+  "source_facts_documents_unchanged": true,
+  "stored_vectors_sha256": "97448070747d864f8dcd31d97d6476377fb594d33748132f9137fe9505fea307",
+  "rss_sample_kib": 591264,
+  "rss_note": "One ps RSS observation during the default fresh run; not a peak measurement.",
+  "unchanged-clamped": {
+    "command": [
+      "/Users/winci/repos/mimirs/target/release/mimirs",
+      "index",
+      "--profile",
+      "/tmp/mimirs-configured-index/unchanged-clamped.json"
+    ],
+    "process_seconds": 0.30249733399250545
+  },
+  "incremental-one-worker": {
+    "command": [
+      "/Users/winci/repos/mimirs/target/release/mimirs",
+      "index",
+      "--profile",
+      "/tmp/mimirs-configured-index/incremental-one-worker.json"
+    ],
+    "process_seconds": 1.8327557920129038
+  },
+  "binary_sha256": "9d06944f14a9061abbe6f1f65759a06e616fe6e89c0652c84eb2ce2d8e1103ca",
+  "implementation_sha256": {
+    "src/config.rs": "0ce4b949c9935ff5861b8b68e31ac7c911e5babf0439e7ec5196dd079295579c",
+    "src/embedding.rs": "2fee83073749d58974d2f06e8c07dccce03499b2c43172185f67ccaa6d56f8ce",
+    "src/embedding/pool.rs": "1d828da238ac641b08bda28d988b47605b251b568f963357398a5a64480cdb6f",
+    "src/commands/index.rs": "7256b8f6ea304103172cf441a4f2e88496549bf742ddd17a02960d2118970787"
+  },
+  "corpus_revision": "479658ad9bce22c6e4955b2e47182111c166e37c",
+  "profiles": {
+    "fresh": {
+      "wall_seconds": 65.449593083,
+      "complete": true,
+      "phases_seconds": {
+        "analysis": 0.817303955,
+        "chunking_token_budget": 2.913954291999999,
+        "config": 0.000330625,
+        "database_open": 0.002301208,
+        "database_policy": 0.001074708,
+        "discovery": 0.015627030000000004,
+        "document_texts": 0.00032379199999999945,
+        "embedding": 60.727440113999975,
+        "invalidation": 0.09645767499999996,
+        "model_assets": 0.038475999,
+        "model_prepare": 0.00018741899999999423,
+        "model_startup": 0.19361087600000002,
+        "model_validation": 8.5042e-05,
+        "progress_output": 0.005811341999999974,
+        "reconciliation": 8.0792e-05,
+        "reuse_check": 0.009056880999999996,
+        "source_read": 0.010925540000000004,
+        "storage_save": 0.6008157850000001,
+        "tokenizer_setup": 0.00300075,
+        "vector_validation": 0.0007172510000000007
+      },
+      "counters": {
+        "documents": 2817,
+        "embedding_calls": 2817,
+        "embedding_documents": 2817,
+        "embedding_worker_limit": 3,
+        "files_discovered": 272,
+        "files_indexed": 272,
+        "files_read": 272,
+        "model_asset_bytes": 273306207,
+        "model_assets_cached": 15,
+        "source_bytes": 1481149
+      },
+      "embedding_batch_sizes": {
+        "1": 2817
+      },
+      "available_parallelism": 10
+    },
+    "unchanged-clamped": {
+      "wall_seconds": 0.230423333,
+      "complete": true,
+      "phases_seconds": {
+        "config": 7.0375e-05,
+        "database_open": 0.010639209,
+        "database_policy": 7.8167e-05,
+        "discovery": 0.010552282,
+        "model_assets": 0.010764583,
+        "model_prepare": 4.1709000000000884e-05,
+        "model_startup": 0.064807792,
+        "model_validation": 0.00011175,
+        "progress_output": 0.0022949340000000032,
+        "reconciliation": 6.3083e-05,
+        "reuse_check": 0.11958334100000004,
+        "source_read": 0.006619374999999997,
+        "tokenizer_setup": 0.002722084
+      },
+      "counters": {
+        "embedding_worker_limit": 10,
+        "files_discovered": 272,
+        "files_read": 272,
+        "files_reused": 272,
+        "model_asset_bytes": 91102069,
+        "model_assets_cached": 5,
+        "source_bytes": 1481149
+      },
+      "embedding_batch_sizes": {},
+      "available_parallelism": 10
+    },
+    "incremental-one-worker": {
+      "wall_seconds": 1.769989292,
+      "complete": true,
+      "phases_seconds": {
+        "analysis": 0.002739334,
+        "chunking_token_budget": 0.028185667,
+        "config": 4.6459e-05,
+        "database_open": 0.009527541,
+        "database_policy": 7.4917e-05,
+        "discovery": 0.007424176000000002,
+        "document_texts": 2.875e-06,
+        "embedding": 1.503395084,
+        "invalidation": 0.003909458,
+        "model_assets": 0.010290958,
+        "model_prepare": 3.087499999999965e-05,
+        "model_startup": 0.064414583,
+        "model_validation": 7.6e-05,
+        "progress_output": 0.0021301950000000027,
+        "reconciliation": 6.3083e-05,
+        "reuse_check": 0.11924820399999989,
+        "source_read": 0.006292044,
+        "storage_save": 0.00700875,
+        "tokenizer_setup": 0.002712875,
+        "vector_validation": 9.708e-06
+      },
+      "counters": {
+        "documents": 57,
+        "embedding_calls": 57,
+        "embedding_documents": 57,
+        "embedding_worker_limit": 1,
+        "files_discovered": 272,
+        "files_indexed": 2,
+        "files_read": 272,
+        "files_reused": 270,
+        "model_asset_bytes": 91102069,
+        "model_assets_cached": 5,
+        "source_bytes": 1481202
+      },
+      "embedding_batch_sizes": {
+        "1": 57
+      },
+      "available_parallelism": 10
+    }
+  },
+  "search": {
+    "query_sha256": "2c3a3305dc7a65cf3418d2bcdc7b30270e78f251aa6136c6f766abbcc983424c",
+    "all_cases_match_previous_ranks_and_visible_answers": true,
+    "cases": [
+      {
+        "id": "P1",
+        "group": "python",
+        "limit": 10,
+        "targets": [
+          {
+            "path": "maturin/__init__.py",
+            "name": "get_maturin_pep517_args",
+            "required_snippets": [
+              "build_args = config_settings.get",
+              "args = shlex.split(env_args)"
+            ],
+            "rank": 1,
+            "visible_answer": true,
+            "displayed_parts": 1
+          }
+        ]
+      },
+      {
+        "id": "P2",
+        "group": "python",
+        "limit": 10,
+        "targets": [
+          {
+            "path": "maturin/__init__.py",
+            "name": "_get_sys_executable",
+            "required_snippets": [
+              "sys._base_executable",
+              "os.path.realpath(base_executable)"
+            ],
+            "rank": null,
+            "visible_answer": false,
+            "displayed_parts": 0
+          }
+        ]
+      },
+      {
+        "id": "P3",
+        "group": "python",
+        "limit": 10,
+        "targets": [
+          {
+            "path": "maturin/__init__.py",
+            "name": "_additional_pep517_args",
+            "required_snippets": [
+              "pointer_width == 32",
+              "i686-pc-windows-msvc"
+            ],
+            "rank": 1,
+            "visible_answer": true,
+            "displayed_parts": 1
+          }
+        ]
+      },
+      {
+        "id": "P4",
+        "group": "python",
+        "limit": 10,
+        "targets": [
+          {
+            "path": "maturin/__init__.py",
+            "name": "_build_wheel",
+            "required_snippets": [
+              "sys.stdout.buffer.write(result.stdout)"
+            ],
+            "rank": 2,
+            "visible_answer": true,
+            "displayed_parts": 2
+          }
+        ]
+      },
+      {
+        "id": "P5",
+        "group": "python",
+        "limit": 10,
+        "targets": [
+          {
+            "path": "maturin/__init__.py",
+            "name": "_get_env",
+            "required_snippets": [
+              "not shutil.which(\"cargo\")",
+              "extra_env = setup_rust()"
+            ],
+            "rank": null,
+            "visible_answer": false,
+            "displayed_parts": 0
+          }
+        ]
+      },
+      {
+        "id": "P6",
+        "group": "python",
+        "limit": 10,
+        "targets": [
+          {
+            "path": "maturin/__init__.py",
+            "name": "get_requires_for_build_wheel",
+            "required_snippets": [
+              "platform.python_implementation() != \"PyPy\"",
+              "requirements = [\"cffi\"]"
+            ],
+            "rank": 5,
+            "visible_answer": true,
+            "displayed_parts": 1
+          }
+        ]
+      },
+      {
+        "id": "P7",
+        "group": "python",
+        "limit": 10,
+        "targets": [
+          {
+            "path": "maturin/__main__.py",
+            "name": "get_maturin_path",
+            "required_snippets": [
+              "sysconfig.get_scheme_names()",
+              "return Path(paths[0]) / SCRIPT_NAME"
+            ],
+            "rank": 2,
+            "visible_answer": true,
+            "displayed_parts": 1
+          }
+        ]
+      },
+      {
+        "id": "R1",
+        "group": "rust",
+        "limit": 10,
+        "targets": [
+          {
+            "path": "src/auditwheel/patchelf.rs",
+            "name": "verify_patchelf",
+            "required_snippets": [
+              "semver::Version::new(0, 14, 0)"
+            ],
+            "rank": 2,
+            "visible_answer": true,
+            "displayed_parts": 1
+          }
+        ]
+      },
+      {
+        "id": "R2",
+        "group": "rust",
+        "limit": 10,
+        "targets": [
+          {
+            "path": "src/develop/install_backend.rs",
+            "name": "stderr_indicates_problem",
+            "required_snippets": [
+              "InstallBackend::Uv { .. } => false"
+            ],
+            "rank": 1,
+            "visible_answer": true,
+            "displayed_parts": 1
+          }
+        ]
+      },
+      {
+        "id": "R3",
+        "group": "rust",
+        "limit": 10,
+        "targets": [
+          {
+            "path": "src/develop/install_backend.rs",
+            "name": "is_uv_venv",
+            "required_snippets": [
+              "content.contains(\"\\nuv = \")"
+            ],
+            "rank": 1,
+            "visible_answer": true,
+            "displayed_parts": 1
+          }
+        ]
+      },
+      {
+        "id": "R4",
+        "group": "rust",
+        "limit": 10,
+        "targets": [
+          {
+            "path": "src/target/wheel_tag.rs",
+            "name": "expand",
+            "required_snippets": [
+              "component.split('.')",
+              ".multi_cartesian_product()"
+            ],
+            "rank": 1,
+            "visible_answer": true,
+            "displayed_parts": 1
+          }
+        ]
+      },
+      {
+        "id": "R5",
+        "group": "rust",
+        "limit": 10,
+        "targets": [
+          {
+            "path": "src/commands/pep517.rs",
+            "name": "require_single_interpreter",
+            "required_snippets": [
+              "retain(|p| seen.insert(p.clone()))",
+              "opts.python.interpreter.len() > 1"
+            ],
+            "rank": 1,
+            "visible_answer": true,
+            "displayed_parts": 1
+          }
+        ]
+      },
+      {
+        "id": "R6",
+        "group": "rust",
+        "limit": 10,
+        "targets": [
+          {
+            "path": "src/target/wheel_tag.rs",
+            "name": "from_str",
+            "required_snippets": [
+              "if components.next().is_some()",
+              "wheel tag must have exactly three components"
+            ],
+            "rank": 3,
+            "visible_answer": true,
+            "displayed_parts": 1
+          }
+        ]
+      },
+      {
+        "id": "R7",
+        "group": "rust",
+        "limit": 10,
+        "targets": [
+          {
+            "path": "src/source_distribution/unpack.rs",
+            "name": "unpack_sdist",
+            "required_snippets": [
+              "pyproject.manifest_path()",
+              "top_dir.join(manifest_path)"
+            ],
+            "rank": null,
+            "visible_answer": false,
+            "displayed_parts": 0
+          }
+        ]
+      },
+      {
+        "id": "X1",
+        "group": "cross",
+        "limit": 10,
+        "targets": [
+          {
+            "path": "maturin/__init__.py",
+            "name": "build_editable",
+            "required_snippets": [
+              "editable=True"
+            ],
+            "rank": null,
+            "visible_answer": false,
+            "displayed_parts": 0
+          },
+          {
+            "path": "maturin/__init__.py",
+            "name": "_build_wheel",
+            "required_snippets": [
+              "options.append(\"--editable\")"
+            ],
+            "rank": null,
+            "visible_answer": false,
+            "displayed_parts": 0
+          },
+          {
+            "path": "src/commands/pep517.rs",
+            "name": "pep517",
+            "required_snippets": [
+              ".editable(editable)"
+            ],
+            "rank": null,
+            "visible_answer": false,
+            "displayed_parts": 0
+          }
+        ]
+      },
+      {
+        "id": "X2",
+        "group": "cross",
+        "limit": 10,
+        "targets": [
+          {
+            "path": "maturin/__init__.py",
+            "name": "build_sdist",
+            "required_snippets": [
+              "\"write-sdist\""
+            ],
+            "rank": null,
+            "visible_answer": false,
+            "displayed_parts": 0
+          },
+          {
+            "path": "src/commands/pep517.rs",
+            "name": "pep517",
+            "required_snippets": [
+              "all_features: true"
+            ],
+            "rank": 2,
+            "visible_answer": true,
+            "displayed_parts": 1
+          }
+        ]
+      },
+      {
+        "id": "R7",
+        "group": "rust",
+        "limit": 64,
+        "targets": [
+          {
+            "path": "src/source_distribution/unpack.rs",
+            "name": "unpack_sdist",
+            "required_snippets": [
+              "pyproject.manifest_path()",
+              "top_dir.join(manifest_path)"
+            ],
+            "rank": 41,
+            "visible_answer": true,
+            "displayed_parts": 2
+          }
+        ]
+      }
+    ]
+  },
+  "validation": {
+    "automated_tests_passed": 170,
+    "explicit_real_model_tests_passed": 2,
+    "clippy": "passed with -D warnings",
+    "raw_artifacts": "/tmp/mimirs-configured-index",
+    "timing_note": "One end-to-end run per scenario, not a repeated performance benchmark."
+  }
+}

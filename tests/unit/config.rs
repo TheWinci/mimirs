@@ -1,6 +1,40 @@
 use super::*;
 
 #[test]
+fn worker_defaults_and_limits_adapt_to_available_cpus() {
+    let config = Config::from_toml("include = [\"**/*.rs\"]").unwrap();
+    for (available, expected) in [(0, 1), (1, 1), (2, 1), (3, 1), (6, 2), (10, 3), (64, 21)] {
+        assert_eq!(config.resolved_embedding_workers(available), expected);
+    }
+    let explicit = Config::from_toml("include = [\"**/*.rs\"]\nembedding_workers = 5").unwrap();
+    assert_eq!(explicit.resolved_embedding_workers(10), 5);
+    assert_eq!(explicit.resolved_embedding_workers(2), 2);
+    assert_eq!(
+        Config::from_toml(&explicit.to_toml().unwrap())
+            .unwrap()
+            .embedding_workers,
+        explicit.embedding_workers
+    );
+    assert!(
+        config
+            .to_toml()
+            .unwrap()
+            .contains("# embedding_workers = 3")
+    );
+}
+
+#[test]
+fn worker_limit_rejects_zero_negative_and_non_integer_values() {
+    for value in ["0", "-1", "1.5", "\"auto\"", "true"] {
+        let error = Config::from_toml(&format!(
+            "include = [\"**/*.rs\"]\nembedding_workers = {value}"
+        ))
+        .unwrap_err();
+        assert!(format!("{error:#}").contains("embedding_workers"));
+    }
+}
+
+#[test]
 fn load_reports_a_missing_file() {
     let err = Config::load(Path::new("/nonexistent-mimirs-root")).unwrap_err();
 
