@@ -1,0 +1,5 @@
+{
+  "excalidraw": {
+    "packages/excalidraw/laser-trails.ts": "packages/excalidraw/laserTrails.ts"
+  }
+}

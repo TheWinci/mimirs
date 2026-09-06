@@ -146,3 +146,9 @@ the interrupted single-thread observation, and the separate sampled run.
 
 [Single-chunk experiments](single-chunks.md) test one existing source chunk per
 call, CPU thread counts, and persistent parallel workers within each file.
+
+[Whole-index embedding experiments](bulk.md) compare one queue for all pending
+chunks, internal batches, length sorting, and a literal single model batch.
+
+[Quantized-model experiments](quantized.md) compare current float32, a second
+float32 export, and q8 weights with the same chunks, CPU budget, and Rust CLI.

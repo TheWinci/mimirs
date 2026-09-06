@@ -1,0 +1,8 @@
+{
+  "status": "stopped_by_user",
+  "supervisor_pid": 86049,
+  "updated_utc": "2026-09-06T13:37:37.178644+00:00",
+  "raw_directory": "/private/tmp/mimirs-three-way",
+  "log": "/private/tmp/mimirs-three-way/full.log",
+  "active_runner_pid": 78107
+}
