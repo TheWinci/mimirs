@@ -149,10 +149,10 @@ pub struct Evidence {
 
 pub mod split;
 
+// Original q8 construction stays only for frozen baseline fixtures.
+#[cfg(test)]
 pub mod source;
 
-#[allow(dead_code)]
 pub mod normalized;
 
-#[allow(dead_code)]
 pub mod ts_v2;

@@ -309,3 +309,25 @@ claiming equivalent numerical behavior.
 The saved Rust q8 baseline remains immutable. It uses its original tokenizer,
 runtime, and source documents. Full public indexing costs and final query
 rankings belong to the adoption comparison, which uses the same three corpora.
+
+## Adopted production path
+
+The [adoption report](adoption/ADOPTION.md) verifies every source-window vector
+and all 262 top-20 rankings on Mimirs, Excalidraw, and Django. Its JSON contains
+per-query differences from the original Rust q8 baseline, resource measurements,
+and exact-source audits. All TS rank comparisons match and all 27,295 vectors
+meet the original tolerance. Kubernetes remains deferred.
+
+Public indexing now constructs TS source windows and embeds their path-aware
+token windows. Public search uses the completed lexical/semantic union, ranking
+signals, file grouping, documentation segmentation, and reference expansion.
+`--limit` counts source files from 1 to 100. Documentation has its separate cap.
+The CLI calls the score `relevance`; previews and exact source evidence have
+separate fields. Source-chunk inspection previews the same windows before token
+splitting. Missing vectors do not remove lexical candidates, while the next index
+run detects and repairs incomplete embeddings. Unsupported policies still fail
+before search and require reindexing. Generated-path globs come from the current
+project config; discovery changes do not replace the saved source snapshot.
+
+Superseded entity retrieval and input construction compile only in tests for
+historical fixtures. They are not production strategies or CLI options.

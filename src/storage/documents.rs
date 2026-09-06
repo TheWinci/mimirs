@@ -16,6 +16,12 @@ pub struct Batch<'a> {
 pub fn save(connection: &mut Connection, analysis: &Analysis, batch: Batch<'_>) -> Result<()> {
     validate(analysis, batch.documents)?;
     super::policy::validate(batch.policy)?;
+    if batch.policy.contains(crate::retrieval::ts_v2::POLICY) {
+        ensure!(
+            batch.documents.iter().all(|d| d.source_chunk.is_some()),
+            "source policy requires retrieval chunk ownership"
+        );
+    }
     let tx = connection.transaction()?;
     if !super::validate_model(&tx)? {
         tx.execute("INSERT INTO index_metadata VALUES ('embedding_model', ?1), ('embedding_dimension', ?2)", params![crate::embedding::model_identity(), DIMENSION.to_string()])?;

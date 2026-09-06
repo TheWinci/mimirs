@@ -65,7 +65,9 @@ pub fn fusion(semantic: Option<usize>, lexical: Option<usize>) -> f64 {
 
 pub struct Read {
     pub candidates: Vec<Candidate>,
+    #[cfg(test)]
     pub baseline_semantic: Vec<i64>,
+    #[cfg(test)]
     pub baseline_lexical: Vec<i64>,
 }
 
@@ -152,6 +154,7 @@ fn read_with_limits(
             .with_context(|| format!("missing candidate document {id}"))?;
         candidates.push(candidate);
     }
+    #[cfg(test)]
     let baseline_semantic = channel_order(&candidates, true);
     let baseline_lexical: Vec<_> = initial_lexical.iter().map(|h| h.id).collect();
     if complete && let Some(vector) = vector {
@@ -222,7 +225,9 @@ fn read_with_limits(
     }
     Ok(Read {
         candidates,
+        #[cfg(test)]
         baseline_semantic,
+        #[cfg(test)]
         baseline_lexical,
     })
 }

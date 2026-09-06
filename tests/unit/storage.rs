@@ -28,7 +28,7 @@ fn vector(x: f32, y: f32) -> Vec<f32> {
 fn save_text(connection: &mut Connection, path: &str, text: &str) -> anyhow::Result<()> {
     let analysis = crate::analysis::extract(source(path, text))?;
     let budget = crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512))?;
-    let policy = policy::document_policy(&budget);
+    let policy = policy::legacy_document_policy(&budget);
     let documents = crate::retrieval::source::documents(&analysis, &budget)?;
     let vectors = vec![vector(1.0, 0.0); documents.len()];
     documents::save(

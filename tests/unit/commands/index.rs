@@ -172,7 +172,7 @@ fn redirected_output_and_stored_relationships_match_the_contract() {
     assert_eq!(calls.borrow().preparations, 1);
     assert_eq!(
         calls.borrow().batches,
-        [vec!["a.rs\nfirst\n\n  second  \n"]]
+        [vec!["File: a.rs\nfirst\n\n  second  \n"]]
     );
     assert_eq!(counts(&dir), [2, 2, 1, 1, 3]);
     let db = connection(&dir);
@@ -192,7 +192,7 @@ fn redirected_output_and_stored_relationships_match_the_contract() {
 
 #[test]
 fn batches_update_only_terminal_progress() {
-    let text = (0..257)
+    let text = (0..1025)
         .map(|n| format!("fn f{n}() {{}}\n"))
         .collect::<String>();
     for terminal in [false, true] {
@@ -208,9 +208,9 @@ fn batches_update_only_terminal_progress() {
                 .iter()
                 .map(Vec::len)
                 .collect::<Vec<_>>(),
-            [256, 1]
+            [1024, 1]
         );
-        assert_eq!(stderr.contains("100% (256/257 documents)"), terminal);
+        assert_eq!(stderr.contains("100% (1024/1025 documents)"), terminal);
         assert_eq!(stderr.contains("\x1b["), terminal);
         assert!(stderr.contains("index_progress: 100% (1/1 files)"));
         if terminal {
@@ -312,7 +312,7 @@ fn embedding_failure_preserves_earlier_commits_and_omits_cleanup() {
     fs::write(dir.path().join("b.rs"), "fail").unwrap();
     fs::remove_file(dir.path().join("stale.rs")).unwrap();
     let mut model = backend();
-    model.fail_on = Some("b.rs\nfail".into());
+    model.fail_on = Some("File: b.rs\nfail".into());
     let (result, stdout, stderr) = run(&dir, model, true);
     assert!(format!("{:#}", result.unwrap_err()).contains("cannot embed source file b.rs"));
     assert!(stdout.is_empty());
@@ -334,7 +334,7 @@ fn progress_failure_keeps_prior_commits_and_stops_before_save_or_cleanup() {
 
     impl Write for ClosedProgress {
         fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-            let batch = b"256/257 documents";
+            let batch = b"1024/1025 documents";
             if bytes.windows(batch.len()).any(|part| part == batch) {
                 return Err(io::Error::new(
                     io::ErrorKind::BrokenPipe,
@@ -354,7 +354,7 @@ fn progress_failure_keeps_prior_commits_and_stops_before_save_or_cleanup() {
     fs::write(dir.path().join("a.rs"), "new a").unwrap();
     fs::write(
         dir.path().join("b.rs"),
-        (0..257)
+        (0..1025)
             .map(|n| format!("fn f{n}() {{}}\n"))
             .collect::<String>(),
     )
@@ -388,7 +388,7 @@ fn progress_failure_keeps_prior_commits_and_stops_before_save_or_cleanup() {
             .iter()
             .map(Vec::len)
             .collect::<Vec<_>>(),
-        [1, 256]
+        [1, 1024]
     );
     assert_eq!(
         files(&dir),
@@ -553,7 +553,7 @@ fn extraction_shares_one_read_and_mixed_types_keep_embedding_inputs() {
     assert_eq!((reads.get(), parses.get(), summary.indexed), (2, 2, 2));
     assert_eq!(
         calls.borrow().batches,
-        [vec!["a.rs\nfn f() {}"], vec!["b.txt\nplain"]]
+        [vec!["File: a.rs\nfn f() {}"], vec!["File: b.txt\nplain"]]
     );
     let db = connection(&dir);
     assert_eq!(
@@ -668,7 +668,7 @@ fn content_hash_detects_same_length_edit_with_same_timestamp() {
     let (result, stdout, _) = run(&dir, model, false);
     result.unwrap();
     assert!(stdout.starts_with("indexed: 1 files\nunchanged: 1 files\nskipped: 0 files\n"));
-    assert_eq!(calls.borrow().batches, [vec!["a.rs\nfn new() {}"]]);
+    assert_eq!(calls.borrow().batches, [vec!["File: a.rs\nfn new() {}"]]);
     assert_eq!(
         storage::analysis::load(&connection(&dir), "a.rs")
             .unwrap()
@@ -718,7 +718,7 @@ fn failed_source_replacement_cannot_return_old_code() {
     run(&dir, backend(), false).0.unwrap();
     fs::write(dir.path().join("a.rs"), "fn new() {}").unwrap();
     let mut failing = backend();
-    failing.fail_on = Some("a.rs\nfn new() {}".into());
+    failing.fail_on = Some("File: a.rs\nfn new() {}".into());
     assert!(run(&dir, failing, false).0.is_err());
     let db = connection(&dir);
     assert!(storage::analysis::load(&db, "a.rs").unwrap().is_none());
@@ -798,8 +798,8 @@ fn previous_modes_rebuild_to_source_and_keep_custom_includes() {
         assert_eq!(
             calls.borrow().batches,
             [
-                vec!["a.rs\nfn f() {}"],
-                vec!["b.txt\nfirst\nsecond\n", "b.txt\nthird"]
+                vec!["File: a.rs\nfn f() {}"],
+                vec!["File: b.txt\nfirst\nsecond\n", "File: b.txt\nthird"]
             ]
         );
         assert_eq!(fs::read_to_string(config_path).unwrap(), config);
@@ -821,7 +821,7 @@ fn registering_an_analyzer_replaces_unchanged_fallback_documents() {
     let budget =
         crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
     let policy = storage::policy::document_policy(&budget);
-    let documents = crate::retrieval::source::documents(&analysis, &budget).unwrap();
+    let documents = crate::retrieval::ts_v2::documents(&analysis).unwrap();
     assert_eq!(documents.len(), 1);
     assert_eq!(documents[0].owner, None);
     let mut db = storage::open(&dir.path().join(".mimirs/index.db"))
@@ -881,7 +881,10 @@ fn registering_an_analyzer_replaces_unchanged_fallback_documents() {
     assert!(stdout.starts_with("indexed: 1 files\nunchanged: 0 files\n"));
     assert_eq!(
         calls.borrow().batches,
-        [vec!["a.rs\nfn first() {}", "a.rs\nfn second() {}"]]
+        [vec![
+            "File: a.rs\nfn first() {}\n",
+            "File: a.rs\nfn second() {}"
+        ]]
     );
     let db = connection(&dir);
     let stored = storage::analysis::load(&db, "a.rs").unwrap().unwrap();
@@ -932,7 +935,7 @@ fn python_and_rust_share_index_reuse_replacement_and_deletion() {
         assert_eq!(stored, expected);
         assert_eq!(
             storage::documents::load(&db, path, &policy).unwrap(),
-            crate::retrieval::source::documents(&expected, &budget).unwrap()
+            crate::retrieval::ts_v2::documents(&expected).unwrap()
         );
     }
     assert!(
@@ -976,7 +979,7 @@ fn python_and_rust_share_index_reuse_replacement_and_deletion() {
     )
     .unwrap();
     let mut model = backend();
-    model.fail_on = Some("a.py\ndef replacement():\n    return 99".into());
+    model.fail_on = Some("File: a.py\ndef replacement():\n    return 99\n".into());
     assert!(run(&dir, model, false).0.is_err());
     let db = connection(&dir);
     assert!(storage::analysis::load(&db, "a.py").unwrap().is_none());
@@ -1097,7 +1100,7 @@ fn javascript_dialects_share_storage_reuse_and_failed_replacement() {
         assert_eq!(direct, stored);
         assert_eq!(
             storage::documents::load(&db, path, &policy).unwrap(),
-            crate::retrieval::source::documents(&direct, &budget).unwrap()
+            crate::retrieval::ts_v2::documents(&direct).unwrap()
         );
     }
     let model = backend();
@@ -1139,7 +1142,7 @@ fn javascript_dialects_share_storage_reuse_and_failed_replacement() {
     );
     fs::write(dir.path().join("a.ts"), "export const replacement = 99;\n").unwrap();
     let mut model = backend();
-    model.fail_on = Some("a.ts\nexport const replacement = 99;".into());
+    model.fail_on = Some("File: a.ts\nexport const replacement = 99;\n".into());
     assert!(run(&dir, model, false).0.is_err());
     assert!(
         storage::analysis::load(&connection(&dir), "a.ts")
@@ -1159,7 +1162,7 @@ fn failed_profile_retains_measurements_for_committed_and_failed_files() {
     let dir = project(&[("a.rs", "fn a() {}"), ("b.rs", "fn b() {}")]);
     let profile = Profiler::enabled();
     let mut model = backend();
-    model.fail_on = Some("b.rs\nfn b() {}".into());
+    model.fail_on = Some("File: b.rs\nfn b() {}".into());
     let result = run_at_profiled(
         dir.path(),
         || Ok(Embedder::new(model)),
@@ -1208,7 +1211,7 @@ fn go_storage_reuse_edits_and_failed_replacement_share_the_pipeline() {
         assert_eq!(storage::analysis::load(&db, path).unwrap().unwrap(), direct);
         assert_eq!(
             storage::documents::load(&db, path, &policy).unwrap(),
-            crate::retrieval::source::documents(&direct, &budget).unwrap()
+            crate::retrieval::ts_v2::documents(&direct).unwrap()
         );
     }
     let model = backend();
@@ -1255,7 +1258,7 @@ fn go_storage_reuse_edits_and_failed_replacement_share_the_pipeline() {
     )
     .unwrap();
     let mut model = backend();
-    model.fail_on = Some("a.go\nvar replacement = 99".into());
+    model.fail_on = Some("File: a.go\nvar replacement = 99\n".into());
     assert!(run(&dir, model, false).0.is_err());
     assert!(
         storage::analysis::load(&connection(&dir), "a.go")

@@ -13,7 +13,7 @@ fn documents_roundtrip_rollback_and_cleanup() {
     .unwrap();
     let budget =
         crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
-    let policy = crate::storage::policy::document_policy(&budget);
+    let policy = crate::storage::policy::legacy_document_policy(&budget);
     let documents = crate::retrieval::source::documents(&analysis, &budget).unwrap();
     let vectors = vec![vec![1.0; DIMENSION]; documents.len()];
     save(
@@ -86,7 +86,7 @@ fn search_collapses_many_parts_and_retains_indexed_evidence() {
         .connection;
     let budget =
         crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
-    let policy = crate::storage::policy::document_policy(&budget);
+    let policy = crate::storage::policy::legacy_document_policy(&budget);
     crate::storage::policy::configure(&mut db, &policy).unwrap();
     let analysis = crate::analysis::extract(crate::source::SourceFile {
         path: "deleted.rs".into(),
@@ -141,14 +141,14 @@ fn search_collapses_many_parts_and_retains_indexed_evidence() {
 }
 
 #[test]
-fn policy_rejects_missing_vectors_and_processing() {
+fn policy_allows_missing_vectors_but_rejects_missing_processing() {
     let dir = tempfile::tempdir().unwrap();
     let mut db = crate::storage::open(&dir.path().join("index.db"))
         .unwrap()
         .connection;
     let budget =
         crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
-    let policy = crate::storage::policy::document_policy(&budget);
+    let policy = crate::storage::policy::legacy_document_policy(&budget);
     crate::storage::policy::configure(&mut db, &policy).unwrap();
     let analysis = crate::analysis::extract(crate::source::SourceFile {
         path: "a.rs".into(),
@@ -167,7 +167,8 @@ fn policy_rejects_missing_vectors_and_processing() {
     )
     .unwrap();
     db.execute("DELETE FROM document_embeddings", []).unwrap();
-    assert!(crate::storage::policy::read(&db).is_err());
+    assert!(crate::storage::policy::read(&db).unwrap().is_some());
+    assert!(!crate::storage::processing::reusable(&db, &analysis.source, &policy).unwrap());
     db.execute("DELETE FROM retrieval_processing", []).unwrap();
     assert!(crate::storage::policy::read(&db).is_err());
 }
@@ -192,7 +193,7 @@ fn selected_chunks_preserve_text_evidence_ties_and_source_order_under_cap() {
         .unwrap();
         let budget =
             crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(64)).unwrap();
-        let policy = crate::storage::policy::document_policy(&budget);
+        let policy = crate::storage::policy::legacy_document_policy(&budget);
         let documents = crate::retrieval::source::documents(&analysis, &budget).unwrap();
         assert!(documents.len() > 7);
         assert!(documents.iter().all(|d| d.owner == documents[0].owner));

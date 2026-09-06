@@ -1,6 +1,8 @@
 use anyhow::Result;
 
-use super::language::{Chunking, Language};
+#[cfg(test)]
+use super::language::Chunking;
+use super::language::Language;
 use super::{Analysis, LineIndex, Scope};
 use crate::source::SourceFile;
 
@@ -8,6 +10,8 @@ pub(super) const LANGUAGE: Language = Language {
     identity: "text/default/parser-none/grammar-none/extractor-1",
     extensions: &[],
     extract,
+    is_native: false,
+    #[cfg(test)]
     chunking: Chunking::Paragraphs,
 };
 

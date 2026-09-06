@@ -45,6 +45,37 @@ pub fn documents(analysis: &crate::analysis::Analysis) -> Result<Vec<super::spli
         .collect()
 }
 
+#[derive(serde::Serialize)]
+pub struct Preview {
+    pub source_chunk: usize,
+    pub owner: Option<usize>,
+    pub kind: String,
+    pub name: Option<String>,
+    pub context: String,
+    pub text: String,
+    pub span: Span,
+}
+
+pub fn preview(analysis: &crate::analysis::Analysis) -> Result<Vec<Preview>> {
+    crate::storage::analysis::validate(analysis)?;
+    let lines = LineIndex::new(&analysis.source.text);
+    project(&analysis.source.text, &analysis.source_chunks, 4000)?
+        .into_iter()
+        .map(|w| {
+            let chunk = &analysis.source_chunks[w.chunk];
+            Ok(Preview {
+                source_chunk: w.chunk,
+                owner: chunk.owner,
+                kind: chunk.kind.clone(),
+                name: chunk.name.clone(),
+                context: format!("File: {}", analysis.source.path),
+                text: analysis.source.text[w.start..w.end].to_owned(),
+                span: lines.span(w.start, w.end),
+            })
+        })
+        .collect()
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Chunk {
     pub kind: String,

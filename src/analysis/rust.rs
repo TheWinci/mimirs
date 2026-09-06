@@ -1,7 +1,9 @@
 use anyhow::{Context, Result};
 use tree_sitter::Parser;
 
-use super::language::{Chunking, DeclarationRules, Language};
+use super::language::Language;
+#[cfg(test)]
+use super::language::{Chunking, DeclarationRules};
 use super::{Analysis, Diagnostic, Entity, Fact, LineIndex, Scope, Span};
 use crate::source::SourceFile;
 
@@ -16,6 +18,8 @@ pub(super) const LANGUAGE: Language = Language {
     identity: "rust/default/tree-sitter-0.27.0/rust-0.24.2/extractor-2",
     extensions: &["rs"],
     extract,
+    is_native: true,
+    #[cfg(test)]
     chunking: Chunking::Declarations(DeclarationRules {
         containers: &["module", "impl", "trait"],
         leading_facts: &["doc", "attribute"],

@@ -18,6 +18,7 @@ pub fn model_identity() -> String {
 }
 
 pub const DIMENSION: usize = 384;
+#[cfg(test)]
 const DOCUMENT_BATCH_SIZE: usize = 256;
 
 mod pool;
@@ -89,6 +90,7 @@ impl Embedder {
         crate::retrieval::split::TokenBudget::new(self.backend.tokenizer()?)
     }
 
+    #[cfg(test)]
     pub fn embed_documents(
         &mut self,
         texts: &[String],
@@ -139,11 +141,15 @@ impl Embedder {
     }
 
     pub fn embed_ts_query(&mut self, query: &str) -> anyhow::Result<Vec<f32>> {
-        let mut vectors = self.backend.embed_query_text(query)?;
+        let mut vectors = self
+            .backend
+            .embed_query_text(query)
+            .context("cannot embed query")?;
         validate(&vectors, 1)?;
         Ok(vectors.remove(0))
     }
 
+    #[cfg(test)]
     pub fn embed_query(&mut self, query: &str) -> anyhow::Result<Vec<f32>> {
         let texts = [query.to_owned()];
         let mut vectors = self.backend.embed(&texts).context("cannot embed query")?;
@@ -377,5 +383,4 @@ pub fn production_profiled(
 #[path = "../tests/unit/embedding.rs"]
 mod tests;
 
-#[allow(dead_code)]
 pub mod ts_v2;

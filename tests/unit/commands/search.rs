@@ -39,6 +39,11 @@ fn project() -> (TempDir, Connection) {
     let connection = storage::open(&dir.path().join(".mimirs/index.db"))
         .unwrap()
         .connection;
+    fs::write(
+        dir.path().join(".mimirs/config.toml"),
+        crate::config::Config::default().to_toml().unwrap(),
+    )
+    .unwrap();
     (dir, connection)
 }
 
@@ -50,7 +55,7 @@ fn save(connection: &mut Connection, path: &str, text: &str, vectors: &[Vec<f32>
     let analysis = crate::analysis::extract(source).unwrap();
     let budget =
         crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
-    let docs = crate::retrieval::source::documents(&analysis, &budget).unwrap();
+    let docs = crate::retrieval::ts_v2::documents(&analysis).unwrap();
     let policy = storage::policy::document_policy(&budget);
     storage::documents::save(
         connection,
@@ -102,7 +107,11 @@ fn search_golden_preserves_stored_text_and_ignores_source_and_config_changes() {
     fs::write(dir.path().join("a.rs"), "changed source").unwrap();
     fs::write(dir.path().join("z.rs"), "deleted source").unwrap();
     fs::remove_file(dir.path().join("z.rs")).unwrap();
-    fs::write(dir.path().join(".mimirs/config.toml"), "not valid toml").unwrap();
+    fs::write(
+        dir.path().join(".mimirs/config.toml"),
+        "include = [\"**/*.none\"]",
+    )
+    .unwrap();
     drop(connection);
     let before = fs::read(dir.path().join(".mimirs/index.db")).unwrap();
     let backend = fixed();
@@ -128,7 +137,7 @@ fn empty_indexes_skip_embedder_creation() {
             2 => storage::reconcile(&mut connection, &[]).unwrap(),
             _ => {}
         }
-        for limit in [1, 4096] {
+        for limit in [1, 100] {
             let (result, output) = execute(dir.path(), "query", limit, unused_embedder);
             result.unwrap();
             assert_eq!(output, include_str!("../../goldens/search/empty.txt"));
@@ -144,9 +153,9 @@ fn invalid_arguments_fail_before_database_access_even_with_an_empty_index() {
         for (query, limit, message) in [
             ("", 5, "query must not be blank"),
             (" \t\n\u{2003}", 5, "query must not be blank"),
-            ("query", 0, "limit must be between 1 and 4096"),
-            ("query", 4097, "limit must be between 1 and 4096"),
-            ("query", usize::MAX, "limit must be between 1 and 4096"),
+            ("query", 0, "limit must be between 1 and 100"),
+            ("query", 101, "limit must be between 1 and 100"),
+            ("query", usize::MAX, "limit must be between 1 and 100"),
         ] {
             let (result, output) = execute(root, query, limit, unused_embedder);
             assert_eq!(result.unwrap_err().to_string(), message);
@@ -294,9 +303,9 @@ fn real_minilm_search_retrieves_indexed_source() {
     let mut embedder = embedding::production().unwrap();
     let budget = embedder.token_budget().unwrap();
     let policy = storage::policy::document_policy(&budget);
-    let docs = crate::retrieval::source::documents(&analysis, &budget).unwrap();
+    let docs = crate::retrieval::ts_v2::documents(&analysis).unwrap();
     let texts: Vec<_> = docs.iter().map(|d| d.text.clone()).collect();
-    let vectors = embedder.embed_documents(&texts, |_, _| Ok(())).unwrap();
+    let vectors = embedder.embed_ts_documents(&texts, |_, _| Ok(())).unwrap();
     storage::documents::save(
         &mut connection,
         &analysis,
@@ -312,8 +321,8 @@ fn real_minilm_search_retrieves_indexed_source() {
         Ok(embedder)
     });
     result.unwrap();
-    // Q8 ranks the implementing function above the detached comment block.
-    assert!(output.contains("location: src/lib.rs:2\n"), "{output}");
+    // The selected source chunk includes its attached comment.
+    assert!(output.contains("location: src/lib.rs:1-2\n"), "{output}");
     assert!(output.contains("source: indexed snapshot") && output.contains("evidence: Source"));
     assert!(
         output.contains("fn read_config(path: &str) -> std::io::Result<String> { std::fs::read_to_string(path) }"),
@@ -333,7 +342,7 @@ fn source_search_forwards_distilled_query_and_reads_deleted_snapshot() {
         text: "/// Expire sessions.\nfn expire_sessions() {}".into(),
     })
     .unwrap();
-    let docs = crate::retrieval::source::documents(&analysis, &budget).unwrap();
+    let docs = crate::retrieval::ts_v2::documents(&analysis).unwrap();
     storage::documents::save(
         &mut connection,
         &analysis,
@@ -351,7 +360,7 @@ fn source_search_forwards_distilled_query_and_reads_deleted_snapshot() {
     let (result, output) = execute(dir.path(), query, 5, || Ok(Embedder::new(backend)));
     result.unwrap();
     assert_eq!(*calls.borrow(), [vec![query.to_owned()]]);
-    assert!(output.contains("location: deleted.rs:2"));
+    assert!(output.contains("location: deleted.rs:1-2"));
     assert!(output.contains("source: indexed snapshot"));
     assert!(output.contains("/// Expire sessions."));
     assert!(output.contains("evidence: Source"));
@@ -362,7 +371,7 @@ fn multiple_matching_chunks_show_later_answer_from_deleted_snapshot() {
     let (dir, mut connection) = project();
     let text = format!(
         "fn answer() {{\n{}}}\n",
-        (0..300)
+        (0..600)
             .map(|i| format!("    let value_{i} = compute({i});\n"))
             .collect::<String>()
     );
@@ -373,7 +382,7 @@ fn multiple_matching_chunks_show_later_answer_from_deleted_snapshot() {
     .unwrap();
     let budget =
         crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
-    let docs = crate::retrieval::source::documents(&analysis, &budget).unwrap();
+    let docs = crate::retrieval::ts_v2::documents(&analysis).unwrap();
     assert!(docs.len() > 3);
     let policy = storage::policy::document_policy(&budget);
     let vectors = (0..docs.len())
@@ -392,26 +401,77 @@ fn multiple_matching_chunks_show_later_answer_from_deleted_snapshot() {
     drop(connection);
     let (result, output) = execute(dir.path(), "later answer", 1, || Ok(Embedder::new(fixed())));
     result.unwrap();
-    assert!(output.contains("omitted_matching_candidates:"));
-    for (i, doc) in docs.iter().take(3).enumerate() {
-        assert!(output.contains(&format!(
-            "chunk: {}/3 part: {} document: {}",
-            i + 1,
-            doc.part,
-            i
-        )));
-        assert!(output.contains(&format!("text: {}", doc.text)));
+    assert!(!output.contains("omitted_matching_candidates:"));
+    for doc in &docs {
         for e in &doc.evidence {
             assert!(output.contains(&format!(
                 "evidence: Source bytes {}..{} lines {}..{}",
                 e.span.start, e.span.end, e.span.line_start, e.span.line_end
             )));
+            let raw = &analysis.source.text[e.span.start..e.span.end];
+            assert!(output.contains(raw));
         }
     }
-    assert!(!output.contains(&format!("text: {}", docs[3].text)));
-    let omitted = &docs[3].evidence[0].span;
-    assert!(!output.contains(&format!(
-        "evidence: Source bytes {}..{}",
-        omitted.start, omitted.end
-    )));
+    assert!(output.contains("value_599"));
+}
+
+#[test]
+fn lexical_results_survive_missing_vectors_and_use_current_generated_rules() {
+    let (dir, mut connection) = project();
+    for path in ["a.rs", "b.rs"] {
+        save(
+            &mut connection,
+            path,
+            "fn recoverArchive() {}\n",
+            &[vector(1.0, 0.0)],
+        );
+    }
+    connection
+        .execute("DELETE FROM document_embeddings", [])
+        .unwrap();
+    let (result, output) = execute(dir.path(), "recoverArchive", 1, || {
+        Ok(Embedder::new(fixed()))
+    });
+    result.unwrap();
+    assert!(output.contains("location: a.rs:1"));
+    assert!(!output.contains("similarity:"));
+    let config = crate::config::Config {
+        generated: vec!["a.rs".into()],
+        ..Default::default()
+    };
+    fs::write(
+        dir.path().join(".mimirs/config.toml"),
+        config.to_toml().unwrap(),
+    )
+    .unwrap();
+    let (result, output) = execute(dir.path(), "recoverArchive", 1, || {
+        Ok(Embedder::new(fixed()))
+    });
+    result.unwrap();
+    assert!(output.contains("location: b.rs:1"));
+}
+
+#[test]
+fn documentation_is_a_separate_segment_with_exact_reference_evidence() {
+    let (dir, mut connection) = project();
+    save(
+        &mut connection,
+        "docs/guide.md",
+        "# Recovery\nRead [implementation](../src/archive.rs).\n",
+        &[vector(1.0, 0.0)],
+    );
+    save(
+        &mut connection,
+        "src/archive.rs",
+        "fn recoverArchive() {}\n",
+        &[vector(0.0, 1.0)],
+    );
+    let (result, output) = execute(dir.path(), "Recovery", 1, || Ok(Embedder::new(fixed())));
+    result.unwrap();
+    assert!(output.starts_with("results: 1\n"));
+    let (source, docs) = output.split_once("\ndocumentation: 1\n").unwrap();
+    assert!(source.contains("location: src/archive.rs:1"));
+    assert!(!source.contains("location: docs/guide.md"));
+    assert!(docs.contains("location: docs/guide.md:1-2"));
+    assert!(docs.contains("reference: ") && docs.contains("../src/archive.rs"));
 }

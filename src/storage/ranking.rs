@@ -13,6 +13,8 @@ pub struct Hit {
     pub representative: Candidate,
     pub score: f64,
     pub semantic_score: f64,
+    // Retain the active TS component for differential reports.
+    #[allow(dead_code)]
     pub lexical_score: f64,
     pub windows: Vec<Candidate>,
 }

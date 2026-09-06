@@ -80,7 +80,7 @@ fn lexical_projection_follows_snapshot_lifecycle() {
     let mut db = crate::storage::open(&path).unwrap().connection;
     let budget =
         crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
-    let policy = crate::storage::policy::document_policy(&budget);
+    let policy = crate::storage::policy::legacy_document_policy(&budget);
     let analysis = crate::analysis::extract(crate::source::SourceFile {
         path: "src/worker.rs".into(),
         text: "fn recoverArchive() { manifest(); }".into(),

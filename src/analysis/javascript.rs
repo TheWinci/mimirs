@@ -2,10 +2,13 @@
 use anyhow::{Context, Result};
 use tree_sitter::{Node, Parser};
 
-use super::language::{Chunking, DeclarationRules, Language};
+use super::language::Language;
+#[cfg(test)]
+use super::language::{Chunking, DeclarationRules};
 use super::{Analysis, Diagnostic, Entity, Fact, LineIndex, Scope, Span};
 use crate::source::SourceFile;
 
+#[cfg(test)]
 const RULES: Chunking = Chunking::Declarations(DeclarationRules {
     containers: &["class", "namespace"],
     leading_facts: &["doc", "decorator", "wrapper"],
@@ -16,18 +19,24 @@ pub(super) const JAVASCRIPT: Language = Language {
     identity: "javascript/jsx/tree-sitter-0.27.0/javascript-0.25.0/extractor-1",
     extensions: &["js", "mjs", "cjs", "jsx"],
     extract: |source| extract(source, tree_sitter_javascript::LANGUAGE.into()),
+    is_native: true,
+    #[cfg(test)]
     chunking: RULES,
 };
 pub(super) const TYPESCRIPT: Language = Language {
     identity: "typescript/default/tree-sitter-0.27.0/typescript-0.23.2/extractor-1",
     extensions: &["ts", "mts", "cts"],
     extract: |source| extract(source, tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into()),
+    is_native: true,
+    #[cfg(test)]
     chunking: RULES,
 };
 pub(super) const TSX: Language = Language {
     identity: "typescript/tsx/tree-sitter-0.27.0/typescript-0.23.2/extractor-1",
     extensions: &["tsx"],
     extract: |source| extract(source, tree_sitter_typescript::LANGUAGE_TSX.into()),
+    is_native: true,
+    #[cfg(test)]
     chunking: RULES,
 };
 

@@ -62,7 +62,7 @@ JavaScript `.js`, `.mjs`, `.cjs`, and `.jsx`, and Go `.go` files. This includes
 `init` preserves an existing config. The first model use can download files;
 indexing and search then use the local cache.
 
-Indexing embeds one source chunk per call with a CPU budget for the whole worker
+Indexing embeds one token window per call with a CPU budget for the whole worker
 pool. By default it uses one-third of available logical CPUs, rounded down, with
 at least one worker. Set an absolute maximum in `.mimirs/config.toml`:
 
@@ -78,60 +78,30 @@ does not require rebuilding unchanged files. Each active worker needs its own
 model session; sessions are created only as files need more workers and reused.
 Search embeds its single query with one worker.
 
-Tree-sitter identifies Rust items for embedding. Small functions and methods
-stay whole, including attached docs and attributes, with a short file and
-containing type/module prefix. Modules, impls, and traits contribute their own
-source around child items without duplicating the child bodies. Imports,
-comments, macro bodies, and incomplete source remain searchable. Embedding
-inputs preserve source spellings, operators, and literals. Ordinary comments
-outside items stay separate and can rank ahead of the code they describe; Rust
-doc comments attach to their item.
+Native tree-sitter grammars identify retrieval chunks for Rust, Python,
+TypeScript, JavaScript, JSX, TSX, and Go. The grammars ship in the binary and
+need no language servers or language runtimes. Written declarations, attached
+comments, decorators, imports, and incomplete source remain searchable. Retrieval
+follows TS v2's chunk boundaries, including collapsed import groups and overloads.
+The saved analysis retains its own entity boundaries and syntax facts.
 
-Python classes partition around methods and nested classes. Functions and methods
-retain their bodies, decorators, and docstrings, including any nested definitions.
-Method inputs include the enclosing class name. Imports, assignments, and ordinary
-comments stay in surrounding source chunks. Stub overloads keep separate owners
-even when their names repeat. Python analysis stores declaration scopes,
-signatures, decorator and docstring facts, and parse diagnostics. It does not
-resolve imports or calls. No Python installation or language server is required.
+Top-level retrieval chunks form source windows targeting 4,000 UTF-16 units.
+Large chunks split at child or source-line boundaries. A long physical line may
+exceed that target. Markdown headings form nested sections; included unsupported
+text uses paragraph chunks and receives no inferred syntax facts. Supported
+Markdown section parsing covers `.md` and `.markdown`.
 
-TypeScript and JavaScript classes and namespaces partition around declarations.
-Functions, methods, interfaces, aliases, enums, class fields, and module-level
-variable declarations keep their source bodies. Bound arrow functions and JSX
-stay in their initializer's chunk. Export and `declare` prefixes, decorators,
-and adjacent JSDoc comments stay with the declaration. Overloads have separate
-owners; anonymous exports, destructuring, and multi-binding declarations remain
-unnamed. Imports, re-exports, ordinary comments, and incomplete syntax stay
-searchable. Analysis records written names, containment, signatures, and parse
-diagnostics without resolving imports, calls, or types. The grammars ship in the
-binary. No Node.js installation or language server is required.
+Each document adds `File: path` context. MiniLM inputs split into 256-token
+windows with a 32-token overlap, repeating the path context. The document vector
+is the normalized average of those window vectors. Embedding text removes a
+leading BOM and normalizes newlines. Saved evidence always retains the original
+UTF-8 bytes, including CRLF. Embedding context is never presented as source.
 
-Go functions and receiver methods retain their written headers and bodies.
-Methods remain file-level owners, with the receiver in their source signature.
-Types, aliases, variables and constants keep their full declarations. Groups
-partition around individual specs, preserving group documentation, keywords and
-separators in the group's source. A multi-name spec has one unnamed owner.
-Contiguous leading comments attach to their declaration; blank lines and trailing
-comments stop attachment. Struct fields, interface elements, local declarations
-and function literals remain inside the containing declaration.
-
-Go imports, package comments, build constraints and cgo preambles remain source.
-Mimirs does not load packages, evaluate build tags or expand `iota` and omitted
-constant expressions. Tests and platform-specific files follow the include and
-exclude rules; `vendor` stays excluded by default. No Go installation is required.
-The pinned grammar can report recoverable separator diagnostics for compact
-parenthesized declarations. Inspection exposes those diagnostics, and indexing
-retains the original source.
-
-Large items split on source lines, repeating their signature. A single oversized
-line splits at tokenizer and UTF-8 boundaries. Every complete input, including
-context and special tokens, fits the backend's 512-token limit. File context
-and repeated signatures each use at most a quarter of that budget. These are
-initial splitting limits, not measured optima.
-
-Included files without a supported parser use paragraph chunks and the same
-token-limited splitting. They receive no inferred syntax facts. A physical line
-is a split boundary for overflow, not an embedding unit.
+Go package comments, build constraints, cgo preambles, and receiver signatures
+remain available. Mimirs does not load packages, evaluate build tags, or expand
+`iota`. Tests and platform-specific files follow the include and exclude rules;
+`vendor` stays excluded by default. Recoverable grammar errors appear in inspection
+and do not discard the original source.
 
 Rust indexing also stores entities, facts, scopes, diagnostics, and the source
 snapshot. That structured analysis stays separate from embedding text. Syntax
@@ -151,25 +121,33 @@ Inspection needs no model. The plain form reports analysis and syntax relations;
 use the indexed snapshot even after the working file changes or disappears.
 Included unsupported text can also be inspected and is identified as text fallback.
 
-Search ranks each entity by its best matching document and displays up to three
-matching documents. Each block contains the exact embedded text and its own
-source evidence ranges. The best match appears first; other selected documents
-follow in source order. Results identify the indexed snapshot and entity location.
-When the cap omits matching candidates, the result reports their count. It does
-not fetch every part of the entity.
-Ownerless source blocks group into one result per file. Candidate retrieval can
-expand to 4,096 documents; many parts belonging to the same entity can yield
-fewer results than requested. Entity ordinals identify only the saved snapshot.
-A failed replacement cannot return that file's old source or vectors.
+Search combines the first 150 semantic candidates with the first 100 lexical
+candidates, completes their missing channel scores, and applies TS v2's weighted
+reciprocal-rank fusion. Name matches, unique definitions, test paths, and generated
+paths affect ranking before files are grouped. `relevance` is this combined score,
+not cosine similarity. The `generated` config accepts path globs and defaults to
+an empty list. Search reads these rules from the current config.
+
+`--limit` selects 1 to 100 source files, default 5. Each file has a short preview
+and exact source blocks for the selected windows, with byte ranges, lines, owners,
+and the indexed snapshot hash. The preview is separate from that evidence.
+Selected windows from multiple declarations can appear in one file result.
+Documentation has a separate segment of up to five files. Strict links and
+qualified references in those documents can add indexed source results.
+Missing compatible document vectors still permit lexical retrieval; the next
+index run repairs incomplete vectors. Incompatible model or source policies
+require rebuilding. A failed replacement cannot return that file's old source.
 
 The caller prepares the query. Distill the request into a short description of
 the relevant behavior or symptom, preserving supplied identifiers and constraints.
-Mimirs embeds the query directly. Both documents and queries use q8 MiniLM weights
-from `Xenova/all-MiniLM-L6-v2`, file `onnx/model_quantized.onnx`, at revision
-`751bff37182d3f1213fa05d7196b954e230abad9`. Tokenizer files remain pinned to
-`Qdrant/all-MiniLM-L6-v2-onnx` at revision
-`5f1b8cd78bc4fb444dd171e59b18f3a3af89a079`, with a 512-token limit.
-Stored embeddings remain 384-dimensional float32 vectors.
+Long queries split at 256 token IDs with a 32-token overlap, then decode and
+re-encode for inference. This can add special tokens beyond 256, so the inference
+ceiling remains 512. Documents and queries use q8 MiniLM weights and tokenizer
+files from `Xenova/all-MiniLM-L6-v2` at revision
+`751bff37182d3f1213fa05d7196b954e230abad9`, with `onnx/model_quantized.onnx`.
+The pinned ONNX Runtime 1.22 reproduces the TS reference vectors within the
+[recorded tolerance](benchmarks/versions/port/CONTRACT.md). Stored embeddings
+remain 384-dimensional float32 vectors.
 
 ### Measuring indexing time
 
@@ -206,7 +184,9 @@ release-build scenarios and the evidence for the next optimization.
 The q8 default requires re-embedding existing float32 indexes. Run `mimirs index`
 to rebuild them for index version 9. Search rejects old indexes until rebuilt.
 
-Source chunks are the single embedding strategy. Remove the obsolete `retrieval`
+The TS v2 retrieval port is the single supported search policy. Schema 11,
+normalized token inputs, and the pinned inference runtime require a rebuild of
+previous indexes. Run `mimirs index`; existing include/exclude rules remain. Remove the obsolete `retrieval`
 key from `.mimirs/config.toml`, preserving your `include` and `exclude` rules,
 then run `mimirs index`. Recognized older alpha indexes rebuild when opened for
 writing. Search and stored inspection reject them with reindex guidance.

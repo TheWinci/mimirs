@@ -60,7 +60,7 @@ fn source_chunk_preview_preserves_code_without_a_model_or_project() {
     );
     let chunks: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(chunks[0]["text"], source);
-    assert_eq!(chunks[0]["context"], "file.rs");
+    assert_eq!(chunks[0]["context"], "File: file.rs");
     assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1);
     let conflict = Command::new(env!("CARGO_BIN_EXE_mimirs"))
         .args(["inspect", "file.rs", "--source-chunks", "--documents"])
@@ -91,10 +91,10 @@ fn python_and_stubs_preview_decorated_methods_without_project_state() {
             .as_array()
             .unwrap()
             .iter()
-            .find(|chunk| chunk["owner"] == 1)
+            .find(|chunk| chunk["owner"] == 0)
             .unwrap();
-        assert_eq!(method["text"], "@classmethod\n    def make(cls): ...");
-        assert_eq!(method["context"], format!("{path} :: class Café"));
+        assert_eq!(method["text"], source);
+        assert_eq!(method["context"], format!("File: {path}"));
         let report = Command::new(env!("CARGO_BIN_EXE_mimirs"))
             .args(["inspect", path])
             .current_dir(&dir)
@@ -150,9 +150,9 @@ fn go_preview_keeps_receiver_and_docs_without_project_state() {
     let chunks: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(
         chunks[1]["text"],
-        source.strip_prefix("package cache\n").unwrap().trim_end()
+        source.strip_prefix("package cache\n").unwrap()
     );
-    assert_eq!(chunks[1]["context"], "cache.go");
+    assert_eq!(chunks[1]["context"], "File: cache.go");
     assert_eq!(chunks[1]["owner"], 0);
     let report = Command::new(env!("CARGO_BIN_EXE_mimirs"))
         .args(["inspect", "cache.go"])

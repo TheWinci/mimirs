@@ -25,9 +25,9 @@ def write(path, value):
     path.write_text(json.dumps(value, indent=2) + '\n')
 
 
-def command(root, version, project, operation, query=None):
+def command(root, version, project, operation, query=None, rust_limit=100):
     if version == 'rust':
-        return [str(root/'engines/mimirs-rust'), operation] + ([query, '--limit', '100'] if query is not None else [])
+        return [str(root/'engines/mimirs-rust'), operation] + ([query, '--limit', str(rust_limit)] if query is not None else [])
     engine = root/'engines'/version
     if version == 'v1':
         return ['bun', str(engine/'src/main.ts'), operation] + ([query, '--top', '20', '--dir', str(project)] if query is not None else [str(project)])
@@ -165,7 +165,7 @@ def run_pair(args, corpus, version):
                 for i,q in enumerate(queries):
                     if not (version == 'rust' and repeat == 0) and i not in sample: continue
                     prefix = output/'search'/f'{repeat}-{i}'
-                    timing = measure(command(root,version,project,'search',q['query']),project,prefix)
+                    timing = measure(command(root,version,project,'search',q['query'],rust_limit=getattr(args,'rust_limit',100)),project,prefix)
                     if i in sample: cli.append({'repeat':repeat,'index':i,**timing})
                     if version == 'rust' and repeat == 0:
                         hits = mixed.parse(prefix.with_suffix('.stdout').read_text())
@@ -187,6 +187,7 @@ def main():
     parser.add_argument('--corpora',nargs='+',default=['mimirs','excalidraw','django','kubernetes'])
     parser.add_argument('--versions',nargs='+',default=['v1','v2','rust'])
     parser.add_argument('--repeats',type=int,default=3)
+    parser.add_argument('--rust-limit',type=int,default=100,help='Use 20 for the file-level retrieval port; historical owner baseline used 100')
     args = parser.parse_args()
     for corpus in args.corpora:
         for version in args.versions:

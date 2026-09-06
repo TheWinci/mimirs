@@ -1,8 +1,12 @@
-use anyhow::{Context, ensure};
+use anyhow::Context;
+#[cfg(test)]
+use anyhow::ensure;
 use rusqlite::Connection;
 
+#[cfg(test)]
 use crate::embedding;
 
+#[cfg(test)]
 #[derive(Debug)]
 pub struct SearchResult {
     pub path: String,
@@ -14,12 +18,15 @@ pub struct SearchResult {
     pub indexed: IndexedEvidence,
 }
 
+#[cfg(test)]
 #[derive(Debug)]
 pub struct IndexedEvidence {
     pub owner: Option<usize>,
+    #[allow(dead_code)]
     pub snapshot_hash: String,
 }
 
+#[cfg(test)]
 #[derive(Debug)]
 pub struct SearchChunk {
     pub ordinal: usize,
@@ -38,6 +45,7 @@ pub fn has_content(connection: &Connection) -> anyhow::Result<bool> {
         .context("cannot check indexed documents")
 }
 
+#[cfg(test)]
 pub fn nearest(
     connection: &Connection,
     query: &[f32],

@@ -9,7 +9,7 @@ pub fn run(file: &Path, stored: bool, source_chunks: bool) -> anyhow::Result<()>
     let root = std::env::current_dir().context("cannot find current directory")?;
     io::stdout().lock().write_all(
         if source_chunks {
-            serde_json::to_string_pretty(&crate::retrieval::source::chunks(&load_at(
+            serde_json::to_string_pretty(&crate::retrieval::ts_v2::preview(&load_at(
                 &root, file, stored,
             )?)?)?
         } else {

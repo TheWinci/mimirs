@@ -13,7 +13,9 @@ pub struct Document {
 }
 
 pub struct TokenBudget {
+    #[cfg(test)]
     tokenizer: Tokenizer,
+    #[cfg(test)]
     pub limit: usize,
     pub fingerprint: String,
 }
@@ -33,12 +35,15 @@ impl TokenBudget {
         tokenizer.with_padding(None);
         ensure!(limit > 8, "token limit too small for entity context");
         Ok(Self {
+            #[cfg(test)]
             tokenizer,
+            #[cfg(test)]
             limit,
             fingerprint,
         })
     }
 
+    #[cfg(test)]
     pub fn count(&self, text: &str) -> Result<usize> {
         Ok(self
             .tokenizer
@@ -47,6 +52,7 @@ impl TokenBudget {
             .len())
     }
 
+    #[cfg(test)]
     pub(super) fn prefix_end(&self, prefix: &str, text: &str, limit: usize) -> Result<usize> {
         let encoding = self
             .tokenizer

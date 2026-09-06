@@ -50,7 +50,7 @@ fn invalid_inputs_leave_both_new_and_populated_indexes_unchanged() {
         let before = snapshot(&db);
         let analysis = crate::analysis::extract(source("a.rs", "fn new() {}")).unwrap();
         let budget = TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
-        let policy = policy::document_policy(&budget);
+        let policy = policy::legacy_document_policy(&budget);
         let docs = documents(&analysis, &budget).unwrap();
         for change in 0..9 {
             let mut docs = docs.clone();

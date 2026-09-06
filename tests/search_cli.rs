@@ -7,8 +7,8 @@ fn search_errors_use_stderr_and_nonzero_exit() {
     let dir = TempDir::new().unwrap();
     for (query, limit, error) in [
         (" ", "5", "query must not be blank"),
-        ("query", "0", "limit must be between 1 and 4096"),
-        ("query", "4097", "limit must be between 1 and 4096"),
+        ("query", "0", "limit must be between 1 and 100"),
+        ("query", "101", "limit must be between 1 and 100"),
         ("query", "5", "run mimirs init or mimirs index"),
     ] {
         let output = Command::new(env!("CARGO_BIN_EXE_mimirs"))

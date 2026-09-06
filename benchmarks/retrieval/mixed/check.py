@@ -18,6 +18,8 @@ spec.loader.exec_module(audit)
 
 
 def parse(stdout):
+    # Documentation has its own segment and must not count toward source recall.
+    stdout = stdout.split("\ndocumentation: ", 1)[0]
     hits = []
     for block in re.split(r'\nresult: \d+/\d+\n', stdout)[1:]:
         header = block.split('\ntext: ', 1)[0].split('\nchunk: ', 1)[0]

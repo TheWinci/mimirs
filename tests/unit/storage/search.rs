@@ -4,7 +4,7 @@ fn save_vectors(connection: &mut Connection, path: &str, text: &str, vectors: &[
     let analysis = crate::analysis::extract(source(path, text)).unwrap();
     let budget =
         crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
-    let policy = policy::document_policy(&budget);
+    let policy = policy::legacy_document_policy(&budget);
     let docs = crate::retrieval::source::documents(&analysis, &budget).unwrap();
     documents::save(
         connection,

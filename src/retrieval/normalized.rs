@@ -88,6 +88,7 @@ impl Source {
         Ok(byte - before + after)
     }
 
+    #[cfg(test)]
     pub fn byte_offset(&self, units: usize) -> Result<usize> {
         let index = self
             .utf16_changes

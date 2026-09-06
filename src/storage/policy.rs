@@ -10,7 +10,8 @@ fn document_prefix_for(source_policy: &str) -> String {
     )
 }
 
-pub fn document_policy(budget: &crate::retrieval::split::TokenBudget) -> String {
+#[cfg(test)]
+pub fn legacy_document_policy(budget: &crate::retrieval::split::TokenBudget) -> String {
     format!(
         "{}{}|{}",
         document_prefix_for(crate::retrieval::source::POLICY),
@@ -19,10 +20,21 @@ pub fn document_policy(budget: &crate::retrieval::split::TokenBudget) -> String 
     )
 }
 
+pub fn document_policy(budget: &crate::retrieval::split::TokenBudget) -> String {
+    format!(
+        "{}256|{}",
+        document_prefix_for(crate::retrieval::ts_v2::POLICY),
+        budget.fingerprint
+    )
+}
+
 pub(super) fn validate(policy: &str) -> Result<()> {
+    #[cfg(test)]
+    if policy.starts_with(&document_prefix_for(crate::retrieval::source::POLICY)) {
+        return Ok(());
+    }
     ensure!(
-        policy.starts_with(&document_prefix_for(crate::retrieval::source::POLICY))
-            || policy.starts_with(&document_prefix_for(crate::retrieval::ts_v2::POLICY)),
+        policy.starts_with(&document_prefix_for(crate::retrieval::ts_v2::POLICY)),
         "unsupported document policy; run mimirs index"
     );
     Ok(())
@@ -46,8 +58,7 @@ pub fn read(connection: &Connection) -> Result<Option<String>> {
         EXISTS(SELECT 1 FROM files f LEFT JOIN source_snapshots s ON s.file_id=f.id WHERE s.file_id IS NULL)
         OR EXISTS(SELECT 1 FROM source_snapshots s LEFT JOIN retrieval_processing p ON p.file_id=s.file_id WHERE p.file_id IS NULL)
         OR EXISTS(SELECT 1 FROM retrieval_processing p WHERE
-            p.document_count != (SELECT count(*) FROM retrieval_documents d WHERE d.file_id=p.file_id)
-            OR p.document_count != (SELECT count(*) FROM document_embeddings e JOIN retrieval_documents d ON d.id=e.document_id WHERE d.file_id=p.file_id))
+            p.document_count != (SELECT count(*) FROM retrieval_documents d WHERE d.file_id=p.file_id))
         OR EXISTS(SELECT 1 FROM document_embeddings e LEFT JOIN retrieval_documents d ON d.id=e.document_id WHERE d.id IS NULL)
         OR EXISTS(SELECT 1 FROM retrieval_documents d LEFT JOIN document_fts l ON l.rowid=d.id WHERE l.rowid IS NULL)
         OR EXISTS(SELECT 1 FROM document_fts l LEFT JOIN retrieval_documents d ON d.id=l.rowid WHERE d.id IS NULL)", [], |r| r.get(0))?;
@@ -68,13 +79,4 @@ pub fn configure(connection: &mut Connection, policy: &str) -> Result<()> {
     tx.execute("INSERT INTO index_metadata VALUES ('document_policy', ?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value", [policy])?;
     tx.commit()?;
     Ok(())
-}
-
-#[allow(dead_code)]
-pub fn ts_document_policy(budget: &crate::retrieval::split::TokenBudget) -> String {
-    format!(
-        "{}256|{}",
-        document_prefix_for(crate::retrieval::ts_v2::POLICY),
-        budget.fingerprint
-    )
 }

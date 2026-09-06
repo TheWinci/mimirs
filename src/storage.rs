@@ -11,7 +11,9 @@ use crate::embedding::{DIMENSION, MODEL_NAME};
 mod reconcile;
 mod search;
 pub use reconcile::{invalidate, reconcile};
-pub use search::{SearchResult, has_content, nearest};
+pub use search::has_content;
+#[cfg(test)]
+pub use search::nearest;
 
 static VEC_REGISTRATION: OnceLock<Result<(), String>> = OnceLock::new();
 
@@ -256,23 +258,19 @@ pub mod documents;
 
 pub mod policy;
 
+#[cfg(test)]
 mod document_search;
 
-// Candidate retrieval is connected to public search after grouping is ported.
-#[allow(dead_code)]
 pub mod lexical;
 
-#[allow(dead_code)]
 pub mod candidates;
 
 #[cfg(test)]
 #[path = "../benchmarks/versions/port-stage.rs"]
 mod port_stage;
 
-#[allow(dead_code)]
 pub mod ranking;
 
-#[allow(dead_code)]
 pub mod hybrid;
 
 #[cfg(test)]

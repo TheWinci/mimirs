@@ -2,21 +2,33 @@ results: 2
 time: 0.14 seconds
 
 result: 1/2
-similarity: 1.0000
-location: a.rs:1
-source: indexed snapshot 563889f889c1764a18db612dc5e168c06d38d94d521fac2d2e943036ecd3dd81
-owner: file
-evidence: Source bytes 0..10 lines 1..1
-text: a.rs
-same score
+relevance: 0.735561
+location: z.rs:1
+source: indexed snapshot 50e14fcb1c1545e6c1bce03793c6e8dfc1e1d31f38a5e2ae0877b00c1d4b1f01
+owner: e0
+preview: "fn café() {}"
+
+chunk: 1/2 part: 0 document: 0
+chunk_owner: e0
+evidence: Source bytes 0..14 lines 1..1
+text: fn café() {}
+
+
+chunk: 2/2 part: 0 document: 1
+chunk_owner: e1
+evidence: Source bytes 14..27 lines 2..2
+text: fn other() {}
 
 ---
 
 result: 2/2
-similarity: 1.0000
-location: z.rs:1
-source: indexed snapshot 50e14fcb1c1545e6c1bce03793c6e8dfc1e1d31f38a5e2ae0877b00c1d4b1f01
-owner: e0
-evidence: Source bytes 0..13 lines 1..1
-text: z.rs
-fn café() {}
+relevance: 0.600000
+location: a.rs:1
+source: indexed snapshot 563889f889c1764a18db612dc5e168c06d38d94d521fac2d2e943036ecd3dd81
+owner: file
+preview: "same score"
+
+chunk: 1/1 part: 0 document: 0
+chunk_owner: file
+evidence: Source bytes 0..10 lines 1..1
+text: same score

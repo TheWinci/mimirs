@@ -44,12 +44,12 @@ enum Command {
         model_cache: Option<std::path::PathBuf>,
     },
 
-    /// Search query with limit.
+    /// Search indexed source and documentation.
     Search {
         /// Caller-distilled intent, preserving supplied identifiers and constraints.
         query: String,
 
-        /// Number of top results to return.
+        /// Number of source files to return, between 1 and 100.
         #[arg(long, default_value_t = 5)]
         limit: usize,
     },

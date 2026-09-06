@@ -101,3 +101,5 @@ TypeScript engine after these corrections. An initial Excalidraw run used
 edits to large encoded WebAssembly files that v1 skips. Its measurements are
 excluded; the final edit protocol selects the two largest files referenced by
 the fixed query labels. This selects the same pilot edit targets as before.
+
+The Rust retrieval port has a separate [three-corpus adoption report](port/adoption/ADOPTION.md), with exact TS v2 rank comparisons, source/vector parity, and costs. Kubernetes is deferred until the language work is complete.

@@ -216,7 +216,7 @@ fn references_only_resolve_indexed_sources_and_preserve_snapshot_evidence() {
         .connection;
     let budget =
         crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
-    let policy = crate::storage::policy::document_policy(&budget);
+    let policy = crate::storage::policy::legacy_document_policy(&budget);
     for (path, text, weight) in [
         (
             "docs/usage.md",
@@ -317,7 +317,7 @@ fn qualified_modules_and_unresolved_reference_caps_follow_ts_policy() {
         .connection;
     let budget =
         crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
-    let policy = crate::storage::policy::document_policy(&budget);
+    let policy = crate::storage::policy::legacy_document_policy(&budget);
     for (path, text) in [
         ("pkg/worker/index.rs", "fn Worker() {}\nfn other() {}\n"),
         ("guide.md", "# Manual\nUse pkg.worker.Worker.\n"),
@@ -361,7 +361,7 @@ fn file_results_retain_every_selected_window_and_distinct_owner() {
         .connection;
     let budget =
         crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(64)).unwrap();
-    let policy = crate::storage::policy::document_policy(&budget);
+    let policy = crate::storage::policy::legacy_document_policy(&budget);
     let source = format!(
         "fn recoverArchive() {{\n{}}}\nfn confirmArchive() {{ recoverArchive(); }}\n",
         "    manifest();\n".repeat(150)
@@ -419,7 +419,7 @@ fn ts_source_chunks_roundtrip_and_keep_raw_evidence_through_replacement() {
         .connection;
     let budget =
         crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
-    let policy = crate::storage::policy::ts_document_policy(&budget);
+    let policy = crate::storage::policy::document_policy(&budget);
     let text =
         "\u{feff}/// café 🧭\r\nfn recoverArchive() { manifest(); }\r\n\r\nfn other() {}\r\n";
     let analysis = crate::analysis::extract(crate::source::SourceFile {

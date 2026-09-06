@@ -1,7 +1,9 @@
 use anyhow::{Context, Result};
 use tree_sitter::{Node, Parser};
 
-use super::language::{Chunking, DeclarationRules, Language};
+use super::language::Language;
+#[cfg(test)]
+use super::language::{Chunking, DeclarationRules};
 use super::{Analysis, Diagnostic, Entity, Fact, LineIndex, Scope, Span};
 use crate::source::SourceFile;
 
@@ -9,6 +11,8 @@ pub(super) const LANGUAGE: Language = Language {
     identity: "python/default/tree-sitter-0.27.0/python-0.25.0/extractor-1",
     extensions: &["py", "pyi"],
     extract,
+    is_native: true,
+    #[cfg(test)]
     chunking: Chunking::Declarations(DeclarationRules {
         containers: &["class"],
         leading_facts: &["decorator"],

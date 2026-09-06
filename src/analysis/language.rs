@@ -5,6 +5,7 @@ use std::path::Path;
 use super::Analysis;
 use crate::source::SourceFile;
 
+#[cfg(test)]
 #[derive(Clone, Copy)]
 pub struct DeclarationRules {
     pub containers: &'static [&'static str],
@@ -12,6 +13,7 @@ pub struct DeclarationRules {
     pub signature_fact: &'static str,
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy)]
 pub enum Chunking {
     Paragraphs,
@@ -25,6 +27,8 @@ pub struct Language {
     pub identity: &'static str,
     pub extensions: &'static [&'static str],
     pub extract: fn(SourceFile) -> Result<Analysis>,
+    pub is_native: bool,
+    #[cfg(test)]
     pub chunking: Chunking,
 }
 

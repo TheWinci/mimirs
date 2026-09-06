@@ -157,10 +157,7 @@ pub fn report(analysis: &Analysis) -> String {
         "file: {}\nsource: {} bytes\nparse: {}\n",
         analysis.source.path,
         analysis.source.text.len(),
-        if matches!(
-            language::for_path(&analysis.source.path).chunking,
-            language::Chunking::Paragraphs
-        ) {
+        if !language::for_path(&analysis.source.path).is_native {
             "not parsed (text fallback)"
         } else if analysis.diagnostics.is_empty() {
             "complete"

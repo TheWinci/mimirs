@@ -225,7 +225,7 @@ fn index_with_profiled(
             ))?;
         }
         let documents = profile.measure("chunking_token_budget", || {
-            crate::retrieval::source::documents(&analysis, &budget)
+            crate::retrieval::ts_v2::documents(&analysis)
         })?;
         profile.count("documents", documents.len());
         let texts: Vec<_> = profile.measure("document_texts", || {
@@ -235,7 +235,7 @@ fn index_with_profiled(
             progress.indexing(path, (0, texts.len()), (attempt, total), false)?;
         }
         let vectors = embedder
-            .embed_documents(&texts, |completed, count| {
+            .embed_ts_documents(&texts, |completed, count| {
                 if progress.is_terminal() {
                     progress.indexing(path, (completed, count), (attempt, total), false)?;
                 }
