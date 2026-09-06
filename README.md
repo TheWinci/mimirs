@@ -164,9 +164,12 @@ A failed replacement cannot return that file's old source or vectors.
 
 The caller prepares the query. Distill the request into a short description of
 the relevant behavior or symptom, preserving supplied identifiers and constraints.
-Mimirs embeds the query directly. Both documents and queries use MiniLM from
-Qdrant/all-MiniLM-L6-v2-onnx at revision
-`5f1b8cd78bc4fb444dd171e59b18f3a3af89a079`.
+Mimirs embeds the query directly. Both documents and queries use q8 MiniLM weights
+from `Xenova/all-MiniLM-L6-v2`, file `onnx/model_quantized.onnx`, at revision
+`751bff37182d3f1213fa05d7196b954e230abad9`. Tokenizer files remain pinned to
+`Qdrant/all-MiniLM-L6-v2-onnx` at revision
+`5f1b8cd78bc4fb444dd171e59b18f3a3af89a079`, with a 512-token limit.
+Stored embeddings remain 384-dimensional float32 vectors.
 
 ### Measuring indexing time
 
@@ -199,6 +202,9 @@ The [index timing check](benchmarks/index/README.md) describes the controlled
 release-build scenarios and the evidence for the next optimization.
 
 ### Updating an existing alpha index
+
+The q8 default requires re-embedding existing float32 indexes. Run `mimirs index`
+to rebuild them for index version 9. Search rejects old indexes until rebuilt.
 
 Source chunks are the single embedding strategy. Remove the obsolete `retrieval`
 key from `.mimirs/config.toml`, preserving your `include` and `exclude` rules,

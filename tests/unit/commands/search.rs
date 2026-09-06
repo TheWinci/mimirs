@@ -312,12 +312,11 @@ fn real_minilm_search_retrieves_indexed_source() {
         Ok(embedder)
     });
     result.unwrap();
-    // Ordinary comments stay ownerless source chunks; this smoke test verifies
-    // file discovery and saved source, not a guaranteed entity rank.
-    assert!(output.contains("location: src/lib.rs:1-4"), "{output}");
+    // Q8 ranks the implementing function above the detached comment block.
+    assert!(output.contains("location: src/lib.rs:2\n"), "{output}");
     assert!(output.contains("source: indexed snapshot") && output.contains("evidence: Source"));
     assert!(
-        output.contains("// Read the configuration file from disk."),
+        output.contains("fn read_config(path: &str) -> std::io::Result<String> { std::fs::read_to_string(path) }"),
         "{output}"
     );
 }

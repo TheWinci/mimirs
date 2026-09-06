@@ -249,7 +249,7 @@ fn real_minilm_documents_and_queries_reuse_the_cache() {
 
 #[test]
 #[ignore = "loads pinned and previously measured local models; run explicitly"]
-fn pinned_snapshot_preserves_measured_backend_embeddings() {
+fn q8_uses_measured_weights_and_preserves_the_float32_tokenizer() {
     let cache = model_cache_dir().unwrap();
     let mut previous = fastembed::TextEmbedding::try_new(
         fastembed::TextInitOptions::new(fastembed::EmbeddingModel::AllMiniLML6V2)
@@ -262,7 +262,7 @@ fn pinned_snapshot_preserves_measured_backend_embeddings() {
             .unwrap();
     assert_eq!(
         measured_revision.trim(),
-        MODEL_REVISION,
+        TOKENIZER_REVISION,
         "the previous backend no longer uses the measured snapshot"
     );
     let texts = vec![
@@ -270,10 +270,27 @@ fn pinned_snapshot_preserves_measured_backend_embeddings() {
         "Rust function café. Calls written expression helper(value). Target unresolved.".to_owned(),
     ];
     let expected = previous.embed(&texts, None).unwrap();
-    let mut pinned = FastEmbedBackend::new(cache);
+    let mut pinned = FastEmbedBackend::new(cache.clone());
     let actual = pinned.embed(&texts).unwrap();
+    let weights = cache.join(format!(
+        "models--Xenova--all-MiniLM-L6-v2/snapshots/{MODEL_REVISION}/{MODEL_FILE}"
+    ));
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::digest(std::fs::read(weights).unwrap())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    assert_eq!(
+        digest,
+        "afdb6f1a0e45b715d0bb9b11772f032c399babd23bfc31fed1c170afc848bdb1"
+    );
+    assert_ne!(actual, expected);
     for (a, b) in actual.iter().zip(&expected) {
-        assert!(a.iter().zip(b).all(|(x, y)| (x - y).abs() < 1e-6));
+        let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
+        assert!(
+            dot > 0.97,
+            "q8 and float32 normalized vectors diverged: {dot}"
+        );
     }
     assert_eq!(
         pinned.tokenizer().unwrap().to_string(false).unwrap(),

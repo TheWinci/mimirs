@@ -303,6 +303,46 @@ fn only_document_vectors_are_stored() {
 }
 
 #[test]
+fn float32_index_requires_rebuild_and_discards_old_vectors() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("index.db");
+    let mut db = open(&path).unwrap().connection;
+    save_text(&mut db, "old.rs", "fn old() {}\n").unwrap();
+    db.execute(
+        "UPDATE index_metadata SET value = ?1 WHERE key = 'embedding_model'",
+        ["all-MiniLM-L6-v2@5f1b8cd78bc4fb444dd171e59b18f3a3af89a079"],
+    )
+    .unwrap();
+    // Matching dimensions alone cannot make float32 and q8 indexes compatible.
+    assert!(validate_model(&db).is_err());
+    db.pragma_update(None, "user_version", 8).unwrap();
+    drop(db);
+    let before = fs::read(&path).unwrap();
+    let error = open_read_only(&path).unwrap_err();
+    assert!(format!("{error:#}").contains("run mimirs init or mimirs index"));
+    assert_eq!(fs::read(&path).unwrap(), before);
+
+    let mut rebuilt = open(&path).unwrap();
+    assert_eq!(rebuilt.outcome, OpenOutcome::Rebuilt);
+    for table in [
+        "files",
+        "retrieval_documents",
+        "document_embeddings",
+        "index_metadata",
+    ] {
+        assert_eq!(count(&rebuilt.connection, table), 0, "{table}");
+    }
+    save_text(&mut rebuilt.connection, "new.rs", "fn new() {}\n").unwrap();
+    assert!(validate_model(&rebuilt.connection).unwrap());
+    assert_eq!(
+        metadata(&rebuilt.connection, "embedding_model")
+            .unwrap()
+            .unwrap(),
+        crate::embedding::model_identity()
+    );
+}
+
+#[test]
 fn pre_revision_schemas_rebuild_only_on_writable_open() {
     for (schema, version) in [
         (SCHEMA_V1, 1),
@@ -312,6 +352,7 @@ fn pre_revision_schemas_rebuild_only_on_writable_open() {
         (SCHEMA_V5, 5),
         (SCHEMA_V6, 6),
         (SCHEMA_V7, 7),
+        (SCHEMA, 8),
     ] {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("index.db");

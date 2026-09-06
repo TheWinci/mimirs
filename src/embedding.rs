@@ -4,14 +4,19 @@ use std::path::PathBuf;
 use anyhow::{Context, ensure};
 use directories::BaseDirs;
 use fastembed::{
-    InitOptionsUserDefined, Pooling, TextEmbedding, TokenizerFiles, UserDefinedEmbeddingModel,
+    InitOptionsUserDefined, Pooling, QuantizationMode, TextEmbedding, TokenizerFiles,
+    UserDefinedEmbeddingModel,
 };
 
-pub const MODEL_NAME: &str = "all-MiniLM-L6-v2";
-pub const MODEL_REVISION: &str = "5f1b8cd78bc4fb444dd171e59b18f3a3af89a079";
-pub const MODEL_REPOSITORY: &str = "Qdrant/all-MiniLM-L6-v2-onnx";
+pub const MODEL_NAME: &str = "all-MiniLM-L6-v2-q8";
+pub const MODEL_REVISION: &str = "751bff37182d3f1213fa05d7196b954e230abad9";
+pub const MODEL_REPOSITORY: &str = "Xenova/all-MiniLM-L6-v2";
+const MODEL_FILE: &str = "onnx/model_quantized.onnx";
+// Keep the tokenizer used in the benchmark, including its 512-token limit.
+const TOKENIZER_REPOSITORY: &str = "Qdrant/all-MiniLM-L6-v2-onnx";
+const TOKENIZER_REVISION: &str = "5f1b8cd78bc4fb444dd171e59b18f3a3af89a079";
 pub fn model_identity() -> String {
-    format!("{MODEL_NAME}@{MODEL_REVISION}")
+    format!("{MODEL_NAME}@{MODEL_REVISION}/tokenizer@{TOKENIZER_REVISION}")
 }
 
 pub const DIMENSION: usize = 384;
@@ -163,14 +168,14 @@ impl FastEmbedBackend {
                 .with_cache_dir(self.cache_dir.clone())
                 .with_progress(false)
                 .build()?;
-            let repository = hf_hub::Repo::with_revision(
-                MODEL_REPOSITORY.into(),
-                hf_hub::RepoType::Model,
-                MODEL_REVISION.into(),
-            );
-            let cached = hf_hub::Cache::new(self.cache_dir.clone()).repo(repository.clone());
-            let repo = api.repo(repository);
-            let read = |name: &str| -> anyhow::Result<Vec<u8>> {
+            let read = |repository: &str, revision: &str, name: &str| -> anyhow::Result<Vec<u8>> {
+                let repository = hf_hub::Repo::with_revision(
+                    repository.into(),
+                    hf_hub::RepoType::Model,
+                    revision.into(),
+                );
+                let cached = hf_hub::Cache::new(self.cache_dir.clone()).repo(repository.clone());
+                let repo = api.repo(repository);
                 self.profile.measure("model_assets", || {
                     let present = cached.get(name).is_some();
                     let path = repo.get(name)?;
@@ -190,14 +195,19 @@ impl FastEmbedBackend {
                     Ok(bytes)
                 })
             };
+            let read_tokenizer = |name| read(TOKENIZER_REPOSITORY, TOKENIZER_REVISION, name);
             let files = TokenizerFiles {
-                tokenizer_file: read("tokenizer.json")?,
-                config_file: read("config.json")?,
-                special_tokens_map_file: read("special_tokens_map.json")?,
-                tokenizer_config_file: read("tokenizer_config.json")?,
+                tokenizer_file: read_tokenizer("tokenizer.json")?,
+                config_file: read_tokenizer("config.json")?,
+                special_tokens_map_file: read_tokenizer("special_tokens_map.json")?,
+                tokenizer_config_file: read_tokenizer("tokenizer_config.json")?,
             };
-            let model = UserDefinedEmbeddingModel::new(read("model.onnx")?, files)
-                .with_pooling(Pooling::Mean);
+            let model = UserDefinedEmbeddingModel::new(
+                read(MODEL_REPOSITORY, MODEL_REVISION, MODEL_FILE)?,
+                files,
+            )
+            .with_pooling(Pooling::Mean)
+            .with_quantization(QuantizationMode::Dynamic);
             self.models.push(
                 self.profile
                     .measure("model_startup", || {
