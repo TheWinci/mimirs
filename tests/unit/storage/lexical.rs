@@ -37,7 +37,7 @@ fn native_bm25_matches_ts_scores_membership_and_ties() {
         .unwrap();
         db.execute("INSERT INTO retrieval_documents(id, file_id, ordinal, owner, kind, part, policy, text, content_hash, evidence)
             VALUES (?1, (SELECT id FROM files WHERE path=?2), ?1, NULL, 'file', 0, 'fixture', ?3, '', ?4)",
-            params![id, path, window["text"].as_str().unwrap(), serde_json::json!([{"span":{"start":window["startOffset"]}}]).to_string()]).unwrap();
+            params![id, path, window["text"].as_str().unwrap(), serde_json::json!([{"span":{"start":window["startOffset"],"end":window["endOffset"]}}]).to_string()]).unwrap();
         insert(
             &db,
             id,

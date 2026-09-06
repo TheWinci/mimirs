@@ -140,6 +140,23 @@ pub(super) fn write(
 }
 
 pub fn load(connection: &Connection, path: &str, policy: &str) -> Result<Vec<Document>> {
+    load_inner(connection, path, policy, true)
+}
+
+pub(super) fn load_for_search(
+    connection: &Connection,
+    path: &str,
+    policy: &str,
+) -> Result<Vec<Document>> {
+    load_inner(connection, path, policy, false)
+}
+
+fn load_inner(
+    connection: &Connection,
+    path: &str,
+    policy: &str,
+    require_vectors: bool,
+) -> Result<Vec<Document>> {
     let analysis = super::analysis::load(connection, path)?.context("missing document snapshot")?;
     let (count, stored): (i64, String) = connection.query_row("SELECT p.document_count, p.policy FROM retrieval_processing p JOIN files f ON f.id=p.file_id WHERE f.path=?1", [path], |r| Ok((r.get(0)?, r.get(1)?)))?;
     ensure!(stored == policy, "unsupported document policy");
@@ -177,7 +194,10 @@ pub fn load(connection: &Connection, path: &str, policy: &str) -> Result<Vec<Doc
                 },
             "invalid document kind"
         );
-        ensure!(row.get::<_, bool>(8)?, "missing document vector");
+        ensure!(
+            !require_vectors || row.get::<_, bool>(8)?,
+            "missing document vector"
+        );
         documents.push(document);
     }
     ensure!(

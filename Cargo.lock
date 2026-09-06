@@ -1226,6 +1226,7 @@ dependencies = [
  "clap",
  "directories",
  "fastembed",
+ "globset",
  "hf-hub",
  "icu_collator",
  "ignore",

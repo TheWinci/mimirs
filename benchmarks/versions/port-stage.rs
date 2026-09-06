@@ -44,9 +44,30 @@ fn candidate_stage_report() -> anyhow::Result<()> {
     tx.commit()?;
     let queries: Vec<Value> = serde_json::from_str(&std::fs::read_to_string(&queries_path)?)?;
     let mut embedder = crate::embedding::production()?;
+    let cached: Option<Value> = std::env::var("MIMIRS_PORT_CACHED_QUERIES")
+        .ok()
+        .map(|p| std::fs::read_to_string(p).map(|text| serde_json::from_str(&text).unwrap()))
+        .transpose()?;
+    let policy = storage::metadata(&db, "document_policy")?.unwrap();
     let mut cases = Vec::new();
     for (index, query) in queries.iter().enumerate() {
-        let vector = embedder.embed_query(query["query"].as_str().unwrap())?;
+        let vector = if let Some(cached) = &cached {
+            anyhow::ensure!(
+                cached["cases"][index]["query"] == query["query"],
+                "cached query mismatch"
+            );
+            serde_json::from_value(cached["cases"][index]["query_vector"].clone())?
+        } else {
+            embedder.embed_query(query["query"].as_str().unwrap())?
+        };
+        let response = storage::hybrid::search(
+            &db,
+            query["query"].as_str().unwrap(),
+            Some(&vector),
+            20,
+            &[],
+            &policy,
+        )?;
         let mut result =
             storage::candidates::read(&db, query["query"].as_str().unwrap(), Some(&vector))?;
         result.candidates.sort_by(|a, b| {
@@ -68,13 +89,15 @@ fn candidate_stage_report() -> anyhow::Result<()> {
             .take(20)
             .collect();
         cases.push(json!({"index":index, "query":query["query"], "expected":query["expected"], "paths":paths,
+            "grouped_paths":response.source.iter().map(|r|&r.hit.representative.path).collect::<Vec<_>>(),
+            "displayed_source_blocks":response.source.iter().map(|r|r.blocks.len()).sum::<usize>(),
             "query_vector":vector, "initial_semantic":result.baseline_semantic, "initial_lexical":result.baseline_lexical,
             "candidates":result.candidates.iter().map(|c| json!({"id":c.id,"path":c.path,"ordinal":c.ordinal,
                 "semantic_score":c.semantic_score,"lexical_score":c.lexical_score,"semantic_rank":c.semantic_rank,"lexical_rank":c.lexical_rank,"score":c.score()})).collect::<Vec<_>>() }));
     }
     let report = json!({"baseline_db":baseline,"queries_sha256":storage::processing::source_hash(&std::fs::read_to_string(&queries_path)?),
         "queries":queries_path,"model":crate::embedding::model_identity(),
-        "stage":"completed window fusion with first occurrence per file; no grouping/signals or new semantic inputs",
+        "stage":"window fusion and grouped source results on unchanged baseline semantic inputs",
         "cases":cases});
     let file = std::fs::OpenOptions::new()
         .write(true)

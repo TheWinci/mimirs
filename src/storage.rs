@@ -266,3 +266,9 @@ pub mod candidates;
 #[cfg(test)]
 #[path = "../benchmarks/versions/port-stage.rs"]
 mod port_stage;
+
+#[allow(dead_code)]
+pub mod ranking;
+
+#[allow(dead_code)]
+pub mod hybrid;

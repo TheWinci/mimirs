@@ -7,6 +7,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
+    /// Generated-source globs receive TS v2's 0.75 ranking multiplier.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub generated: Vec<String>,
     /// Maximum concurrent single-threaded embedding workers. None selects one-third of CPUs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub embedding_workers: Option<std::num::NonZeroUsize>,
@@ -21,6 +24,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             embedding_workers: None,
+            generated: Vec::new(),
             include: [
                 "**/*.rs", "**/*.py", "**/*.pyi", "**/*.ts", "**/*.mts", "**/*.cts", "**/*.tsx",
                 "**/*.js", "**/*.mjs", "**/*.cjs", "**/*.jsx", "**/*.go",

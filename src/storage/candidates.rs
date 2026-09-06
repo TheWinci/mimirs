@@ -33,6 +33,7 @@ pub struct Candidate {
     pub owner: Option<usize>,
     pub path: String,
     pub start: usize,
+    pub end: usize,
     pub semantic_score: Option<f64>,
     pub lexical_score: Option<f64>,
     pub semantic_rank: Option<usize>,
@@ -110,7 +111,7 @@ fn read_with_limits(
     let mut candidates = Vec::new();
     let mut stmt = db.prepare(
         "SELECT d.file_id, d.ordinal, d.owner, f.path,
-        json_extract(d.evidence, '$[0].span.start') FROM retrieval_documents d
+        json_extract(d.evidence, '$[0].span.start'), json_extract(d.evidence, '$[#-1].span.end') FROM retrieval_documents d
         JOIN files f ON f.id=d.file_id WHERE d.id=?1",
     )?;
     for id in ids {
@@ -129,6 +130,7 @@ fn read_with_limits(
                         .transpose()?,
                     path: r.get(3)?,
                     start: position(r, 4)?,
+                    end: position(r, 5)?,
                     semantic_score: semantic.get(&id).copied(),
                     lexical_score: lexical.get(&id).copied(),
                     semantic_rank: None,
@@ -245,7 +247,7 @@ fn cosine(left: &[f32], right: &[f32]) -> Option<f64> {
 
 #[cfg(test)]
 #[path = "../../tests/unit/storage/candidates.rs"]
-mod tests;
+pub(crate) mod tests;
 
 fn position(row: &rusqlite::Row<'_>, index: usize) -> rusqlite::Result<usize> {
     let value: i64 = row.get(index)?;
