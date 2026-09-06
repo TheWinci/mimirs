@@ -223,6 +223,7 @@ pub fn documents(analysis: &Analysis, budget: &TokenBudget) -> Result<Vec<Docume
             }];
             evidence.extend(signature_evidence.clone());
             output.push(Document {
+                source_chunk: None,
                 owner: chunk.owner,
                 part: *part,
                 text,

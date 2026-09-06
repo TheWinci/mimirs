@@ -1,0 +1,685 @@
+//! The active TS v2 source tree, before the 4,000 UTF-16-unit window projection.
+//! It shares the language parser with analysis; facts and raw source owners stay
+//! independent of retrieval's adjusted spans and collapsed import/overload groups.
+use crate::analysis::{Entity as Owner, LineIndex, Span};
+use anyhow::Result;
+use std::{
+    collections::{BTreeMap, HashSet},
+    sync::OnceLock,
+};
+use tree_sitter::{Node, Query, QueryCursor, StreamingIterator};
+
+mod markdown;
+mod windows;
+pub use windows::project;
+
+pub const POLICY: &str = "ts-v2-source-windows-4000-path-average-256-32-1";
+
+pub fn documents(analysis: &crate::analysis::Analysis) -> Result<Vec<super::split::Document>> {
+    crate::storage::analysis::validate(analysis)?;
+    let normalized = super::normalized::Source::new(&analysis.source.text);
+    let lines = LineIndex::new(&analysis.source.text);
+    let mut parts = std::collections::HashMap::new();
+    project(&analysis.source.text, &analysis.source_chunks, 4000)?
+        .into_iter()
+        .map(|window| {
+            let part = parts.entry(window.chunk).or_insert(0);
+            let document = super::split::Document {
+                source_chunk: Some(window.chunk),
+                owner: analysis.source_chunks[window.chunk].owner,
+                part: *part,
+                text: format!(
+                    "File: {}\n{}",
+                    analysis.source.path,
+                    &normalized.text[normalized.normalized_offset(window.start)?
+                        ..normalized.normalized_offset(window.end)?]
+                ),
+                evidence: vec![super::Evidence {
+                    record: super::Record::Source,
+                    span: lines.span(window.start, window.end),
+                }],
+            };
+            *part += 1;
+            Ok(document)
+        })
+        .collect()
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Chunk {
+    pub kind: String,
+    pub name: Option<String>,
+    pub span: Span,
+    pub parent: Option<usize>,
+    pub owner: Option<usize>,
+}
+
+struct Entity {
+    kind: String,
+    name: Option<String>,
+    node_start: usize,
+    node_end: usize,
+    start_row: usize,
+    start: usize,
+    end: usize,
+    overload: bool,
+    children: Vec<Entity>,
+}
+
+#[derive(Clone)]
+struct TreeChunk {
+    kind: String,
+    name: Option<String>,
+    start: usize,
+    end: usize,
+    children: Vec<TreeChunk>,
+}
+
+impl TreeChunk {
+    fn new(kind: &str, name: Option<String>, start: usize, end: usize) -> Self {
+        Self {
+            kind: kind.into(),
+            name,
+            start,
+            end,
+            children: Vec::new(),
+        }
+    }
+}
+
+struct Comments {
+    spans: Vec<(usize, usize)>,
+    lines: BTreeMap<usize, (usize, usize)>,
+}
+
+fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Query> {
+    static RUST: OnceLock<Result<Query, String>> = OnceLock::new();
+    static PYTHON: OnceLock<Result<Query, String>> = OnceLock::new();
+    static JS: OnceLock<Result<Query, String>> = OnceLock::new();
+    static TS: OnceLock<Result<Query, String>> = OnceLock::new();
+    static TSX: OnceLock<Result<Query, String>> = OnceLock::new();
+    static GO: OnceLock<Result<Query, String>> = OnceLock::new();
+    let (slot, text) = match language {
+        "rust" => (&RUST, include_str!("ts_v2/queries/rust.scm")),
+        "python" => (&PYTHON, include_str!("ts_v2/queries/python.scm")),
+        "javascript" => (&JS, include_str!("ts_v2/queries/javascript.scm")),
+        "typescript" => (&TS, include_str!("ts_v2/queries/typescript.scm")),
+        "tsx" => (&TSX, include_str!("ts_v2/queries/typescript.scm")),
+        "go" => (&GO, include_str!("ts_v2/queries/go.scm")),
+        _ => anyhow::bail!("unsupported retrieval grammar {language}"),
+    };
+    slot.get_or_init(|| Query::new(grammar, text).map_err(|e| e.to_string()))
+        .as_ref()
+        .map_err(|e| anyhow::anyhow!("cannot compile {language} retrieval query: {e}"))
+}
+
+pub fn from_tree(
+    source: &str,
+    root: Node<'_>,
+    grammar: &tree_sitter::Language,
+    language: &str,
+    owners: &[Owner],
+) -> Result<Vec<Chunk>> {
+    let query = query(language, grammar)?;
+    let mut cursor = QueryCursor::new();
+    let mut matches = cursor.matches(query, root, source.as_bytes());
+    let names = query.capture_names();
+    let mut flat = Vec::new();
+    let mut seen = HashSet::new();
+    while let Some(m) = matches.next() {
+        let Some(item) = m
+            .captures()
+            .iter()
+            .find(|c| names[c.index as usize] == "item")
+        else {
+            continue;
+        };
+        let node = item.node;
+        if !seen.insert(node.start_byte()) {
+            continue;
+        }
+        let captured = m
+            .captures()
+            .iter()
+            .find(|c| names[c.index as usize] == "name")
+            .map(|c| text(c.node, source).to_owned());
+        let special = |name: &str| m.captures().iter().any(|c| names[c.index as usize] == name);
+        let mut kind = node_kind(node.kind()).to_owned();
+        if special("docstring") {
+            kind = "comment".into();
+        }
+        if node.kind() == "variable_declarator"
+            && node
+                .child_by_field_name("value")
+                .is_some_and(|n| matches!(n.kind(), "arrow_function" | "function_expression"))
+        {
+            kind = "function".into();
+        }
+        if (language == "go"
+            && ((node.kind() == "short_var_declaration"
+                && contains(node.child_by_field_name("right"), "func_literal"))
+                || (node.kind() == "var_spec"
+                    && contains(node.child_by_field_name("value"), "func_literal"))))
+            || (language == "rust"
+                && node.kind() == "let_declaration"
+                && contains(node.child_by_field_name("value"), "closure_expression"))
+        {
+            kind = "function".into();
+        }
+        if language == "go" && node.kind() == "type_spec" {
+            kind = match node.child_by_field_name("type").map(|n| n.kind()) {
+                Some("struct_type") => "struct",
+                Some("interface_type") => "interface",
+                _ => "type",
+            }
+            .into();
+        }
+        let name = declared_name(node, source, language)
+            .or(captured)
+            .or_else(|| special("default_export").then(|| "default".into()));
+        flat.push(Entity {
+            kind,
+            name,
+            node_start: node.start_byte(),
+            node_end: node.end_byte(),
+            start_row: node.start_position().row,
+            start: node.start_byte(),
+            end: node.end_byte(),
+            overload: special("overload"),
+            children: Vec::new(),
+        });
+    }
+    flat.sort_by_key(|e| (e.node_start, std::cmp::Reverse(e.node_end)));
+    let mut entities = nest(flat);
+    let comments = comments(root, source, language);
+    let starts = line_starts(source);
+    adjust(
+        &mut entities,
+        source,
+        &starts,
+        language,
+        &comments.lines,
+        Parent {
+            floor: None,
+            end: source.len(),
+            kind: None,
+        },
+    );
+    entities = collapse(entities, source);
+    let tree = emit_level(source, &starts, &comments.spans, &entities, 0, source.len());
+    Ok(flatten(tree, source, owners))
+}
+
+fn text<'a>(node: Node<'_>, source: &'a str) -> &'a str {
+    &source[node.start_byte()..node.end_byte()]
+}
+fn contains(node: Option<Node<'_>>, kind: &str) -> bool {
+    let Some(node) = node else { return false };
+    let mut stack = vec![node];
+    while let Some(node) = stack.pop() {
+        if node.kind() == kind {
+            return true;
+        }
+        stack.extend(node.named_children(&mut node.walk()));
+    }
+    false
+}
+
+fn declared_name(node: Node<'_>, source: &str, language: &str) -> Option<String> {
+    if language == "rust" && node.kind() == "impl_item" {
+        let ty = text(node.child_by_field_name("type")?, source);
+        return Some(node.child_by_field_name("trait").map_or_else(
+            || ty.to_owned(),
+            |tr| format!("{} for {ty}", text(tr, source)),
+        ));
+    }
+    if language != "go" {
+        return None;
+    }
+    let mut names = Vec::new();
+    match node.kind() {
+        "field_declaration" => {
+            for child in node.named_children(&mut node.walk()) {
+                if child.kind() == "field_identifier" {
+                    names.push(text(child, source));
+                }
+            }
+            if names.is_empty() {
+                return node
+                    .child_by_field_name("type")
+                    .map(|n| text(n, source).to_owned());
+            }
+        }
+        "const_spec" | "var_spec" => {
+            let boundary = node
+                .child_by_field_name("type")
+                .map_or(node.end_byte(), |n| n.start_byte())
+                .min(
+                    node.child_by_field_name("value")
+                        .map_or(node.end_byte(), |n| n.start_byte()),
+                );
+            for child in node.named_children(&mut node.walk()) {
+                if child.kind() == "identifier" && child.end_byte() <= boundary {
+                    names.push(text(child, source));
+                }
+            }
+        }
+        "short_var_declaration" => {
+            let left = node.child_by_field_name("left")?;
+            for child in left.named_children(&mut left.walk()) {
+                if child.kind() == "identifier" {
+                    names.push(text(child, source));
+                }
+            }
+        }
+        _ => return None,
+    }
+    (!names.is_empty()).then(|| names.join(", "))
+}
+
+fn node_kind(kind: &str) -> &str {
+    match kind {
+        "function_declaration"
+        | "function_signature"
+        | "function_expression"
+        | "generator_function_declaration"
+        | "arrow_function"
+        | "function_definition"
+        | "decorated_definition"
+        | "function_item" => "function",
+        "class_declaration" | "abstract_class_declaration" | "class_definition" | "class" => {
+            "class"
+        }
+        "method_definition"
+        | "method_signature"
+        | "abstract_method_signature"
+        | "function_signature_item"
+        | "method_declaration"
+        | "method_elem" => "method",
+        "interface_declaration" => "interface",
+        "type_alias_declaration" | "type_item" | "type_declaration" | "type_spec" => "type",
+        "enum_declaration" | "enum_item" => "enum",
+        "import_statement"
+        | "import_from_statement"
+        | "use_declaration"
+        | "extern_crate_declaration"
+        | "import_declaration" => "import",
+        "export_statement" => "export",
+        "internal_module" | "mod_item" => "module",
+        "variable_declarator"
+        | "lexical_declaration"
+        | "expression_statement"
+        | "static_item"
+        | "let_declaration"
+        | "var_declaration"
+        | "var_spec"
+        | "short_var_declaration" => "variable",
+        "field_definition" | "public_field_definition" | "field_declaration" => "field",
+        "property_signature" => "property",
+        "struct_item" | "union_item" => "struct",
+        "trait_item" => "trait",
+        "impl_item" => "impl",
+        "const_item" | "enum_variant" | "const_declaration" | "const_spec" => "constant",
+        "macro_definition" => "macro",
+        "package_clause" => "package",
+        _ => "block",
+    }
+}
+
+fn nest(flat: Vec<Entity>) -> Vec<Entity> {
+    fn insert(level: &mut Vec<Entity>, entity: Entity) {
+        if let Some(parent) = level.last_mut()
+            && parent.node_end > entity.node_start
+        {
+            if entity.node_end > parent.node_end
+                || (entity.node_start == parent.node_start && entity.node_end == parent.node_end)
+            {
+                return;
+            }
+            insert(&mut parent.children, entity);
+        } else {
+            level.push(entity);
+        }
+    }
+    let mut roots = Vec::new();
+    for entity in flat {
+        insert(&mut roots, entity);
+    }
+    roots
+}
+
+fn line_starts(source: &str) -> Vec<usize> {
+    std::iter::once(0)
+        .chain(source.match_indices('\n').map(|(i, _)| i + 1))
+        .collect()
+}
+fn row(starts: &[usize], byte: usize) -> usize {
+    starts.partition_point(|&i| i <= byte) - 1
+}
+
+fn comments(root: Node<'_>, source: &str, language: &str) -> Comments {
+    let starts = line_starts(source);
+    let mut result = Comments {
+        spans: Vec::new(),
+        lines: BTreeMap::new(),
+    };
+    let mut stack = vec![root];
+    while let Some(node) = stack.pop() {
+        let (sr, er) = (node.start_position().row, node.end_position().row);
+        if language == "python" && node.kind() == "decorator" {
+            for i in sr..=er {
+                result.lines.insert(i, (sr, er));
+            }
+        }
+        if node.kind().contains("comment") {
+            result.spans.push((node.start_byte(), node.end_byte()));
+            let pure_start = source[starts[sr]..node.start_byte()].trim().is_empty();
+            let pure_end = source
+                [node.end_byte()..starts.get(er + 1).copied().unwrap_or(source.len())]
+                .trim()
+                .is_empty();
+            for i in sr..=er {
+                if (i != sr || pure_start) && (i != er || pure_end) {
+                    result.lines.insert(i, (sr, er));
+                }
+            }
+        } else {
+            stack.extend(node.children(&mut node.walk()));
+        }
+    }
+    result.spans.sort_unstable();
+    result
+}
+
+fn decorator(line: &str, language: &str) -> bool {
+    let line = line.trim();
+    match language {
+        "python" => line.starts_with('@'),
+        "typescript" | "tsx" | "javascript" => {
+            line.starts_with('@') && !line.starts_with("@interface")
+        }
+        "rust" => line.starts_with("#[") || line.starts_with("#!["),
+        _ => false,
+    }
+}
+
+struct Parent<'a> {
+    floor: Option<usize>,
+    end: usize,
+    kind: Option<&'a str>,
+}
+
+fn adjust(
+    entities: &mut [Entity],
+    source: &str,
+    starts: &[usize],
+    language: &str,
+    comments: &BTreeMap<usize, (usize, usize)>,
+    parent: Parent<'_>,
+) {
+    let mut previous = parent.floor;
+    for i in 0..entities.len() {
+        let next_row = entities.get(i + 1).map(|e| e.start_row);
+        let entity = &mut entities[i];
+        if (language == "python" && parent.kind == Some("class"))
+            || (language == "rust" && matches!(parent.kind, Some("impl" | "trait")))
+        {
+            if entity.kind == "function" {
+                entity.kind = "method".into();
+            }
+            if language == "python" && entity.kind == "variable" {
+                entity.kind = "field".into();
+            }
+        }
+        let mut attached = entity.start_row;
+        let mut cursor = entity.start_row;
+        while cursor > 0 && previous.is_none_or(|p| cursor - 1 > p) {
+            let i = cursor - 1;
+            let line = &source[starts[i]..starts.get(i + 1).copied().unwrap_or(source.len())];
+            if line.trim().is_empty() {
+                break;
+            }
+            if let Some(&(start, _)) = comments.get(&i)
+                && comments.contains_key(&start)
+            {
+                attached = start.max(previous.map_or(0, |p| p + 1));
+                cursor = attached;
+            } else if decorator(line, language) {
+                attached = i;
+                cursor = i;
+            } else {
+                break;
+            }
+        }
+        if attached < entity.start_row {
+            entity.start = starts[attached];
+        } else if previous.is_none_or(|p| p < entity.start_row) {
+            entity.start = starts[entity.start_row];
+        }
+        let end_row = row(starts, entity.start.max(entity.node_end.saturating_sub(1)));
+        let end = if next_row.is_none_or(|next| next > end_row) {
+            starts.get(end_row + 1).copied().unwrap_or(source.len())
+        } else {
+            entity.node_end
+        };
+        entity.end = end.max(entity.node_end).min(parent.end);
+        adjust(
+            &mut entity.children,
+            source,
+            starts,
+            language,
+            comments,
+            Parent {
+                floor: Some(entity.start_row),
+                end: entity.end,
+                kind: Some(&entity.kind),
+            },
+        );
+        previous = Some(row(starts, entity.start.max(entity.end.saturating_sub(1))));
+    }
+}
+
+fn blank_line(text: &str) -> bool {
+    text.split_once('\n').is_some_and(|(_, rest)| {
+        rest.split('\n')
+            .next()
+            .is_some_and(|line| line.bytes().all(|b| b == b' ' || b == b'\t'))
+            && rest.contains('\n')
+    })
+}
+
+fn collapse(entities: Vec<Entity>, source: &str) -> Vec<Entity> {
+    let mut imports: Vec<Entity> = Vec::new();
+    for entity in entities {
+        if let Some(previous) = imports.last_mut()
+            && previous.kind == "import"
+            && entity.kind == "import"
+            && previous.children.is_empty()
+            && entity.children.is_empty()
+        {
+            let between = &source[previous.end..entity.start];
+            if between.trim().is_empty() && !blank_line(between) {
+                previous.end = entity.end;
+                previous.node_end = entity.node_end;
+                previous.name = None;
+                continue;
+            }
+        }
+        imports.push(entity);
+    }
+    let mut result: Vec<Entity> = Vec::new();
+    for mut entity in imports {
+        if let Some(previous) = result.last_mut()
+            && previous.overload
+            && matches!(previous.kind.as_str(), "function" | "method")
+            && entity.kind == previous.kind
+            && entity.name == previous.name
+            && source[previous.end..entity.start].trim().is_empty()
+        {
+            previous.node_end = entity.node_end;
+            previous.end = entity.end;
+            previous.overload = entity.overload;
+            previous.children.append(&mut entity.children);
+            continue;
+        }
+        result.push(entity);
+    }
+    for entity in &mut result {
+        entity.children = collapse(std::mem::take(&mut entity.children), source);
+    }
+    result
+}
+
+fn filler(
+    source: &str,
+    starts: &[usize],
+    comments: &[(usize, usize)],
+    start: usize,
+    end: usize,
+    output: &mut Vec<TreeChunk>,
+) {
+    if start >= end {
+        return;
+    }
+    let mut blocks: Vec<(usize, usize)> = Vec::new();
+    for &(cs, ce) in comments
+        .iter()
+        .filter(|&&(cs, ce)| cs >= start && ce <= end)
+    {
+        if let Some(previous) = blocks.last_mut() {
+            let between = &source[previous.1..cs];
+            if between.trim().is_empty() && !blank_line(between) {
+                previous.1 = ce;
+                continue;
+            }
+        }
+        blocks.push((cs, ce));
+    }
+    let mut cursor = start;
+    let remainder = |s, e, output: &mut Vec<TreeChunk>| {
+        if s < e {
+            output.push(TreeChunk::new(
+                if source[s..e].trim().is_empty() {
+                    "gap"
+                } else {
+                    "block"
+                },
+                None,
+                s,
+                e,
+            ));
+        }
+    };
+    for (mut bs, mut be) in blocks {
+        let mut scan = be;
+        while scan < end && matches!(source.as_bytes()[scan], b' ' | b'\t') {
+            scan += 1;
+        }
+        if scan < end && source.as_bytes()[scan] == b'\n' {
+            be = scan + 1;
+        }
+        let line = starts[row(starts, bs)];
+        if line >= cursor && source[line..bs].trim().is_empty() {
+            bs = line;
+        }
+        remainder(cursor, bs, output);
+        output.push(TreeChunk::new("comment", None, bs, be));
+        cursor = be;
+    }
+    remainder(cursor, end, output);
+}
+
+fn emit_level(
+    source: &str,
+    starts: &[usize],
+    comments: &[(usize, usize)],
+    entities: &[Entity],
+    start: usize,
+    end: usize,
+) -> Vec<TreeChunk> {
+    let mut output = Vec::new();
+    let mut cursor = start;
+    for entity in entities {
+        let es = entity.start.max(cursor);
+        let ee = entity.end.max(es).min(end);
+        if ee <= es {
+            continue;
+        }
+        filler(source, starts, comments, cursor, es, &mut output);
+        let mut chunk = TreeChunk::new(&entity.kind, entity.name.clone(), es, ee);
+        if !entity.children.is_empty() || comments.iter().any(|&(cs, ce)| cs >= es && ce <= ee) {
+            chunk.children = emit_level(source, starts, comments, &entity.children, es, ee);
+        }
+        output.push(chunk);
+        cursor = ee;
+    }
+    filler(source, starts, comments, cursor, end, &mut output);
+    output
+}
+
+fn flatten(tree: Vec<TreeChunk>, source: &str, owners: &[Owner]) -> Vec<Chunk> {
+    fn visit(
+        tree: Vec<TreeChunk>,
+        parent: Option<usize>,
+        lines: &LineIndex,
+        owners: &[Owner],
+        output: &mut Vec<Chunk>,
+    ) {
+        for chunk in tree {
+            let id = output.len();
+            let owner = chunk.name.as_ref().and_then(|name| {
+                owners.iter().position(|owner| {
+                    owner.name.as_ref() == Some(name)
+                        && owner.span.start >= chunk.start
+                        && owner.span.end <= chunk.end
+                })
+            });
+            output.push(Chunk {
+                kind: chunk.kind,
+                name: chunk.name,
+                span: lines.span(chunk.start, chunk.end),
+                parent,
+                owner,
+            });
+            visit(chunk.children, Some(id), lines, owners, output);
+        }
+    }
+    let mut output = Vec::new();
+    visit(tree, None, &LineIndex::new(source), owners, &mut output);
+    output
+}
+
+pub fn text_chunks(source: &str, path: &str) -> Vec<Chunk> {
+    if path.ends_with(".md") || path.ends_with(".markdown") {
+        return flatten(markdown::chunks(source), source, &[]);
+    }
+    let mut tree = Vec::new();
+    let mut start = 0;
+    let mut kind = None;
+    let mut end = 0;
+    for line in source.split_inclusive('\n') {
+        let next = if line
+            .trim_end_matches('\n')
+            .bytes()
+            .all(|b| matches!(b, b' ' | b'\t'))
+        {
+            "gap"
+        } else {
+            "paragraph"
+        };
+        if kind.is_some_and(|previous| previous != next) {
+            tree.push(TreeChunk::new(kind.unwrap(), None, start, end));
+            start = end;
+        }
+        kind = Some(next);
+        end += line.len();
+    }
+    if start < end {
+        tree.push(TreeChunk::new(kind.unwrap(), None, start, end));
+    }
+    flatten(tree, source, &[])
+}
+
+#[cfg(test)]
+#[path = "../../tests/unit/ts_v2_source.rs"]
+mod tests;

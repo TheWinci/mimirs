@@ -56,6 +56,7 @@ fn document_segmentation_matches_ts_on_equivalent_windows() {
                 parent: None,
             };
             let document = Document {
+                source_chunk: None,
                 owner: Some(owner),
                 part: 0,
                 text: window["text"].as_str().unwrap().into(),
@@ -166,6 +167,7 @@ fn candidates_from_reference(completed: &serde_json::Value) -> Vec<Candidate> {
         for (rank, c) in completed[channel].as_array().unwrap().iter().enumerate() {
             let id = c["id"].as_i64().unwrap();
             let candidate = candidates.entry(id).or_insert_with(|| Candidate {
+                source_chunk: None,
                 id,
                 file_id: 0,
                 ordinal: id as usize,
@@ -407,4 +409,107 @@ fn file_results_retain_every_selected_window_and_distinct_owner() {
                 .join("\n")
         );
     }
+}
+
+#[test]
+fn ts_source_chunks_roundtrip_and_keep_raw_evidence_through_replacement() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut db = crate::storage::open(&dir.path().join("index.db"))
+        .unwrap()
+        .connection;
+    let budget =
+        crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
+    let policy = crate::storage::policy::ts_document_policy(&budget);
+    let text =
+        "\u{feff}/// café 🧭\r\nfn recoverArchive() { manifest(); }\r\n\r\nfn other() {}\r\n";
+    let analysis = crate::analysis::extract(crate::source::SourceFile {
+        path: "src/archive.rs".into(),
+        text: text.into(),
+    })
+    .unwrap();
+    let documents = crate::retrieval::ts_v2::documents(&analysis).unwrap();
+    assert!(
+        documents
+            .iter()
+            .all(|d| !d.text.contains('\r') && !d.text.contains('\u{feff}'))
+    );
+    let mut vector = vec![0.0; crate::embedding::DIMENSION];
+    vector[0] = 1.0;
+    let vectors = vec![vector; documents.len()];
+    crate::storage::documents::save(
+        &mut db,
+        &analysis,
+        crate::storage::documents::Batch {
+            documents: &documents,
+            vectors: &vectors,
+            policy: &policy,
+        },
+    )
+    .unwrap();
+    let loaded = crate::storage::analysis::load(&db, "src/archive.rs")
+        .unwrap()
+        .unwrap();
+    assert_eq!(loaded.source.text, text);
+    assert_eq!(loaded.source_chunks, analysis.source_chunks);
+    let response = search(&db, "recover", None, 20, &[], &policy).unwrap();
+    assert_eq!(response.source.len(), 1);
+    assert!(response.source[0].hit.representative.source_chunk.is_some());
+    assert!(
+        response.source[0]
+            .blocks
+            .iter()
+            .any(|b| b.text.contains("café 🧭\r\n"))
+    );
+    for block in &response.source[0].blocks {
+        assert_eq!(
+            block.text,
+            block
+                .evidence
+                .iter()
+                .map(|e| &text[e.span.start..e.span.end])
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+    }
+    let replacement = crate::analysis::extract(crate::source::SourceFile {
+        path: "src/archive.rs".into(),
+        text: "fn replacement() {}\n".into(),
+    })
+    .unwrap();
+    let documents = crate::retrieval::ts_v2::documents(&replacement).unwrap();
+    let vectors = vec![vectors[0].clone(); documents.len()];
+    crate::storage::documents::save(
+        &mut db,
+        &replacement,
+        crate::storage::documents::Batch {
+            documents: &documents,
+            vectors: &vectors,
+            policy: &policy,
+        },
+    )
+    .unwrap();
+    assert!(
+        search(&db, "recover", None, 20, &[], &policy)
+            .unwrap()
+            .source
+            .is_empty()
+    );
+    assert_eq!(
+        search(&db, "replacement", None, 20, &[], &policy)
+            .unwrap()
+            .source
+            .len(),
+        1
+    );
+    crate::storage::invalidate(&mut db, "src/archive.rs").unwrap();
+    let count: i64 = db
+        .query_row("SELECT count(*) FROM source_chunks", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(count, 0);
+    assert!(
+        search(&db, "replacement", None, 20, &[], &policy)
+            .unwrap()
+            .source
+            .is_empty()
+    );
 }

@@ -1,0 +1,49 @@
+{
+  "stage": "S5 source construction and real-model inputs",
+  "reference": "122674c8bfbbc3549390743f51396c5f0e4e3537",
+  "corpora": {
+    "mimirs": {
+      "files": 80,
+      "chunks": 3932,
+      "windows": 859,
+      "mismatches": [],
+      "rustReportSha256": "290be6ef0922a03b9ee35609cf3712b14b74219f0373c41d1d0f7b2fc1333137",
+      "reference": "122674c8bfbbc3549390743f51396c5f0e4e3537"
+    },
+    "excalidraw": {
+      "files": 628,
+      "chunks": 19180,
+      "windows": 7791,
+      "mismatches": [],
+      "rustReportSha256": "ec32e061ed57d9c2fbd502f73d16e18d5155509ff126d7f1d308c7d7818567f1",
+      "reference": "122674c8bfbbc3549390743f51396c5f0e4e3537"
+    },
+    "django": {
+      "files": 2919,
+      "chunks": 139154,
+      "windows": 18645,
+      "mismatches": [],
+      "rustReportSha256": "c6a4b8a803a7a272a766f5198e1d21a6f6edb03c2018462004e46bcdfc42729e",
+      "reference": "122674c8bfbbc3549390743f51396c5f0e4e3537"
+    }
+  },
+  "realModel": {
+    "referenceRuntime": "onnxruntime-node 1.21.0",
+    "rustRuntime": "ONNX Runtime 1.22.0, ort 2.0.0-rc.10",
+    "platform": "darwin arm64",
+    "maximumComponentError": 1.4901161207725444e-08,
+    "minimumCosine": 0.999999999999,
+    "documentCases": 2,
+    "queryCases": 2,
+    "tokenInputMismatches": 0,
+    "workerThreads": 1
+  },
+  "rejectedRuntime": {
+    "version": "ONNX Runtime 1.28.0",
+    "maximumComponentErrorFirstDocument": 0.004811187740415335,
+    "cosineFirstDocument": 0.999529530225,
+    "identicalWeightsAndTokenIds": true
+  },
+  "timingScope": "Source-only probes and small model fixtures; public indexing and retrieval costs measured at adoption.",
+  "kubernetes": "deferred"
+}

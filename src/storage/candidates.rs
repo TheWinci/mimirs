@@ -27,6 +27,7 @@ pub fn ordinal_compare(left: &str, right: &str) -> Ordering {
 
 #[derive(Clone, Debug)]
 pub struct Candidate {
+    pub source_chunk: Option<usize>,
     pub id: i64,
     pub file_id: i64,
     pub ordinal: usize,
@@ -41,6 +42,10 @@ pub struct Candidate {
 }
 
 impl Candidate {
+    pub fn chunk_key(&self) -> (i64, Option<usize>) {
+        (self.file_id, self.source_chunk.or(self.owner))
+    }
+
     pub fn score(&self) -> f64 {
         fusion(self.semantic_rank, self.lexical_rank)
     }
@@ -111,13 +116,20 @@ fn read_with_limits(
     let mut candidates = Vec::new();
     let mut stmt = db.prepare(
         "SELECT d.file_id, d.ordinal, d.owner, f.path,
-        json_extract(d.evidence, '$[0].span.start'), json_extract(d.evidence, '$[#-1].span.end') FROM retrieval_documents d
+        json_extract(d.evidence, '$[0].span.start'), json_extract(d.evidence, '$[#-1].span.end'), d.source_chunk FROM retrieval_documents d
         JOIN files f ON f.id=d.file_id WHERE d.id=?1",
     )?;
     for id in ids {
         let candidate = stmt
             .query_row([id], |r| {
                 Ok(Candidate {
+                    source_chunk: r
+                        .get::<_, Option<i64>>(6)?
+                        .map(|v| {
+                            usize::try_from(v)
+                                .map_err(|_| rusqlite::Error::IntegralValueOutOfRange(6, v))
+                        })
+                        .transpose()?,
                     id,
                     file_id: r.get(0)?,
                     ordinal: position(r, 1)?,

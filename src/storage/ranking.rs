@@ -41,7 +41,7 @@ pub fn group_chunks(candidates: Vec<Candidate>, mut signals: impl FnMut(&mut Hit
     let mut groups: BTreeMap<_, Vec<_>> = BTreeMap::new();
     for candidate in candidates {
         groups
-            .entry((candidate.file_id, candidate.owner))
+            .entry(candidate.chunk_key())
             .or_default()
             .push(candidate);
     }
@@ -171,10 +171,17 @@ impl Signals {
         generated: &[String],
     ) -> Result<Self> {
         let mut names = HashMap::new();
-        let mut stmt = db.prepare("SELECT name FROM entities WHERE file_id=?1 AND ordinal=?2")?;
+        let table = if candidates.iter().any(|c| c.source_chunk.is_some()) {
+            "source_chunks"
+        } else {
+            "entities"
+        };
+        let mut stmt = db.prepare(&format!(
+            "SELECT name FROM {table} WHERE file_id=?1 AND ordinal=?2"
+        ))?;
         for candidate in candidates {
-            let key = (candidate.file_id, candidate.owner);
-            if let Some(owner) = candidate.owner
+            let key = candidate.chunk_key();
+            if let Some(owner) = candidate.source_chunk.or(candidate.owner)
                 && !names.contains_key(&key)
             {
                 use rusqlite::OptionalExtension;
@@ -189,8 +196,8 @@ impl Signals {
                 }
             }
         }
-        let mut stmt = db.prepare("SELECT e.file_id, e.ordinal, lower(e.name), f.path FROM entities e
-            JOIN files f ON f.id=e.file_id WHERE e.name COLLATE NOCASE IN (SELECT value FROM json_each(?1))")?;
+        let mut stmt = db.prepare(&format!("SELECT e.file_id, e.ordinal, lower(e.name), f.path FROM {table} e
+            JOIN files f ON f.id=e.file_id WHERE e.name COLLATE NOCASE IN (SELECT value FROM json_each(?1))"))?;
         let rows = stmt
             .query_map([serde_json::to_string(&identifiers(query, true))?], |r| {
                 Ok((
@@ -231,7 +238,7 @@ impl Signals {
     }
 
     pub fn apply(&self, hit: &mut Hit) {
-        let key = (hit.representative.file_id, hit.representative.owner);
+        let key = hit.representative.chunk_key();
         if let Some(name) = self.names.get(&key) {
             let terms = super::lexical::terms(name);
             if !terms.is_empty() && terms.iter().all(|t| self.query_terms.contains(t)) {

@@ -150,9 +150,19 @@ pub(super) fn segment(
         .collect();
     let mut definitions: HashMap<String, Vec<Definition>> = HashMap::new();
     if !names.is_empty() {
-        let mut stmt=snapshots.db.prepare("SELECT f.path,e.name,e.byte_start,e.byte_end,e.line_start,e.line_end FROM entities e
+        let has_chunks: bool = snapshots.db.query_row(
+            "SELECT EXISTS(SELECT 1 FROM retrieval_documents WHERE source_chunk IS NOT NULL)",
+            [],
+            |r| r.get(0),
+        )?;
+        let table = if has_chunks {
+            "source_chunks"
+        } else {
+            "entities"
+        };
+        let mut stmt=snapshots.db.prepare(&format!("SELECT f.path,e.name,e.byte_start,e.byte_end,e.line_start,e.line_end FROM {table} e
             JOIN files f ON f.id=e.file_id WHERE e.name COLLATE NOCASE IN (SELECT value FROM json_each(?1))
-            ORDER BY e.name COLLATE NOCASE,f.path,e.byte_start,e.ordinal")?;
+            ORDER BY e.name COLLATE NOCASE,f.path,e.byte_start,e.ordinal"))?;
         let rows = stmt.query_map([serde_json::to_string(&names)?], |r| {
             Ok((
                 r.get::<_, String>(0)?,
@@ -206,9 +216,14 @@ pub(super) fn segment(
             .as_ref()
             .and_then(|d| {
                 windows.iter().find(|w| {
-                    let owner = w.owner.map_or(&file.analysis.scopes[0].span, |id| {
-                        &file.analysis.entities[id].span
-                    });
+                    let owner = w
+                        .source_chunk
+                        .map(|id| &file.analysis.source_chunks[id].span)
+                        .unwrap_or_else(|| {
+                            w.owner.map_or(&file.analysis.scopes[0].span, |id| {
+                                &file.analysis.entities[id].span
+                            })
+                        });
                     owner.start <= d.span.start && owner.end >= d.span.end
                 })
             })

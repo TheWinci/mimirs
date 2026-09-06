@@ -4,6 +4,8 @@ use tokenizers::Tokenizer;
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Document {
+    #[serde(default)]
+    pub source_chunk: Option<usize>,
     pub owner: Option<usize>,
     pub part: usize,
     pub text: String,

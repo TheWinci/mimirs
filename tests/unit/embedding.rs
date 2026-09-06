@@ -41,7 +41,7 @@ impl Backend for ReplyBackend {
 fn empty_documents_do_not_load_the_model_or_report_progress() {
     let dir = TempDir::new().unwrap();
     let cache = dir.path().join("models");
-    let mut embedder = Embedder::new(FastEmbedBackend::new(cache.clone()));
+    let mut embedder = Embedder::new(OnnxBackend::new(cache.clone()));
 
     assert!(
         embedder
@@ -221,7 +221,7 @@ fn progress_errors_stop_before_the_next_batch_and_keep_the_cause() {
 #[ignore = "downloads the MiniLM model"]
 fn real_minilm_documents_and_queries_reuse_the_cache() {
     let cache = TempDir::new().unwrap();
-    let mut first = Embedder::new(FastEmbedBackend::new(cache.path().to_owned()));
+    let mut first = Embedder::new(OnnxBackend::new(cache.path().to_owned()));
 
     first.prepare().unwrap();
     first.prepare().unwrap();
@@ -243,66 +243,15 @@ fn real_minilm_documents_and_queries_reuse_the_cache() {
     assert!(cache.path().read_dir().unwrap().next().is_some());
 
     drop(first);
-    let mut second = Embedder::new(FastEmbedBackend::new(cache.path().to_owned()));
+    let mut second = Embedder::new(OnnxBackend::new(cache.path().to_owned()));
     assert_eq!(second.embed_query("entry point").unwrap().len(), DIMENSION);
-}
-
-#[test]
-#[ignore = "loads pinned and previously measured local models; run explicitly"]
-fn q8_uses_measured_weights_and_preserves_the_float32_tokenizer() {
-    let cache = model_cache_dir().unwrap();
-    let mut previous = fastembed::TextEmbedding::try_new(
-        fastembed::TextInitOptions::new(fastembed::EmbeddingModel::AllMiniLML6V2)
-            .with_cache_dir(cache.clone())
-            .with_show_download_progress(false),
-    )
-    .unwrap();
-    let measured_revision =
-        std::fs::read_to_string(cache.join("models--Qdrant--all-MiniLM-L6-v2-onnx/refs/main"))
-            .unwrap();
-    assert_eq!(
-        measured_revision.trim(),
-        TOKENIZER_REVISION,
-        "the previous backend no longer uses the measured snapshot"
-    );
-    let texts = vec![
-        "remove expired sessions".to_owned(),
-        "Rust function café. Calls written expression helper(value). Target unresolved.".to_owned(),
-    ];
-    let expected = previous.embed(&texts, None).unwrap();
-    let mut pinned = FastEmbedBackend::new(cache.clone());
-    let actual = pinned.embed(&texts).unwrap();
-    let weights = cache.join(format!(
-        "models--Xenova--all-MiniLM-L6-v2/snapshots/{MODEL_REVISION}/{MODEL_FILE}"
-    ));
-    use sha2::{Digest, Sha256};
-    let digest = Sha256::digest(std::fs::read(weights).unwrap())
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
-    assert_eq!(
-        digest,
-        "afdb6f1a0e45b715d0bb9b11772f032c399babd23bfc31fed1c170afc848bdb1"
-    );
-    assert_ne!(actual, expected);
-    for (a, b) in actual.iter().zip(&expected) {
-        let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
-        assert!(
-            dot > 0.97,
-            "q8 and float32 normalized vectors diverged: {dot}"
-        );
-    }
-    assert_eq!(
-        pinned.tokenizer().unwrap().to_string(false).unwrap(),
-        previous.tokenizer.to_string(false).unwrap()
-    );
 }
 
 #[test]
 #[ignore = "loads the real MiniLM model from the local cache"]
 fn real_workers_match_serial_vectors_and_load_sessions_only_when_needed() {
     tokenizers::utils::parallelism::set_parallelism(false);
-    let mut backend = FastEmbedBackend::new(model_cache_dir().unwrap());
+    let mut backend = OnnxBackend::new(model_cache_dir().unwrap());
     backend.set_workers(3);
     backend.prepare().unwrap();
     assert_eq!(backend.models.len(), 1);

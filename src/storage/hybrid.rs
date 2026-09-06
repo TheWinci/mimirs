@@ -110,7 +110,10 @@ impl Snapshots<'_> {
             .documents
             .get(candidate.ordinal)
             .context("missing indexed document")?;
-        ensure!(doc.owner == candidate.owner, "candidate owner mismatch");
+        ensure!(
+            doc.owner == candidate.owner && doc.source_chunk == candidate.source_chunk,
+            "candidate owner mismatch"
+        );
         let text = doc
             .evidence
             .iter()
@@ -163,6 +166,7 @@ impl Snapshots<'_> {
                 .get(ordinal)
                 .context("invalid document ordinal")?;
             windows.push(Candidate {
+                source_chunk: doc.source_chunk,
                 id,
                 file_id,
                 ordinal,
@@ -178,8 +182,12 @@ impl Snapshots<'_> {
         }
         windows.sort_by_key(|c| {
             (
-                c.owner
-                    .map_or(0, |id| file.analysis.entities[id].span.start),
+                c.source_chunk
+                    .map(|id| file.analysis.source_chunks[id].span.start)
+                    .unwrap_or_else(|| {
+                        c.owner
+                            .map_or(0, |id| file.analysis.entities[id].span.start)
+                    }),
                 c.ordinal,
             )
         });

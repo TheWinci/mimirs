@@ -76,6 +76,23 @@ pub fn write(transaction: &Transaction<'_>, file_id: i64, analysis: &Analysis) -
             ],
         )?;
     }
+    for (id, chunk) in analysis.source_chunks.iter().enumerate() {
+        transaction.execute(
+            "INSERT INTO source_chunks VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
+            params![
+                file_id,
+                id as i64,
+                chunk.kind,
+                chunk.name,
+                chunk.span.start as i64,
+                chunk.span.end as i64,
+                chunk.span.line_start as i64,
+                chunk.span.line_end as i64,
+                chunk.parent.map(|v| v as i64),
+                chunk.owner.map(|v| v as i64)
+            ],
+        )?;
+    }
     let payload =
         serde_json::to_string(&(&analysis.facts, &analysis.scopes, &analysis.diagnostics))?;
     transaction.execute(
@@ -140,6 +157,18 @@ pub fn validate(analysis: &Analysis) -> Result<()> {
         );
         Ok(())
     };
+    for (id, chunk) in analysis.source_chunks.iter().enumerate() {
+        validate_span(source, &chunk.span, &lines)?;
+        owner(chunk.owner)?;
+        if let Some(parent) = chunk.parent {
+            ensure!(parent < id, "invalid source chunk parent");
+            let span = &analysis.source_chunks[parent].span;
+            ensure!(
+                span.start <= chunk.span.start && span.end >= chunk.span.end,
+                "source chunk escapes parent"
+            );
+        }
+    }
     ensure!(!analysis.scopes.is_empty(), "missing file scope");
     for (id, scope) in analysis.scopes.iter().enumerate() {
         validate_span(source, &scope.span, &lines)?;
@@ -215,7 +244,36 @@ pub fn load(connection: &Connection, path: &str) -> Result<Option<Analysis>> {
     let payload: String = connection.query_row("SELECT r.payload FROM analysis_records r JOIN files f ON f.id = r.file_id WHERE f.path = ?1", [path], |row| row.get(0)).context("missing stored analysis records")?;
     let (facts, scopes, diagnostics) =
         serde_json::from_str(&payload).context("invalid stored analysis payload")?;
+    let mut stmt=connection.prepare("SELECT c.ordinal,c.kind,c.name,c.byte_start,c.byte_end,c.line_start,c.line_end,c.parent,c.owner FROM source_chunks c JOIN files f ON f.id=c.file_id WHERE f.path=?1 ORDER BY c.ordinal")?;
+    let mut rows = stmt.query([path])?;
+    let mut source_chunks = Vec::new();
+    while let Some(row) = rows.next()? {
+        let number = |index| -> Result<usize> { Ok(usize::try_from(row.get::<_, i64>(index)?)?) };
+        ensure!(
+            number(0)? == source_chunks.len(),
+            "missing source chunk ordinal"
+        );
+        source_chunks.push(crate::retrieval::ts_v2::Chunk {
+            kind: row.get(1)?,
+            name: row.get(2)?,
+            span: Span {
+                start: number(3)?,
+                end: number(4)?,
+                line_start: number(5)?,
+                line_end: number(6)?,
+            },
+            parent: row
+                .get::<_, Option<i64>>(7)?
+                .map(usize::try_from)
+                .transpose()?,
+            owner: row
+                .get::<_, Option<i64>>(8)?
+                .map(usize::try_from)
+                .transpose()?,
+        });
+    }
     let analysis = Analysis {
+        source_chunks,
         source,
         entities,
         facts,

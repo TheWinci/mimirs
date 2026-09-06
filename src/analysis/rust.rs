@@ -89,7 +89,15 @@ fn extract(source: SourceFile) -> Result<Analysis> {
                 break;
             }
             if !cursor.goto_parent() {
+                let source_chunks = crate::retrieval::ts_v2::from_tree(
+                    &source.text,
+                    tree.root_node(),
+                    &tree_sitter_rust::LANGUAGE.into(),
+                    "rust",
+                    &entities,
+                )?;
                 return Ok(Analysis {
+                    source_chunks,
                     source,
                     diagnostics,
                     entities,

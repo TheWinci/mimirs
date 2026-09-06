@@ -56,7 +56,27 @@ pub fn validate(analysis: &Analysis, documents: &[Document]) -> Result<()> {
             document.owner.is_none_or(|id| id < analysis.entities.len()),
             "invalid document owner"
         );
-        let next = parts.entry(document.owner).or_insert(0);
+        if let Some(id) = document.source_chunk {
+            let chunk = analysis
+                .source_chunks
+                .get(id)
+                .context("invalid document source chunk")?;
+            ensure!(
+                chunk.parent.is_none() && chunk.kind != "gap",
+                "document must belong to a meaningful root chunk"
+            );
+            ensure!(chunk.owner == document.owner, "source chunk owner mismatch");
+            ensure!(
+                document
+                    .evidence
+                    .iter()
+                    .all(|e| e.span.start >= chunk.span.start && e.span.end <= chunk.span.end),
+                "document escapes source chunk"
+            );
+        }
+        let next = parts
+            .entry((document.source_chunk, document.owner))
+            .or_insert(0);
         ensure!(document.part == *next, "invalid document part order");
         *next += 1;
         ensure!(
@@ -110,7 +130,7 @@ pub(super) fn write(
             vector.len() == DIMENSION && vector.iter().all(|v| v.is_finite()),
             "invalid document vector"
         );
-        tx.execute("INSERT INTO retrieval_documents(file_id, ordinal, owner, kind, part, policy, text, content_hash, evidence) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)", params![file_id, ordinal as i64, document.owner.map(|id| id as i64), if document.owner.is_some() { "entity" } else { "file" }, document.part as i64, batch.policy, document.text, source_hash(&document.text), serde_json::to_string(&document.evidence)?])?;
+        tx.execute("INSERT INTO retrieval_documents(file_id, ordinal, owner, kind, part, policy, text, content_hash, evidence, source_chunk) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)", params![file_id, ordinal as i64, document.owner.map(|id| id as i64), if document.owner.is_some() { "entity" } else { "file" }, document.part as i64, batch.policy, document.text, source_hash(&document.text), serde_json::to_string(&document.evidence)?, document.source_chunk.map(|id|id as i64)])?;
         let id = tx.last_insert_rowid();
         let source = document
             .evidence
@@ -123,8 +143,13 @@ pub(super) fn write(
             id,
             &analysis.source.path,
             document
-                .owner
-                .and_then(|owner| analysis.entities[owner].name.as_deref()),
+                .source_chunk
+                .map(|id| analysis.source_chunks[id].name.as_deref())
+                .unwrap_or_else(|| {
+                    document
+                        .owner
+                        .and_then(|owner| analysis.entities[owner].name.as_deref())
+                }),
             &source,
         )?;
         tx.execute(
@@ -160,7 +185,7 @@ fn load_inner(
     let analysis = super::analysis::load(connection, path)?.context("missing document snapshot")?;
     let (count, stored): (i64, String) = connection.query_row("SELECT p.document_count, p.policy FROM retrieval_processing p JOIN files f ON f.id=p.file_id WHERE f.path=?1", [path], |r| Ok((r.get(0)?, r.get(1)?)))?;
     ensure!(stored == policy, "unsupported document policy");
-    let mut statement = connection.prepare("SELECT d.ordinal, d.owner, d.part, d.text, d.content_hash, d.evidence, d.policy, d.kind, EXISTS(SELECT 1 FROM document_embeddings e WHERE e.document_id=d.id) FROM retrieval_documents d JOIN files f ON f.id=d.file_id WHERE f.path=?1 ORDER BY d.ordinal")?;
+    let mut statement = connection.prepare("SELECT d.ordinal, d.owner, d.part, d.text, d.content_hash, d.evidence, d.policy, d.kind, EXISTS(SELECT 1 FROM document_embeddings e WHERE e.document_id=d.id), d.source_chunk FROM retrieval_documents d JOIN files f ON f.id=d.file_id WHERE f.path=?1 ORDER BY d.ordinal")?;
     let mut rows = statement.query([path])?;
     let mut documents = Vec::new();
     while let Some(row) = rows.next()? {
@@ -169,6 +194,10 @@ fn load_inner(
             "missing document ordinal"
         );
         let document = Document {
+            source_chunk: row
+                .get::<_, Option<i64>>(9)?
+                .map(usize::try_from)
+                .transpose()?,
             owner: row
                 .get::<_, Option<i64>>(1)?
                 .map(usize::try_from)

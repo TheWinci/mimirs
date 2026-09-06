@@ -306,17 +306,19 @@ fn only_document_vectors_are_stored() {
 fn float32_index_requires_rebuild_and_discards_old_vectors() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("index.db");
-    let mut db = open(&path).unwrap().connection;
-    save_text(&mut db, "old.rs", "fn old() {}\n").unwrap();
+    register_vec().unwrap();
+    let db = Connection::open(&path).unwrap();
+    db.execute_batch(SCHEMA_V9).unwrap();
+    db.execute_batch("INSERT INTO files VALUES (1,'old.rs');
+        INSERT INTO source_snapshots VALUES (1,'old','fn old() {}');
+        INSERT INTO retrieval_documents VALUES (1,1,0,NULL,'file',0,'old','fn old() {}','old','[]');
+        INSERT INTO index_metadata VALUES ('embedding_model','all-MiniLM-L6-v2@5f1b8cd78bc4fb444dd171e59b18f3a3af89a079'),('embedding_dimension','384');").unwrap();
     db.execute(
-        "UPDATE index_metadata SET value = ?1 WHERE key = 'embedding_model'",
-        ["all-MiniLM-L6-v2@5f1b8cd78bc4fb444dd171e59b18f3a3af89a079"],
+        "INSERT INTO document_embeddings VALUES (1, ?1)",
+        [vector_bytes(&vec![1.0; DIMENSION])],
     )
     .unwrap();
-    // Matching dimensions alone cannot make float32 and q8 indexes compatible.
     assert!(validate_model(&db).is_err());
-    db.execute_batch("DROP TRIGGER delete_document_fts; DROP TABLE document_fts;")
-        .unwrap();
     db.pragma_update(None, "user_version", 8).unwrap();
     drop(db);
     let before = fs::read(&path).unwrap();
@@ -356,6 +358,7 @@ fn pre_revision_schemas_rebuild_only_on_writable_open() {
         (SCHEMA_V7, 7),
         (SCHEMA_V9, 8),
         (SCHEMA_V9, 9),
+        (SCHEMA_V10, 10),
     ] {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("index.db");

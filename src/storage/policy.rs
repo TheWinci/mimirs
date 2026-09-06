@@ -1,11 +1,11 @@
 use anyhow::{Result, ensure};
 use rusqlite::Connection;
 
-fn document_prefix() -> String {
+fn document_prefix_for(source_policy: &str) -> String {
     format!(
         "{}|{}|{}|",
         crate::analysis::language::registry_identity(),
-        crate::retrieval::source::POLICY,
+        source_policy,
         crate::embedding::model_identity()
     )
 }
@@ -13,7 +13,7 @@ fn document_prefix() -> String {
 pub fn document_policy(budget: &crate::retrieval::split::TokenBudget) -> String {
     format!(
         "{}{}|{}",
-        document_prefix(),
+        document_prefix_for(crate::retrieval::source::POLICY),
         budget.limit,
         budget.fingerprint
     )
@@ -21,7 +21,8 @@ pub fn document_policy(budget: &crate::retrieval::split::TokenBudget) -> String 
 
 pub(super) fn validate(policy: &str) -> Result<()> {
     ensure!(
-        policy.starts_with(&document_prefix()),
+        policy.starts_with(&document_prefix_for(crate::retrieval::source::POLICY))
+            || policy.starts_with(&document_prefix_for(crate::retrieval::ts_v2::POLICY)),
         "unsupported document policy; run mimirs index"
     );
     Ok(())
@@ -67,4 +68,13 @@ pub fn configure(connection: &mut Connection, policy: &str) -> Result<()> {
     tx.execute("INSERT INTO index_metadata VALUES ('document_policy', ?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value", [policy])?;
     tx.commit()?;
     Ok(())
+}
+
+#[allow(dead_code)]
+pub fn ts_document_policy(budget: &crate::retrieval::split::TokenBudget) -> String {
+    format!(
+        "{}256|{}",
+        document_prefix_for(crate::retrieval::ts_v2::POLICY),
+        budget.fingerprint
+    )
 }

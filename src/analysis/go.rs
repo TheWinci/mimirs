@@ -28,6 +28,7 @@ fn extract(source: SourceFile) -> Result<Analysis> {
         .context("Go parser returned no tree")?;
     let lines = LineIndex::new(&source.text);
     let mut analysis = Analysis {
+        source_chunks: Vec::new(),
         scopes: vec![Scope {
             kind: "file".into(),
             span: lines.span(0, source.text.len()),
@@ -115,6 +116,13 @@ fn extract(source: SourceFile) -> Result<Analysis> {
         stack.extend(children.into_iter().rev().map(|child| (child, owner)));
     }
     analysis.facts.sort_by_key(|f| (f.span.start, f.span.end));
+    analysis.source_chunks = crate::retrieval::ts_v2::from_tree(
+        &analysis.source.text,
+        tree.root_node(),
+        &tree_sitter_go::LANGUAGE.into(),
+        "go",
+        &analysis.entities,
+    )?;
     Ok(analysis)
 }
 

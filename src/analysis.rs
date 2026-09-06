@@ -106,6 +106,7 @@ pub struct Diagnostic {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Analysis {
+    pub source_chunks: Vec<crate::retrieval::ts_v2::Chunk>,
     pub source: SourceFile,
     pub diagnostics: Vec<Diagnostic>,
     pub entities: Vec<Entity>,
@@ -114,7 +115,41 @@ pub struct Analysis {
 }
 
 pub fn extract(source: SourceFile) -> Result<Analysis> {
-    (language::for_path(&source.path).extract)(source)
+    let normalized = crate::retrieval::normalized::Source::new(&source.text);
+    let mut analysis = (language::for_path(&source.path).extract)(SourceFile {
+        path: source.path.clone(),
+        text: normalized.text.clone(),
+    })?;
+    let lines = LineIndex::new(&source.text);
+    let map = |span: &mut Span| -> Result<()> {
+        *span = lines.span(
+            normalized.raw_offset(span.start)?,
+            normalized.raw_offset(span.end)?,
+        );
+        Ok(())
+    };
+    for entity in &mut analysis.entities {
+        map(&mut entity.span)?;
+    }
+    for chunk in &mut analysis.source_chunks {
+        map(&mut chunk.span)?;
+    }
+    for fact in &mut analysis.facts {
+        map(&mut fact.span)?;
+        for evidence in &mut fact.evidence {
+            map(&mut evidence.span)?;
+        }
+    }
+    for scope in &mut analysis.scopes {
+        map(&mut scope.span)?;
+    }
+    analysis.scopes[0].span = lines.span(0, source.text.len());
+    for diagnostic in &mut analysis.diagnostics {
+        map(&mut diagnostic.span)?;
+        diagnostic.column = lines.column(diagnostic.span.start);
+    }
+    analysis.source = source;
+    Ok(analysis)
 }
 
 pub fn report(analysis: &Analysis) -> String {

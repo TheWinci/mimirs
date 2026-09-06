@@ -41,6 +41,7 @@ fn extract(source: SourceFile, language: tree_sitter::Language) -> Result<Analys
         .context("JavaScript/TypeScript parser returned no tree")?;
     let lines = LineIndex::new(&source.text);
     let mut analysis = Analysis {
+        source_chunks: Vec::new(),
         scopes: vec![Scope {
             kind: "file".into(),
             span: lines.span(0, source.text.len()),
@@ -120,6 +121,20 @@ fn extract(source: SourceFile, language: tree_sitter::Language) -> Result<Analys
         );
     }
     analysis.facts.sort_by_key(|f| (f.span.start, f.span.end));
+    analysis.source_chunks = crate::retrieval::ts_v2::from_tree(
+        &analysis.source.text,
+        tree.root_node(),
+        &language,
+        match std::path::Path::new(&analysis.source.path)
+            .extension()
+            .and_then(|s| s.to_str())
+        {
+            Some("tsx") => "tsx",
+            Some("ts" | "mts" | "cts") => "typescript",
+            _ => "javascript",
+        },
+        &analysis.entities,
+    )?;
     Ok(analysis)
 }
 

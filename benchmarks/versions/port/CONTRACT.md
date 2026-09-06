@@ -260,3 +260,52 @@ Use Mimirs, Excalidraw, and Django during development. Kubernetes remains deferr
 The q8 baseline is saved separately from the historical float32 results so the
 earlier comparison remains reproducible. Single-run baseline timings are
 descriptive, not statistically established speedups.
+
+## Semantic input port
+
+`port/stages/s5-inputs.json` compares all 27,295 source windows and 162,266
+non-gap source chunks from the retained Mimirs, Excalidraw, and Django indexes.
+The tree comparison includes kind, name, normalized UTF-16 bounds, and parent.
+Rust also retains gap chunks for raw-source coverage; TS skips gaps in storage.
+Both window sets and the non-gap trees match exactly. Reproduce extraction
+without model inference with the ignored `source_stage_report` Rust test,
+setting `MIMIRS_PORT_BASELINE_DB` to the original Rust index and
+`MIMIRS_PORT_SOURCE_REPORT` to a new JSON file. Then run:
+
+```sh
+python3 benchmarks/versions/port-source-compare.py REPORT TS_INDEX NEW_OUTPUT
+```
+
+`port-model-reference.ts` captures actual calls to the pinned TS pipeline and
+final vectors for short and long documents and queries. It verifies the frozen
+source hashes and uses cached model assets. Reproduce it as follows:
+
+```sh
+bun benchmarks/versions/port-model-reference.ts ENGINE NEW_OUTPUT
+cargo test real_model_inputs_and_vectors_match_ts_reference -- --ignored --nocapture
+cargo test final_document_inputs_match_ts_text_and_token_ids -- --ignored
+cargo test real_workers_match_serial_vectors_and_load_sessions_only_when_needed -- --ignored
+```
+
+The token windows need one distinction. Documents include path context and fit
+within 256 tokens. Queries first split token IDs at 256 with a 32-token overlap,
+then decode each slice and re-encode for inference. Adding special tokens at
+that step produces 257- or 258-token inputs in the long-query fixture. The
+pipeline tokenizer therefore retains TS's 512-token inference ceiling.
+
+On macOS arm64, ONNX Runtime 1.28 changed q8 outputs despite identical weights
+and token IDs. The first document differed by 0.004811 in one component and had
+cosine 0.999530. Disabling graph optimizations or changing TS thread counts did
+not remove the difference. Direct Rust inference with TS's 1.21 runtime reduced
+the maximum component error to 1.49e-8. The distributable 1.22 runtime gives the
+same accepted result for every model fixture. Rust pins `ort` rc.10 and its 1.22
+runtime, runs each session on one CPU thread, and keeps the existing bounded
+worker pool. Pooling uses TS's float64 accumulation and float32 tensor storage.
+The original tolerance remains unchanged. Runtime, tokenizer, source policy,
+and schema changes all enter index compatibility checks. Results are measured
+on the recorded platform; other architectures must run the model check before
+claiming equivalent numerical behavior.
+
+The saved Rust q8 baseline remains immutable. It uses its original tokenizer,
+runtime, and source documents. Full public indexing costs and final query
+rankings belong to the adoption comparison, which uses the same three corpora.

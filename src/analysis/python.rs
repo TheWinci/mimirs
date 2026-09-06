@@ -26,6 +26,7 @@ fn extract(source: SourceFile) -> Result<Analysis> {
         .context("Python parser returned no tree")?;
     let lines = LineIndex::new(&source.text);
     let mut analysis = Analysis {
+        source_chunks: Vec::new(),
         entities: Vec::new(),
         facts: Vec::new(),
         scopes: vec![Scope {
@@ -137,6 +138,13 @@ fn extract(source: SourceFile) -> Result<Analysis> {
     analysis
         .facts
         .sort_by_key(|fact| (fact.span.start, fact.span.end));
+    analysis.source_chunks = crate::retrieval::ts_v2::from_tree(
+        &analysis.source.text,
+        tree.root_node(),
+        &tree_sitter_python::LANGUAGE.into(),
+        "python",
+        &analysis.entities,
+    )?;
     Ok(analysis)
 }
 

@@ -3,20 +3,18 @@ use std::path::PathBuf;
 
 use anyhow::{Context, ensure};
 use directories::BaseDirs;
-use fastembed::{
-    InitOptionsUserDefined, Pooling, QuantizationMode, TextEmbedding, TokenizerFiles,
-    UserDefinedEmbeddingModel,
-};
+mod model;
+use model::Model;
 
 pub const MODEL_NAME: &str = "all-MiniLM-L6-v2-q8";
 pub const MODEL_REVISION: &str = "751bff37182d3f1213fa05d7196b954e230abad9";
 pub const MODEL_REPOSITORY: &str = "Xenova/all-MiniLM-L6-v2";
 const MODEL_FILE: &str = "onnx/model_quantized.onnx";
-// Keep the tokenizer used in the benchmark, including its 512-token limit.
-const TOKENIZER_REPOSITORY: &str = "Qdrant/all-MiniLM-L6-v2-onnx";
-const TOKENIZER_REVISION: &str = "5f1b8cd78bc4fb444dd171e59b18f3a3af89a079";
+// TS v2 pins its tokenizer with the model; documents are explicitly split at 256.
+const TOKENIZER_REPOSITORY: &str = MODEL_REPOSITORY;
+const TOKENIZER_REVISION: &str = MODEL_REVISION;
 pub fn model_identity() -> String {
-    format!("{MODEL_NAME}@{MODEL_REVISION}/tokenizer@{TOKENIZER_REVISION}")
+    format!("{MODEL_NAME}@{MODEL_REVISION}/tokenizer@{TOKENIZER_REVISION}/ort@1.22.0")
 }
 
 pub const DIMENSION: usize = 384;
@@ -25,6 +23,17 @@ const DOCUMENT_BATCH_SIZE: usize = 256;
 mod pool;
 
 pub trait Backend {
+    fn embed_source_profiled(
+        &mut self,
+        texts: &[String],
+        profile: &Profiler,
+    ) -> anyhow::Result<Vec<Vec<f32>>> {
+        self.embed_profiled(texts, profile)
+    }
+    fn embed_query_text(&mut self, text: &str) -> anyhow::Result<Vec<Vec<f32>>> {
+        self.embed(&[text.to_owned()])
+    }
+
     fn set_workers(&mut self, _workers: usize) {}
 
     fn embed_profiled(
@@ -112,6 +121,29 @@ impl Embedder {
         Ok(vectors)
     }
 
+    pub fn embed_ts_documents(
+        &mut self,
+        texts: &[String],
+        mut progress: impl FnMut(usize, usize) -> anyhow::Result<()>,
+    ) -> anyhow::Result<Vec<Vec<f32>>> {
+        let mut output = Vec::new();
+        for (i, batch) in texts.chunks(1024).enumerate() {
+            let vectors = self.profile.measure("embedding", || {
+                self.backend.embed_source_profiled(batch, &self.profile)
+            })?;
+            validate(&vectors, batch.len())?;
+            output.extend(vectors);
+            progress((i * 1024 + batch.len()).min(texts.len()), texts.len())?;
+        }
+        Ok(output)
+    }
+
+    pub fn embed_ts_query(&mut self, query: &str) -> anyhow::Result<Vec<f32>> {
+        let mut vectors = self.backend.embed_query_text(query)?;
+        validate(&vectors, 1)?;
+        Ok(vectors.remove(0))
+    }
+
     pub fn embed_query(&mut self, query: &str) -> anyhow::Result<Vec<f32>> {
         let texts = [query.to_owned()];
         let mut vectors = self.backend.embed(&texts).context("cannot embed query")?;
@@ -145,14 +177,14 @@ fn validate(vectors: &[Vec<f32>], expected_count: usize) -> anyhow::Result<()> {
     Ok(())
 }
 
-struct FastEmbedBackend {
+struct OnnxBackend {
     cache_dir: PathBuf,
-    models: Vec<TextEmbedding>,
+    models: Vec<Model>,
     workers: usize,
     profile: Profiler,
 }
 
-impl FastEmbedBackend {
+impl OnnxBackend {
     fn new(cache_dir: PathBuf) -> Self {
         Self {
             cache_dir,
@@ -196,28 +228,11 @@ impl FastEmbedBackend {
                 })
             };
             let read_tokenizer = |name| read(TOKENIZER_REPOSITORY, TOKENIZER_REVISION, name);
-            let files = TokenizerFiles {
-                tokenizer_file: read_tokenizer("tokenizer.json")?,
-                config_file: read_tokenizer("config.json")?,
-                special_tokens_map_file: read_tokenizer("special_tokens_map.json")?,
-                tokenizer_config_file: read_tokenizer("tokenizer_config.json")?,
-            };
-            let model = UserDefinedEmbeddingModel::new(
-                read(MODEL_REPOSITORY, MODEL_REVISION, MODEL_FILE)?,
-                files,
-            )
-            .with_pooling(Pooling::Mean)
-            .with_quantization(QuantizationMode::Dynamic);
+            let tokenizer = read_tokenizer("tokenizer.json")?;
+            let weights = read(MODEL_REPOSITORY, MODEL_REVISION, MODEL_FILE)?;
             self.models.push(
                 self.profile
-                    .measure("model_startup", || {
-                        TextEmbedding::try_new_from_user_defined(
-                            model,
-                            InitOptionsUserDefined::new()
-                                .with_max_length(512)
-                                .with_intra_threads(1),
-                        )
-                    })
+                    .measure("model_startup", || Model::new(&weights, &tokenizer))
                     .with_context(|| {
                         format!("cannot initialize embedding model {MODEL_NAME}@{MODEL_REVISION}")
                     })?,
@@ -227,7 +242,7 @@ impl FastEmbedBackend {
         Ok(())
     }
 
-    fn model(&mut self) -> anyhow::Result<&mut TextEmbedding> {
+    fn model(&mut self) -> anyhow::Result<&mut Model> {
         self.ensure_models(1)?;
         Ok(&mut self.models[0])
     }
@@ -243,14 +258,71 @@ impl FastEmbedBackend {
         let count = self.workers.min(texts.len());
         self.ensure_models(count)?;
         pool::embed(&mut self.models[..count], texts, profile, |model, text| {
-            let mut vectors = model.embed([text], Some(1))?;
+            let mut vectors = model.embed(&[text])?;
             validate(&vectors, 1)?;
             Ok(vectors.remove(0))
         })
     }
 }
 
-impl Backend for FastEmbedBackend {
+impl Backend for OnnxBackend {
+    fn embed_source_profiled(
+        &mut self,
+        texts: &[String],
+        profile: &Profiler,
+    ) -> anyhow::Result<Vec<Vec<f32>>> {
+        if texts.is_empty() {
+            return Ok(Vec::new());
+        }
+        let tokenizer = ts_v2::unbounded(self.model()?.tokenizer.clone())?;
+        let mut unique = Vec::new();
+        let mut indexes = std::collections::HashMap::new();
+        let mut plans = Vec::new();
+        for text in texts {
+            let mut plan = Vec::new();
+            for input in ts_v2::document_inputs(&tokenizer, text)? {
+                let index = *indexes.entry(input.clone()).or_insert_with(|| {
+                    let index = unique.len();
+                    unique.push(input);
+                    index
+                });
+                plan.push(index);
+            }
+            plans.push(plan);
+        }
+        let vectors = self.embed_chunks(&unique, profile)?;
+        plans
+            .into_iter()
+            .map(|plan| {
+                ts_v2::merge(
+                    &plan
+                        .iter()
+                        .map(|&i| vectors[i].as_slice())
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect()
+    }
+
+    fn embed_query_text(&mut self, text: &str) -> anyhow::Result<Vec<Vec<f32>>> {
+        let tokenizer = ts_v2::unbounded(self.model()?.tokenizer.clone())?;
+        let windows = ts_v2::query_inputs(&tokenizer, text)?;
+        let mut order: Vec<_> = (0..windows.len()).collect();
+        order.sort_by_key(|&i| (windows[i].1, i));
+        let mut vectors = vec![Vec::new(); windows.len()];
+        for batch in order.chunks(32) {
+            let texts: Vec<_> = batch.iter().map(|&i| windows[i].0.as_str()).collect();
+            let outputs = self.model()?.embed(&texts)?;
+            validate(&outputs, batch.len())?;
+            for (&index, output) in batch.iter().zip(outputs) {
+                vectors[index] = output;
+            }
+        }
+        Ok(vec![ts_v2::merge(
+            &vectors.iter().map(Vec::as_slice).collect::<Vec<_>>(),
+        )?])
+    }
+
     fn set_workers(&mut self, workers: usize) {
         self.workers = workers;
         self.models.truncate(workers);
@@ -293,7 +365,7 @@ pub fn production_profiled(
 ) -> anyhow::Result<Embedder> {
     // Tokenization of a single input needs no additional global worker pool.
     tokenizers::utils::parallelism::set_parallelism(false);
-    let mut backend = FastEmbedBackend::new(match cache_dir {
+    let mut backend = OnnxBackend::new(match cache_dir {
         Some(path) => path,
         None => model_cache_dir()?,
     });
@@ -304,3 +376,6 @@ pub fn production_profiled(
 #[cfg(test)]
 #[path = "../tests/unit/embedding.rs"]
 mod tests;
+
+#[allow(dead_code)]
+pub mod ts_v2;

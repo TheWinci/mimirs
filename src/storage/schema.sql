@@ -39,6 +39,7 @@ CREATE TABLE retrieval_documents (
     file_id INTEGER NOT NULL REFERENCES source_snapshots(file_id) ON DELETE CASCADE,
     ordinal INTEGER NOT NULL CHECK (ordinal >= 0),
     owner INTEGER,
+    source_chunk INTEGER,
     kind TEXT NOT NULL CHECK (kind IN ('entity', 'file')),
     part INTEGER NOT NULL CHECK (part >= 0),
     policy TEXT NOT NULL,
@@ -46,7 +47,8 @@ CREATE TABLE retrieval_documents (
     content_hash TEXT NOT NULL,
     evidence TEXT NOT NULL,
     UNIQUE (file_id, ordinal),
-    FOREIGN KEY (file_id, owner) REFERENCES entities(file_id, ordinal)
+    FOREIGN KEY (file_id, owner) REFERENCES entities(file_id, ordinal),
+    FOREIGN KEY (file_id, source_chunk) REFERENCES source_chunks(file_id, ordinal)
 );
 
 CREATE VIRTUAL TABLE document_embeddings USING vec0(
@@ -72,3 +74,20 @@ CREATE VIRTUAL TABLE document_fts USING fts5(
 CREATE TRIGGER delete_document_fts AFTER DELETE ON retrieval_documents BEGIN
     DELETE FROM document_fts WHERE rowid = old.id;
 END;
+
+CREATE TABLE source_chunks (
+    file_id INTEGER NOT NULL REFERENCES source_snapshots(file_id) ON DELETE CASCADE,
+    ordinal INTEGER NOT NULL CHECK (ordinal >= 0),
+    kind TEXT NOT NULL,
+    name TEXT,
+    byte_start INTEGER NOT NULL,
+    byte_end INTEGER NOT NULL,
+    line_start INTEGER NOT NULL,
+    line_end INTEGER NOT NULL,
+    parent INTEGER,
+    owner INTEGER,
+    PRIMARY KEY (file_id, ordinal),
+    FOREIGN KEY (file_id, parent) REFERENCES source_chunks(file_id, ordinal)
+        DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (file_id, owner) REFERENCES entities(file_id, ordinal)
+);

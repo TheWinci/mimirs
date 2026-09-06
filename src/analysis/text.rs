@@ -14,7 +14,9 @@ pub(super) const LANGUAGE: Language = Language {
 /// Text snapshots have source coverage but no inferred syntax records.
 fn extract(source: SourceFile) -> Result<Analysis> {
     let span = LineIndex::new(&source.text).span(0, source.text.len());
+    let source_chunks = crate::retrieval::ts_v2::text_chunks(&source.text, &source.path);
     Ok(Analysis {
+        source_chunks,
         source,
         diagnostics: Vec::new(),
         entities: Vec::new(),

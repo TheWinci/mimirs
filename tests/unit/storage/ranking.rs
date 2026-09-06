@@ -26,6 +26,7 @@ fn chunk_and_file_grouping_match_ts_reference() {
         .map(|c| {
             let id = c["id"].as_i64().unwrap();
             Candidate {
+                source_chunk: None,
                 id,
                 file_id: 1,
                 ordinal: id as usize,
@@ -121,6 +122,7 @@ fn unique_symbol_counts_distinct_files_and_signals_precede_confirmation() {
     .unwrap();
     let candidates = (0..3)
         .map(|ordinal| Candidate {
+            source_chunk: None,
             id: ordinal as i64 + 1,
             file_id: 1,
             ordinal,
