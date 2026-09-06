@@ -128,7 +128,10 @@ fn search_collapses_many_parts_and_retains_indexed_evidence() {
     let owners: std::collections::HashSet<_> = hits.iter().map(|h| h.indexed.owner).collect();
     assert_eq!(owners.len(), 3);
     assert_eq!(hits[0].line_end, 1);
-    assert!(hits.iter().all(|h| !h.indexed.spans.is_empty()));
+    assert!(
+        hits.iter()
+            .all(|h| h.chunks.iter().all(|c| !c.spans.is_empty()))
+    );
     db.execute(
         "UPDATE retrieval_documents SET policy='broken' WHERE ordinal=0",
         [],
@@ -167,4 +170,69 @@ fn policy_rejects_missing_vectors_and_processing() {
     assert!(crate::storage::policy::read(&db).is_err());
     db.execute("DELETE FROM retrieval_processing", []).unwrap();
     assert!(crate::storage::policy::read(&db).is_err());
+}
+
+#[test]
+fn selected_chunks_preserve_text_evidence_ties_and_source_order_under_cap() {
+    for path in ["deleted.rs", "deleted.txt"] {
+        let dir = tempfile::tempdir().unwrap();
+        let mut db = crate::storage::open(&dir.path().join("index.db"))
+            .unwrap()
+            .connection;
+        let source = format!(
+            "fn answer() {{\n{}}}\n",
+            (0..100)
+                .map(|i| format!("    let value_{i} = compute({i});\n"))
+                .collect::<String>()
+        );
+        let analysis = crate::analysis::extract(crate::source::SourceFile {
+            path: path.into(),
+            text: source,
+        })
+        .unwrap();
+        let budget =
+            crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(64)).unwrap();
+        let policy = crate::storage::policy::document_policy(&budget);
+        let documents = crate::retrieval::source::documents(&analysis, &budget).unwrap();
+        assert!(documents.len() > 7);
+        assert!(documents.iter().all(|d| d.owner == documents[0].owner));
+        let vectors = (0..documents.len())
+            .map(|i| {
+                let mut v = vec![0.0; DIMENSION];
+                v[0] = 1.0;
+                v[1] = match i {
+                    4 => 0.0,
+                    1 | 7 => 0.1,
+                    _ => 10.0,
+                };
+                v
+            })
+            .collect::<Vec<_>>();
+        save(
+            &mut db,
+            &analysis,
+            Batch {
+                documents: &documents,
+                vectors: &vectors,
+                policy: &policy,
+            },
+        )
+        .unwrap();
+        let mut query = vec![0.0; DIMENSION];
+        query[0] = 1.0;
+        let hits = crate::storage::nearest(&db, &query, 1).unwrap();
+        assert_eq!(hits.len(), 1);
+        let hit = &hits[0];
+        assert_eq!(hit.similarity, 1.0);
+        assert_eq!(
+            hit.chunks.iter().map(|c| c.ordinal).collect::<Vec<_>>(),
+            [4, 1, 7]
+        );
+        assert_eq!(hit.omitted_candidates, documents.len().min(16) - 3);
+        for (chunk, ordinal) in hit.chunks.iter().zip([4, 1, 7]) {
+            assert_eq!(chunk.part, documents[ordinal].part);
+            assert_eq!(chunk.text, documents[ordinal].text);
+            assert_eq!(chunk.spans, documents[ordinal].evidence);
+        }
+    }
 }

@@ -88,7 +88,7 @@ fn nearest_keeps_same_named_entities_separate() {
     assert!(
         results
             .iter()
-            .all(|r| r.path == "nested/file.rs" && r.text.contains("fn same() {}"))
+            .all(|r| r.path == "nested/file.rs" && r.chunks[0].text.contains("fn same() {}"))
     );
 }
 
@@ -139,7 +139,10 @@ fn text_and_rust_share_ranking_and_saved_source_evidence() {
     let hits = nearest(&connection, &vector(1.0, 0.0), 5).unwrap();
     assert_eq!(hits.len(), 2);
     assert_eq!(hits[0].path, "a.txt");
-    assert_eq!(hits[0].text, "a.txt\nsecond paragraph");
+    assert_eq!(hits[0].chunks[0].text, "a.txt\nsecond paragraph");
     assert!(hits[0].indexed.owner.is_none());
-    assert!(hits.iter().all(|h| !h.indexed.spans.is_empty()));
+    assert!(
+        hits.iter()
+            .all(|h| h.chunks.iter().all(|c| !c.spans.is_empty()))
+    );
 }

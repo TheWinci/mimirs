@@ -92,18 +92,37 @@ fn write_results(
                 .owner
                 .map_or_else(|| "file".into(), |id| format!("e{id}"))
         )?;
-        for evidence in &indexed.spans {
+        if result.omitted_candidates > 0 {
             writeln!(
                 stdout,
-                "evidence: {:?} bytes {}..{} lines {}..{}",
-                evidence.record,
-                evidence.span.start,
-                evidence.span.end,
-                evidence.span.line_start,
-                evidence.span.line_end
+                "omitted_matching_candidates: {}",
+                result.omitted_candidates
             )?;
         }
-        writeln!(stdout, "text: {}", result.text)?;
+        for (number, chunk) in result.chunks.iter().enumerate() {
+            if result.chunks.len() > 1 {
+                writeln!(
+                    stdout,
+                    "\nchunk: {}/{} part: {} document: {}",
+                    number + 1,
+                    result.chunks.len(),
+                    chunk.part,
+                    chunk.ordinal
+                )?;
+            }
+            for evidence in &chunk.spans {
+                writeln!(
+                    stdout,
+                    "evidence: {:?} bytes {}..{} lines {}..{}",
+                    evidence.record,
+                    evidence.span.start,
+                    evidence.span.end,
+                    evidence.span.line_start,
+                    evidence.span.line_end
+                )?;
+            }
+            writeln!(stdout, "text: {}", chunk.text)?;
+        }
     }
 
     Ok(())

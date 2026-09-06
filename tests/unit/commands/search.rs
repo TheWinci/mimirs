@@ -357,3 +357,62 @@ fn source_search_forwards_distilled_query_and_reads_deleted_snapshot() {
     assert!(output.contains("/// Expire sessions."));
     assert!(output.contains("evidence: Source"));
 }
+
+#[test]
+fn multiple_matching_chunks_show_later_answer_from_deleted_snapshot() {
+    let (dir, mut connection) = project();
+    let text = format!(
+        "fn answer() {{\n{}}}\n",
+        (0..300)
+            .map(|i| format!("    let value_{i} = compute({i});\n"))
+            .collect::<String>()
+    );
+    let analysis = crate::analysis::extract(SourceFile {
+        path: "deleted.rs".into(),
+        text,
+    })
+    .unwrap();
+    let budget =
+        crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
+    let docs = crate::retrieval::source::documents(&analysis, &budget).unwrap();
+    assert!(docs.len() > 3);
+    let policy = storage::policy::document_policy(&budget);
+    let vectors = (0..docs.len())
+        .map(|i| vector(1.0, i as f32))
+        .collect::<Vec<_>>();
+    storage::documents::save(
+        &mut connection,
+        &analysis,
+        storage::documents::Batch {
+            documents: &docs,
+            vectors: &vectors,
+            policy: &policy,
+        },
+    )
+    .unwrap();
+    drop(connection);
+    let (result, output) = execute(dir.path(), "later answer", 1, || Ok(Embedder::new(fixed())));
+    result.unwrap();
+    assert!(output.contains("omitted_matching_candidates:"));
+    for (i, doc) in docs.iter().take(3).enumerate() {
+        assert!(output.contains(&format!(
+            "chunk: {}/3 part: {} document: {}",
+            i + 1,
+            doc.part,
+            i
+        )));
+        assert!(output.contains(&format!("text: {}", doc.text)));
+        for e in &doc.evidence {
+            assert!(output.contains(&format!(
+                "evidence: Source bytes {}..{} lines {}..{}",
+                e.span.start, e.span.end, e.span.line_start, e.span.line_end
+            )));
+        }
+    }
+    assert!(!output.contains(&format!("text: {}", docs[3].text)));
+    let omitted = &docs[3].evidence[0].span;
+    assert!(!output.contains(&format!(
+        "evidence: Source bytes {}..{}",
+        omitted.start, omitted.end
+    )));
+}

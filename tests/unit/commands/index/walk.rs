@@ -199,3 +199,29 @@ fn malformed_ignore_rules_are_reported_alongside_accepted_files() {
     assert_eq!(walk.errors.len(), 1);
     assert!(walk.errors[0].contains(".gitignore"));
 }
+
+#[test]
+fn default_target_exclusion_is_rooted_and_custom_rules_stay_explicit() {
+    let dir = tree(&[
+        ("target/generated.rs", "build output"),
+        ("src/target/mod.rs", "fn target() {}"),
+        ("packages/compiler/src/target/mod.rs", "fn nested() {}"),
+        ("crates/tool/target/generated.rs", "nested build output"),
+    ]);
+    let mut defaults = Config::default();
+    assert_eq!(
+        walk(dir.path(), &defaults).unwrap().paths,
+        [
+            "crates/tool/target/generated.rs",
+            "packages/compiler/src/target/mod.rs",
+            "src/target/mod.rs",
+        ]
+    );
+    defaults.exclude.push("/crates/tool/target/**".into());
+    assert_eq!(
+        walk(dir.path(), &defaults).unwrap().paths,
+        ["packages/compiler/src/target/mod.rs", "src/target/mod.rs",]
+    );
+    let old = config(&["**/*.rs"], &["**/target/**"]);
+    assert!(walk(dir.path(), &old).unwrap().paths.is_empty());
+}

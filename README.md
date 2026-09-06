@@ -105,8 +105,12 @@ Inspection needs no model. The plain form reports analysis and syntax relations;
 use the indexed snapshot even after the working file changes or disappears.
 Included unsupported text can also be inspected and is identified as text fallback.
 
-Search returns each entity's best matching document, with the exact embedded
-text, indexed snapshot hash, entity location, and source evidence ranges.
+Search ranks each entity by its best matching document and displays up to three
+matching documents. Each block contains the exact embedded text and its own
+source evidence ranges. The best match appears first; other selected documents
+follow in source order. Results identify the indexed snapshot and entity location.
+When the cap omits matching candidates, the result reports their count. It does
+not fetch every part of the entity.
 Ownerless source blocks group into one result per file. Candidate retrieval can
 expand to 4,096 documents; many parts belonging to the same entity can yield
 fewer results than requested. Entity ordinals identify only the saved snapshot.
@@ -132,6 +136,13 @@ To enable Python in an existing project, add `"**/*.py"` and `"**/*.pyi"` to
 run `mimirs index`. Add `"**/.venv/**"`, `"**/venv/**"`, and `"**/__pycache__/**"`
 to `exclude` if your config does not already exclude those directories. `init`
 preserves the contents of your existing config.
+
+Fresh configs exclude only the root `/target/**` build directory. Older configs
+using `"**/target/**"` also exclude source directories such as `src/target/`.
+Replace that entry with `"/target/**"` to include nested source, then run
+`mimirs index`. Add explicit exclusions for nested or custom build outputs,
+for example `"/crates/tool/target/**"`. This does not discover Cargo workspaces
+automatically. Existing configs retain their rules until you edit them.
 
 The old `inspect --documents` facts-description preview has been removed.
 

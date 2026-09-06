@@ -24,7 +24,7 @@ impl Default for Config {
                 "**/.git/**",
                 "**/.mimirs/**",
                 "**/node_modules/**",
-                "**/target/**",
+                "/target/**",
                 "**/dist/**",
                 "**/build/**",
                 "**/vendor/**",

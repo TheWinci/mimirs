@@ -8,7 +8,8 @@ pub struct SearchResult {
     pub path: String,
     pub line_start: i64,
     pub line_end: i64,
-    pub text: String,
+    pub chunks: Vec<SearchChunk>,
+    pub omitted_candidates: usize,
     pub similarity: f64,
     pub indexed: IndexedEvidence,
 }
@@ -17,6 +18,13 @@ pub struct SearchResult {
 pub struct IndexedEvidence {
     pub owner: Option<usize>,
     pub snapshot_hash: String,
+}
+
+#[derive(Debug)]
+pub struct SearchChunk {
+    pub ordinal: usize,
+    pub part: usize,
+    pub text: String,
     pub spans: Vec<crate::retrieval::Evidence>,
 }
 
