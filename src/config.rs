@@ -23,7 +23,7 @@ impl Default for Config {
             embedding_workers: None,
             include: [
                 "**/*.rs", "**/*.py", "**/*.pyi", "**/*.ts", "**/*.mts", "**/*.cts", "**/*.tsx",
-                "**/*.js", "**/*.mjs", "**/*.cjs", "**/*.jsx",
+                "**/*.js", "**/*.mjs", "**/*.cjs", "**/*.jsx", "**/*.go",
             ]
             .map(String::from)
             .to_vec(),

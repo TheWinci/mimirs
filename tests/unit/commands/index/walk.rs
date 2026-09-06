@@ -68,6 +68,11 @@ fn default_include_selects_delivered_languages() {
         ("app.js", "function main() {}"),
         ("api.d.ts", "declare function main(): void;"),
         ("node_modules/lib/index.js", "function ignored() {}"),
+        ("cache.go", "package cache"),
+        ("cache_test.go", "package cache_test"),
+        ("cache_windows.go", "//go:build windows\n\npackage cache"),
+        ("vendor/lib/cache.go", "package dependency"),
+        ("target/cache.go", "package generated"),
         ("src/lib.rs", "pub fn answer() -> u8 { 42 }"),
     ]);
 
@@ -81,6 +86,9 @@ fn default_include_selects_delivered_languages() {
             "app.py",
             "app.ts",
             "b.rs",
+            "cache.go",
+            "cache_test.go",
+            "cache_windows.go",
             "src/lib.rs",
             "stubs/app.pyi",
             "view.tsx"

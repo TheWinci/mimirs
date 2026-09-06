@@ -1180,3 +1180,92 @@ fn failed_profile_retains_measurements_for_committed_and_failed_files() {
     assert_eq!(report.files.len(), 2);
     assert_eq!(files(&dir), [("a.rs".into(), "fn a() {}".into())]);
 }
+
+#[test]
+fn go_storage_reuse_edits_and_failed_replacement_share_the_pipeline() {
+    let dir = project(&[
+        ("a.go", include_str!("../../fixtures/go/declarations.go")),
+        ("empty.go", ""),
+        ("remove.go", "package cache\nfunc removed() {}\n"),
+        ("keep.rs", "fn keep() {}"),
+        ("keep.py", "def keep(): pass\n"),
+        ("keep.ts", "export const keep = 1;\n"),
+    ]);
+    run(&dir, backend(), false).0.unwrap();
+    let budget =
+        crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
+    let policy = storage::policy::document_policy(&budget);
+    for path in [
+        "a.go",
+        "empty.go",
+        "remove.go",
+        "keep.rs",
+        "keep.py",
+        "keep.ts",
+    ] {
+        let direct = crate::analysis::extract(source::read(dir.path(), path).unwrap()).unwrap();
+        let db = connection(&dir);
+        assert_eq!(storage::analysis::load(&db, path).unwrap().unwrap(), direct);
+        assert_eq!(
+            storage::documents::load(&db, path, &policy).unwrap(),
+            crate::retrieval::source::documents(&direct, &budget).unwrap()
+        );
+    }
+    let model = backend();
+    let calls = model.calls.clone();
+    let mut stderr = Vec::new();
+    let mut progress = Progress::new(dir.path(), &mut stderr, false, &|| Duration::ZERO);
+    let summary = index_with(
+        dir.path(),
+        || Ok(Embedder::new(model)),
+        &mut progress,
+        source::read,
+        |_| panic!("unchanged Go source parsed"),
+    )
+    .unwrap();
+    assert_eq!((summary.indexed, summary.unchanged), (0, 6));
+    assert!(calls.borrow().batches.is_empty());
+    fs::remove_file(dir.path().join("remove.go")).unwrap();
+    fs::write(
+        dir.path().join("a.go"),
+        "package cache\nfunc changed() {}\n",
+    )
+    .unwrap();
+    fs::write(dir.path().join("keep.ts"), "export const changed = 2;\n").unwrap();
+    let (result, stdout, _) = run(&dir, backend(), false);
+    result.unwrap();
+    assert!(stdout.starts_with("indexed: 2 files\nunchanged: 3 files\n"));
+    assert!(
+        storage::analysis::load(&connection(&dir), "remove.go")
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(
+        storage::analysis::load(&connection(&dir), "a.go")
+            .unwrap()
+            .unwrap()
+            .entities[0]
+            .name
+            .as_deref(),
+        Some("changed")
+    );
+    fs::write(
+        dir.path().join("a.go"),
+        "package cache\nvar replacement = 99\n",
+    )
+    .unwrap();
+    let mut model = backend();
+    model.fail_on = Some("a.go\nvar replacement = 99".into());
+    assert!(run(&dir, model, false).0.is_err());
+    assert!(
+        storage::analysis::load(&connection(&dir), "a.go")
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        storage::nearest(&connection(&dir), &vec![1.0; DIMENSION], 10)
+            .unwrap()
+            .iter()
+            .all(|h| h.path != "a.go")
+    );
+}

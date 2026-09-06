@@ -20,3 +20,18 @@ fn javascript_typescript_and_tsx_grammars_load() {
         assert!(!tree.root_node().has_error(), "{source}");
     }
 }
+
+#[test]
+fn go_grammar_loads_with_generic_declarations_and_receivers() {
+    let source = "package cache\ntype Box[T any] struct { Value T }\ntype Alias[T any] = Box[T]\nfunc (b *Box[T]) Get() T { return b.Value }\nconst (\nFirst = iota; Second\n)\nvar (\na, b = 1, 2\n)\nfunc external(x int) int\n";
+    let mut parser = tree_sitter::Parser::new();
+    parser
+        .set_language(&tree_sitter_go::LANGUAGE.into())
+        .unwrap();
+    let tree = parser.parse(source, None).unwrap();
+    assert!(
+        !tree.root_node().has_error(),
+        "{}",
+        tree.root_node().to_sexp()
+    );
+}

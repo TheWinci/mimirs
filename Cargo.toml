@@ -29,6 +29,7 @@ tokenizers = { version = "0.22.2", default-features = false, features = ["onig"]
 hf-hub = { version = "0.5.0", default-features = false, features = ["ureq", "rustls-tls"] }
 tree-sitter-typescript = "=0.23.2"
 tree-sitter-javascript = "=0.25.0"
+tree-sitter-go = "=0.25.0"
 
 [dev-dependencies]
 tempfile = "3.27.0"

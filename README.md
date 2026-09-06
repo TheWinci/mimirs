@@ -54,9 +54,9 @@ mimirs search 'valid_username check for trailing newline' --limit 5
 ```
 
 Run these commands from the project root. Fresh config includes Rust `.rs`,
-Python `.py` and `.pyi`, TypeScript `.ts`, `.mts`, `.cts`, and `.tsx`, and
-JavaScript `.js`, `.mjs`, `.cjs`, and `.jsx` files. This includes `.d.ts`
-declarations. `node_modules` and common Python environment directories `.venv`,
+Python `.py` and `.pyi`, TypeScript `.ts`, `.mts`, `.cts`, and `.tsx`,
+JavaScript `.js`, `.mjs`, `.cjs`, and `.jsx`, and Go `.go` files. This includes
+`.d.ts` declarations. `node_modules` and common Python environment directories `.venv`,
 `venv`, and `__pycache__` are excluded. Customize `include` and `exclude` in
 `.mimirs/config.toml` for your project.
 `init` preserves an existing config. The first model use can download files;
@@ -105,6 +105,23 @@ unnamed. Imports, re-exports, ordinary comments, and incomplete syntax stay
 searchable. Analysis records written names, containment, signatures, and parse
 diagnostics without resolving imports, calls, or types. The grammars ship in the
 binary. No Node.js installation or language server is required.
+
+Go functions and receiver methods retain their written headers and bodies.
+Methods remain file-level owners, with the receiver in their source signature.
+Types, aliases, variables and constants keep their full declarations. Groups
+partition around individual specs, preserving group documentation, keywords and
+separators in the group's source. A multi-name spec has one unnamed owner.
+Contiguous leading comments attach to their declaration; blank lines and trailing
+comments stop attachment. Struct fields, interface elements, local declarations
+and function literals remain inside the containing declaration.
+
+Go imports, package comments, build constraints and cgo preambles remain source.
+Mimirs does not load packages, evaluate build tags or expand `iota` and omitted
+constant expressions. Tests and platform-specific files follow the include and
+exclude rules; `vendor` stays excluded by default. No Go installation is required.
+The pinned grammar can report recoverable separator diagnostics for compact
+parenthesized declarations. Inspection exposes those diagnostics, and indexing
+retains the original source.
 
 Large items split on source lines, repeating their signature. A single oversized
 line splits at tokenizer and UTF-8 boundaries. Every complete input, including
@@ -202,6 +219,11 @@ and `"**/*.jsx"` to `include`. Retain your other rules, exclude
 `"**/node_modules/**"`, and run `mimirs index`. The new analyzer registry requires
 a rebuild of the index, including files already handled by Rust and Python.
 
+To enable Go in an existing project, add `"**/*.go"` to `include`, retain your
+other includes and exclusions, and run `mimirs index`. Registering Go changes the
+shared analyzer policy, so this upgrade rebuilds the whole index once. Ordinary
+source edits remain incremental.
+
 Fresh configs exclude only the root `/target/**` build directory. Older configs
 using `"**/target/**"` also exclude source directories such as `src/target/`.
 Replace that entry with `"/target/**"` to include nested source, then run
@@ -220,3 +242,6 @@ first Python source and mixed-language search verification.
 
 The [TypeScript and JavaScript retrieval check](benchmarks/retrieval/javascript/README.md)
 covers dialects, fallback upgrades, mixed-language indexing, and visible answers.
+
+The [Go retrieval check](benchmarks/retrieval/go/README.md) records declaration
+groups, receiver methods, fallback upgrades and mixed-language search results.

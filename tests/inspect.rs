@@ -130,3 +130,36 @@ fn javascript_dialects_preview_wrapped_declarations_without_a_project() {
     }
     assert!(!dir.path().join(".mimirs").exists());
 }
+
+#[test]
+fn go_preview_keeps_receiver_and_docs_without_project_state() {
+    let dir = tempfile::tempdir().unwrap();
+    let source =
+        "package cache\n// Get returns the value.\nfunc (b *Box[T]) Get() T { return b.Value }\n";
+    fs::write(dir.path().join("cache.go"), source).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_mimirs"))
+        .args(["inspect", "cache.go", "--source-chunks"])
+        .current_dir(&dir)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let chunks: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        chunks[1]["text"],
+        source.strip_prefix("package cache\n").unwrap().trim_end()
+    );
+    assert_eq!(chunks[1]["context"], "cache.go");
+    assert_eq!(chunks[1]["owner"], 0);
+    let report = Command::new(env!("CARGO_BIN_EXE_mimirs"))
+        .args(["inspect", "cache.go"])
+        .current_dir(&dir)
+        .output()
+        .unwrap();
+    assert!(report.status.success());
+    assert!(String::from_utf8_lossy(&report.stdout).contains("parse: complete"));
+    assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1);
+}

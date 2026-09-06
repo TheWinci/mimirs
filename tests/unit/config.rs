@@ -77,7 +77,7 @@ fn from_toml_accepts_the_default() {
         config.include,
         [
             "**/*.rs", "**/*.py", "**/*.pyi", "**/*.ts", "**/*.mts", "**/*.cts", "**/*.tsx",
-            "**/*.js", "**/*.mjs", "**/*.cjs", "**/*.jsx"
+            "**/*.js", "**/*.mjs", "**/*.cjs", "**/*.jsx", "**/*.go"
         ]
     );
 }
