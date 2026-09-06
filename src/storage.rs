@@ -17,10 +17,11 @@ static VEC_REGISTRATION: OnceLock<Result<(), String>> = OnceLock::new();
 
 // Alpha versions identify rebuilds, not positions in a migration list.
 // Keep rusqlite_migration for the baseline before database compatibility is promised.
-// Version 9 rebuilds float32 indexes with q8 weights; the table layout is unchanged.
-pub(crate) const SCHEMA_VERSION: i64 = 9;
+// Version 10 adds the lexical projection; prior indexes require a rebuild.
+pub(crate) const SCHEMA_VERSION: i64 = 10;
 const SCHEMA: &str = include_str!("storage/schema.sql");
 // Used only to recognize old databases, never to upgrade their rows.
+const SCHEMA_V9: &str = include_str!("storage/schema_v9.sql");
 const SCHEMA_V7: &str = include_str!("storage/schema_v7.sql");
 const SCHEMA_V6: &str = include_str!("storage/schema_v6.sql");
 const SCHEMA_V5: &str = include_str!("storage/schema_v5.sql");
@@ -178,7 +179,7 @@ fn validate_version(connection: &Connection) -> anyhow::Result<i64> {
         5 => SCHEMA_V5,
         6 => SCHEMA_V6,
         7 => SCHEMA_V7,
-        8 => SCHEMA,
+        8 | 9 => SCHEMA_V9,
         SCHEMA_VERSION => SCHEMA,
         _ => anyhow::bail!("unknown database schema version {found}"),
     };
@@ -254,3 +255,7 @@ pub mod documents;
 pub mod policy;
 
 mod document_search;
+
+// Candidate retrieval is connected to public search after grouping is ported.
+#[allow(dead_code)]
+pub mod lexical;

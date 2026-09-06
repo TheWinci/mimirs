@@ -59,3 +59,16 @@ CREATE TABLE retrieval_processing (
     policy TEXT NOT NULL,
     document_count INTEGER NOT NULL CHECK (document_count >= 0)
 );
+
+CREATE VIRTUAL TABLE document_fts USING fts5(
+    path,
+    chunk_name,
+    text,
+    content = '',
+    contentless_delete = 1,
+    tokenize = 'unicode61'
+);
+
+CREATE TRIGGER delete_document_fts AFTER DELETE ON retrieval_documents BEGIN
+    DELETE FROM document_fts WHERE rowid = old.id;
+END;

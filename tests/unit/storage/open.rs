@@ -315,6 +315,8 @@ fn float32_index_requires_rebuild_and_discards_old_vectors() {
     .unwrap();
     // Matching dimensions alone cannot make float32 and q8 indexes compatible.
     assert!(validate_model(&db).is_err());
+    db.execute_batch("DROP TRIGGER delete_document_fts; DROP TABLE document_fts;")
+        .unwrap();
     db.pragma_update(None, "user_version", 8).unwrap();
     drop(db);
     let before = fs::read(&path).unwrap();
@@ -352,7 +354,8 @@ fn pre_revision_schemas_rebuild_only_on_writable_open() {
         (SCHEMA_V5, 5),
         (SCHEMA_V6, 6),
         (SCHEMA_V7, 7),
-        (SCHEMA, 8),
+        (SCHEMA_V9, 8),
+        (SCHEMA_V9, 9),
     ] {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("index.db");

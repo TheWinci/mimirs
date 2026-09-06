@@ -112,6 +112,21 @@ pub(super) fn write(
         );
         tx.execute("INSERT INTO retrieval_documents(file_id, ordinal, owner, kind, part, policy, text, content_hash, evidence) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)", params![file_id, ordinal as i64, document.owner.map(|id| id as i64), if document.owner.is_some() { "entity" } else { "file" }, document.part as i64, batch.policy, document.text, source_hash(&document.text), serde_json::to_string(&document.evidence)?])?;
         let id = tx.last_insert_rowid();
+        let source = document
+            .evidence
+            .iter()
+            .map(|evidence| &analysis.source.text[evidence.span.start..evidence.span.end])
+            .collect::<Vec<_>>()
+            .join("\n");
+        super::lexical::insert(
+            tx,
+            id,
+            &analysis.source.path,
+            document
+                .owner
+                .and_then(|owner| analysis.entities[owner].name.as_deref()),
+            &source,
+        )?;
         tx.execute(
             "INSERT INTO document_embeddings(document_id, embedding) VALUES (?1, ?2)",
             params![id, super::vector_bytes(vector)],

@@ -47,7 +47,9 @@ pub fn read(connection: &Connection) -> Result<Option<String>> {
         OR EXISTS(SELECT 1 FROM retrieval_processing p WHERE
             p.document_count != (SELECT count(*) FROM retrieval_documents d WHERE d.file_id=p.file_id)
             OR p.document_count != (SELECT count(*) FROM document_embeddings e JOIN retrieval_documents d ON d.id=e.document_id WHERE d.file_id=p.file_id))
-        OR EXISTS(SELECT 1 FROM document_embeddings e LEFT JOIN retrieval_documents d ON d.id=e.document_id WHERE d.id IS NULL)", [], |r| r.get(0))?;
+        OR EXISTS(SELECT 1 FROM document_embeddings e LEFT JOIN retrieval_documents d ON d.id=e.document_id WHERE d.id IS NULL)
+        OR EXISTS(SELECT 1 FROM retrieval_documents d LEFT JOIN document_fts l ON l.rowid=d.id WHERE l.rowid IS NULL)
+        OR EXISTS(SELECT 1 FROM document_fts l LEFT JOIN retrieval_documents d ON d.id=l.rowid WHERE d.id IS NULL)", [], |r| r.get(0))?;
     ensure!(
         !incomplete,
         "incomplete source retrieval output; run mimirs index"
