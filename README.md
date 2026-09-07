@@ -74,8 +74,9 @@ CPUs; zero and non-integer values are invalid. Remove the entry to restore the
 automatic default. This controls inference concurrency, not a hard CPU percentage.
 A reader/parser worker and a window preparation worker run alongside inference.
 A separate merger collects ordered vectors, and one writer owns SQLite
-mutations. Database writes can overlap the next file's preparation and inference. Each worker
-owns a model session, and its thread and session persist across files. The pool
+mutations. Database writes can overlap the next file's preparation and inference.
+Each inference worker owns a model session. Its thread and session persist across
+files. The pool
 starts when a file needs embeddings. Changing the worker setting does not
 require rebuilding unchanged files. Search embeds its query with one worker.
 
@@ -98,6 +99,9 @@ analysis, documents and window mappings, then merged vectors. The writer drains
 these stages while inference continues. Complete files replace their searchable
 rows atomically in `.mimirs/index.db`. Staging has its own schema version and does
 not change document or model identities. Unchanged files reuse their live data.
+
+During incremental indexing, the writer releases unused database cache after
+publication so the separate reader can check unchanged files efficiently.
 
 One OS writer lock covers indexing and cleanup. Published stages are deleted;
 abandoned stages are discarded on the next indexing run. Incomplete files are

@@ -291,3 +291,11 @@ mod port_source;
 #[cfg(test)]
 #[path = "../benchmarks/versions/port-language-reuse.rs"]
 mod port_language_reuse;
+
+/// Releasing unused writer pages after an incremental publication avoids costly
+/// reuse reads on the separate parser connection. This keeps the same connection,
+/// statements and validation policy; fresh indexing does not call it.
+pub(crate) fn release_writer_cache(connection: &mut Connection) -> anyhow::Result<()> {
+    connection.execute_batch("PRAGMA shrink_memory")?;
+    Ok(())
+}

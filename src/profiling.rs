@@ -302,8 +302,14 @@ impl Drop for Scope {
                 "analysis" => Some("parsing"),
                 "chunking_token_budget" | "document_texts" | "embedding_prepare" => Some("windows"),
                 "vector_merge" => Some("merge"),
-                "storage_save" | "invalidation" | "reconciliation" | "staging_save"
-                | "staging_validation" | "staging_open" | "staging_cleanup" => Some("database"),
+                "storage_save"
+                | "writer_cache_release"
+                | "invalidation"
+                | "reconciliation"
+                | "staging_save"
+                | "staging_validation"
+                | "staging_open"
+                | "staging_cleanup" => Some("database"),
                 _ => None,
             };
             if let Some(name) = stage {

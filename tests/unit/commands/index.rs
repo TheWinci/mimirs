@@ -1991,3 +1991,47 @@ fn full_writer_queue_cancels_without_deadlock() {
             <= 6
     );
 }
+
+#[test]
+fn writer_cache_release_is_limited_to_incremental_publications() {
+    let dir = project(&[("a.rs", "old a"), ("b.rs", "unchanged")]);
+    let invoke = |profile: &Profiler| {
+        let pool =
+            embedding::pool::Pool::new(vec![(); 3], |_, text| Ok(fake_vector(text))).unwrap();
+        run_parallel_test(
+            dir.path(),
+            || Ok(Embedder::new(AsyncBackend { pool, limit: 6 })),
+            &mut Vec::new(),
+            &mut Vec::new(),
+            false,
+            &|| Duration::ZERO,
+            profile,
+        )
+        .unwrap();
+    };
+    let profile = Profiler::enabled();
+    invoke(&profile);
+    let report = profile.finish(None).unwrap();
+    assert!(!report.counters.contains_key("writer_cache_releases"));
+    fs::write(dir.path().join("a.rs"), "updated a").unwrap();
+    fs::write(dir.path().join("c.rs"), "new file").unwrap();
+    let profile = Profiler::enabled();
+    invoke(&profile);
+    let report = profile.finish(None).unwrap();
+    assert_eq!(report.counters["writer_cache_releases"], 2);
+    assert_eq!(report.counters["files_indexed"], 2);
+    assert_eq!(report.counters["files_reused"], 1);
+    assert_eq!(
+        files(&dir),
+        [
+            ("a.rs".into(), "updated a".into()),
+            ("b.rs".into(), "unchanged".into()),
+            ("c.rs".into(), "new file".into())
+        ]
+    );
+    let profile = Profiler::enabled();
+    invoke(&profile);
+    let report = profile.finish(None).unwrap();
+    assert!(!report.counters.contains_key("writer_cache_releases"));
+    assert_eq!(report.counters["files_reused"], 3);
+}

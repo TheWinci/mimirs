@@ -113,6 +113,8 @@ pub(super) fn run(
     profile: &Profiler,
     summary: &mut Summary,
 ) -> Result<Vec<String>> {
+    let incremental: bool =
+        connection.query_row("SELECT EXISTS(SELECT 1 FROM files)", [], |r| r.get(0))?;
     let cancel = channel::Cancel::default();
     let admission = admission::Admission::new(workers.saturating_mul(2).max(1), profile, &cancel);
     let capacity = workers.saturating_mul(2).max(1);
@@ -148,6 +150,7 @@ pub(super) fn run(
             &write_rx,
             connection,
             &mut staging,
+            incremental,
             policy,
             progress,
             profile,
@@ -380,6 +383,7 @@ fn consume(
     receive: &channel::Receiver<Write>,
     connection: &mut rusqlite::Connection,
     staging: &mut storage::staging::Store,
+    incremental: bool,
     policy: &str,
     progress: &mut Progress<'_>,
     profile: &Profiler,
@@ -505,6 +509,12 @@ fn consume(
                             return Err(error);
                         }
                     };
+                    if incremental {
+                        file.profile.measure("writer_cache_release", || {
+                            storage::release_writer_cache(connection)
+                        })?;
+                        file.profile.count("writer_cache_releases", 1);
+                    }
                     staging.remove(&file.key(policy))?;
                     progress.diagnostic(&format!("documents: {}: {}", file.path, count))?;
                     successful.push(file.path.clone());

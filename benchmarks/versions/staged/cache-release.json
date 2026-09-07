@@ -1,0 +1,199 @@
+{
+  "binarySha256": {
+    "baseline": "c7e3cde70d3fe182dab6fa802a2ec55fc387d3ec4511f3b3b8d185a3ee9bc5a0",
+    "before": "185c87ad2a4d1cc09de945497cf846d2d079ba39573ee0bfcb13e4a250ef7669",
+    "after": "5de0c6bb607455284342a84a89d646cd531942a327b3774430b501ed0bcf0925"
+  },
+  "repeats": 2,
+  "workers": 3,
+  "profiled": false,
+  "manifestSha256": "6beddae92344cceae188842bf7510eb0d093336fd299fe7d9c575c9b29d7e9a0",
+  "querySha256": "12e308d6f460fd07c64e8f58092f7eae57407be3edff1619ef2a0c7ffcf119a1",
+  "editPaths": [
+    "pkg/kubelet/kubelet.go",
+    "pkg/kubelet/kubelet_pods.go"
+  ],
+  "trials": [
+    {
+      "label": "baseline",
+      "trial": 0,
+      "runs": {
+        "edited": {
+          "command": [
+            "/private/tmp/mimirs-staged-incremental-comparison/engines/baseline",
+            "index"
+          ],
+          "wall_seconds": 11.68308716698084,
+          "exit_code": 0,
+          "user_seconds": 17.54,
+          "system_seconds": 1.54,
+          "peak_rss_bytes": 291831808
+        },
+        "restore": {
+          "command": [
+            "/private/tmp/mimirs-staged-incremental-comparison/engines/baseline",
+            "index"
+          ],
+          "wall_seconds": 10.10578666604124,
+          "exit_code": 0,
+          "user_seconds": 17.37,
+          "system_seconds": 1.39,
+          "peak_rss_bytes": 291094528
+        }
+      }
+    },
+    {
+      "label": "before",
+      "trial": 0,
+      "runs": {
+        "edited": {
+          "command": [
+            "/private/tmp/mimirs-staged-incremental-comparison/engines/before",
+            "index"
+          ],
+          "wall_seconds": 23.938236541987862,
+          "exit_code": 0,
+          "user_seconds": 21.37,
+          "system_seconds": 9.71,
+          "peak_rss_bytes": 291782656
+        },
+        "restore": {
+          "command": [
+            "/private/tmp/mimirs-staged-incremental-comparison/engines/before",
+            "index"
+          ],
+          "wall_seconds": 22.213793416973203,
+          "exit_code": 0,
+          "user_seconds": 21.21,
+          "system_seconds": 9.62,
+          "peak_rss_bytes": 307740672
+        }
+      }
+    },
+    {
+      "label": "after",
+      "trial": 0,
+      "runs": {
+        "edited": {
+          "command": [
+            "/private/tmp/mimirs-staged-incremental-comparison/engines/after",
+            "index"
+          ],
+          "wall_seconds": 12.460735291009769,
+          "exit_code": 0,
+          "user_seconds": 17.95,
+          "system_seconds": 1.79,
+          "peak_rss_bytes": 287997952
+        },
+        "restore": {
+          "command": [
+            "/private/tmp/mimirs-staged-incremental-comparison/engines/after",
+            "index"
+          ],
+          "wall_seconds": 10.93040299997665,
+          "exit_code": 0,
+          "user_seconds": 17.93,
+          "system_seconds": 1.73,
+          "peak_rss_bytes": 309100544
+        }
+      }
+    },
+    {
+      "label": "after",
+      "trial": 1,
+      "runs": {
+        "edited": {
+          "command": [
+            "/private/tmp/mimirs-staged-incremental-comparison/engines/after",
+            "index"
+          ],
+          "wall_seconds": 10.972464416990988,
+          "exit_code": 0,
+          "user_seconds": 17.92,
+          "system_seconds": 1.81,
+          "peak_rss_bytes": 309313536
+        },
+        "restore": {
+          "command": [
+            "/private/tmp/mimirs-staged-incremental-comparison/engines/after",
+            "index"
+          ],
+          "wall_seconds": 10.618389750015922,
+          "exit_code": 0,
+          "user_seconds": 17.89,
+          "system_seconds": 1.74,
+          "peak_rss_bytes": 302399488
+        }
+      }
+    },
+    {
+      "label": "before",
+      "trial": 1,
+      "runs": {
+        "edited": {
+          "command": [
+            "/private/tmp/mimirs-staged-incremental-comparison/engines/before",
+            "index"
+          ],
+          "wall_seconds": 22.491075208992697,
+          "exit_code": 0,
+          "user_seconds": 21.26,
+          "system_seconds": 9.74,
+          "peak_rss_bytes": 305610752
+        },
+        "restore": {
+          "command": [
+            "/private/tmp/mimirs-staged-incremental-comparison/engines/before",
+            "index"
+          ],
+          "wall_seconds": 22.031581166025717,
+          "exit_code": 0,
+          "user_seconds": 21.28,
+          "system_seconds": 9.56,
+          "peak_rss_bytes": 302284800
+        }
+      }
+    },
+    {
+      "label": "baseline",
+      "trial": 1,
+      "runs": {
+        "edited": {
+          "command": [
+            "/private/tmp/mimirs-staged-incremental-comparison/engines/baseline",
+            "index"
+          ],
+          "wall_seconds": 10.548698041995522,
+          "exit_code": 0,
+          "user_seconds": 17.46,
+          "system_seconds": 1.49,
+          "peak_rss_bytes": 300531712
+        },
+        "restore": {
+          "command": [
+            "/private/tmp/mimirs-staged-incremental-comparison/engines/baseline",
+            "index"
+          ],
+          "wall_seconds": 10.068392166984268,
+          "exit_code": 0,
+          "user_seconds": 17.38,
+          "system_seconds": 1.39,
+          "peak_rss_bytes": 294993920
+        }
+      }
+    }
+  ],
+  "publishedTableSha256": {
+    "files": "e5055f9c8465a075bb40ecc019cb2293618ba8ef700a2470af72e67c81267c89",
+    "source_snapshots": "9af1ced697f94299dfaec13087075c69de3bab510b55be60e27e36791e2204c6",
+    "entities": "71e94358df8372ac79080fc652126a1370c8d7c989add2a8e3086b06ff1f53fc",
+    "analysis_records": "e04136a04b19f60d4a9487d36712f8b0af21ebde969777a45cb3e7082292027b",
+    "source_chunks": "07fe9cc432278d20e7f315338553d7817c11f2fc5930bd3c472caa53fed5bf43",
+    "retrieval_documents": "958ca5c1bb8fe75612cc65882183fa2ee307c3d158f12936d30993110a0f763b",
+    "retrieval_processing": "8fee49d5b1465b6cdbbf40c928d00ee7d2ac318caf30438883c2d8267c413b99",
+    "index_metadata": "8501654c51e1f26a30eefd10808f8aee71e5c2d6881b414f5f2a6d55f92c3921",
+    "document_embeddings_rowids": "11fce3a012c8e7cc420f20e217c87e95e6297882ff59141af98b65a33160ee67",
+    "document_embeddings_chunks": "bcf281519635fbb9546267a2d213a7f6f83430d0a187edb4b80def8e8ef357d4",
+    "document_embeddings_vector_chunks00": "81b3d134d05398018320eef42070a15ad5902d595032b4a5ff648d43844b5426"
+  }
+}
