@@ -1,0 +1,167 @@
+[
+  {
+    "language": "java",
+    "extensions": [
+      "java"
+    ],
+    "path": "archive.java",
+    "source": "/** Restore café archives. */\npublic class Archive {\n  int count, size;\n  public String recover(String path) { return path; }\n  class Nested { void recover() {} }\n}\n"
+  },
+  {
+    "language": "c",
+    "extensions": [
+      "c",
+      "h"
+    ],
+    "path": "archive.c",
+    "source": "#include <stdio.h>\n#define LIMIT 4\n/** Restore café archives. */\nstruct Archive { int count; };\nint recover(const char *path) { return 1; }\n"
+  },
+  {
+    "language": "cpp",
+    "extensions": [
+      "cpp",
+      "cc",
+      "cxx",
+      "hpp",
+      "hh",
+      "hxx"
+    ],
+    "path": "archive.cpp",
+    "source": "#include <string>\nnamespace archive {\n/** Restore café archives. */\nclass Archive { public: int recover() { return 1; } };\ntemplate <typename T> T restore(T value) { return value; }\n}\n"
+  },
+  {
+    "language": "csharp",
+    "extensions": [
+      "cs"
+    ],
+    "path": "archive.cs",
+    "source": "using System;\nnamespace Archive;\n/// Restore café archives.\npublic class Store { public int Count { get; set; } public string Recover(string path) { return path; } }\n"
+  },
+  {
+    "language": "ruby",
+    "extensions": [
+      "rb"
+    ],
+    "path": "archive.rb",
+    "source": "# Restore café archives.\nmodule Archive\n  class Store\n    def recover(path)\n      path\n    end\n  end\nend\n"
+  },
+  {
+    "language": "php",
+    "extensions": [
+      "php"
+    ],
+    "path": "archive.php",
+    "source": "<?php\nnamespace Archive;\n/** Restore café archives. */\nclass Store { public $count, $size; public function recover($path) { return $path; } }\n"
+  },
+  {
+    "language": "scala",
+    "extensions": [
+      "scala",
+      "sc"
+    ],
+    "path": "archive.scala",
+    "source": "package archive\n/** Restore café archives. */\nclass Store(val count: Int) {\n  def recover(path: String): String = path\n}\n"
+  },
+  {
+    "language": "html",
+    "extensions": [
+      "html",
+      "htm"
+    ],
+    "path": "archive.html",
+    "source": "<!doctype html>\n<!-- Restore café archives. -->\n<section id=\"archive\"><h1>Recover archives</h1><p>Restore the manifest.</p></section>\n"
+  },
+  {
+    "language": "css",
+    "extensions": [
+      "css"
+    ],
+    "path": "archive.css",
+    "source": "/* Restore café archive panel. */\n.archive { color: red; }\n@media (max-width: 600px) { .archive { display: block; } }\n"
+  },
+  {
+    "language": "kotlin",
+    "extensions": [
+      "kt",
+      "kts"
+    ],
+    "path": "archive.kt",
+    "source": "package archive\n/** Restore café archives. */\ndata class Store(val count: Int) {\n  fun recover(path: String): String { return path }\n}\n"
+  },
+  {
+    "language": "lua",
+    "extensions": [
+      "lua"
+    ],
+    "path": "archive.lua",
+    "source": "-- Restore café archives.\nlocal archive = {}\nfunction archive:recover(path)\n  return path\nend\nreturn archive\n"
+  },
+  {
+    "language": "zig",
+    "extensions": [
+      "zig"
+    ],
+    "path": "archive.zig",
+    "source": "const std = @import(\"std\");\n/// Restore café archives.\npub const Archive = struct {\n  count: usize,\n  pub fn recover(path: []const u8) []const u8 { return path; }\n};\ntest \"recover archive\" {}\n"
+  },
+  {
+    "language": "elixir",
+    "extensions": [
+      "ex",
+      "exs"
+    ],
+    "path": "archive.ex",
+    "source": "# Restore café archives.\ndefmodule Archive do\n  defstruct [:count]\n  def recover(path) do\n    path\n  end\nend\n"
+  },
+  {
+    "language": "bash",
+    "extensions": [
+      "sh",
+      "bash"
+    ],
+    "path": "archive.sh",
+    "source": "#!/bin/bash\n# Restore café archives.\nsource ./config.sh\nLIMIT=4\nrecover() {\n  printf \"%s\" \"$1\"\n}\n"
+  },
+  {
+    "language": "toml",
+    "extensions": [
+      "toml"
+    ],
+    "path": "archive.toml",
+    "source": "# Restore café archives.\n[archive]\npath = \"manifest\"\ncount = 4\n[[archive.stores]]\nname = \"primary\"\n"
+  },
+  {
+    "language": "yaml",
+    "extensions": [
+      "yaml",
+      "yml"
+    ],
+    "path": "archive.yaml",
+    "source": "# Restore café archives.\narchive:\n  path: manifest\n  stores:\n    - name: primary\n      count: 4\n"
+  },
+  {
+    "language": "haskell",
+    "extensions": [
+      "hs"
+    ],
+    "path": "archive.hs",
+    "source": "module Archive where\n-- | Restore café archives.\nrecover :: String -> String\nrecover path = path\ndata Store = Store Int\n"
+  },
+  {
+    "language": "ocaml",
+    "extensions": [
+      "ml",
+      "mli"
+    ],
+    "path": "archive.ml",
+    "source": "(** Restore café archives. *)\nmodule Archive = struct\n  type store = { count : int }\n  let recover path = path\nend\n"
+  },
+  {
+    "language": "dart",
+    "extensions": [
+      "dart"
+    ],
+    "path": "archive.dart",
+    "source": "library archive;\n/// Restore café archives.\nclass Store {\n  final int count;\n  Store(this.count);\n  String recover(String path) { return path; }\n}\n"
+  }
+]
