@@ -23,7 +23,7 @@ const DOCUMENT_BATCH_SIZE: usize = 256;
 
 pub(crate) mod pool;
 mod task;
-pub use task::SourceTask;
+pub use task::{SourceTask, WindowPlan};
 
 pub trait Backend {
     /// Move production model ownership to the window worker. Local test backends

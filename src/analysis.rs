@@ -12,7 +12,7 @@ mod python;
 mod rust;
 mod text;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Entity {
     pub kind: String,
     pub name: Option<String>,
@@ -106,7 +106,7 @@ pub struct Diagnostic {
     pub column: usize,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Analysis {
     pub source_chunks: Vec<crate::retrieval::ts_v2::Chunk>,
     pub source: SourceFile,

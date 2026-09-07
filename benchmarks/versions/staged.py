@@ -10,6 +10,7 @@ import hashlib
 import json
 from pathlib import Path
 import shutil
+import sqlite3
 
 from pipeline import logical_hashes, module
 from run import config, edit_files, measure, write
@@ -67,6 +68,12 @@ def main():
         stored = logical_hashes(project / '.mimirs/index.db')
         assert stored == logical_hashes(reference / 'projects' / corpus / '.mimirs/index.db'), 'published data changed'
         entry['storedTableSha256'] = stored
+        staging = project / '.mimirs/staging.db'
+        if staging.exists():
+            with sqlite3.connect(staging) as db:
+                empty = {table: db.execute(f'SELECT count(*) FROM {table}').fetchone()[0] for table in ('runs', 'work', 'source_stages', 'window_stages', 'vector_stages')}
+            assert all(count == 0 for count in empty.values()), 'staging was not cleaned'
+            entry['staging'] = {'remainingRows': empty, 'finalBytes': staging.stat().st_size}
         entry['indexBytes'] = (project / '.mimirs/index.db').stat().st_size
         write(root / 'report.json', report)
         print('PARITY', corpus, 'all published tables and vector bytes exact', flush=True)

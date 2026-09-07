@@ -265,6 +265,7 @@ pub mod analysis;
 pub mod processing;
 
 pub mod documents;
+pub(crate) mod staging;
 
 pub mod policy;
 

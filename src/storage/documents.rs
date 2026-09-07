@@ -14,6 +14,25 @@ pub struct Batch<'a> {
 }
 
 pub fn save(connection: &mut Connection, analysis: &Analysis, batch: Batch<'_>) -> Result<()> {
+    save_inner(connection, analysis, batch, false)
+}
+
+/// Delete and replace in one transaction, retaining the indexing pipeline's ID
+/// assignment while readers observe either the old complete file or the new one.
+pub(crate) fn publish(
+    connection: &mut Connection,
+    analysis: &Analysis,
+    batch: Batch<'_>,
+) -> Result<()> {
+    save_inner(connection, analysis, batch, true)
+}
+
+fn save_inner(
+    connection: &mut Connection,
+    analysis: &Analysis,
+    batch: Batch<'_>,
+    replace: bool,
+) -> Result<()> {
     validate(analysis, batch.documents)?;
     super::policy::validate(batch.policy)?;
     if batch.policy.contains(crate::retrieval::ts_v2::POLICY) {
@@ -23,6 +42,10 @@ pub fn save(connection: &mut Connection, analysis: &Analysis, batch: Batch<'_>) 
         );
     }
     let tx = connection.transaction()?;
+    if replace {
+        tx.execute("DELETE FROM document_embeddings WHERE document_id IN (SELECT d.id FROM retrieval_documents d JOIN files f ON f.id=d.file_id WHERE f.path=?1)", [&analysis.source.path])?;
+        tx.execute("DELETE FROM files WHERE path=?1", [&analysis.source.path])?;
+    }
     if !super::validate_model(&tx)? {
         tx.execute("INSERT INTO index_metadata VALUES ('embedding_model', ?1), ('embedding_dimension', ?2)", params![crate::embedding::model_identity(), DIMENSION.to_string()])?;
     }

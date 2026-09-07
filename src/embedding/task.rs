@@ -2,7 +2,8 @@
 //! singleton model calls. Only the coordinator reports progress or touches storage.
 use super::{DIMENSION, pool, ts_v2, validate};
 use crate::profiling::Profiler;
-use anyhow::Result;
+use anyhow::{Result, ensure};
+use std::sync::Arc;
 
 pub struct SourceTask {
     inner: Task,
@@ -15,11 +16,54 @@ enum Task {
     Ready(Vec<Vec<f32>>),
     Pending {
         job: pool::Job,
-        plans: Vec<Vec<usize>>,
+        plans: Arc<Vec<Vec<usize>>>,
     },
 }
 
+#[derive(Clone)]
+pub struct WindowPlan {
+    pub inputs: Arc<Vec<String>>,
+    pub documents: Arc<Vec<Vec<usize>>>,
+}
+
+impl WindowPlan {
+    pub(crate) fn validate(&self, count: usize, path: &str) -> Result<()> {
+        ensure!(self.documents.len() == count, "incomplete window mapping");
+        let mut used = vec![false; self.inputs.len()];
+        for plan in self.documents.iter() {
+            ensure!(!plan.is_empty(), "document has no embedding windows");
+            for &input in plan {
+                ensure!(input < used.len(), "window mapping outside inputs");
+                used[input] = true;
+            }
+        }
+        ensure!(used.iter().all(|v| *v), "unmapped embedding inputs");
+        let prefix = format!("File: {path}\n");
+        ensure!(
+            self.inputs.iter().all(|s| s.starts_with(&prefix)),
+            "window source path mismatch"
+        );
+        Ok(())
+    }
+}
+
 impl SourceTask {
+    pub(crate) fn window_plan(&self) -> Result<WindowPlan> {
+        match &self.inner {
+            Task::Pending { job, plans } => Ok(WindowPlan {
+                inputs: job.inputs(),
+                documents: plans.clone(),
+            }),
+            Task::Ready(vectors) => {
+                ensure!(vectors.is_empty(), "backend did not retain its window plan");
+                Ok(WindowPlan {
+                    inputs: Arc::default(),
+                    documents: Arc::default(),
+                })
+            }
+        }
+    }
+
     pub(crate) fn completed(vectors: Vec<Vec<f32>>) -> Self {
         Self {
             profile: None,
@@ -44,7 +88,10 @@ impl SourceTask {
         Self {
             profile: None,
             counted: false,
-            inner: Task::Pending { job, plans },
+            inner: Task::Pending {
+                job,
+                plans: Arc::new(plans),
+            },
             retained_bytes,
         }
     }

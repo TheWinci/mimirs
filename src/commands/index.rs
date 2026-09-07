@@ -9,6 +9,7 @@ use crate::{config::Config, embedding, source, storage};
 
 mod admission;
 mod channel;
+mod lock;
 mod parallel;
 mod pipeline;
 mod progress;
@@ -170,6 +171,7 @@ fn index_with_mode(
     streaming: bool,
 ) -> anyhow::Result<Summary> {
     let config = profile.measure("config", || Config::load(root))?;
+    let _writer_lock = profile.measure("writer_lock", || lock::acquire(root))?;
     progress.walking("-", 0)?;
     let cancel = channel::Cancel::default();
     let _cancel_on_exit = cancel.guard();

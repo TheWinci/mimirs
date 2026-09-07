@@ -19,7 +19,7 @@ struct State {
 }
 
 struct Work {
-    texts: Vec<String>,
+    texts: Arc<Vec<String>>,
     state: Mutex<State>,
     changed: Condvar,
 }
@@ -27,6 +27,10 @@ struct Work {
 pub(crate) struct Job(Arc<Work>);
 
 impl Job {
+    pub(crate) fn inputs(&self) -> Arc<Vec<String>> {
+        self.0.texts.clone()
+    }
+
     pub(crate) fn ready(&self) -> bool {
         let state = self.0.state.lock().unwrap();
         state.active == 0 && (state.cancelled || state.next == self.0.texts.len())
@@ -146,7 +150,7 @@ impl Pool {
     pub(crate) fn submit(&self, texts: Vec<String>) -> Job {
         let count = texts.len();
         let job = Arc::new(Work {
-            texts,
+            texts: Arc::new(texts),
             state: Mutex::new(State {
                 next: 0,
                 active: 0,

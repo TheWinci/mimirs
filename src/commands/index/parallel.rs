@@ -7,7 +7,7 @@ use anyhow::{Context, Result, ensure};
 
 use super::{Progress, Summary, admission, channel, walk};
 use crate::analysis::Analysis;
-use crate::embedding::{SourceTask, Worker};
+use crate::embedding::{SourceTask, WindowPlan, Worker};
 use crate::profiling::{FileScope, Profiler};
 use crate::retrieval::split::Document;
 use crate::{source, storage};
@@ -32,6 +32,7 @@ struct Work {
     task: SourceTask,
     analysis: Arc<Analysis>,
     documents: Arc<Vec<Document>>,
+    plan: WindowPlan,
 }
 
 enum Prepared {
@@ -44,7 +45,8 @@ enum Prepared {
 struct Complete {
     analysis: Arc<Analysis>,
     documents: Arc<Vec<Document>>,
-    vectors: Result<Vec<Vec<f32>>>,
+    plan: WindowPlan,
+    vectors: Result<Arc<Vec<Vec<f32>>>>,
 }
 
 enum Completed {
@@ -71,6 +73,34 @@ impl<T> Message<T> {
     }
 }
 
+enum Stage {
+    Discovered,
+    Source(Arc<Analysis>),
+    Windows(Arc<Vec<Document>>, WindowPlan),
+    Vectors(Arc<Vec<Vec<f32>>>),
+}
+
+enum Write {
+    Stage(Stage, Arc<File>),
+    Complete(Message<Completed>),
+}
+
+impl File {
+    fn key<'a>(&'a self, policy: &'a str) -> storage::staging::Key<'a> {
+        storage::staging::Key {
+            ordinal: self.ordinal,
+            path: &self.path,
+            source_hash: &self.source_hash,
+            policy,
+        }
+    }
+}
+
+fn stage(send: &channel::Sender<Write>, stage: Stage, file: &Arc<File>) -> bool {
+    send.send(Write::Stage(stage, file.clone()), file._permit.bytes())
+        .is_ok()
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn run(
     root: &Path,
@@ -91,16 +121,38 @@ pub(super) fn run(
     let (write_tx, write_rx) = channel::bounded(capacity, "writer", profile, &cancel);
     let (_shutdown_tx, shutdown_rx) =
         channel::bounded::<()>(1, "planner_shutdown", profile, &cancel);
-    std::thread::scope(|scope| {
+    let mut staging = profile.measure("staging_open", || {
+        storage::staging::Store::open(&root.join(".mimirs/staging.db"), profile)
+    })?;
+    let result = std::thread::scope(|scope| {
         let _stop = cancel.guard();
+        let source_writes = write_tx.clone();
+        let window_writes = write_tx.clone();
         let parser = scope.spawn(move || {
-            if let Err(error) = parse(root, paths, admission, &parsed_tx, policy, profile) {
+            if let Err(error) = parse(
+                root,
+                paths,
+                admission,
+                &parsed_tx,
+                &source_writes,
+                policy,
+                profile,
+            ) {
                 let _ = parsed_tx.send(Message::Fatal(error), 0);
             }
         });
-        let planner = scope.spawn(move || prepare(worker, parsed_rx, ready_tx, shutdown_rx));
+        let planner =
+            scope.spawn(move || prepare(worker, parsed_rx, ready_tx, window_writes, shutdown_rx));
         let merger = scope.spawn(move || merge(ready_rx, write_tx));
-        let result = consume(&write_rx, connection, policy, progress, profile, summary);
+        let result = consume(
+            &write_rx,
+            connection,
+            &mut staging,
+            policy,
+            progress,
+            profile,
+            summary,
+        );
         cancel.cancel();
         drop(write_rx);
         let joined = [parser.join(), planner.join(), merger.join()];
@@ -108,14 +160,29 @@ pub(super) fn run(
             anyhow::bail!("index worker panicked");
         }
         result
-    })
+    });
+    let cleanup = staging.finish();
+    match result {
+        Ok(paths) => {
+            cleanup?;
+            Ok(paths)
+        }
+        Err(error) => {
+            cleanup.context(format!(
+                "index failed: {error:#}; staging cleanup also failed"
+            ))?;
+            Err(error)
+        }
+    }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn parse(
     root: &Path,
     paths: impl Iterator<Item = Result<walk::stream::Event>>,
     admission: admission::Admission,
     send: &channel::Sender<Message<Parsed>>,
+    writer: &channel::Sender<Write>,
     policy: &str,
     profile: &Profiler,
 ) -> Result<()> {
@@ -140,35 +207,17 @@ fn parse(
         };
         let (file_profile, scope) = profile.fork_file(&path);
         let read = file_profile.measure("source_read", || source::read(root, &path));
-        let mut source_hash = String::new();
-        let parsed = match read {
-            Err(error) => Parsed::Skipped(error),
-            Ok(source) => {
-                if !permit.grow(admission::estimate(source.text.len(), path.len())) {
-                    return Ok(());
-                }
-                source_hash = storage::processing::source_hash(&source.text);
-                file_profile.count("files_read", 1);
-                file_profile.count("source_bytes", source.text.len());
-                file_profile.stage_items("source", 1);
-                match file_profile.measure("reuse_check", || {
-                    storage::processing::reusable(&reader, &source, policy)
-                }) {
-                    Ok(true) => Parsed::Reused,
-                    Err(error) => Parsed::Failed(error),
-                    Ok(false) => {
-                        file_profile.stage_items("parsing", 1);
-                        Parsed::Changed(
-                            file_profile
-                                .measure("analysis", || crate::analysis::extract(source))
-                                .map(Arc::new)
-                                .with_context(|| format!("cannot analyze source file {path}")),
-                        )
-                    }
-                }
+        let source_hash = if let Ok(source) = &read {
+            if !permit.grow(admission::estimate(source.text.len(), path.len())) {
+                return Ok(());
             }
+            file_profile.count("files_read", 1);
+            file_profile.count("source_bytes", source.text.len());
+            file_profile.stage_items("source", 1);
+            storage::processing::source_hash(&source.text)
+        } else {
+            String::new()
         };
-        let failed = matches!(parsed, Parsed::Failed(_) | Parsed::Changed(Err(_)));
         let file = Arc::new(File {
             ordinal,
             path,
@@ -177,6 +226,33 @@ fn parse(
             _scope: scope,
             _permit: permit,
         });
+        let parsed = match read {
+            Err(error) => Parsed::Skipped(error),
+            Ok(source) => match file.profile.measure("reuse_check", || {
+                storage::processing::reusable(&reader, &source, policy)
+            }) {
+                Ok(true) => Parsed::Reused,
+                Err(error) => Parsed::Failed(error),
+                Ok(false) => {
+                    if !stage(writer, Stage::Discovered, &file) {
+                        return Ok(());
+                    }
+                    file.profile.stage_items("parsing", 1);
+                    let analysis = file
+                        .profile
+                        .measure("analysis", || crate::analysis::extract(source))
+                        .map(Arc::new)
+                        .with_context(|| format!("cannot analyze source file {}", file.path));
+                    if let Ok(analysis) = &analysis
+                        && !stage(writer, Stage::Source(analysis.clone()), &file)
+                    {
+                        return Ok(());
+                    }
+                    Parsed::Changed(analysis)
+                }
+            },
+        };
+        let failed = matches!(parsed, Parsed::Failed(_) | Parsed::Changed(Err(_)));
         let message = Message::File(parsed, file);
         let bytes = message.bytes();
         if send.send(message, bytes).is_err() || failed {
@@ -190,6 +266,7 @@ fn prepare(
     worker: Worker,
     receive: channel::Receiver<Message<Parsed>>,
     send: channel::Sender<Message<Prepared>>,
+    writer: channel::Sender<Write>,
     shutdown: channel::Receiver<()>,
 ) {
     let mut embedder = worker.into_embedder();
@@ -213,10 +290,21 @@ fn prepare(
                         let task = embedder
                             .submit_ts_documents(&texts, &file.profile, |_, _| Ok(()))
                             .with_context(|| format!("cannot embed source file {}", file.path))?;
+                        let plan = task.window_plan()?;
+                        let documents = Arc::new(documents);
+                        ensure!(
+                            stage(
+                                &writer,
+                                Stage::Windows(documents.clone(), plan.clone()),
+                                &file
+                            ),
+                            "index writer closed"
+                        );
                         Ok(Work {
                             task,
                             analysis,
-                            documents: Arc::new(documents),
+                            documents,
+                            plan,
                         })
                     })()),
                 };
@@ -226,6 +314,7 @@ fn prepare(
             Message::End(found) => {
                 let _ = send.send(Message::End(found), 0);
                 drop(send);
+                drop(writer);
                 // Keep the inference pool alive until its queued tasks drain.
                 shutdown.recv();
                 return;
@@ -238,10 +327,11 @@ fn prepare(
         }
     }
     drop(send);
+    drop(writer);
     shutdown.recv();
 }
 
-fn merge(receive: channel::Receiver<Message<Prepared>>, send: channel::Sender<Message<Completed>>) {
+fn merge(receive: channel::Receiver<Message<Prepared>>, send: channel::Sender<Write>) {
     while let Some(message) = receive.recv() {
         let message = match message {
             Message::File(prepared, file) => {
@@ -254,13 +344,19 @@ fn merge(receive: channel::Receiver<Message<Prepared>>, send: channel::Sender<Me
                              task,
                              analysis,
                              documents,
+                             plan,
                          }| {
                             let vectors = task
                                 .finish(&file.profile, |_, _| Ok(()))
-                                .with_context(|| format!("cannot embed source file {}", file.path));
+                                .with_context(|| format!("cannot embed source file {}", file.path))
+                                .map(Arc::new);
+                            if let Ok(vectors) = &vectors {
+                                stage(&send, Stage::Vectors(vectors.clone()), &file);
+                            }
                             Complete {
                                 analysis,
                                 documents,
+                                plan,
                                 vectors,
                             }
                         },
@@ -273,24 +369,44 @@ fn merge(receive: channel::Receiver<Message<Prepared>>, send: channel::Sender<Me
             Message::Fatal(error) => Message::Fatal(error),
         };
         let bytes = message.bytes();
-        if send.send(message, bytes).is_err() {
+        if send.send(Write::Complete(message), bytes).is_err() {
             return;
         }
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn consume(
-    receive: &channel::Receiver<Message<Completed>>,
+    receive: &channel::Receiver<Write>,
     connection: &mut rusqlite::Connection,
+    staging: &mut storage::staging::Store,
     policy: &str,
     progress: &mut Progress<'_>,
     profile: &Profiler,
     summary: &mut Summary,
 ) -> Result<Vec<String>> {
     let mut successful = Vec::new();
+    let mut stage_errors = std::collections::BTreeMap::new();
     let mut ended = false;
     let result = (|| {
         while let Some(message) = receive.recv() {
+            let message = match message {
+                Write::Complete(message) => message,
+                Write::Stage(stage, file) => {
+                    let payload = match &stage {
+                        Stage::Discovered => storage::staging::Stage::Discovered,
+                        Stage::Source(analysis) => storage::staging::Stage::Source(analysis),
+                        Stage::Windows(documents, plan) => {
+                            storage::staging::Stage::Windows(documents, plan)
+                        }
+                        Stage::Vectors(vectors) => storage::staging::Stage::Vectors(vectors),
+                    };
+                    if let Err(error) = staging.record(&file.key(policy), payload) {
+                        stage_errors.entry(file.ordinal).or_insert(error);
+                    }
+                    continue;
+                }
+            };
             let (prepared, file) = match message {
                 Message::WalkError(error) => {
                     progress.diagnostic(&format!("walk_error: {error}"))?;
@@ -316,55 +432,81 @@ fn consume(
             progress.set_profile(file.profile.clone());
             match prepared {
                 Completed::Reused => {
+                    if let Some(error) = stage_errors.remove(&file.ordinal) {
+                        return Err(error);
+                    }
                     successful.push(file.path.clone());
                     summary.unchanged += 1;
                     file.profile.count("files_reused", 1);
                 }
                 Completed::Skipped(error) => {
+                    if let Some(error) = stage_errors.remove(&file.ordinal) {
+                        return Err(error);
+                    }
                     progress.diagnostic(&format!("skipped: {error:#}"))?;
                     summary.skipped += 1;
                     file.profile.count("files_skipped", 1);
                 }
                 Completed::Failed(error) => return Err(error),
                 Completed::Changed(work) => {
-                    file.profile.measure("invalidation", || {
-                        storage::invalidate(connection, &file.path)
-                    })?;
-                    let Complete {
-                        analysis,
-                        documents,
-                        vectors,
-                    } = work?;
-                    for diagnostic in &analysis.diagnostics {
-                        progress.diagnostic(&format!(
-                            "syntax: {}:{}:{} {}",
-                            file.path,
-                            diagnostic.span.line_start,
-                            diagnostic.column,
-                            diagnostic.kind
-                        ))?;
-                    }
-                    let vectors = vectors?;
-                    ensure!(
-                        file.source_hash == storage::processing::source_hash(&analysis.source.text),
-                        "source generation changed"
-                    );
-                    file.profile.measure("storage_save", || {
-                        storage::documents::save(
-                            connection,
-                            &analysis,
-                            storage::documents::Batch {
-                                documents: &documents,
-                                vectors: &vectors,
-                                policy,
-                            },
-                        )
-                    })?;
-                    progress.diagnostic(&format!(
-                        "documents: {}: {}",
-                        file.path,
-                        documents.len()
-                    ))?;
+                    let published = (|| -> Result<usize> {
+                        if let Some(error) = stage_errors.remove(&file.ordinal) {
+                            return Err(error);
+                        }
+                        let Complete {
+                            analysis,
+                            documents,
+                            plan,
+                            vectors,
+                        } = work?;
+                        for diagnostic in &analysis.diagnostics {
+                            progress.diagnostic(&format!(
+                                "syntax: {}:{}:{} {}",
+                                file.path,
+                                diagnostic.span.line_start,
+                                diagnostic.column,
+                                diagnostic.kind
+                            ))?;
+                        }
+                        let vectors = vectors?;
+                        ensure!(
+                            file.source_hash
+                                == storage::processing::source_hash(&analysis.source.text),
+                            "source generation changed"
+                        );
+                        file.profile.measure("staging_validation", || {
+                            staging.validate_complete(
+                                &file.key(policy),
+                                &analysis,
+                                &documents,
+                                &plan,
+                                &vectors,
+                            )
+                        })?;
+                        file.profile.measure("storage_save", || {
+                            storage::documents::publish(
+                                connection,
+                                &analysis,
+                                storage::documents::Batch {
+                                    documents: &documents,
+                                    vectors: &vectors,
+                                    policy,
+                                },
+                            )
+                        })?;
+                        Ok(documents.len())
+                    })();
+                    let count = match published {
+                        Ok(count) => count,
+                        Err(error) => {
+                            file.profile.measure("invalidation", || {
+                                storage::invalidate(connection, &file.path)
+                            })?;
+                            return Err(error);
+                        }
+                    };
+                    staging.remove(&file.key(policy))?;
+                    progress.diagnostic(&format!("documents: {}: {}", file.path, count))?;
                     successful.push(file.path.clone());
                     summary.indexed += 1;
                     file.profile.count("files_indexed", 1);

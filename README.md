@@ -93,6 +93,19 @@ File discovery streams through a bounded channel while indexing runs. Until
 discovery finishes, progress reports completed files without inventing a final
 total. Paths still publish in the same canonical order as a fully sorted walk.
 
+Intermediate results commit to `.mimirs/staging.db`: discovered work, source and
+analysis, documents and window mappings, then merged vectors. The writer drains
+these stages while inference continues. Complete files replace their searchable
+rows atomically in `.mimirs/index.db`. Staging has its own schema version and does
+not change document or model identities. Unchanged files reuse their live data.
+
+One OS writer lock covers indexing and cleanup. Published stages are deleted;
+abandoned stages are discarded on the next indexing run. Incomplete files are
+recomputed from source. Automatic resume from intermediate stages is not enabled.
+Profiling reports serialized staging payload bytes and peak database/journal disk
+use separately from the published index size. Per-channel payload estimates can
+include shared messages; the admission reservation counts each file once.
+
 Native tree-sitter grammars identify retrieval chunks for the
 [languages listed here](docs/languages.md#native-syntax). They ship in the binary and
 need no language servers or language runtimes. Written declarations, attached

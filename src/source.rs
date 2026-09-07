@@ -3,7 +3,7 @@ use std::path::Path;
 
 use anyhow::Context;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SourceFile {
     pub path: String,
     pub text: String,
