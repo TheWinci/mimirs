@@ -151,6 +151,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
     static BASH: OnceLock<Result<Query, String>> = OnceLock::new();
     static TOML: OnceLock<Result<Query, String>> = OnceLock::new();
     static YAML: OnceLock<Result<Query, String>> = OnceLock::new();
+    static HASKELL: OnceLock<Result<Query, String>> = OnceLock::new();
     static JAVA: OnceLock<Result<Query, String>> = OnceLock::new();
     let (slot, text) = match language {
         "rust" => (&RUST, include_str!("ts_v2/queries/rust.scm")),
@@ -174,6 +175,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
         "bash" => (&BASH, include_str!("ts_v2/queries/bash.scm")),
         "toml" => (&TOML, include_str!("ts_v2/queries/toml.scm")),
         "yaml" => (&YAML, include_str!("ts_v2/queries/yaml.scm")),
+        "haskell" => (&HASKELL, include_str!("ts_v2/queries/haskell.scm")),
         "java" => (&JAVA, include_str!("ts_v2/queries/java.scm")),
         _ => anyhow::bail!("unsupported retrieval grammar {language}"),
     };
@@ -427,6 +429,18 @@ pub(crate) fn declarations(
                 kind = "import".into();
             }
         }
+        if language == "haskell" && node.kind() == "header" {
+            kind = "module".into();
+        }
+        let captured = if language == "haskell" && node.kind() == "instance" {
+            Some(format!(
+                "{} {}",
+                captured.as_deref().unwrap_or("?"),
+                context.unwrap_or("?")
+            ))
+        } else {
+            captured
+        };
         let name = declared_name(node, source, language)
             .or(captured)
             .or_else(|| special("default_export").then(|| "default".into()));
@@ -701,7 +715,7 @@ fn comments(root: Node<'_>, source: &str, language: &str) -> Comments {
                 result.lines.insert(i, (sr, er));
             }
         }
-        if node.kind().contains("comment") {
+        if node.kind().contains("comment") || node.kind() == "haddock" {
             result.spans.push((node.start_byte(), node.end_byte()));
             let pure_start = source[starts[sr]..node.start_byte()].trim().is_empty();
             let pure_end = source

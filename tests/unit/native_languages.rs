@@ -524,6 +524,31 @@ fn yaml_documents_sequences_and_repeated_keys_keep_their_own_ranges() {
 }
 
 #[test]
+fn haskell_haddock_signatures_and_instances_remain_distinct() {
+    let result = analyze(
+        "Store.hs",
+        "module Store where\n-- | Restore archive contents.\nrecover :: String -> String\nrecover path = path\nclass Restore a where\n  restore :: a -> a\ninstance Restore Int where\n  restore x = x\n",
+    );
+    assert!(result.facts.iter().any(|f| f.kind == "doc"
+        && result.source.text[f.span.start..f.span.end].contains("Restore archive")));
+    for (name, kind) in [
+        ("Store", "module"),
+        ("recover", "type"),
+        ("recover", "function"),
+        ("Restore Int", "impl"),
+    ] {
+        assert!(
+            result
+                .entities
+                .iter()
+                .any(|e| e.name.as_deref() == Some(name) && e.kind == kind),
+            "{name}: {:?}",
+            result.entities
+        );
+    }
+}
+
+#[test]
 fn native_snapshots_round_trip_replace_rollback_and_delete() {
     for case in fixture_cases() {
         let path = case["path"].as_str().unwrap();

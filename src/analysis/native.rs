@@ -149,6 +149,15 @@ pub(super) const YAML: Language = Language {
     chunking: super::language::Chunking::Paragraphs,
 };
 
+pub(super) const HASKELL: Language = Language {
+    identity: "haskell/default/tree-sitter-0.27.0/tree-sitter-haskell-0.23.1/extractor-1",
+    extensions: &["hs"],
+    extract: |source| extract(source, tree_sitter_haskell::LANGUAGE.into(), "haskell"),
+    is_native: true,
+    #[cfg(test)]
+    chunking: super::language::Chunking::Paragraphs,
+};
+
 fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analysis> {
     let mut parser = Parser::new();
     parser
@@ -226,15 +235,25 @@ fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analy
                     .push(fact("signature", lines.span(start, end), id, scope));
             }
             let mut first = node;
+            // Some grammars put a declaration list between its first item and
+            // the leading comment. Preserve adjacency across that wrapper.
+            while first.prev_named_sibling().is_none()
+                && let Some(wrapper) = first
+                    .parent()
+                    .filter(|p| p.start_byte() == first.start_byte())
+            {
+                first = wrapper;
+            }
             while let Some(doc) = first
                 .prev_named_sibling()
-                .filter(|n| n.kind().contains("comment"))
+                .filter(|n| n.kind().contains("comment") || n.kind() == "haddock")
             {
                 let gap = &analysis.source.text[doc.end_byte()..first.start_byte()];
                 let line_start = analysis.source.text[..doc.start_byte()]
                     .rfind('\n')
                     .map_or(0, |i| i + 1);
-                if !gap.trim().is_empty()
+                if doc.start_byte() < analysis.scopes[parent.map_or(0, |id| id + 1)].span.start
+                    || !gap.trim().is_empty()
                     || gap.bytes().filter(|b| *b == b'\n').count() > 1
                     || !analysis.source.text[line_start..doc.start_byte()]
                         .trim()

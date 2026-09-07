@@ -302,3 +302,8 @@ their names and source ranges. Configuration values remain exact source.
 YAML uses the native 0.7.1 grammar for `.yaml` and `.yml`. Existing projects
 can add `"**/*.yaml"` and `"**/*.yml"` and reindex. Document sections, nested keys,
 flow mappings, sequences and directives retain their written source structure.
+
+Haskell uses the native 0.23.1 grammar for `.hs`. Existing projects can add
+`"**/*.hs"` and reindex. Module headers, type signatures, bindings, data types,
+classes and instances retain names. Haddock comments attach as documentation.
+Literate `.lhs` files use explicit text fallback.
