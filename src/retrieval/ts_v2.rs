@@ -139,6 +139,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
     static C: OnceLock<Result<Query, String>> = OnceLock::new();
     static CPP: OnceLock<Result<Query, String>> = OnceLock::new();
     static CSHARP: OnceLock<Result<Query, String>> = OnceLock::new();
+    static RUBY: OnceLock<Result<Query, String>> = OnceLock::new();
     static JAVA: OnceLock<Result<Query, String>> = OnceLock::new();
     let (slot, text) = match language {
         "rust" => (&RUST, include_str!("ts_v2/queries/rust.scm")),
@@ -150,6 +151,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
         "c" => (&C, include_str!("ts_v2/queries/c.scm")),
         "cpp" => (&CPP, include_str!("ts_v2/queries/cpp.scm")),
         "csharp" => (&CSHARP, include_str!("ts_v2/queries/csharp.scm")),
+        "ruby" => (&RUBY, include_str!("ts_v2/queries/ruby.scm")),
         "java" => (&JAVA, include_str!("ts_v2/queries/java.scm")),
         _ => anyhow::bail!("unsupported retrieval grammar {language}"),
     };
@@ -266,6 +268,14 @@ pub(crate) fn declarations(
         {
             kind = "function".into();
         }
+        if language == "ruby" && node.kind() == "assignment" {
+            kind = if contains(node.child_by_field_name("right"), "lambda") {
+                "function"
+            } else {
+                "constant"
+            }
+            .into();
+        }
         let name = declared_name(node, source, language)
             .or(captured)
             .or_else(|| special("default_export").then(|| "default".into()));
@@ -336,6 +346,20 @@ fn contains(node: Option<Node<'_>>, kind: &str) -> bool {
 }
 
 fn declared_name(node: Node<'_>, source: &str, language: &str) -> Option<String> {
+    if language == "ruby" {
+        if node.kind() == "singleton_class" {
+            return Some(format!(
+                "singleton {}",
+                node.child_by_field_name("value")
+                    .map_or("?", |n| text(n, source))
+            ));
+        }
+        if node.kind() == "assignment" {
+            return node
+                .child_by_field_name("left")
+                .map(|n| text(n, source).into());
+        }
+    }
     if language == "csharp" {
         return names::csharp(node, source);
     }

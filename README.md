@@ -249,3 +249,7 @@ methods and declaration names remain tied to their written source.
 C# uses the native 0.23.1 grammar for `.cs`. Fresh configs include it; existing
 projects can add `"**/*.cs"` and reindex. File-scoped namespaces own their
 remaining source, and property, event, operator and lambda names are retained.
+
+Ruby uses the native 0.23.1 grammar for `.rb`, included by fresh configs. Add
+`"**/*.rb"` to existing configs and reindex. Modules, singleton methods and
+classes, constant assignments and assigned lambdas retain their source names.

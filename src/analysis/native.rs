@@ -41,6 +41,15 @@ pub(super) const CSHARP: Language = Language {
     chunking: super::language::Chunking::Paragraphs,
 };
 
+pub(super) const RUBY: Language = Language {
+    identity: "ruby/default/tree-sitter-0.27.0/tree-sitter-ruby-0.23.1/extractor-1",
+    extensions: &["rb"],
+    extract: |source| extract(source, tree_sitter_ruby::LANGUAGE.into(), "ruby"),
+    is_native: true,
+    #[cfg(test)]
+    chunking: super::language::Chunking::Paragraphs,
+};
+
 fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analysis> {
     let mut parser = Parser::new();
     parser

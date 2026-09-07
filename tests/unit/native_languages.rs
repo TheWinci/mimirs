@@ -203,6 +203,29 @@ fn csharp_file_namespace_operators_and_fields_retain_their_owners() {
 }
 
 #[test]
+fn ruby_singleton_classes_constants_and_lambdas_have_distinct_kinds() {
+    let result = analyze(
+        "store.rb",
+        "LIMIT = 4\ncallback = ->(path) { path }\nclass Store\n  class << self\n    def recover(path)\n      path\n    end\n  end\nend\n",
+    );
+    for (name, kind) in [
+        ("LIMIT", "constant"),
+        ("callback", "function"),
+        ("singleton self", "class"),
+        ("recover", "method"),
+    ] {
+        assert!(
+            result
+                .entities
+                .iter()
+                .any(|e| e.name.as_deref() == Some(name) && e.kind == kind),
+            "{name}: {:?}",
+            result.entities
+        );
+    }
+}
+
+#[test]
 fn native_snapshots_round_trip_replace_rollback_and_delete() {
     for case in fixture_cases() {
         let path = case["path"].as_str().unwrap();

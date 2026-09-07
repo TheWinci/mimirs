@@ -9,7 +9,7 @@ fn dispatch_preserves_rust_and_text_fallback() {
         );
     }
     for path in [
-        "main.rb",
+        "main.unknown",
         "main.RS",
         "notes.md",
         "README",
