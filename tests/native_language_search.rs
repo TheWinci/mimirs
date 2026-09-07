@@ -51,9 +51,12 @@ fn native_language_search_uses_saved_source_and_reuses_unchanged_files() {
         );
         let results = run(root, &["search", "restore café archives", "--limit", "1"]);
         assert!(results.contains(path), "{selected}: {results}");
-        run(root, &["index", "--profile", "unchanged.json"]);
+        // Profiles contain source filenames. Keep generated test artifacts out
+        // of the corpus so a deletion check cannot retrieve the profile itself.
+        run(root, &["index", "--profile", ".mimirs/unchanged.json"]);
         let profile: Value =
-            serde_json::from_slice(&fs::read(root.join("unchanged.json")).unwrap()).unwrap();
+            serde_json::from_slice(&fs::read(root.join(".mimirs/unchanged.json")).unwrap())
+                .unwrap();
         assert_eq!(
             profile["counters"]["embedding_calls"].as_u64().unwrap_or(0),
             0,
@@ -65,6 +68,13 @@ fn native_language_search_uses_saved_source_and_reuses_unchanged_files() {
             run(root, &["inspect", path, "--source-chunks", "--stored"])
         );
         run(root, &["index"]);
+        let db = rusqlite::Connection::open(root.join(".mimirs/index.db")).unwrap();
+        assert_eq!(
+            db.query_row("SELECT count(*) FROM files WHERE path=?1", [path], |r| r
+                .get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
         assert!(!run(root, &["search", "restore café archives", "--limit", "5"]).contains(path));
     }
 }

@@ -104,4 +104,6 @@ edits to large encoded WebAssembly files that v1 skips. Its measurements are
 excluded; the final edit protocol selects the two largest files referenced by
 the fixed query labels. This selects the same pilot edit targets as before.
 
-The Rust retrieval port has a separate [three-corpus adoption report](port/adoption/ADOPTION.md), with exact TS v2 rank comparisons, source/vector parity, and costs. Kubernetes is deferred until the language work is complete.
+The Rust retrieval port has a separate [three-corpus adoption report](port/adoption/ADOPTION.md), with exact TS v2 rank comparisons, source/vector parity, and costs. The completed language port has a [Kubernetes checkpoint](port/kubernetes/KUBERNETES.md).
+
+The subsequent [persistent-worker experiment](pipeline/PIPELINE.md) compares bounded file read-ahead with that Rust release on the three development corpora. It preserves stored vectors and search responses and leaves Kubernetes out of rapid iterations.

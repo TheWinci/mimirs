@@ -7,6 +7,7 @@ use anyhow::{Context, ensure};
 
 use crate::{config::Config, embedding, source, storage};
 
+mod pipeline;
 mod progress;
 mod walk;
 
@@ -186,79 +187,18 @@ fn index_with_profiled(
         walk_errors: walk.errors.len(),
         ..Summary::default()
     };
-    let mut successful = Vec::new();
-    let total = walk.paths.len();
-    for (attempt, path) in walk.paths.iter().enumerate() {
-        let _file = profile.file(path);
-        progress.indexing(path, (0, 0), (attempt, total), false)?;
-        let source = match profile.measure("source_read", || read(root, path)) {
-            Ok(source) => source,
-            Err(error) => {
-                progress.diagnostic(&format!("skipped: {error:#}"))?;
-                summary.skipped += 1;
-                profile.count("files_skipped", 1);
-                progress.indexing(path, (0, 0), (attempt + 1, total), true)?;
-                continue;
-            }
-        };
-        profile.count("files_read", 1);
-        profile.count("source_bytes", source.text.len());
-        if profile.measure("reuse_check", || {
-            storage::processing::reusable(&database.connection, &source, &document_policy)
-        })? {
-            successful.push(path.as_str());
-            summary.unchanged += 1;
-            profile.count("files_reused", 1);
-            progress.indexing(path, (0, 0), (attempt + 1, total), true)?;
-            continue;
-        }
-        profile.measure("invalidation", || {
-            storage::invalidate(&mut database.connection, path)
-        })?;
-        let analysis = profile
-            .measure("analysis", || extract(source))
-            .with_context(|| format!("cannot analyze source file {path}"))?;
-        for diagnostic in &analysis.diagnostics {
-            progress.diagnostic(&format!(
-                "syntax: {path}:{}:{} {}",
-                diagnostic.span.line_start, diagnostic.column, diagnostic.kind
-            ))?;
-        }
-        let documents = profile.measure("chunking_token_budget", || {
-            crate::retrieval::ts_v2::documents(&analysis)
-        })?;
-        profile.count("documents", documents.len());
-        let texts: Vec<_> = profile.measure("document_texts", || {
-            documents.iter().map(|d| d.text.clone()).collect()
-        });
-        if progress.is_terminal() {
-            progress.indexing(path, (0, texts.len()), (attempt, total), false)?;
-        }
-        let vectors = embedder
-            .embed_ts_documents(&texts, |completed, count| {
-                if progress.is_terminal() {
-                    progress.indexing(path, (completed, count), (attempt, total), false)?;
-                }
-                Ok(())
-            })
-            .with_context(|| format!("cannot embed source file {path}"))?;
-        profile.measure("storage_save", || {
-            storage::documents::save(
-                &mut database.connection,
-                &analysis,
-                storage::documents::Batch {
-                    documents: &documents,
-                    vectors: &vectors,
-                    policy: &document_policy,
-                },
-            )
-        })?;
-        progress.diagnostic(&format!("documents: {path}: {}", documents.len()))?;
-        successful.push(path.as_str());
-        summary.indexed += 1;
-        profile.count("files_indexed", 1);
-        progress.indexing(path, (texts.len(), texts.len()), (attempt + 1, total), true)?;
-    }
+    let successful = pipeline::run(
+        root,
+        &walk.paths,
+        &mut database.connection,
+        &mut embedder,
+        &document_policy,
+        progress,
+        profile,
+        &mut summary,
+        read,
+        extract,
+    )?;
     profile.measure("reconciliation", || {
         storage::reconcile(&mut database.connection, &successful)
     })?;

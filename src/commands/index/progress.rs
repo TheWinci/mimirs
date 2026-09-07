@@ -33,6 +33,10 @@ impl<'a> Progress<'a> {
         self
     }
 
+    pub(super) fn set_profile(&mut self, profile: crate::profiling::Profiler) {
+        self.profile = profile;
+    }
+
     pub(super) fn is_terminal(&self) -> bool {
         self.terminal
     }

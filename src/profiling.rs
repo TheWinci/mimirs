@@ -56,6 +56,7 @@ pub struct Scope(Profiler);
 pub struct FileScope {
     profile: Profiler,
     start: Option<Instant>,
+    parent: Option<Profiler>,
 }
 
 impl Profiler {
@@ -97,6 +98,14 @@ impl Profiler {
         }
     }
 
+    pub fn maximum(&self, name: &'static str, value: usize) {
+        if let Some(state) = &self.0 {
+            let mut state = state.borrow_mut();
+            let counter = state.counters.entry(name).or_default();
+            *counter = (*counter).max(value as u64);
+        }
+    }
+
     pub fn batch(&self, size: usize) {
         self.count("embedding_calls", 1);
         self.count("embedding_documents", size);
@@ -119,6 +128,36 @@ impl Profiler {
         FileScope {
             profile: self.clone(),
             start,
+            parent: None,
+        }
+    }
+
+    /// File preparation and completion may interleave. Each file keeps its own
+    /// coordinator scopes; completed measurements merge into the run report.
+    pub fn fork_file(&self, path: &str) -> (Profiler, FileScope) {
+        let child = if self.0.is_some() {
+            Self::enabled()
+        } else {
+            Self::default()
+        };
+        let mut scope = child.file(path);
+        scope.parent = Some(self.clone());
+        (child, scope)
+    }
+
+    fn merge(&self, report: Report) {
+        if let Some(state) = &self.0 {
+            let mut state = state.borrow_mut();
+            for (key, value) in report.phases_seconds {
+                *state.phases.entry(key).or_default() += value;
+            }
+            for (key, value) in report.counters {
+                *state.counters.entry(key).or_default() += value;
+            }
+            for (key, value) in report.embedding_batch_sizes {
+                *state.batch_sizes.entry(key).or_default() += value;
+            }
+            state.files.extend(report.files);
         }
     }
 
@@ -180,6 +219,11 @@ impl Drop for FileScope {
             let mut file = state.current_file.take().expect("balanced file profiling");
             file.wall_seconds = self.start.expect("file start").elapsed().as_secs_f64();
             state.files.push(file);
+        }
+        if let Some(parent) = &self.parent
+            && let Some(report) = self.profile.finish(None)
+        {
+            parent.merge(report);
         }
     }
 }

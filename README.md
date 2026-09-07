@@ -71,11 +71,19 @@ embedding_workers = 3
 
 Each worker uses one inference thread. Larger values are clamped to available
 CPUs; zero and non-integer values are invalid. Remove the entry to restore the
-automatic default. This controls concurrency, not a hard CPU percentage. Workers
-finish the current file before indexing moves on, and changing this setting
-does not require rebuilding unchanged files. Each active worker needs its own
-model session; sessions are created only as files need more workers and reused.
-Search embeds its single query with one worker.
+automatic default. This controls inference concurrency, not a hard CPU percentage.
+The coordinator can prepare and save files while inference runs. Each worker
+owns a model session, and its thread and session persist across files. The pool
+starts when a file needs embeddings. Changing the worker setting does not
+require rebuilding unchanged files. Search embeds its query with one worker.
+
+Indexing allows at most twice the worker count in-flight files. Read-ahead pauses
+when their estimated input/vector payload reaches 32 MiB; one additional large
+file can exceed that threshold. This is a queue limit, not a total memory cap.
+Files commit in discovery order. On failure, earlier commits remain, the failed
+replacement is invalidated, and later queued results are discarded. In-flight
+model calls finish before indexing returns. The scheduling change preserves
+existing index compatibility and singleton inference inputs.
 
 Native tree-sitter grammars identify retrieval chunks for the
 [languages listed here](docs/languages.md#native-syntax). They ship in the binary and
@@ -159,13 +167,17 @@ mimirs index --profile .mimirs/index-reuse.json
 `--profile` writes a new local JSON report and refuses to overwrite an existing
 file. Keep reports outside included source paths. The report records exclusive
 phase wall times, unassigned time, file/byte/document counts, embedding call
-sizes, and per-file costs. Per-file times overlap the aggregate phases; do not
-add them together. Nested work is subtracted from its enclosing phase.
+sizes, queue peaks, and per-file costs. Per-file wall times include time waiting
+in the queue and can overlap each other. Do not add them together. Phase times
+measure exclusive coordinator work; nested work is subtracted from its enclosing
+phase.
 
 `model_assets` includes cache lookup or downloads and asset reads.
-`model_startup` measures tokenizer and ONNX session creation. `embedding`
-includes FastEmbed's internal tokenization, inference, and pooling. Batch counts
-refer to calls made by mimirs, not sampled CPU work. Timings stop before report
+`model_startup` measures tokenizer and ONNX session creation. `embedding_prepare`
+measures token-window planning and job submission. `embedding_wait` measures only
+the coordinator's wait for vectors. Background inference also runs during other
+phases, so this wait is not total inference time. Batch counts record singleton
+model calls, including calls that started before cancellation. Timings stop before report
 serialization. Ordinary index output and saved embeddings keep their format.
 An index error writes `complete: false` and the error when the report can be
 saved. Abrupt process termination may prevent a report from being written.

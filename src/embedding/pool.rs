@@ -1,91 +1,198 @@
+//! Persistent singleton-inference workers. The indexing coordinator bounds the
+//! number and retained bytes of submitted files; workers never access SQLite.
+use std::collections::VecDeque;
 use std::panic::{AssertUnwindSafe, catch_unwind};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Condvar, Mutex};
+use std::thread::JoinHandle;
 
-use anyhow::{Context, anyhow, ensure};
+use anyhow::{Context, Result, anyhow, ensure};
 
-use crate::profiling::Profiler;
+struct State {
+    next: usize,
+    active: usize,
+    calls: usize,
+    cancelled: bool,
+    error: Option<anyhow::Error>,
+    vectors: Vec<Option<Vec<f32>>>,
+}
 
-/// Reuse model sessions, assign the next chunk to whichever worker is free, and
-/// join every worker before returning. No work can outlive the current file.
-pub(super) fn embed<W: Send>(
-    workers: &mut [W],
-    texts: &[String],
-    profile: &Profiler,
-    operation: impl Fn(&mut W, &str) -> anyhow::Result<Vec<f32>> + Sync,
-) -> anyhow::Result<Vec<Vec<f32>>> {
-    ensure!(!workers.is_empty(), "embedding needs at least one worker");
-    let next = AtomicUsize::new(0);
-    let calls = AtomicUsize::new(0);
-    let cancelled = AtomicBool::new(false);
-    let work = |worker: &mut W| {
-        let result = catch_unwind(AssertUnwindSafe(|| {
-            let mut results = Vec::new();
-            while !cancelled.load(Ordering::Relaxed) {
-                let ordinal = next.fetch_add(1, Ordering::Relaxed);
-                let Some(text) = texts.get(ordinal) else {
-                    break;
-                };
-                calls.fetch_add(1, Ordering::Relaxed);
-                results.push((
-                    ordinal,
-                    operation(worker, text)
-                        .with_context(|| format!("embedding chunk {ordinal}"))?,
-                ));
-            }
-            Ok(results)
-        }))
-        .unwrap_or_else(|_| Err(anyhow!("embedding worker panicked")));
-        if result.is_err() {
-            cancelled.store(true, Ordering::Relaxed);
-        }
-        result
-    };
-    let result = if workers.len() == 1 {
-        work(&mut workers[0])
-    } else {
-        std::thread::scope(|scope| {
-            let mut handles = Vec::new();
-            let mut error = None;
-            for worker in workers {
-                match std::thread::Builder::new()
-                    .name("mimirs-embedding".into())
-                    .spawn_scoped(scope, || work(worker))
-                {
-                    Ok(handle) => handles.push(handle),
-                    Err(cause) => {
-                        cancelled.store(true, Ordering::Relaxed);
-                        error = Some(anyhow!(cause).context("cannot start embedding worker"));
-                        break;
-                    }
-                }
-            }
-            let mut results = Vec::new();
-            // Join all handles even after an error, before the caller can touch
-            // storage or report a failure. A partial result is never returned.
-            for handle in handles {
-                match handle
-                    .join()
-                    .unwrap_or_else(|_| Err(anyhow!("embedding worker panicked")))
-                {
-                    Ok(completed) => results.extend(completed),
-                    Err(cause) => {
-                        error.get_or_insert(cause);
-                    }
-                }
-            }
-            error.map_or(Ok(results), Err)
-        })
-    };
-    for _ in 0..calls.load(Ordering::Relaxed) {
-        profile.batch(1);
+struct Work {
+    texts: Vec<String>,
+    state: Mutex<State>,
+    changed: Condvar,
+}
+
+pub(crate) struct Job(Arc<Work>);
+
+impl Job {
+    pub(crate) fn ready(&self) -> bool {
+        let state = self.0.state.lock().unwrap();
+        state.active == 0 && (state.cancelled || state.next == self.0.texts.len())
     }
-    let mut ordered = result?;
-    ensure!(
-        ordered.len() == texts.len(),
-        "embedding workers returned incomplete results"
-    );
-    ordered.sort_unstable_by_key(|(ordinal, _)| *ordinal);
-    Ok(ordered.into_iter().map(|(_, vector)| vector).collect())
+
+    pub(crate) fn wait(&mut self) -> Result<Vec<Vec<f32>>> {
+        let mut state = self.0.state.lock().unwrap();
+        while state.active != 0 || (!state.cancelled && state.next != self.0.texts.len()) {
+            state = self.0.changed.wait(state).unwrap();
+        }
+        if let Some(error) = state.error.take() {
+            return Err(error);
+        }
+        ensure!(!state.cancelled, "embedding job cancelled");
+        std::mem::take(&mut state.vectors)
+            .into_iter()
+            .map(|v| v.context("embedding workers returned incomplete results"))
+            .collect()
+    }
+
+    pub(crate) fn cancel(&self) {
+        self.0.state.lock().unwrap().cancelled = true;
+        self.0.changed.notify_all();
+    }
+
+    pub(crate) fn calls(&self) -> usize {
+        self.0.state.lock().unwrap().calls
+    }
+}
+
+impl Drop for Job {
+    fn drop(&mut self) {
+        self.0.state.lock().unwrap().cancelled = true;
+        self.0.changed.notify_all();
+    }
+}
+
+#[derive(Default)]
+struct Queue {
+    stopped: bool,
+    jobs: VecDeque<Arc<Work>>,
+}
+
+#[derive(Default)]
+struct Shared {
+    queue: Mutex<Queue>,
+    changed: Condvar,
+}
+
+pub(crate) struct Pool {
+    shared: Arc<Shared>,
+    threads: Vec<JoinHandle<()>>,
+}
+
+impl Pool {
+    pub(crate) fn new<W: Send + 'static>(
+        workers: Vec<W>,
+        operation: impl Fn(&mut W, &str) -> Result<Vec<f32>> + Send + Sync + 'static,
+    ) -> Result<Self> {
+        ensure!(!workers.is_empty(), "embedding needs at least one worker");
+        let mut pool = Self {
+            shared: Arc::default(),
+            threads: Vec::new(),
+        };
+        let operation = Arc::new(operation);
+        for mut worker in workers {
+            let shared = pool.shared.clone();
+            let operation = operation.clone();
+            pool.threads.push(
+                std::thread::Builder::new()
+                    .name("mimirs-embedding".into())
+                    .spawn(move || {
+                        while let Some((job, ordinal)) = next(&shared) {
+                            let result = catch_unwind(AssertUnwindSafe(|| {
+                                operation(&mut worker, &job.texts[ordinal])
+                                    .with_context(|| format!("embedding chunk {ordinal}"))
+                            }))
+                            .unwrap_or_else(|_| Err(anyhow!("embedding worker panicked")));
+                            let mut state = job.state.lock().unwrap();
+                            state.active -= 1;
+                            match result {
+                                Ok(vector) => state.vectors[ordinal] = Some(vector),
+                                Err(error) => {
+                                    if state.error.is_none() {
+                                        state.error = Some(error);
+                                    }
+                                    state.cancelled = true;
+                                }
+                            }
+                            job.changed.notify_all();
+                        }
+                    })
+                    .context("cannot start embedding worker")?,
+            );
+        }
+        Ok(pool)
+    }
+
+    pub(crate) fn submit(&self, texts: Vec<String>) -> Job {
+        let count = texts.len();
+        let job = Arc::new(Work {
+            texts,
+            state: Mutex::new(State {
+                next: 0,
+                active: 0,
+                calls: 0,
+                cancelled: false,
+                error: None,
+                vectors: vec![None; count],
+            }),
+            changed: Condvar::new(),
+        });
+        if count != 0 {
+            self.shared
+                .queue
+                .lock()
+                .unwrap()
+                .jobs
+                .push_back(job.clone());
+            self.shared.changed.notify_all();
+        }
+        Job(job)
+    }
+}
+
+fn next(shared: &Shared) -> Option<(Arc<Work>, usize)> {
+    let mut queue = shared.queue.lock().unwrap();
+    loop {
+        if queue.stopped {
+            return None;
+        }
+        if let Some(job) = queue.jobs.front().cloned() {
+            let mut state = job.state.lock().unwrap();
+            if state.cancelled {
+                queue.jobs.pop_front();
+                job.changed.notify_all();
+                continue;
+            }
+            let ordinal = state.next;
+            state.next += 1;
+            state.active += 1;
+            state.calls += 1;
+            if state.next == job.texts.len() {
+                queue.jobs.pop_front();
+            }
+            drop(state);
+            return Some((job, ordinal));
+        }
+        queue = shared.changed.wait(queue).unwrap();
+    }
+}
+
+impl Drop for Pool {
+    fn drop(&mut self) {
+        {
+            let mut queue = self.shared.queue.lock().unwrap();
+            queue.stopped = true;
+            for job in queue.jobs.drain(..) {
+                job.state.lock().unwrap().cancelled = true;
+                job.changed.notify_all();
+            }
+        }
+        self.shared.changed.notify_all();
+        for thread in self.threads.drain(..) {
+            // In-flight inference finishes before the model sessions are dropped.
+            let _ = thread.join();
+        }
+    }
 }
 
 #[cfg(test)]
