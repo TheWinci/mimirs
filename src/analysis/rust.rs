@@ -37,22 +37,13 @@ fn extract(source: SourceFile) -> Result<Analysis> {
         .context("Rust parser returned no tree")?;
     let lines = LineIndex::new(&source.text);
     let entities = entities::extract(tree.root_node(), &source.text);
-    let mut facts = facts::extract(tree.root_node(), &source.text, &entities);
-    facts.extend(signatures::extract(
-        tree.root_node(),
-        &source.text,
-        &entities,
-        &lines,
-    ));
-    facts.extend(imports::extract(tree.root_node(), &source.text, &entities));
-    let (scopes, bindings) = scopes::extract(tree.root_node(), &source.text, &entities, &lines);
+    let nodes = facts::nodes(tree.root_node());
+    let mut facts = facts::extract(&nodes, &source.text, &entities);
+    facts.extend(signatures::extract(&nodes, &source.text, &entities, &lines));
+    facts.extend(imports::extract(&nodes, &source.text, &entities));
+    let (scopes, bindings) = scopes::extract(&nodes, &source.text, &entities, &lines);
     facts.extend(bindings);
-    facts.extend(references::extract(
-        tree.root_node(),
-        &source.text,
-        &entities,
-        &facts,
-    ));
+    facts.extend(references::extract(&nodes, &source.text, &entities, &facts));
     for fact in &mut facts {
         fact.scope = scopes::containing(&scopes, &fact.span);
     }
@@ -74,17 +65,7 @@ fn extract(source: SourceFile) -> Result<Analysis> {
     let mut cursor = tree.walk();
     loop {
         let node = cursor.node();
-        if node.is_error() || node.is_missing() {
-            diagnostics.push(Diagnostic {
-                kind: if node.is_missing() {
-                    format!("missing {}", node.kind())
-                } else {
-                    "ERROR".into()
-                },
-                span: Span::of(node, &source.text),
-                column: node.start_position().column + 1,
-            });
-        }
+        diagnostics.extend(Diagnostic::from_node(node, &source.text));
         if cursor.goto_first_child() {
             continue;
         }

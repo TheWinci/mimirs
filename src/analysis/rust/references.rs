@@ -1,23 +1,22 @@
-use super::{Entity, Fact, facts};
+use super::{Entity, Fact};
 use tree_sitter::Node;
 
 pub(super) fn extract(
-    root: Node<'_>,
+    nodes: &[Node<'_>],
     source: &str,
     entities: &[Entity],
     existing: &[Fact],
 ) -> Vec<Fact> {
-    let nodes = facts::nodes(root);
     let mut output = Vec::new();
-    let excluded: Vec<_> = existing
-        .iter()
-        .flat_map(|fact| {
-            if matches!(
-                fact.kind.as_str(),
-                "signature" | "import" | "extern_crate" | "attribute" | "comment" | "doc"
-            ) {
-                vec![&fact.span]
-            } else if fact.kind == "binding" {
+    let mut excluded = Vec::new();
+    for fact in existing {
+        if matches!(
+            fact.kind.as_str(),
+            "signature" | "import" | "extern_crate" | "attribute" | "comment" | "doc"
+        ) {
+            excluded.push((fact.span.start, fact.span.end));
+        } else if fact.kind == "binding" {
+            excluded.extend(
                 fact.evidence
                     .iter()
                     .filter(|e| {
@@ -26,16 +25,13 @@ pub(super) fn extract(
                             "let" | "parameter" | "closure" | "for" | "match" | "conditional"
                         )
                     })
-                    .map(|e| &e.span)
-                    .collect()
-            } else {
-                Vec::new()
-            }
-        })
-        .collect();
-    let excluded = merge_ranges(excluded.into_iter().map(|s| (s.start, s.end)).collect());
+                    .map(|e| (e.span.start, e.span.end)),
+            );
+        }
+    }
+    let excluded = merge_ranges(excluded);
     let is_excluded = |node| covered(node, &excluded);
-    for &node in &nodes {
+    for &node in nodes {
         if is_excluded(node) {
             continue;
         }
@@ -103,7 +99,7 @@ pub(super) fn extract(
             .map(|e| (e.span.start, e.span.end))
             .collect(),
     );
-    for node in nodes {
+    for &node in nodes {
         if is_excluded(node) || node.is_missing() {
             continue;
         }

@@ -233,21 +233,23 @@ fn read_with_limits(
 }
 
 fn channel_order(candidates: &[Candidate], semantic: bool) -> Vec<i64> {
-    let score = |c: &Candidate| {
-        if semantic {
-            c.semantic_score
-        } else {
-            c.lexical_score
-        }
-    };
-    let mut channel: Vec<_> = candidates.iter().filter(|c| score(c).is_some()).collect();
-    channel.sort_by(|a, b| {
-        score(b)
-            .unwrap()
-            .total_cmp(&score(a).unwrap())
+    let mut channel: Vec<_> = candidates
+        .iter()
+        .filter_map(|c| {
+            let score = if semantic {
+                c.semantic_score
+            } else {
+                c.lexical_score
+            }?;
+            Some((c, score))
+        })
+        .collect();
+    channel.sort_by(|(a, a_score), (b, b_score)| {
+        b_score
+            .total_cmp(a_score)
             .then_with(|| a.compare_position(b))
     });
-    channel.into_iter().map(|c| c.id).collect()
+    channel.into_iter().map(|(c, _)| c.id).collect()
 }
 
 fn cosine(left: &[f32], right: &[f32]) -> Option<f64> {

@@ -20,6 +20,7 @@ pub fn model_identity() -> String {
 pub const DIMENSION: usize = 384;
 #[cfg(test)]
 const DOCUMENT_BATCH_SIZE: usize = 256;
+const SOURCE_BATCH_SIZE: usize = 1024;
 
 pub(crate) mod pool;
 mod task;
@@ -168,13 +169,13 @@ impl Embedder {
         mut progress: impl FnMut(usize, usize) -> anyhow::Result<()>,
     ) -> anyhow::Result<Vec<Vec<f32>>> {
         let mut output = Vec::new();
-        for (i, batch) in texts.chunks(1024).enumerate() {
+        for batch in texts.chunks(SOURCE_BATCH_SIZE) {
             let vectors = self.profile.measure("embedding", || {
                 self.backend.embed_source_profiled(batch, &self.profile)
             })?;
             validate(&vectors, batch.len())?;
             output.extend(vectors);
-            progress((i * 1024 + batch.len()).min(texts.len()), texts.len())?;
+            progress(output.len(), texts.len())?;
         }
         Ok(output)
     }
@@ -299,8 +300,7 @@ impl OnnxBackend {
                     Ok(bytes)
                 })
             };
-            let read_tokenizer = |name| read(TOKENIZER_REPOSITORY, TOKENIZER_REVISION, name);
-            let tokenizer = read_tokenizer("tokenizer.json")?;
+            let tokenizer = read(TOKENIZER_REPOSITORY, TOKENIZER_REVISION, "tokenizer.json")?;
             let weights = read(MODEL_REPOSITORY, MODEL_REVISION, MODEL_FILE)?;
             self.models.push(
                 self.profile
@@ -338,6 +338,37 @@ impl OnnxBackend {
         result
     }
 
+    fn source_task(&mut self, texts: &[String], profile: &Profiler) -> anyhow::Result<SourceTask> {
+        if texts.is_empty() {
+            return Ok(SourceTask::completed(Vec::new()));
+        }
+        self.profile = profile.clone();
+        self.ensure_pool()?;
+        let tokenizer = self.source_tokenizer.as_ref().unwrap();
+        let mut unique = Vec::new();
+        let mut plans = Vec::new();
+        // Preserve the original 1024-document deduplication boundaries.
+        for batch in texts.chunks(SOURCE_BATCH_SIZE) {
+            let mut indexes = std::collections::HashMap::new();
+            for text in batch {
+                let mut plan = Vec::new();
+                for input in ts_v2::document_inputs(tokenizer, text)? {
+                    let index = *indexes.entry(input.clone()).or_insert_with(|| {
+                        let index = unique.len();
+                        unique.push(input);
+                        index
+                    });
+                    plan.push(index);
+                }
+                plans.push(plan);
+            }
+        }
+        let input_bytes = unique.iter().map(String::len).sum();
+        let inputs = unique.len();
+        let job = self.pool.as_ref().unwrap().submit(unique);
+        Ok(SourceTask::pending(job, plans, input_bytes, inputs))
+    }
+
     fn ensure_pool(&mut self) -> anyhow::Result<()> {
         if self.pool.is_none() {
             self.ensure_models(self.workers)?;
@@ -371,34 +402,7 @@ impl Backend for OnnxBackend {
         texts: &[String],
         profile: &Profiler,
     ) -> anyhow::Result<Option<SourceTask>> {
-        if texts.is_empty() {
-            return Ok(Some(SourceTask::completed(Vec::new())));
-        }
-        self.profile = profile.clone();
-        self.ensure_pool()?;
-        let tokenizer = self.source_tokenizer.as_ref().unwrap();
-        let mut unique = Vec::new();
-        let mut plans = Vec::new();
-        // Preserve the original 1024-document deduplication boundaries.
-        for batch in texts.chunks(1024) {
-            let mut indexes = std::collections::HashMap::new();
-            for text in batch {
-                let mut plan = Vec::new();
-                for input in ts_v2::document_inputs(tokenizer, text)? {
-                    let index = *indexes.entry(input.clone()).or_insert_with(|| {
-                        let index = unique.len();
-                        unique.push(input);
-                        index
-                    });
-                    plan.push(index);
-                }
-                plans.push(plan);
-            }
-        }
-        let input_bytes = unique.iter().map(String::len).sum();
-        let inputs = unique.len();
-        let job = self.pool.as_ref().unwrap().submit(unique);
-        Ok(Some(SourceTask::pending(job, plans, input_bytes, inputs)))
+        self.source_task(texts, profile).map(Some)
     }
 
     fn embed_source_profiled(
@@ -406,8 +410,7 @@ impl Backend for OnnxBackend {
         texts: &[String],
         profile: &Profiler,
     ) -> anyhow::Result<Vec<Vec<f32>>> {
-        self.submit_source(texts, profile)?
-            .unwrap()
+        self.source_task(texts, profile)?
             .finish(profile, |_, _| Ok(()))
     }
 

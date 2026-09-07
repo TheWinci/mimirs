@@ -31,32 +31,12 @@ fn extract(source: SourceFile) -> Result<Analysis> {
         .parse(&source.text, None)
         .context("Go parser returned no tree")?;
     let lines = LineIndex::new(&source.text);
-    let mut analysis = Analysis {
-        source_chunks: Vec::new(),
-        scopes: vec![Scope {
-            kind: "file".into(),
-            span: lines.span(0, source.text.len()),
-            parent: None,
-            owner: None,
-        }],
-        source,
-        entities: Vec::new(),
-        facts: Vec::new(),
-        diagnostics: Vec::new(),
-    };
+    let mut analysis = Analysis::new(source, &lines);
     let mut stack = vec![(tree.root_node(), None::<usize>)];
     while let Some((node, mut owner)) = stack.pop() {
-        if node.is_error() || node.is_missing() {
-            analysis.diagnostics.push(Diagnostic {
-                kind: if node.is_missing() {
-                    format!("missing {}", node.kind())
-                } else {
-                    "ERROR".into()
-                },
-                span: Span::of(node, &analysis.source.text),
-                column: node.start_position().column + 1,
-            });
-        }
+        analysis
+            .diagnostics
+            .extend(Diagnostic::from_node(node, &analysis.source.text));
         if !node.is_missing()
             && node.start_byte() < node.end_byte()
             && let Some((kind, spec)) = declaration(node, owner, &analysis)
@@ -106,9 +86,12 @@ fn extract(source: SourceFile) -> Result<Analysis> {
                     let start = node.start_byte();
                     let end = start + analysis.source.text[start..end].trim_end().len();
                     if end > start {
-                        analysis
-                            .facts
-                            .push(fact("signature", lines.span(start, end), id, scope));
+                        analysis.facts.push(Fact::at(
+                            "signature",
+                            lines.span(start, end),
+                            Some(id),
+                            scope,
+                        ));
                     }
                 }
                 owner = Some(id);
@@ -210,24 +193,13 @@ fn attach_docs(node: Node<'_>, owner: usize, lines: &LineIndex, analysis: &mut A
         {
             break;
         }
-        analysis.facts.push(fact(
+        analysis.facts.push(Fact::at(
             "doc",
             lines.span(doc.start_byte(), doc.end_byte()),
-            owner,
+            Some(owner),
             0,
         ));
         first = doc;
-    }
-}
-
-fn fact(kind: &str, span: Span, owner: usize, scope: usize) -> Fact {
-    Fact {
-        kind: kind.into(),
-        span,
-        owner: Some(owner),
-        scope,
-        evidence: Vec::new(),
-        related: None,
     }
 }
 

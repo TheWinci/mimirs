@@ -20,21 +20,23 @@ pub struct Hit {
 }
 
 pub fn compare(left: &Hit, right: &Hit) -> Ordering {
-    right
-        .score
-        .total_cmp(&left.score)
-        .then_with(|| right.semantic_score.total_cmp(&left.semantic_score))
-        .then_with(|| ordinal_compare(&left.representative.path, &right.representative.path))
-        .then(left.representative.start.cmp(&right.representative.start))
-        .then(left.representative.id.cmp(&right.representative.id))
+    compare_by_path(left, right, ordinal_compare)
 }
 
 pub fn compare_segmented(left: &Hit, right: &Hit) -> Ordering {
+    compare_by_path(left, right, locale_compare)
+}
+
+fn compare_by_path(
+    left: &Hit,
+    right: &Hit,
+    compare_path: impl FnOnce(&str, &str) -> Ordering,
+) -> Ordering {
     right
         .score
         .total_cmp(&left.score)
         .then_with(|| right.semantic_score.total_cmp(&left.semantic_score))
-        .then_with(|| locale_compare(&left.representative.path, &right.representative.path))
+        .then_with(|| compare_path(&left.representative.path, &right.representative.path))
         .then(left.representative.start.cmp(&right.representative.start))
         .then(left.representative.id.cmp(&right.representative.id))
 }
@@ -96,11 +98,12 @@ pub fn collapse_files(hits: Vec<Hit>) -> Vec<Hit> {
         .into_values()
         .map(|mut hits| {
             hits.sort_by(compare);
-            let mut best = hits[0].clone();
-            if let Some(second) = hits.get(1) {
+            let mut best = hits.remove(0);
+            if let Some(second) = hits.first() {
                 best.score += 0.25 * best.score.min(second.score);
             }
-            best.windows = hits.into_iter().flat_map(|h| h.windows).collect();
+            best.windows
+                .extend(hits.into_iter().flat_map(|h| h.windows));
             order_windows(&mut best.windows);
             best
         })
@@ -109,15 +112,16 @@ pub fn collapse_files(hits: Vec<Hit>) -> Vec<Hit> {
     result
 }
 
-pub fn merge(left: Hit, right: Hit) -> Hit {
-    let mut best = if compare_segmented(&left, &right).is_le() {
-        left.clone()
+pub fn merge(mut left: Hit, mut right: Hit) -> Hit {
+    let prefer_left = compare_segmented(&left, &right).is_le();
+    left.windows.append(&mut right.windows);
+    order_windows(&mut left.windows);
+    if prefer_left {
+        left
     } else {
-        right.clone()
-    };
-    best.windows = left.windows.into_iter().chain(right.windows).collect();
-    order_windows(&mut best.windows);
-    best
+        right.windows = left.windows;
+        right
+    }
 }
 
 fn order_windows(windows: &mut Vec<Candidate>) {

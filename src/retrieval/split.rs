@@ -12,6 +12,17 @@ pub struct Document {
     pub evidence: Vec<Evidence>,
 }
 
+impl Document {
+    /// Reconstruct cited text from a validated snapshot's evidence spans.
+    pub fn source_text(&self, source: &str) -> String {
+        self.evidence
+            .iter()
+            .map(|e| &source[e.span.start..e.span.end])
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
+
 pub struct TokenBudget {
     #[cfg(test)]
     tokenizer: Tokenizer,

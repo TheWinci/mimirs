@@ -915,12 +915,9 @@ fn adjust(
 }
 
 fn blank_line(text: &str) -> bool {
-    text.split_once('\n').is_some_and(|(_, rest)| {
-        rest.split('\n')
-            .next()
-            .is_some_and(|line| line.bytes().all(|b| b == b' ' || b == b'\t'))
-            && rest.contains('\n')
-    })
+    text.split_once('\n')
+        .and_then(|(_, rest)| rest.split_once('\n'))
+        .is_some_and(|(line, _)| line.bytes().all(|b| b == b' ' || b == b'\t'))
 }
 
 fn collapse(entities: Vec<Entity>, source: &str) -> Vec<Entity> {
@@ -1088,12 +1085,10 @@ pub fn text_chunks(source: &str, path: &str) -> Vec<Chunk> {
     if path.ends_with(".md") || path.ends_with(".markdown") || path.ends_with(".mdx") {
         return flatten(markdown::chunks(source), source, &[]);
     }
-    let mut tree = Vec::new();
-    let mut start = 0;
-    let mut kind = None;
+    let mut tree: Vec<TreeChunk> = Vec::new();
     let mut end = 0;
     for line in source.split_inclusive('\n') {
-        let next = if line
+        let kind = if line
             .trim_end_matches('\n')
             .bytes()
             .all(|b| matches!(b, b' ' | b'\t'))
@@ -1102,15 +1097,13 @@ pub fn text_chunks(source: &str, path: &str) -> Vec<Chunk> {
         } else {
             "paragraph"
         };
-        if kind.is_some_and(|previous| previous != next) {
-            tree.push(TreeChunk::new(kind.unwrap(), None, start, end));
-            start = end;
-        }
-        kind = Some(next);
+        let start = end;
         end += line.len();
-    }
-    if start < end {
-        tree.push(TreeChunk::new(kind.unwrap(), None, start, end));
+        if let Some(previous) = tree.last_mut().filter(|chunk| chunk.kind == kind) {
+            previous.end = end;
+        } else {
+            tree.push(TreeChunk::new(kind, None, start, end));
+        }
     }
     flatten(tree, source, &[])
 }

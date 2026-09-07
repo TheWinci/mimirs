@@ -29,37 +29,20 @@ fn extract(source: SourceFile) -> Result<Analysis> {
         .parse(&source.text, None)
         .context("Python parser returned no tree")?;
     let lines = LineIndex::new(&source.text);
-    let mut analysis = Analysis {
-        source_chunks: Vec::new(),
-        entities: Vec::new(),
-        facts: Vec::new(),
-        scopes: vec![Scope {
-            kind: "file".into(),
-            span: lines.span(0, source.text.len()),
-            parent: None,
-            owner: None,
-        }],
-        diagnostics: Vec::new(),
-        source,
-    };
+    let mut analysis = Analysis::new(source, &lines);
     if let Some(doc) = docstring(tree.root_node(), &analysis.source.text) {
-        analysis
-            .facts
-            .push(fact("doc", Span::of(doc, &analysis.source.text), None, 0));
+        analysis.facts.push(Fact::at(
+            "doc",
+            Span::of(doc, &analysis.source.text),
+            None,
+            0,
+        ));
     }
     let mut stack = vec![(tree.root_node(), None::<usize>, 0)];
     while let Some((node, mut owner, mut scope)) = stack.pop() {
-        if node.is_error() || node.is_missing() {
-            analysis.diagnostics.push(Diagnostic {
-                kind: if node.is_missing() {
-                    format!("missing {}", node.kind())
-                } else {
-                    "ERROR".into()
-                },
-                span: Span::of(node, &analysis.source.text),
-                column: node.start_position().column + 1,
-            });
-        }
+        analysis
+            .diagnostics
+            .extend(Diagnostic::from_node(node, &analysis.source.text));
         if matches!(node.kind(), "class_definition" | "function_definition")
             && let Some(name) = node
                 .child_by_field_name("name")
@@ -88,7 +71,7 @@ fn extract(source: SourceFile) -> Result<Analysis> {
                     .named_children(&mut cursor)
                     .filter(|n| n.kind() == "decorator")
                 {
-                    analysis.facts.push(fact(
+                    analysis.facts.push(Fact::at(
                         "decorator",
                         Span::of(decorator, &analysis.source.text),
                         Some(id),
@@ -112,7 +95,7 @@ fn extract(source: SourceFile) -> Result<Analysis> {
                 .children(&mut cursor)
                 .find(|n| n.kind() == ":" && !n.is_missing())
             {
-                analysis.facts.push(fact(
+                analysis.facts.push(Fact::at(
                     "signature",
                     lines.span(node.start_byte(), colon.end_byte()),
                     owner,
@@ -122,7 +105,7 @@ fn extract(source: SourceFile) -> Result<Analysis> {
             if let Some(body) = node.child_by_field_name("body")
                 && let Some(doc) = docstring(body, &analysis.source.text)
             {
-                analysis.facts.push(fact(
+                analysis.facts.push(Fact::at(
                     "doc",
                     Span::of(doc, &analysis.source.text),
                     owner,
@@ -150,17 +133,6 @@ fn extract(source: SourceFile) -> Result<Analysis> {
         &analysis.entities,
     )?;
     Ok(analysis)
-}
-
-fn fact(kind: &str, span: Span, owner: Option<usize>, scope: usize) -> Fact {
-    Fact {
-        kind: kind.into(),
-        span,
-        owner,
-        scope,
-        evidence: Vec::new(),
-        related: None,
-    }
 }
 
 fn docstring<'a>(body: Node<'a>, source: &str) -> Option<Node<'a>> {

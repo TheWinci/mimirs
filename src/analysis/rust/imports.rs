@@ -1,9 +1,9 @@
-use super::{Entity, Fact, facts};
+use super::{Entity, Fact};
 use tree_sitter::Node;
 
-pub(super) fn extract(root: Node<'_>, source: &str, entities: &[Entity]) -> Vec<Fact> {
+pub(super) fn extract(nodes: &[Node<'_>], source: &str, entities: &[Entity]) -> Vec<Fact> {
     let mut output = Vec::new();
-    for node in facts::nodes(root) {
+    for &node in nodes {
         match node.kind() {
             "use_declaration" => {
                 let mut declaration = Fact::new("import", node, source, entities);

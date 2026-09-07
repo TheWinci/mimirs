@@ -49,32 +49,12 @@ fn extract(source: SourceFile, language: tree_sitter::Language) -> Result<Analys
         .parse(&source.text, None)
         .context("JavaScript/TypeScript parser returned no tree")?;
     let lines = LineIndex::new(&source.text);
-    let mut analysis = Analysis {
-        source_chunks: Vec::new(),
-        scopes: vec![Scope {
-            kind: "file".into(),
-            span: lines.span(0, source.text.len()),
-            parent: None,
-            owner: None,
-        }],
-        source,
-        entities: Vec::new(),
-        facts: Vec::new(),
-        diagnostics: Vec::new(),
-    };
+    let mut analysis = Analysis::new(source, &lines);
     let mut stack = vec![(tree.root_node(), None::<usize>, 0, false)];
     while let Some((node, mut owner, mut scope, mut opaque)) = stack.pop() {
-        if node.is_error() || node.is_missing() {
-            analysis.diagnostics.push(Diagnostic {
-                kind: if node.is_missing() {
-                    format!("missing {}", node.kind())
-                } else {
-                    "ERROR".into()
-                },
-                span: Span::of(node, &analysis.source.text),
-                column: node.start_position().column + 1,
-            });
-        }
+        analysis
+            .diagnostics
+            .extend(Diagnostic::from_node(node, &analysis.source.text));
         if !opaque
             && node.is_named()
             && !node.is_missing()
@@ -102,7 +82,9 @@ fn extract(source: SourceFile, language: tree_sitter::Language) -> Result<Analys
                 });
             }
             if let Some(span) = signature(node, kind, &analysis.source.text, &lines) {
-                analysis.facts.push(fact("signature", span, id, scope));
+                analysis
+                    .facts
+                    .push(Fact::at("signature", span, Some(id), scope));
             }
             opaque = matches!(
                 kind,
@@ -240,24 +222,13 @@ fn module_boundary(node: Node<'_>) -> bool {
     })
 }
 
-fn fact(kind: &str, span: Span, owner: usize, scope: usize) -> Fact {
-    Fact {
-        kind: kind.into(),
-        span,
-        owner: Some(owner),
-        scope,
-        evidence: Vec::new(),
-        related: None,
-    }
-}
-
 fn attach(node: Node<'_>, owner: usize, scope: usize, lines: &LineIndex, analysis: &mut Analysis) {
     let outer = wrapper(node);
     if outer.start_byte() < node.start_byte() {
-        analysis.facts.push(fact(
+        analysis.facts.push(Fact::at(
             "wrapper",
             lines.span(outer.start_byte(), node.start_byte()),
-            owner,
+            Some(owner),
             scope,
         ));
     }
@@ -269,10 +240,10 @@ fn attach(node: Node<'_>, owner: usize, scope: usize, lines: &LineIndex, analysi
             .named_children(&mut cursor)
             .filter(|n| n.kind() == "decorator")
         {
-            analysis.facts.push(fact(
+            analysis.facts.push(Fact::at(
                 "decorator",
                 Span::of(decorator, &analysis.source.text),
-                owner,
+                Some(owner),
                 scope,
             ));
         }
@@ -288,10 +259,10 @@ fn attach(node: Node<'_>, owner: usize, scope: usize, lines: &LineIndex, analysi
         {
             break;
         }
-        analysis.facts.push(fact(
+        analysis.facts.push(Fact::at(
             "decorator",
             Span::of(previous, &analysis.source.text),
-            owner,
+            Some(owner),
             scope,
         ));
         first = previous;
@@ -304,10 +275,10 @@ fn attach(node: Node<'_>, owner: usize, scope: usize, lines: &LineIndex, analysi
             && gap.trim().is_empty()
             && gap.bytes().filter(|b| *b == b'\n').count() <= 1
         {
-            analysis.facts.push(fact(
+            analysis.facts.push(Fact::at(
                 "doc",
                 Span::of(doc, &analysis.source.text),
-                owner,
+                Some(owner),
                 scope,
             ));
         }

@@ -4,14 +4,7 @@ use tree_sitter::Node;
 
 impl Fact {
     pub(super) fn new(kind: &str, node: Node<'_>, source: &str, entities: &[Entity]) -> Self {
-        Self {
-            kind: kind.into(),
-            span: Span::of(node, source),
-            owner: owner(node, entities),
-            evidence: Vec::new(),
-            related: None,
-            scope: 0,
-        }
+        Self::at(kind, Span::of(node, source), owner(node, entities), 0)
     }
 
     pub(super) fn add(&mut self, role: &str, node: Option<Node<'_>>, source: &str) {
@@ -49,9 +42,9 @@ pub(super) fn nodes(root: Node<'_>) -> Vec<Node<'_>> {
     output
 }
 
-pub(super) fn extract(root: Node<'_>, source: &str, entities: &[Entity]) -> Vec<Fact> {
+pub(super) fn extract(nodes: &[Node<'_>], source: &str, entities: &[Entity]) -> Vec<Fact> {
     let mut facts = Vec::new();
-    for node in nodes(root) {
+    for &node in nodes {
         let attribute = matches!(node.kind(), "attribute_item" | "inner_attribute_item");
         let comment = matches!(node.kind(), "line_comment" | "block_comment");
         if !attribute && !comment {

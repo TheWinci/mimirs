@@ -2,13 +2,13 @@ use super::{Entity, Fact, facts};
 use tree_sitter::Node;
 
 pub(super) fn extract(
-    root: Node<'_>,
+    nodes: &[Node<'_>],
     source: &str,
     entities: &[Entity],
     lines: &super::LineIndex,
 ) -> Vec<Fact> {
     let mut output = Vec::new();
-    for node in facts::nodes(root) {
+    for &node in nodes {
         if super::entities::kind(node).is_none() {
             continue;
         }

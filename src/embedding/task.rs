@@ -1,6 +1,6 @@
 //! A file's ordered document vectors, produced without changing token inputs or
 //! singleton model calls. Only the coordinator reports progress or touches storage.
-use super::{DIMENSION, pool, ts_v2, validate};
+use super::{DIMENSION, SOURCE_BATCH_SIZE, pool, ts_v2, validate};
 use crate::profiling::Profiler;
 use anyhow::{Result, ensure};
 use std::sync::Arc;
@@ -130,7 +130,7 @@ impl SourceTask {
                 let _merge = profile.scope("vector_merge");
                 let total = plans.len();
                 let mut output = Vec::with_capacity(total);
-                for batch in plans.chunks(1024) {
+                for batch in plans.chunks(SOURCE_BATCH_SIZE) {
                     for plan in batch {
                         output.push(ts_v2::merge(
                             &plan

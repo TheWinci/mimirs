@@ -21,12 +21,27 @@ pub(super) struct File {
     _permit: admission::Permit,
 }
 
-enum Parsed {
+enum Outcome<T> {
     Reused,
     Skipped(anyhow::Error),
-    Changed(Result<Arc<Analysis>>),
+    Changed(Result<T>),
     Failed(anyhow::Error),
 }
+
+impl<T> Outcome<T> {
+    fn map_changed<U>(self, prepare: impl FnOnce(T) -> Result<U>) -> Outcome<U> {
+        match self {
+            Self::Reused => Outcome::Reused,
+            Self::Skipped(error) => Outcome::Skipped(error),
+            Self::Failed(error) => Outcome::Failed(error),
+            Self::Changed(result) => Outcome::Changed(result.and_then(prepare)),
+        }
+    }
+}
+
+type Parsed = Outcome<Arc<Analysis>>;
+type Prepared = Outcome<Work>;
+type Completed = Outcome<Complete>;
 
 struct Work {
     task: SourceTask,
@@ -35,25 +50,11 @@ struct Work {
     plan: WindowPlan,
 }
 
-enum Prepared {
-    Reused,
-    Skipped(anyhow::Error),
-    Changed(Result<Work>),
-    Failed(anyhow::Error),
-}
-
 struct Complete {
     analysis: Arc<Analysis>,
     documents: Arc<Vec<Document>>,
     plan: WindowPlan,
     vectors: Result<Arc<Vec<Vec<f32>>>>,
-}
-
-enum Completed {
-    Reused,
-    Skipped(anyhow::Error),
-    Changed(Result<Complete>),
-    Failed(anyhow::Error),
 }
 
 enum Message<T> {
@@ -116,8 +117,8 @@ pub(super) fn run(
     let incremental: bool =
         connection.query_row("SELECT EXISTS(SELECT 1 FROM files)", [], |r| r.get(0))?;
     let cancel = channel::Cancel::default();
-    let admission = admission::Admission::new(workers.saturating_mul(2).max(1), profile, &cancel);
     let capacity = workers.saturating_mul(2).max(1);
+    let admission = admission::Admission::new(capacity, profile, &cancel);
     let (parsed_tx, parsed_rx) = channel::bounded(capacity, "parsed", profile, &cancel);
     let (ready_tx, ready_rx) = channel::bounded(capacity, "prepared", profile, &cancel);
     let (write_tx, write_rx) = channel::bounded(capacity, "writer", profile, &cancel);
@@ -276,41 +277,35 @@ fn prepare(
     while let Some(message) = receive.recv() {
         let message = match message {
             Message::File(parsed, file) => {
-                let prepared = match parsed {
-                    Parsed::Reused => Prepared::Reused,
-                    Parsed::Skipped(error) => Prepared::Skipped(error),
-                    Parsed::Failed(error) => Prepared::Failed(error),
-                    Parsed::Changed(analysis) => Prepared::Changed((|| {
-                        let analysis = analysis?;
-                        let documents = file.profile.measure("chunking_token_budget", || {
-                            crate::retrieval::ts_v2::documents(&analysis)
-                        })?;
-                        file.profile.count("documents", documents.len());
-                        file.profile.stage_items("windows", documents.len());
-                        let texts = file.profile.measure("document_texts", || {
-                            documents.iter().map(|d| d.text.clone()).collect::<Vec<_>>()
-                        });
-                        let task = embedder
-                            .submit_ts_documents(&texts, &file.profile, |_, _| Ok(()))
-                            .with_context(|| format!("cannot embed source file {}", file.path))?;
-                        let plan = task.window_plan()?;
-                        let documents = Arc::new(documents);
-                        ensure!(
-                            stage(
-                                &writer,
-                                Stage::Windows(documents.clone(), plan.clone()),
-                                &file
-                            ),
-                            "index writer closed"
-                        );
-                        Ok(Work {
-                            task,
-                            analysis,
-                            documents,
-                            plan,
-                        })
-                    })()),
-                };
+                let prepared = parsed.map_changed(|analysis| {
+                    let documents = file.profile.measure("chunking_token_budget", || {
+                        crate::retrieval::ts_v2::documents(&analysis)
+                    })?;
+                    file.profile.count("documents", documents.len());
+                    file.profile.stage_items("windows", documents.len());
+                    let texts = file.profile.measure("document_texts", || {
+                        documents.iter().map(|d| d.text.clone()).collect::<Vec<_>>()
+                    });
+                    let task = embedder
+                        .submit_ts_documents(&texts, &file.profile, |_, _| Ok(()))
+                        .with_context(|| format!("cannot embed source file {}", file.path))?;
+                    let plan = task.window_plan()?;
+                    let documents = Arc::new(documents);
+                    ensure!(
+                        stage(
+                            &writer,
+                            Stage::Windows(documents.clone(), plan.clone()),
+                            &file
+                        ),
+                        "index writer closed"
+                    );
+                    Ok(Work {
+                        task,
+                        analysis,
+                        documents,
+                        plan,
+                    })
+                });
                 Message::File(prepared, file)
             }
             Message::WalkError(error) => Message::WalkError(error),
@@ -338,33 +333,28 @@ fn merge(receive: channel::Receiver<Message<Prepared>>, send: channel::Sender<Wr
     while let Some(message) = receive.recv() {
         let message = match message {
             Message::File(prepared, file) => {
-                let completed = match prepared {
-                    Prepared::Reused => Completed::Reused,
-                    Prepared::Skipped(error) => Completed::Skipped(error),
-                    Prepared::Failed(error) => Completed::Failed(error),
-                    Prepared::Changed(work) => Completed::Changed(work.map(
-                        |Work {
-                             task,
-                             analysis,
-                             documents,
-                             plan,
-                         }| {
-                            let vectors = task
-                                .finish(&file.profile, |_, _| Ok(()))
-                                .with_context(|| format!("cannot embed source file {}", file.path))
-                                .map(Arc::new);
-                            if let Ok(vectors) = &vectors {
-                                stage(&send, Stage::Vectors(vectors.clone()), &file);
-                            }
-                            Complete {
-                                analysis,
-                                documents,
-                                plan,
-                                vectors,
-                            }
-                        },
-                    )),
-                };
+                let completed = prepared.map_changed(
+                    |Work {
+                         task,
+                         analysis,
+                         documents,
+                         plan,
+                     }| {
+                        let vectors = task
+                            .finish(&file.profile, |_, _| Ok(()))
+                            .with_context(|| format!("cannot embed source file {}", file.path))
+                            .map(Arc::new);
+                        if let Ok(vectors) = &vectors {
+                            stage(&send, Stage::Vectors(vectors.clone()), &file);
+                        }
+                        Ok(Complete {
+                            analysis,
+                            documents,
+                            plan,
+                            vectors,
+                        })
+                    },
+                );
                 Message::File(completed, file)
             }
             Message::WalkError(error) => Message::WalkError(error),
@@ -418,10 +408,7 @@ fn consume(
                     continue;
                 }
                 Message::End(found) => {
-                    ensure!(
-                        found == summary.indexed + summary.unchanged + summary.skipped,
-                        "missing completed files"
-                    );
+                    ensure!(found == summary.completed(), "missing completed files");
                     progress.indexing("-", (0, 0), (found, found), true)?;
                     ended = true;
                     continue;
@@ -429,10 +416,7 @@ fn consume(
                 Message::Fatal(error) => return Err(error),
                 Message::File(prepared, file) => (prepared, file),
             };
-            ensure!(
-                file.ordinal == summary.indexed + summary.unchanged + summary.skipped,
-                "unordered publication"
-            );
+            ensure!(file.ordinal == summary.completed(), "unordered publication");
             progress.set_profile(file.profile.clone());
             match prepared {
                 Completed::Reused => {

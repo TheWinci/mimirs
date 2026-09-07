@@ -98,7 +98,7 @@ pub(super) fn run(
             }
             let (file_profile, scope) = profile.fork_file(path);
             progress.set_profile(file_profile.clone());
-            let completed = summary.indexed + summary.unchanged + summary.skipped;
+            let completed = summary.completed();
             let outcome = (|| {
                 progress.indexing(
                     path,

@@ -1,9 +1,9 @@
 //! TS v2 MiniLM input construction and float32 averaging. Model execution stays
 //! in the existing bounded worker pool.
-use anyhow::{Result, ensure};
+use anyhow::{Context, Result, ensure};
 use regex::Regex;
 use std::sync::LazyLock;
-use tokenizers::{Model, NormalizedString, Normalizer, Tokenizer};
+use tokenizers::{Encoding, Model, NormalizedString, Normalizer, Tokenizer};
 
 pub const LIMIT: usize = 256;
 const OVERLAP: usize = 32;
@@ -23,22 +23,20 @@ pub fn unbounded(mut tokenizer: Tokenizer) -> Result<Tokenizer> {
 }
 
 pub fn ids(tokenizer: &Tokenizer, text: &str) -> Result<Vec<u32>> {
-    Ok(tokenizer
-        .encode(text, true)
-        .map_err(|e| anyhow::anyhow!(e))?
-        .get_ids()
-        .to_vec())
+    Ok(encode(tokenizer, text)?.get_ids().to_vec())
+}
+
+fn encode(tokenizer: &Tokenizer, text: &str) -> Result<Encoding> {
+    tokenizer.encode(text, true).map_err(|e| anyhow::anyhow!(e))
 }
 
 pub fn document_inputs(tokenizer: &Tokenizer, projected: &str) -> Result<Vec<String>> {
-    let newline = projected.find('\n');
-    ensure!(
-        projected.starts_with("File: ") && newline.is_some_and(|n| n > 6),
-        "path-average input must start with File: <relative path> and a newline"
-    );
-    let newline = newline.unwrap();
-    let (prefix, text) = projected.split_at(newline + 1);
-    if ids(tokenizer, projected)?.len() <= LIMIT {
+    let (path, text) = projected
+        .split_once('\n')
+        .filter(|(path, _)| path.starts_with("File: ") && path.len() > 6)
+        .context("path-average input must start with File: <relative path> and a newline")?;
+    let prefix = &projected[..path.len() + 1];
+    if encode(tokenizer, projected)?.len() <= LIMIT {
         return Ok(vec![projected.into()]);
     }
     let mut pieces = Vec::new();
@@ -63,7 +61,7 @@ pub fn document_inputs(tokenizer: &Tokenizer, projected: &str) -> Result<Vec<Str
     );
     let mut windows = Vec::new();
     let mut start_piece = 0;
-    let prefix_tokens = ids(tokenizer, prefix)?.len();
+    let prefix_tokens = encode(tokenizer, prefix)?.len();
     while start_piece < pieces.len() {
         let mut end_piece = start_piece;
         let mut tokens = prefix_tokens;
@@ -81,14 +79,14 @@ pub fn document_inputs(tokenizer: &Tokenizer, projected: &str) -> Result<Vec<Str
         };
         let mut end = pieces.get(end_piece).map_or(text.len(), |p| p.0);
         while end_piece > start_piece + 1
-            && ids(tokenizer, &format!("{prefix}{}", &text[start..end]))?.len() > LIMIT
+            && encode(tokenizer, &format!("{prefix}{}", &text[start..end]))?.len() > LIMIT
         {
             end_piece -= 1;
             end = pieces[end_piece].0;
         }
         let window = format!("{prefix}{}", &text[start..end]);
         ensure!(
-            ids(tokenizer, &window)?.len() <= LIMIT,
+            encode(tokenizer, &window)?.len() <= LIMIT,
             "cannot fit source piece within 256 tokens"
         );
         windows.push(window);

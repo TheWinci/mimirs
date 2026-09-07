@@ -161,12 +161,7 @@ pub(super) fn write(
         );
         tx.execute("INSERT INTO retrieval_documents(file_id, ordinal, owner, kind, part, policy, text, content_hash, evidence, source_chunk) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)", params![file_id, ordinal as i64, document.owner.map(|id| id as i64), if document.owner.is_some() { "entity" } else { "file" }, document.part as i64, batch.policy, document.text, source_hash(&document.text), serde_json::to_string(&document.evidence)?, document.source_chunk.map(|id|id as i64)])?;
         let id = tx.last_insert_rowid();
-        let source = document
-            .evidence
-            .iter()
-            .map(|evidence| &analysis.source.text[evidence.span.start..evidence.span.end])
-            .collect::<Vec<_>>()
-            .join("\n");
+        let source = document.source_text(&analysis.source.text);
         super::lexical::insert(
             tx,
             id,

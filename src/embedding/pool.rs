@@ -65,8 +65,7 @@ impl Job {
 
 impl Drop for Job {
     fn drop(&mut self) {
-        self.0.state.lock().unwrap().cancelled = true;
-        self.0.changed.notify_all();
+        self.cancel();
     }
 }
 

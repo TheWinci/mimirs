@@ -36,6 +36,19 @@ pub struct Fact {
     pub scope: usize,
 }
 
+impl Fact {
+    fn at(kind: &str, span: Span, owner: Option<usize>, scope: usize) -> Self {
+        Self {
+            kind: kind.into(),
+            span,
+            owner,
+            scope,
+            evidence: Vec::new(),
+            related: None,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Scope {
     pub kind: String,
@@ -106,6 +119,20 @@ pub struct Diagnostic {
     pub column: usize,
 }
 
+impl Diagnostic {
+    fn from_node(node: Node<'_>, source: &str) -> Option<Self> {
+        (node.is_error() || node.is_missing()).then(|| Self {
+            kind: if node.is_missing() {
+                format!("missing {}", node.kind())
+            } else {
+                "ERROR".into()
+            },
+            span: Span::of(node, source),
+            column: node.start_position().column + 1,
+        })
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Analysis {
     pub source_chunks: Vec<crate::retrieval::ts_v2::Chunk>,
@@ -114,6 +141,24 @@ pub struct Analysis {
     pub entities: Vec<Entity>,
     pub facts: Vec<Fact>,
     pub scopes: Vec<Scope>,
+}
+
+impl Analysis {
+    fn new(source: SourceFile, lines: &LineIndex) -> Self {
+        Self {
+            scopes: vec![Scope {
+                kind: "file".into(),
+                span: lines.span(0, source.text.len()),
+                parent: None,
+                owner: None,
+            }],
+            source,
+            source_chunks: Vec::new(),
+            entities: Vec::new(),
+            facts: Vec::new(),
+            diagnostics: Vec::new(),
+        }
+    }
 }
 
 pub fn extract(source: SourceFile) -> Result<Analysis> {

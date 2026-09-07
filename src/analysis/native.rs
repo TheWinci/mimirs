@@ -202,19 +202,7 @@ fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analy
     let root = tree.root_node();
     let declarations = ts_v2::declarations(&source.text, root, &grammar, language)?;
     let lines = LineIndex::new(&source.text);
-    let mut analysis = Analysis {
-        source_chunks: Vec::new(),
-        scopes: vec![Scope {
-            kind: "file".into(),
-            span: lines.span(0, source.text.len()),
-            parent: None,
-            owner: None,
-        }],
-        source,
-        entities: Vec::new(),
-        facts: Vec::new(),
-        diagnostics: Vec::new(),
-    };
+    let mut analysis = Analysis::new(source, &lines);
     let mut ancestors = Vec::<usize>::new();
     for declaration in &declarations {
         if declaration.kind == "comment" || declaration.node_start == declaration.node_end {
@@ -263,9 +251,12 @@ fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analy
                 .min(declaration.node_end);
             let end = start + analysis.source.text[start..end].trim_end().len();
             if end > start {
-                analysis
-                    .facts
-                    .push(fact("signature", lines.span(start, end), id, scope));
+                analysis.facts.push(Fact::at(
+                    "signature",
+                    lines.span(start, end),
+                    Some(id),
+                    scope,
+                ));
             }
             let mut first = node;
             // Some grammars put a declaration list between its first item and
@@ -295,10 +286,10 @@ fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analy
                     break;
                 }
                 // Leading documentation belongs to the surrounding scope.
-                analysis.facts.push(fact(
+                analysis.facts.push(Fact::at(
                     "doc",
                     Span::of(doc, &analysis.source.text),
-                    id,
+                    Some(id),
                     parent.map_or(0, |id| id + 1),
                 ));
                 first = doc;
@@ -307,17 +298,9 @@ fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analy
     }
     let mut stack = vec![root];
     while let Some(node) = stack.pop() {
-        if node.is_error() || node.is_missing() {
-            analysis.diagnostics.push(Diagnostic {
-                kind: if node.is_missing() {
-                    format!("missing {}", node.kind())
-                } else {
-                    "ERROR".into()
-                },
-                span: Span::of(node, &analysis.source.text),
-                column: node.start_position().column + 1,
-            });
-        }
+        analysis
+            .diagnostics
+            .extend(Diagnostic::from_node(node, &analysis.source.text));
         stack.extend(node.children(&mut node.walk()));
     }
     analysis
@@ -332,17 +315,6 @@ fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analy
         declarations,
     );
     Ok(analysis)
-}
-
-fn fact(kind: &str, span: Span, owner: usize, scope: usize) -> Fact {
-    Fact {
-        kind: kind.into(),
-        span,
-        owner: Some(owner),
-        scope,
-        evidence: Vec::new(),
-        related: None,
-    }
 }
 
 #[cfg(test)]

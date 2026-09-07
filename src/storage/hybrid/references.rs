@@ -107,15 +107,12 @@ pub(super) fn segment(
     let paths = stmt
         .query_map([], |r| r.get::<_, String>(0))?
         .collect::<rusqlite::Result<BTreeSet<_>>>()?;
-    let docs: Vec<_> = hits
-        .iter()
-        .filter(|h| is_documentation(&h.representative.path))
-        .cloned()
-        .collect();
+    let (docs, source): (Vec<_>, Vec<_>) = hits
+        .into_iter()
+        .partition(|h| is_documentation(&h.representative.path));
     let mut pending = Vec::new();
     for document in docs.iter().take(10) {
-        let mut windows = vec![&document.representative];
-        windows.extend(
+        let windows = std::iter::once(&document.representative).chain(
             document
                 .windows
                 .iter()
@@ -123,7 +120,7 @@ pub(super) fn segment(
         );
         let mut seen = HashSet::new();
         let mut accepted = 0;
-        'windows: for window in windows.into_iter().take(6) {
+        'windows: for window in windows.take(6) {
             for reference in extract(&snapshots.block(window)?.text) {
                 if !seen.insert(reference.clone()) {
                     continue;
@@ -191,9 +188,8 @@ pub(super) fn segment(
         }
     }
     let modules = modules(&paths);
-    let mut source: BTreeMap<_, _> = hits
+    let mut source: BTreeMap<_, _> = source
         .into_iter()
-        .filter(|h| !is_documentation(&h.representative.path))
         .map(|h| (h.representative.path.clone(), h))
         .collect();
     let mut relations = Vec::new();
@@ -238,10 +234,10 @@ pub(super) fn segment(
             lexical_score: 0.0,
             windows: vec![window.clone()],
         };
-        let hit = source.remove(&path).map_or_else(
-            || inherited.clone(),
-            |existing| ranking::merge(existing, inherited.clone()),
-        );
+        let hit = match source.remove(&path) {
+            Some(existing) => ranking::merge(existing, inherited),
+            None => inherited,
+        };
         source.insert(path.clone(), hit);
         relations.push(Relation {
             document_window_id: pending.document.id,

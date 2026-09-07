@@ -2,7 +2,7 @@ use super::{Entity, Fact, Scope, Span, facts};
 use tree_sitter::Node;
 
 pub(super) fn extract(
-    root: Node<'_>,
+    nodes: &[Node<'_>],
     source: &str,
     entities: &[Entity],
     lines: &super::LineIndex,
@@ -13,7 +13,7 @@ pub(super) fn extract(
         parent: None,
         owner: None,
     }];
-    for node in facts::nodes(root) {
+    for &node in nodes {
         let kind = if super::entities::kind(node).is_some() {
             Some("item")
         } else {
@@ -51,7 +51,7 @@ pub(super) fn extract(
         }
     }
     let mut bindings = Vec::new();
-    for node in facts::nodes(root) {
+    for &node in nodes {
         let role = match node.kind() {
             "parameter" | "self_parameter" => "parameter",
             "let_declaration" => "let",

@@ -114,16 +114,10 @@ impl Snapshots<'_> {
             doc.owner == candidate.owner && doc.source_chunk == candidate.source_chunk,
             "candidate owner mismatch"
         );
-        let text = doc
-            .evidence
-            .iter()
-            .map(|e| &file.analysis.source.text[e.span.start..e.span.end])
-            .collect::<Vec<_>>()
-            .join("\n");
         Ok(SourceBlock {
             document: candidate.clone(),
             part: doc.part,
-            text,
+            text: doc.source_text(&file.analysis.source.text),
             evidence: doc.evidence.clone(),
         })
     }

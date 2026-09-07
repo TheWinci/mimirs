@@ -113,6 +113,12 @@ struct Summary {
     walk_errors: usize,
 }
 
+impl Summary {
+    fn completed(&self) -> usize {
+        self.indexed + self.unchanged + self.skipped
+    }
+}
+
 fn index_profiled(
     root: &Path,
     make_embedder: impl FnOnce() -> anyhow::Result<embedding::Embedder>,

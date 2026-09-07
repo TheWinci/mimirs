@@ -3,7 +3,7 @@ use anyhow::Result;
 #[cfg(test)]
 use super::language::Chunking;
 use super::language::Language;
-use super::{Analysis, LineIndex, Scope};
+use super::{Analysis, LineIndex};
 use crate::source::SourceFile;
 
 pub(super) const LANGUAGE: Language = Language {
@@ -17,19 +17,9 @@ pub(super) const LANGUAGE: Language = Language {
 
 /// Text snapshots have source coverage but no inferred syntax records.
 fn extract(source: SourceFile) -> Result<Analysis> {
-    let span = LineIndex::new(&source.text).span(0, source.text.len());
-    let source_chunks = crate::retrieval::ts_v2::text_chunks(&source.text, &source.path);
-    Ok(Analysis {
-        source_chunks,
-        source,
-        diagnostics: Vec::new(),
-        entities: Vec::new(),
-        facts: Vec::new(),
-        scopes: vec![Scope {
-            kind: "file".into(),
-            span,
-            parent: None,
-            owner: None,
-        }],
-    })
+    let lines = LineIndex::new(&source.text);
+    let mut analysis = Analysis::new(source, &lines);
+    analysis.source_chunks =
+        crate::retrieval::ts_v2::text_chunks(&analysis.source.text, &analysis.source.path);
+    Ok(analysis)
 }

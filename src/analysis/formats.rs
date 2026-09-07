@@ -47,12 +47,9 @@ pub fn named_text(path: &str) -> bool {
     let Some(name) = Path::new(path).file_name().and_then(|s| s.to_str()) else {
         return false;
     };
-    let lower = name.to_ascii_lowercase();
+    let prefix = name.split_once('.').map_or(name, |(prefix, _)| prefix);
     BASENAMES.iter().any(|n| n.eq_ignore_ascii_case(name))
-        || PREFIXES.iter().any(|n| {
-            lower == n.to_ascii_lowercase()
-                || lower.starts_with(&format!("{}.", n.to_ascii_lowercase()))
-        })
+        || PREFIXES.iter().any(|n| n.eq_ignore_ascii_case(prefix))
 }
 
 pub fn includes() -> Vec<String> {

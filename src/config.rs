@@ -52,8 +52,9 @@ impl Default for Config {
                 "**/.pgpass",
                 "**/.netrc",
             ]
+            .into_iter()
             .map(String::from)
-            .to_vec(),
+            .collect(),
         }
     }
 }
