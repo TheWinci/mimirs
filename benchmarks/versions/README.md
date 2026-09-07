@@ -107,3 +107,5 @@ the fixed query labels. This selects the same pilot edit targets as before.
 The Rust retrieval port has a separate [three-corpus adoption report](port/adoption/ADOPTION.md), with exact TS v2 rank comparisons, source/vector parity, and costs. The completed language port has a [Kubernetes checkpoint](port/kubernetes/KUBERNETES.md).
 
 The subsequent [persistent-worker experiment](pipeline/PIPELINE.md) compares bounded file read-ahead with that Rust release on the three development corpora. It preserves stored vectors and search responses and leaves Kubernetes out of rapid iterations.
+
+The [Kubernetes follow-up](pipeline/kubernetes/KUBERNETES.md) measures the same persistent-worker binary on the full pinned corpus. Fresh indexing falls from 1,620.49 to 1,226.43 seconds, with identical stored vectors and all 120 CLI responses.

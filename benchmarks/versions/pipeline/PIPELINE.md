@@ -1,6 +1,8 @@
 # Persistent indexing workers
 
-Persistent embedding threads and bounded file read-ahead reduced fresh indexing wall time on all three development corpora. The worker budget remains three singleton inference calls at a time. This experiment did not rerun Kubernetes. Its last measured fresh index remains 1,620.49 seconds, and the 11-minute target is still open.
+Persistent embedding threads and bounded file read-ahead reduced fresh indexing wall time on all three development corpora. The worker budget remains three singleton inference calls at a time. This development experiment did not rerun Kubernetes; its baseline was 1,620.49 seconds. The 11-minute target is still open.
+
+A [subsequent Kubernetes run](kubernetes/KUBERNETES.md) measured 1,226.43 seconds with this same binary, 24.3% less time than the previous checkpoint. All stored vectors and 120 CLI responses matched. The tables below preserve the earlier development-corpus measurements.
 
 | Corpus | Trials per binary | Before s | After s | Less wall time |
 | --- | ---: | ---: | ---: | ---: |
