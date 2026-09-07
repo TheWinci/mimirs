@@ -62,7 +62,7 @@ def main():
                 assert not profile['counters'].get('embedding_calls', 0)
             else:
                 assert profile['counters']['files_indexed'] == (len(manifest['manifest']) if stage == 'fresh' else 2)
-            entry['runs'][stage] = {'timing': timing, 'counters': profile['counters'], 'stages': profile['stages']}
+            entry['runs'][stage] = {'timing': timing, 'counters': profile['counters'], 'stages': profile['stages'], 'phases': profile['phases_seconds']}
             print('DONE', corpus, stage, round(timing['wall_seconds'], 3), flush=True)
         baseline.verify_project(project, manifest)
         stored = logical_hashes(project / '.mimirs/index.db')

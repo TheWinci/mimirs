@@ -25,7 +25,7 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def collect(root, reference, output):
+def collect(root, reference, output, *, checkpoint_path=None, renderer=None, profile_path=None):
     output.mkdir(parents=True, exist_ok=False)
     baseline = module('port-baseline')
     manifest = baseline.verify_manifest(root, 'kubernetes')
@@ -34,7 +34,7 @@ def collect(root, reference, output):
     assert digest(root / 'engines/mimirs-rust') == provenance['rustBinarySha256']
     previous = read(reference / 'provenance.json')
     assert digest(reference / 'engines/mimirs-rust') == previous['rustBinarySha256']
-    checkpoint = read(Path(__file__).parent / 'port/kubernetes/kubernetes.json')
+    checkpoint = read(checkpoint_path or Path(__file__).parent / 'port/kubernetes/kubernetes.json')
     assert previous == checkpoint['provenance'], 'reference is not the accepted checkpoint'
     queries = read(Path(__file__).parent / 'queries/kubernetes.json')
     report = {'provenance': provenance, 'referenceProvenance': previous,
@@ -77,7 +77,7 @@ def collect(root, reference, output):
         path = Path('results/kubernetes/rust/search') / f'0-{i}.stdout'
         assert normalize((root / path).read_text()) == normalize((reference / path).read_text()), f'CLI response changed: {i}'
     project = root / 'projects/kubernetes-rust-0'
-    profile_path = output / 'unchanged-profile.json'
+    profile_path = profile_path or output / 'unchanged-profile.json'
     subprocess.run([str(root / 'engines/mimirs-rust'), 'index', '--profile', str(profile_path)],
                    cwd=project, capture_output=True, check=True)
     profile = read(profile_path)
@@ -94,7 +94,7 @@ def collect(root, reference, output):
         freshSpeedup=before['phases']['fresh']['wall_seconds'] / after['phases']['fresh']['wall_seconds'],
         timingScope='One new Rust trial compared with the earlier accepted Rust trial on the same host and corpus. Cached model assets, three inference workers, unprofiled fresh indexes. Timed fresh, unchanged, edited, restored indexes and all 120 cold CLI queries run sequentially. Correctness audits are outside measured commands. The baseline was retained, not rerun alongside the candidate.')
     write(output / 'kubernetes.json', report)
-    (output / 'KUBERNETES.md').write_text(markdown(report))
+    (output / 'KUBERNETES.md').write_text((renderer or markdown)(report))
     print(json.dumps({'freshSeconds': after['phases']['fresh']['wall_seconds'],
                       'freshSpeedup': report['freshSpeedup'], 'responseMismatches': 0,
                       'storedTablesMatched': len(fingerprints['after']), 'evidence': report['evidence']}), flush=True)

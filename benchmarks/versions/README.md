@@ -109,3 +109,8 @@ The Rust retrieval port has a separate [three-corpus adoption report](port/adopt
 The subsequent [persistent-worker experiment](pipeline/PIPELINE.md) compares bounded file read-ahead with that Rust release on the three development corpora. It preserves stored vectors and search responses and leaves Kubernetes out of rapid iterations.
 
 The [Kubernetes follow-up](pipeline/kubernetes/KUBERNETES.md) measures the same persistent-worker binary on the full pinned corpus. Fresh indexing falls from 1,620.49 to 1,226.43 seconds, with identical stored vectors and all 120 CLI responses.
+
+The [staged indexing measurements](staged/FINAL.md) separate independent workers
+from intermediate persistence. They retain exact output comparisons, queue and
+staging costs, repeated small-corpus trials, interruption checks and one final
+Kubernetes run.

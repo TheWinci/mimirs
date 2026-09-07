@@ -145,6 +145,34 @@
               "peak_queued_items": 3,
               "peak_queued_bytes": 6862336
             }
+          },
+          "phases": {
+            "analysis": 0.21360208199999992,
+            "chunking_token_budget": 0.009121118999999999,
+            "config": 0.00026625,
+            "database_open": 0.003625209,
+            "database_policy": 0.001330125,
+            "discovery": 0.004020877000000089,
+            "discovery_queue_wait": 0.9458770389999999,
+            "document_texts": 0.00020858300000000003,
+            "embedding_prepare": 0.796657875,
+            "embedding_wait": 11.695733959999998,
+            "model_assets": 0.010814958,
+            "model_prepare": 0.00012787499999999952,
+            "model_startup": 0.145743583,
+            "model_validation": 0.000138458,
+            "progress_output": 0.0013936270000000004,
+            "reconciliation": 6.2042e-05,
+            "reuse_check": 0.0029503780000000005,
+            "source_read": 0.003343627000000002,
+            "staging_cleanup": 0.0014195,
+            "staging_open": 0.002762833,
+            "staging_save": 0.21204324600000007,
+            "staging_validation": 0.01979471,
+            "storage_save": 0.20377742199999993,
+            "tokenizer_setup": 0.004134667,
+            "vector_merge": 0.00050333,
+            "writer_lock": 9.8542e-05
           }
         },
         "unchanged": {
@@ -248,6 +276,25 @@
               "peak_queued_items": 2,
               "peak_queued_bytes": 3431168
             }
+          },
+          "phases": {
+            "config": 6.3416e-05,
+            "database_open": 0.012882,
+            "database_policy": 9.675e-05,
+            "discovery": 0.002209754000000022,
+            "discovery_queue_wait": 0.07449878799999998,
+            "model_assets": 0.00336625,
+            "model_prepare": 3.5082999999998254e-05,
+            "model_startup": 0.050308708,
+            "model_validation": 0.00012925,
+            "progress_output": 0.00056425,
+            "reconciliation": 4.0083e-05,
+            "reuse_check": 0.026586749999999996,
+            "source_read": 0.0020644120000000007,
+            "staging_cleanup": 0.001100916,
+            "staging_open": 0.001803625,
+            "tokenizer_setup": 0.004361959,
+            "writer_lock": 3.4959e-05
           }
         },
         "edited": {
@@ -390,6 +437,34 @@
               "peak_queued_items": 6,
               "peak_queued_bytes": 10033984
             }
+          },
+          "phases": {
+            "analysis": 0.038714833000000004,
+            "chunking_token_budget": 0.001129751,
+            "config": 6.5667e-05,
+            "database_open": 0.012403584,
+            "database_policy": 0.00010525,
+            "discovery": 0.0019830039999999827,
+            "discovery_queue_wait": 0.07369524600000002,
+            "document_texts": 1.2166e-05,
+            "embedding_prepare": 0.108439583,
+            "embedding_wait": 1.5730305420000001,
+            "model_assets": 0.010553709,
+            "model_prepare": 3.458400000000417e-05,
+            "model_startup": 0.134587291,
+            "model_validation": 0.000113833,
+            "progress_output": 0.0006999170000000001,
+            "reconciliation": 5.325e-05,
+            "reuse_check": 0.024394164999999995,
+            "source_read": 0.0016850880000000004,
+            "staging_cleanup": 0.001173375,
+            "staging_open": 0.001722,
+            "staging_save": 0.00828775,
+            "staging_validation": 0.0017841660000000002,
+            "storage_save": 0.032802458,
+            "tokenizer_setup": 0.004012209,
+            "vector_merge": 6.2084e-05,
+            "writer_lock": 2.9584e-05
           }
         },
         "restore": {
@@ -532,6 +607,34 @@
               "peak_queued_items": 6,
               "peak_queued_bytes": 10029120
             }
+          },
+          "phases": {
+            "analysis": 0.038144583,
+            "chunking_token_budget": 0.001166416,
+            "config": 7.1833e-05,
+            "database_open": 0.01325325,
+            "database_policy": 0.000101958,
+            "discovery": 0.0017831640000000037,
+            "discovery_queue_wait": 0.07445321099999999,
+            "document_texts": 1.7499e-05,
+            "embedding_prepare": 0.106979543,
+            "embedding_wait": 1.575026625,
+            "model_assets": 0.010528749,
+            "model_prepare": 4.924999999999374e-05,
+            "model_startup": 0.132485917,
+            "model_validation": 0.000144291,
+            "progress_output": 0.0006224160000000001,
+            "reconciliation": 4.3167e-05,
+            "reuse_check": 0.024672548000000006,
+            "source_read": 0.0017867540000000002,
+            "staging_cleanup": 0.001061917,
+            "staging_open": 0.00153075,
+            "staging_save": 0.008595666,
+            "staging_validation": 0.001734499,
+            "storage_save": 0.031937415999999996,
+            "tokenizer_setup": 0.0042595,
+            "vector_merge": 7.7167e-05,
+            "writer_lock": 3.7083e-05
           }
         }
       },
@@ -703,6 +806,34 @@
               "peak_queued_items": 6,
               "peak_queued_bytes": 124555136
             }
+          },
+          "phases": {
+            "analysis": 1.3157813190000005,
+            "chunking_token_budget": 0.078407174,
+            "config": 5.45e-05,
+            "database_open": 0.001436666,
+            "database_policy": 0.0010795,
+            "discovery": 0.024583826999986513,
+            "discovery_queue_wait": 90.85969433900001,
+            "document_texts": 0.001185480999999999,
+            "embedding_prepare": 8.145252041999997,
+            "embedding_wait": 94.65967096,
+            "model_assets": 0.010358208999999998,
+            "model_prepare": 4.5625000000000526e-05,
+            "model_startup": 0.13626554100000002,
+            "model_validation": 9.2375e-05,
+            "progress_output": 0.009884735999999991,
+            "reconciliation": 0.000150417,
+            "reuse_check": 0.02451876500000001,
+            "source_read": 0.027073996999999995,
+            "staging_cleanup": 0.001385,
+            "staging_open": 0.002238042,
+            "staging_save": 1.5585137510000004,
+            "staging_validation": 0.1573240049999999,
+            "storage_save": 2.593108194000001,
+            "tokenizer_setup": 0.004326167,
+            "vector_merge": 0.003807839000000001,
+            "writer_lock": 6.9e-05
           }
         },
         "unchanged": {
@@ -806,6 +937,25 @@
               "peak_queued_items": 2,
               "peak_queued_bytes": 62277568
             }
+          },
+          "phases": {
+            "config": 6.6291e-05,
+            "database_open": 0.091552625,
+            "database_policy": 0.00011575,
+            "discovery": 0.012800741999999699,
+            "discovery_queue_wait": 0.3505341330000003,
+            "model_assets": 0.003185292,
+            "model_prepare": 4.520700000000544e-05,
+            "model_startup": 0.052636417,
+            "model_validation": 0.000158541,
+            "progress_output": 0.003990123999999999,
+            "reconciliation": 0.000149209,
+            "reuse_check": 0.20471480699999997,
+            "source_read": 0.016874015999999995,
+            "staging_cleanup": 0.001225958,
+            "staging_open": 0.001471833,
+            "tokenizer_setup": 0.003917292,
+            "writer_lock": 3.6125e-05
           }
         },
         "edited": {
@@ -948,6 +1098,34 @@
               "peak_queued_items": 6,
               "peak_queued_bytes": 62277568
             }
+          },
+          "phases": {
+            "analysis": 0.049377709000000006,
+            "chunking_token_budget": 0.001759166,
+            "config": 5.8625e-05,
+            "database_open": 0.090502667,
+            "database_policy": 0.000112958,
+            "discovery": 0.014145962000002843,
+            "discovery_queue_wait": 3.485804245999997,
+            "document_texts": 7.2792e-05,
+            "embedding_prepare": 0.171842041,
+            "embedding_wait": 2.199635792,
+            "model_assets": 0.010200917,
+            "model_prepare": 4.149999999999987e-05,
+            "model_startup": 0.135086126,
+            "model_validation": 0.000140875,
+            "progress_output": 0.005209702999999993,
+            "reconciliation": 0.000178,
+            "reuse_check": 0.8562834100000001,
+            "source_read": 0.01537284,
+            "staging_cleanup": 0.001965,
+            "staging_open": 0.001301791,
+            "staging_save": 0.010285334,
+            "staging_validation": 0.002299499,
+            "storage_save": 0.060066166,
+            "tokenizer_setup": 0.004320917,
+            "vector_merge": 7.1833e-05,
+            "writer_lock": 2.6833e-05
           }
         },
         "restore": {
@@ -1090,6 +1268,34 @@
               "peak_queued_items": 6,
               "peak_queued_bytes": 62277568
             }
+          },
+          "phases": {
+            "analysis": 0.048476416,
+            "chunking_token_budget": 0.001972459,
+            "config": 5.0375e-05,
+            "database_open": 0.108025875,
+            "database_policy": 9.5208e-05,
+            "discovery": 0.01373858300000208,
+            "discovery_queue_wait": 2.9729016249999978,
+            "document_texts": 2.5790999999999998e-05,
+            "embedding_prepare": 0.19384400000000002,
+            "embedding_wait": 2.2326189579999998,
+            "model_assets": 0.010537,
+            "model_prepare": 3.845999999999711e-05,
+            "model_startup": 0.136216874,
+            "model_validation": 0.000157541,
+            "progress_output": 0.004068912999999994,
+            "reconciliation": 0.000159458,
+            "reuse_check": 0.2002435569999999,
+            "source_read": 0.016327316999999977,
+            "staging_cleanup": 0.001891875,
+            "staging_open": 0.001779167,
+            "staging_save": 0.009735,
+            "staging_validation": 0.002206042,
+            "storage_save": 0.04134025,
+            "tokenizer_setup": 0.004594375,
+            "vector_merge": 7.5583e-05,
+            "writer_lock": 3.1042e-05
           }
         }
       },
@@ -1261,6 +1467,34 @@
               "peak_queued_items": 6,
               "peak_queued_bytes": 52128768
             }
+          },
+          "phases": {
+            "analysis": 3.8154492389999977,
+            "chunking_token_budget": 0.2331969859999995,
+            "config": 6.2e-05,
+            "database_open": 0.001391042,
+            "database_policy": 0.001037583,
+            "discovery": 0.17577965800103357,
+            "discovery_queue_wait": 270.95424938399896,
+            "document_texts": 0.004054531999999989,
+            "embedding_prepare": 19.71597782599985,
+            "embedding_wait": 271.85814569800004,
+            "model_assets": 0.010720457999999999,
+            "model_prepare": 4.187600000000319e-05,
+            "model_startup": 0.13281853999999998,
+            "model_validation": 7.1833e-05,
+            "progress_output": 0.04299779600000009,
+            "reconciliation": 0.001357792,
+            "reuse_check": 0.12855469100000033,
+            "source_read": 0.22731407800000003,
+            "staging_cleanup": 0.0017015,
+            "staging_open": 0.002687292,
+            "staging_save": 6.438169120000018,
+            "staging_validation": 0.5743626689999991,
+            "storage_save": 16.052336906999987,
+            "tokenizer_setup": 0.0043405,
+            "vector_merge": 0.010989468999999969,
+            "writer_lock": 6.3292e-05
           }
         },
         "unchanged": {
@@ -1364,6 +1598,25 @@
               "peak_queued_items": 2,
               "peak_queued_bytes": 26064384
             }
+          },
+          "phases": {
+            "config": 0.000212083,
+            "database_open": 0.721191291,
+            "database_policy": 0.000124292,
+            "discovery": 0.0730327659999983,
+            "discovery_queue_wait": 1.7415325680000018,
+            "model_assets": 0.008538667,
+            "model_prepare": 0.002123,
+            "model_startup": 0.0490855,
+            "model_validation": 0.000141791,
+            "progress_output": 0.016561445000000004,
+            "reconciliation": 0.000612917,
+            "reuse_check": 0.8238891860000008,
+            "source_read": 0.1837226840000002,
+            "staging_cleanup": 0.001112958,
+            "staging_open": 0.001260583,
+            "tokenizer_setup": 0.003998167,
+            "writer_lock": 4.3458e-05
           }
         },
         "edited": {
@@ -1506,6 +1759,34 @@
               "peak_queued_items": 6,
               "peak_queued_bytes": 26064384
             }
+          },
+          "phases": {
+            "analysis": 0.038380041000000004,
+            "chunking_token_budget": 0.002302333,
+            "config": 6.4042e-05,
+            "database_open": 0.29397975,
+            "database_policy": 0.000135916,
+            "discovery": 0.05998791099999767,
+            "discovery_queue_wait": 4.602421172000002,
+            "document_texts": 3.2833e-05,
+            "embedding_prepare": 0.22223266700000002,
+            "embedding_wait": 2.9290168330000004,
+            "model_assets": 0.009341958000000001,
+            "model_prepare": 5.250000000000393e-05,
+            "model_startup": 0.132422917,
+            "model_validation": 0.000155542,
+            "progress_output": 0.018728961999999977,
+            "reconciliation": 0.000536083,
+            "reuse_check": 0.8135114879999983,
+            "source_read": 0.060990464000000126,
+            "staging_cleanup": 0.001306959,
+            "staging_open": 0.001298208,
+            "staging_save": 0.010902834,
+            "staging_validation": 0.0030517920000000002,
+            "storage_save": 0.129682083,
+            "tokenizer_setup": 0.004108,
+            "vector_merge": 7.7959e-05,
+            "writer_lock": 2.8583e-05
           }
         },
         "restore": {
@@ -1648,6 +1929,34 @@
               "peak_queued_items": 6,
               "peak_queued_bytes": 26064384
             }
+          },
+          "phases": {
+            "analysis": 0.038299625000000004,
+            "chunking_token_budget": 0.002585459,
+            "config": 6.4459e-05,
+            "database_open": 0.312371042,
+            "database_policy": 0.000103292,
+            "discovery": 0.0661915529999968,
+            "discovery_queue_wait": 4.625326072000004,
+            "document_texts": 2.3166e-05,
+            "embedding_prepare": 0.22298670799999998,
+            "embedding_wait": 2.911345833,
+            "model_assets": 0.01096525,
+            "model_prepare": 5.23340000000011e-05,
+            "model_startup": 0.131707583,
+            "model_validation": 0.00015925,
+            "progress_output": 0.018623285000000007,
+            "reconciliation": 0.000512417,
+            "reuse_check": 0.8140321300000012,
+            "source_read": 0.08086626399999992,
+            "staging_cleanup": 0.001320834,
+            "staging_open": 0.001270709,
+            "staging_save": 0.009910709,
+            "staging_validation": 0.003055875,
+            "storage_save": 0.136605334,
+            "tokenizer_setup": 0.004696417,
+            "vector_merge": 6.7916e-05,
+            "writer_lock": 3.4542e-05
           }
         }
       },
