@@ -586,6 +586,36 @@ fn ocaml_interfaces_bindings_and_functions_use_the_selected_grammar() {
 }
 
 #[test]
+fn dart_constructors_extensions_and_function_bodies_keep_written_source() {
+    let result = analyze(
+        "store.dart",
+        "class Store {\n final int count;\n Store(this.count);\n Store.empty() : count = 0;\n String recover(String path) { return path; }\n}\nextension Restore on String { String restore() { return this; } }\n",
+    );
+    for (name, kind) in [
+        ("Store", "class"),
+        ("count", "field"),
+        ("Store.empty", "method"),
+        ("recover", "method"),
+        ("Restore", "class"),
+    ] {
+        assert!(
+            result
+                .entities
+                .iter()
+                .any(|e| e.name.as_deref() == Some(name) && e.kind == kind),
+            "{name}: {:?}",
+            result.entities
+        );
+    }
+    let method = result
+        .entities
+        .iter()
+        .find(|e| e.name.as_deref() == Some("recover"))
+        .unwrap();
+    assert!(result.source.text[method.span.start..method.span.end].contains("return path;"));
+}
+
+#[test]
 fn native_snapshots_round_trip_replace_rollback_and_delete() {
     for case in fixture_cases() {
         let path = case["path"].as_str().unwrap();

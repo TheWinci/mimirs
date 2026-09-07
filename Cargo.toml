@@ -72,5 +72,7 @@ tree-sitter-haskell = "=0.23.1"
 
 tree-sitter-ocaml = "=0.24.2"
 
+tree-sitter-dart = { package = "tree-sitter-dart-orchard", version = "=0.6.0" }
+
 [dev-dependencies]
 tempfile = "3.27.0"

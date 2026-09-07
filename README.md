@@ -312,3 +312,8 @@ OCaml uses native 0.24.2 grammars for `.ml` implementations and `.mli` interface
 Existing projects can add `"**/*.ml"` and `"**/*.mli"` and reindex. Value bindings,
 patterns, modules, classes and interface specifications retain declared names.
 The interface parser and query cache are separate from implementation parsing.
+
+Dart uses the native Dart Orchard 0.6.0 grammar for `.dart`. Existing projects can add
+`"**/*.dart"` and reindex. Constructors, named extensions, fields, local functions
+and directives retain names. Function and method chunks include their bodies
+even when the grammar represents the body as a sibling of the signature.

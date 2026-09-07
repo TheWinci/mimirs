@@ -9,6 +9,7 @@ use std::{
 };
 use tree_sitter::{Node, Query, QueryCursor, StreamingIterator};
 
+mod dart;
 mod declarators;
 mod kinds;
 mod markdown;
@@ -154,6 +155,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
     static HASKELL: OnceLock<Result<Query, String>> = OnceLock::new();
     static OCAML_INTERFACE: OnceLock<Result<Query, String>> = OnceLock::new();
     static OCAML: OnceLock<Result<Query, String>> = OnceLock::new();
+    static DART: OnceLock<Result<Query, String>> = OnceLock::new();
     static JAVA: OnceLock<Result<Query, String>> = OnceLock::new();
     let (slot, text) = match language {
         "rust" => (&RUST, include_str!("ts_v2/queries/rust.scm")),
@@ -180,6 +182,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
         "haskell" => (&HASKELL, include_str!("ts_v2/queries/haskell.scm")),
         "ocaml_interface" => (&OCAML_INTERFACE, include_str!("ts_v2/queries/ocaml.scm")),
         "ocaml" => (&OCAML, include_str!("ts_v2/queries/ocaml.scm")),
+        "dart" => (&DART, include_str!("ts_v2/queries/dart.scm")),
         "java" => (&JAVA, include_str!("ts_v2/queries/java.scm")),
         _ => anyhow::bail!("unsupported retrieval grammar {language}"),
     };
@@ -453,9 +456,27 @@ pub(crate) fn declarations(
         if language == "ocaml" && node.kind() == "value_definition" {
             kind = names::ocaml_kind(node).into();
         }
-        let name = declared_name(node, source, language)
-            .or(captured)
-            .or_else(|| special("default_export").then(|| "default".into()));
+        if language == "dart" {
+            if matches!(
+                node.kind(),
+                "declaration"
+                    | "static_final_declaration_list"
+                    | "initialized_identifier_list"
+                    | "local_variable_declaration"
+            ) {
+                kind = dart::kind(node).into();
+            }
+            if node.kind() == "import_or_export" && contains(Some(node), "library_export") {
+                kind = "export".into();
+            }
+        }
+        let name = if language == "dart" {
+            captured.or_else(|| dart::name(node, source))
+        } else {
+            declared_name(node, source, language)
+                .or(captured)
+                .or_else(|| special("default_export").then(|| "default".into()))
+        };
         let mut node_end =
             if language == "csharp" && node.kind() == "file_scoped_namespace_declaration" {
                 root.end_byte()
@@ -490,6 +511,14 @@ pub(crate) fn declarations(
         }
         if language == "kotlin" && node.kind() == "package_header" {
             node_end = root.end_byte();
+        }
+        if language == "dart"
+            && matches!(node.kind(), "function_signature" | "method_signature")
+            && let Some(body) = node
+                .next_named_sibling()
+                .filter(|n| n.kind() == "function_body")
+        {
+            node_end = body.end_byte();
         }
         flat.push(Entity {
             node_type: node.kind().into(),

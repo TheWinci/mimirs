@@ -182,6 +182,15 @@ pub(super) const OCAML_INTERFACE: Language = Language {
     chunking: super::language::Chunking::Paragraphs,
 };
 
+pub(super) const DART: Language = Language {
+    identity: "dart/default/tree-sitter-0.27.0/dart-orchard-0.6.0/extractor-1",
+    extensions: &["dart"],
+    extract: |source| extract(source, tree_sitter_dart::LANGUAGE.into(), "dart"),
+    is_native: true,
+    #[cfg(test)]
+    chunking: super::language::Chunking::Paragraphs,
+};
+
 fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analysis> {
     let mut parser = Parser::new();
     parser
