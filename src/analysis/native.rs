@@ -68,6 +68,15 @@ pub(super) const SCALA: Language = Language {
     chunking: super::language::Chunking::Paragraphs,
 };
 
+pub(super) const HTML: Language = Language {
+    identity: "html/default/tree-sitter-0.27.0/tree-sitter-html-0.23.2/extractor-1",
+    extensions: &["html", "htm"],
+    extract: |source| extract(source, tree_sitter_html::LANGUAGE.into(), "html"),
+    is_native: true,
+    #[cfg(test)]
+    chunking: super::language::Chunking::Paragraphs,
+};
+
 fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analysis> {
     let mut parser = Parser::new();
     parser
@@ -132,7 +141,8 @@ fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analy
             let start = declaration.node_start;
             let end = node
                 .child_by_field_name("body")
-                .map_or(declaration.syntax_end, |body| body.start_byte());
+                .map_or(declaration.syntax_end, |body| body.start_byte())
+                .min(declaration.node_end);
             let end = start + analysis.source.text[start..end].trim_end().len();
             if end > start {
                 analysis

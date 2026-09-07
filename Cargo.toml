@@ -50,5 +50,7 @@ tree-sitter-php = "=0.24.2"
 
 tree-sitter-scala = "=0.24.0"
 
+tree-sitter-html = "=0.23.2"
+
 [dev-dependencies]
 tempfile = "3.27.0"

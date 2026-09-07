@@ -142,6 +142,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
     static RUBY: OnceLock<Result<Query, String>> = OnceLock::new();
     static PHP: OnceLock<Result<Query, String>> = OnceLock::new();
     static SCALA: OnceLock<Result<Query, String>> = OnceLock::new();
+    static HTML: OnceLock<Result<Query, String>> = OnceLock::new();
     static JAVA: OnceLock<Result<Query, String>> = OnceLock::new();
     let (slot, text) = match language {
         "rust" => (&RUST, include_str!("ts_v2/queries/rust.scm")),
@@ -156,6 +157,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
         "ruby" => (&RUBY, include_str!("ts_v2/queries/ruby.scm")),
         "php" => (&PHP, include_str!("ts_v2/queries/php.scm")),
         "scala" => (&SCALA, include_str!("ts_v2/queries/scala.scm")),
+        "html" => (&HTML, include_str!("ts_v2/queries/html.scm")),
         "java" => (&JAVA, include_str!("ts_v2/queries/java.scm")),
         _ => anyhow::bail!("unsupported retrieval grammar {language}"),
     };
@@ -334,6 +336,17 @@ pub(crate) fn declarations(
             && node.child_by_field_name("body").is_none()
         {
             node_end = root.end_byte();
+        }
+        if language == "html" && node.kind() == "element" {
+            let tag = node
+                .named_children(&mut node.walk())
+                .find(|n| matches!(n.kind(), "start_tag" | "self_closing_tag"));
+            let closed = node
+                .named_children(&mut node.walk())
+                .any(|n| n.kind() == "end_tag");
+            if !closed && let Some(tag) = tag {
+                node_end = tag.end_byte();
+            }
         }
         flat.push(Entity {
             node_type: node.kind().into(),

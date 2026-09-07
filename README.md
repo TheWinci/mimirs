@@ -263,3 +263,8 @@ Scala uses the native 0.24.0 grammar for `.scala` and `.sc`. Existing projects
 can add `"**/*.scala"` and `"**/*.sc"` and reindex. Class parameters become fields
 only for `val`/`var`, case classes or enum cases. Given and extension definitions
 retain computed names; package clauses own the remaining file.
+
+HTML uses the native 0.23.2 grammar for `.html` and `.htm`. Existing projects
+can add `"**/*.html"` and `"**/*.htm"` and reindex. Element names, nested ranges,
+comments, and inline script/style source remain searchable. Embedded languages
+are retained as HTML source rather than separately parsed.

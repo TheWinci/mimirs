@@ -285,6 +285,30 @@ fn scala_constructor_parameters_and_methods_have_honest_owners() {
 }
 
 #[test]
+fn html_void_tags_do_not_swallow_the_following_elements() {
+    let result = analyze(
+        "page.htm",
+        "<main><input type=\"text\"><p>Recover archives</p><script>function recover() {}</script></main>\n",
+    );
+    let input = result
+        .entities
+        .iter()
+        .find(|e| e.name.as_deref() == Some("input"))
+        .unwrap();
+    assert_eq!(
+        &result.source.text[input.span.start..input.span.end],
+        "<input type=\"text\">"
+    );
+    assert!(
+        result
+            .entities
+            .iter()
+            .any(|e| e.name.as_deref() == Some("p") && e.parent == Some(0))
+    );
+    assert!(result.source.text.contains("function recover()"));
+}
+
+#[test]
 fn native_snapshots_round_trip_replace_rollback_and_delete() {
     for case in fixture_cases() {
         let path = case["path"].as_str().unwrap();
