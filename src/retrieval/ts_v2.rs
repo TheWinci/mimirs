@@ -144,6 +144,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
     static SCALA: OnceLock<Result<Query, String>> = OnceLock::new();
     static HTML: OnceLock<Result<Query, String>> = OnceLock::new();
     static CSS: OnceLock<Result<Query, String>> = OnceLock::new();
+    static KOTLIN: OnceLock<Result<Query, String>> = OnceLock::new();
     static JAVA: OnceLock<Result<Query, String>> = OnceLock::new();
     let (slot, text) = match language {
         "rust" => (&RUST, include_str!("ts_v2/queries/rust.scm")),
@@ -160,6 +161,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
         "scala" => (&SCALA, include_str!("ts_v2/queries/scala.scm")),
         "html" => (&HTML, include_str!("ts_v2/queries/html.scm")),
         "css" => (&CSS, include_str!("ts_v2/queries/css.scm")),
+        "kotlin" => (&KOTLIN, include_str!("ts_v2/queries/kotlin.scm")),
         "java" => (&JAVA, include_str!("ts_v2/queries/java.scm")),
         _ => anyhow::bail!("unsupported retrieval grammar {language}"),
     };
@@ -210,6 +212,13 @@ pub(crate) fn declarations(
         if language == "scala"
             && node.kind() == "class_parameter"
             && !names::scala_parameter_is_field(node, source)
+        {
+            continue;
+        }
+        if language == "kotlin"
+            && node.kind() == "class_parameter"
+            && !names::word(text(node, source), "val")
+            && !names::word(text(node, source), "var")
         {
             continue;
         }
@@ -315,6 +324,19 @@ pub(crate) fn declarations(
         {
             kind = "function".into();
         }
+        if language == "kotlin" {
+            if node.kind() == "class_declaration" {
+                kind = names::kotlin_class_kind(node, source).into();
+            }
+            if node.kind() == "property_declaration" {
+                kind = if contains(Some(node), "lambda_literal") {
+                    "function"
+                } else {
+                    "variable"
+                }
+                .into();
+            }
+        }
         let name = declared_name(node, source, language)
             .or(captured)
             .or_else(|| special("default_export").then(|| "default".into()));
@@ -349,6 +371,9 @@ pub(crate) fn declarations(
             if !closed && let Some(tag) = tag {
                 node_end = tag.end_byte();
             }
+        }
+        if language == "kotlin" && node.kind() == "package_header" {
+            node_end = root.end_byte();
         }
         flat.push(Entity {
             node_type: node.kind().into(),
@@ -411,6 +436,18 @@ fn contains(node: Option<Node<'_>>, kind: &str) -> bool {
 }
 
 fn declared_name(node: Node<'_>, source: &str, language: &str) -> Option<String> {
+    if language == "kotlin" {
+        if node.kind() == "companion_object" {
+            return Some(
+                node.child_by_field_name("name")
+                    .map_or("(companion)", |n| text(n, source))
+                    .into(),
+            );
+        }
+        if node.kind() == "secondary_constructor" {
+            return Some("constructor".into());
+        }
+    }
     if language == "css"
         && matches!(
             node.kind(),
@@ -618,6 +655,19 @@ pub(crate) fn classified_kind<'a>(
             Some("class" | "trait" | "enum" | "given" | "impl" | "module")
         ) && kind == "variable"
         {
+            return "field";
+        }
+    }
+    if language == "kotlin"
+        && matches!(
+            parent,
+            Some("class" | "interface" | "enum" | "record" | "annotation_type")
+        )
+    {
+        if kind == "function" && node_type == "function_declaration" {
+            return "method";
+        }
+        if node_type == "property_declaration" {
             return "field";
         }
     }

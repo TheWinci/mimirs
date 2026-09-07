@@ -86,6 +86,15 @@ pub(super) const CSS: Language = Language {
     chunking: super::language::Chunking::Paragraphs,
 };
 
+pub(super) const KOTLIN: Language = Language {
+    identity: "kotlin/default/tree-sitter-0.27.0/tree-sitter-kotlin-ng-1.1.0/extractor-1",
+    extensions: &["kt", "kts"],
+    extract: |source| extract(source, tree_sitter_kotlin_ng::LANGUAGE.into(), "kotlin"),
+    is_native: true,
+    #[cfg(test)]
+    chunking: super::language::Chunking::Paragraphs,
+};
+
 fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analysis> {
     let mut parser = Parser::new();
     parser

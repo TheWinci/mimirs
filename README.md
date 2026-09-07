@@ -272,3 +272,8 @@ are retained as HTML source rather than separately parsed.
 CSS uses the native 0.25.0 grammar for `.css`. Existing projects can add
 `"**/*.css"` and reindex. Selectors, keyframes, media queries and other at-rules
 retain names and nested ranges. SCSS and Less use explicit text fallback.
+
+Kotlin uses the native Kotlin NG 1.1.0 grammar for `.kt` and `.kts`. Existing
+projects can add `"**/*.kt"` and `"**/*.kts"` and reindex. Data/value classes,
+interfaces, enum and annotation classes retain distinct kinds. Constructor
+fields, companion objects, properties and methods retain their owners.

@@ -8,6 +8,30 @@ pub(super) fn word(source: &str, target: &str) -> bool {
         .any(|s| s == target)
 }
 
+pub(super) fn kotlin_class_kind(node: Node<'_>, source: &str) -> &'static str {
+    let modifiers = node
+        .named_children(&mut node.walk())
+        .find(|n| n.kind() == "modifiers")
+        .map_or("", |n| text(n, source));
+    if word(modifiers, "interface")
+        || node
+            .children(&mut node.walk())
+            .any(|n| n.kind() == "interface")
+    {
+        return "interface";
+    }
+    if word(modifiers, "enum") {
+        return "enum";
+    }
+    if word(modifiers, "annotation") {
+        return "annotation_type";
+    }
+    if word(modifiers, "data") || word(modifiers, "value") {
+        return "record";
+    }
+    "class"
+}
+
 pub(super) fn scala_parameter_is_field(node: Node<'_>, source: &str) -> bool {
     if word(text(node, source), "val") || word(text(node, source), "var") {
         return true;

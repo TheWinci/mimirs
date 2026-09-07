@@ -332,6 +332,37 @@ fn css_at_rule_names_include_conditions_and_nested_selectors() {
 }
 
 #[test]
+fn kotlin_distinguishes_class_kinds_parameters_and_companions() {
+    let result = analyze(
+        "Store.kts",
+        "package archive\ndata class Entry(val count: Int)\nclass Store(hidden: Int, val count: Int) {\n companion object {\n  fun recover(): Int { return 1 }\n }\n val size = 4\n}\ninterface Reader {\n fun read(): Int\n}\n",
+    );
+    assert!(
+        !result
+            .entities
+            .iter()
+            .any(|e| e.name.as_deref() == Some("hidden"))
+    );
+    for (name, kind) in [
+        ("Entry", "record"),
+        ("count", "field"),
+        ("size", "field"),
+        ("(companion)", "class"),
+        ("recover", "method"),
+        ("Reader", "interface"),
+    ] {
+        assert!(
+            result
+                .entities
+                .iter()
+                .any(|e| e.name.as_deref() == Some(name) && e.kind == kind),
+            "{name}: {:?}",
+            result.entities
+        );
+    }
+}
+
+#[test]
 fn native_snapshots_round_trip_replace_rollback_and_delete() {
     for case in fixture_cases() {
         let path = case["path"].as_str().unwrap();
