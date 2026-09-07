@@ -1,0 +1,11 @@
+tests/fixtures/go/imports.go
+├── import "fmt" [3]
+├── import tool "example.com/project/tool" [4]
+├── import "strings" [6]
+├── import . "math" [7]
+├── import _ "example.com/project/driver" [8]
+├── call fmt.Println in function UseImports [12]
+├── call strings.TrimSpace in function UseImports [12]
+├── call tool.Run in function UseImports [13]
+├── call Println in function UseImports [14]
+└── call Sqrt in function UseImports [14]

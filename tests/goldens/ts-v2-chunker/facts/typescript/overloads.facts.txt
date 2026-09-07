@@ -1,0 +1,6 @@
+tests/fixtures/typescript/overloads.ts
+├── export parse [1–5]
+├── call String in function parse [4]
+├── export Parser [7–13]
+├── call new TextDecoder().decode in method parse [11]
+└── export Codec [15–18]

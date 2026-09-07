@@ -1,0 +1,3 @@
+tests/fixtures/go/types.go
+├── call NewStore in variable ActiveStore [5]
+└── call Identifier in function ParseIdentifier [19]

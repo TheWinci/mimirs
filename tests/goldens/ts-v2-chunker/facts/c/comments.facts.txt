@@ -1,0 +1,2 @@
+tests/fixtures/c/comments.c
+└── call check_state in function coordinator_ready [10]

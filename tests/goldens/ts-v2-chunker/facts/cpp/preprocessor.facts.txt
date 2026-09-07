@@ -1,0 +1,5 @@
+tests/fixtures/cpp/preprocessor.cpp
+├── #include <vector> [1]
+├── #include "local.hpp" [2]
+├── call APPLY in function enabled [10]
+└── call TEMPORARY in function enabled [11]

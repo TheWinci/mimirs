@@ -1,0 +1,2 @@
+tests/fixtures/yaml/comments.yaml
+└── (no facts)

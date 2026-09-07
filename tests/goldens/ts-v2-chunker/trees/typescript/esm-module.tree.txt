@@ -1,0 +1,5 @@
+tests/fixtures/typescript/esm-module.mts
+├── import [1–2]
+├── export [4]
+├── variable config [6]
+└── block [7–8]

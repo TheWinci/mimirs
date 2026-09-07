@@ -1,0 +1,5 @@
+tests/fixtures/java/references.java
+├── import java.util.function.Supplier [3]
+├── call Supplier<> in field anonymous [9–14]
+├── call create in method get [12]
+└── call consume in method execute [18]

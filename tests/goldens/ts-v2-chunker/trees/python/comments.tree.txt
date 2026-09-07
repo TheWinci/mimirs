@@ -1,0 +1,8 @@
+tests/fixtures/python/comments.py
+├── comment [1]
+├── variable DEFAULT_NAME [3–4]
+│   └── comment [3]
+├── function documented [7–10]
+│   ├── comment [8]
+│   └── comment [9]
+└── comment [13]

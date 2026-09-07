@@ -1,0 +1,3 @@
+go/ambiguity
+├── import cmd/main.go -> package duplicate via "example.com/ambiguous/duplicate" [3]
+└── unresolved call cmd/main.go:function main -> duplicate.Run [6]

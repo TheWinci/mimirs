@@ -1,0 +1,10 @@
+tests/fixtures/java/fields.java
+├── call loadPrimary in field PRIMARY, SECONDARY [4]
+├── call loadSecondary in field PRIMARY, SECONDARY [4]
+├── call notifyReady in field callback [5]
+├── call initialize in class Configuration [8]
+├── call register in class Configuration [12]
+├── call perform in function local [16]
+├── call local.run in method execute [17]
+├── call value.trim in function normalize [19]
+└── call normalize.apply in method execute [20]

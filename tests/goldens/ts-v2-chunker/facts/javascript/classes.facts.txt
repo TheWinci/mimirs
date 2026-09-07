@@ -1,0 +1,5 @@
+tests/fixtures/javascript/classes.js
+├── export MemoryStore [1–21]
+├── call this.#items.set in method constructor [6]
+├── call this.#items.get in method get [11]
+└── call this.#items.set in method set [15]

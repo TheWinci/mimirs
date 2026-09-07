@@ -1,0 +1,6 @@
+tests/fixtures/typescript/default-class.ts
+└── class default [1–15]
+    ├── field #value [2]
+    ├── method constructor [4–6]
+    ├── method increment [8–10]
+    └── method current [12–14]

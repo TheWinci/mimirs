@@ -1,0 +1,7 @@
+tests/fixtures/kotlin/script-scope.kts
+├── call make in variable callback [5]
+├── call callback in module [6]
+├── call make in variable nested [9]
+├── call nested in function scoped [10]
+├── call scoped in module [12]
+└── call nested in module [13]

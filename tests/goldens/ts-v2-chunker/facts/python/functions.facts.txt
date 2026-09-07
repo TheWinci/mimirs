@@ -1,0 +1,7 @@
+tests/fixtures/python/functions.py
+├── call format_name in function greet [2]
+├── call loader in function fetch [6]
+├── call normalize in function inner [11]
+├── call inner in function outer [13]
+├── import plugin as local_plugin in function run_plugin [17]
+└── call local_plugin.run in function run_plugin [18]

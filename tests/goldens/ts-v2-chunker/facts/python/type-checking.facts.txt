@@ -1,0 +1,6 @@
+tests/fixtures/python/type-checking.py
+├── from typing import TYPE_CHECKING [1]
+├── import typing [2]
+├── from package.models import User (type-only) [5]
+├── from package.services import Service as ServiceType (type-only) [8]
+└── from package.runtime import User as RuntimeUser [10]

@@ -1,0 +1,8 @@
+tests/fixtures/source-windows/typescript/nested-class.ts
+└── class SessionStore [1–31]
+    ├── window [1–3] (169 chars) “/** Store active sessions and expose stable snapshots. */ export class SessionStore<Session ext…”
+    ├── window [4–9] (144 chars) “constructor(initial: Iterable<Session> = []) { for (const session of initial) { this.#sessions.…”
+    ├── window [10–14] (135 chars) “/** Find one session without changing the store. */ get(id: string): Session | undefined { retu…”
+    ├── window [15–22] (157 chars) “set(session: Session): void { this.#sessions.set(session.id, session); } remove(id: string): bo…”
+    ├── window [23–26] (81 chars) “snapshot(): readonly Session[] { return [...this.#sessions.values()]; }”
+    └── window [27–31] (121 chars) “static empty<Session extends { id: string }>(): SessionStore<Session> { return new SessionStore…”

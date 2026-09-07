@@ -1,0 +1,6 @@
+tests/fixtures/source-windows/javascript/component.jsx
+├── import [1]
+│   └── window [1] (44 chars) “import { formatReport } from "./format.js";”
+└── function ReportCard [3–13]
+    ├── window [3–7] (156 chars) “/** Render a report card with an explicit event call. */ export function ReportCard({ report, o…”
+    └── window [8–13] (148 chars) “<article data-report-id={report.id}> <h2>{title}</h2> <button onClick={() => onOpen(report.id)}…”

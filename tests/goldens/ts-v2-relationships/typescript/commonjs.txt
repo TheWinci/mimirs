@@ -1,0 +1,5 @@
+typescript/commonjs
+├── import src/main.cts -> src/named.cts via "./named.cjs" [3]
+├── import src/main.cts -> src/worker.cts via "./worker.cjs" [2]
+├── call src/main.cts:function start -> src/worker.cts:function run via worker.run [6]
+└── call src/main.cts:function start -> src/named.cts:function execute via execute [6]

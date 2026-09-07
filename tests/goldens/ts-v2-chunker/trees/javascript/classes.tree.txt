@@ -1,0 +1,7 @@
+tests/fixtures/javascript/classes.js
+└── class MemoryStore [1–21]
+    ├── field #items [2]
+    ├── method constructor [4–8]
+    ├── method get [10–12]
+    ├── method set [14–16]
+    └── method create [18–20]

@@ -1,0 +1,7 @@
+tests/fixtures/go/generic-bindings.go
+├── package sample [1]
+├── function GenericBindings [3–14]
+├── struct Box [16]
+├── method Convert [18–20]
+└── function LocalType [22–25]
+    └── type Converter [23]

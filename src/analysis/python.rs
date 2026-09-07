@@ -8,7 +8,7 @@ use super::{Analysis, Diagnostic, Entity, Fact, LineIndex, Scope, Span};
 use crate::source::SourceFile;
 
 pub(super) const LANGUAGE: Language = Language {
-    identity: "python/default/tree-sitter-0.27.0/python-0.25.0/extractor-1",
+    identity: "python/default/tree-sitter-0.27.0/python-0.25.0/extractor-1/source-facts-1",
     extensions: &["py", "pyi"],
     extract,
     is_native: true,
@@ -132,6 +132,17 @@ fn extract(source: SourceFile) -> Result<Analysis> {
         "python",
         &analysis.entities,
     )?;
+    analysis.source_facts = super::source_facts::extract(
+        "python",
+        &analysis.source.text,
+        tree.root_node(),
+        &analysis.source_chunks,
+    );
+    if analysis.source.path.ends_with(".pyi") {
+        analysis
+            .source_facts
+            .retain(|fact| matches!(fact.kind, super::source_facts::Kind::Import { .. }));
+    }
     Ok(analysis)
 }
 

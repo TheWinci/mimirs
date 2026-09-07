@@ -45,7 +45,8 @@ diagnostics. Incomplete source remains searchable.
 Extension matching is case-sensitive. `.h` uses C; C++ headers use `.hpp`, `.hh`
 or `.hxx`. `.mli` uses a separate OCaml interface grammar. HTML retains inline
 script/style content inside HTML chunks. Native support does not imply type
-checking, classpath loading, macro expansion or cross-file name resolution.
+checking, classpath loading or macro expansion. Cross-file resolution follows
+the conservative TS v2 rules described below.
 
 The pinned Kotlin grammar reports errors for some compact companion-object
 forms. Diagnostics expose partial parsing; source is retained. Dart Orchard
@@ -78,6 +79,30 @@ This preserves format coverage while using the accepted TS v2 retrieval policy.
 It does not port v1's separate SQL, JSON, Makefile, Dockerfile or Bruno splitters.
 Native SCSS, Less, Zsh, ZON and literate Haskell parsing are not claimed.
 
+## Facts and cross-file relationships
+
+Production analysis records typed imports, exports, call bindings and source
+chunk targets. HTML, CSS and Markdown also record resource references. TOML,
+YAML and plain text retain empty semantic fact arrays. `mimirs inspect FILE`
+shows these facts, and `--stored` reads the exact saved snapshot.
+
+Run `mimirs relationships` from the project root to resolve imports, re-exports,
+calls and resource paths across current files. `--json` includes full source
+and target evidence. This command needs neither an index nor an embedding model.
+It uses `.mimirs/config.toml` when present, otherwise the default language globs.
+Asset discovery respects exclusions and ignore rules and only checks paths;
+binary contents are not parsed. The root `go.mod` supplies local Go module paths.
+
+Resolution covers the pinned TS v2 language rules for modules, packages, aliases,
+local headers, CommonJS, re-exports and callable declarations. Ambiguity stays
+unresolved. External dependencies are not loaded, and dynamic receiver types
+are not inferred. Lua module imports resolve, but calls through module return
+values remain unresolved. These relationships do not change search ranking.
+
+Semantic facts persist with analysis and retain raw UTF-8 byte evidence after
+BOM/CRLF normalization. The analyzer version changed; run `mimirs index` to
+replace older snapshots.
+
 ## Verification
 
 [Reference fixtures](../benchmarks/versions/port/languages/README.md) compare
@@ -86,3 +111,8 @@ Repository checks also cover Unicode, BOM/CRLF mapping, incomplete syntax,
 repeated names, large input, stored inspection, unchanged reuse, edits, deletion
 and failed replacement. Focused cached-model tests retrieve archive code among
 an unrelated Rust file. These are correctness checks, not new benchmark corpora.
+
+The [272-case chunker corpus](../benchmarks/versions/port/chunker/README.md)
+checks full trees and facts for every language. The
+[107-project relationship corpus](../benchmarks/versions/port/relationships/README.md)
+checks resolved and unresolved relationships against original TS goldens.

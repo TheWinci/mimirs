@@ -1,0 +1,3 @@
+tests/fixtures/source-windows/python/small-function.py
+└── function format_account [1–4]
+    └── window [1–4] (196 chars) “def format_account(name: str, active: bool) -> str: """Format one account label for a search re…”

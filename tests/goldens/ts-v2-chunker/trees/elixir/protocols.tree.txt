@@ -1,0 +1,9 @@
+tests/fixtures/elixir/protocols.ex
+├── trait Fixtures.Printable [1–4]
+│   └── function print [2–3]
+├── impl Fixtures.Printable for Fixtures.User [6–8]
+│   └── function print [7]
+└── module Fixtures.User [10–15]
+    ├── struct User [11]
+    ├── type t [13]
+    └── method load [14]

@@ -1,0 +1,8 @@
+tests/fixtures/python/type-checking.py
+├── import [1–2]
+├── block [3–4]
+├── import [5]
+├── block [6–7]
+├── import [8]
+├── block [9]
+└── import [10]

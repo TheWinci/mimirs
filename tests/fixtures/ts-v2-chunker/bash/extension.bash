@@ -1,0 +1,5 @@
+bootstrap() {
+  prepare
+}
+
+bootstrap

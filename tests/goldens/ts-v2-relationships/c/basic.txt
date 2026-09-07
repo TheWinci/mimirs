@@ -1,0 +1,5 @@
+c/basic
+├── import src/main.c -> include/api.h via "../include/api.h" [1]
+├── call src/main.c:function main -> src/main.c:function local via local [8]
+├── call src/main.c:function main -> include/api.h:function calculate via calculate [9]
+└── call src/main.c:function main -> include/api.h:macro READY via READY [10]

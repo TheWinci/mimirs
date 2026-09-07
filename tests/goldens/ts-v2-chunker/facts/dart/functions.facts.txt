@@ -1,0 +1,6 @@
+tests/fixtures/dart/functions.dart
+├── call multiply in function square [1]
+├── call normalize in function callback [4]
+├── call callback in variable result [8]
+├── call save in function nested [11]
+└── call nested in function main [14]

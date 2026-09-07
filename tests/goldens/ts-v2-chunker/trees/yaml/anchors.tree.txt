@@ -1,0 +1,11 @@
+tests/fixtures/yaml/anchors.yaml
+└── section [1–11]
+    ├── property defaults [1–3]
+    │   ├── property retries [2]
+    │   └── property timeout [3]
+    ├── property development [5–7]
+    │   ├── property << [6]
+    │   └── property endpoint [7]
+    └── property production [9–11]
+        ├── property << [10]
+        └── property endpoint [11]

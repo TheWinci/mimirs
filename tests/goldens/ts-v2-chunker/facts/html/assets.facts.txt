@@ -1,0 +1,8 @@
+tests/fixtures/html/assets.html
+├── video.src "movie.mp4" in element main [2]
+├── video.poster "poster.jpg" in element main [2]
+├── audio.src "sound.mp3" in element main [3]
+├── iframe.src "frame.html" in element main [4]
+├── object.data "diagram.svg" in element main [5]
+├── use.href "icons.svg#add" in element svg [6]
+└── input.src "button.png" in element main [8]

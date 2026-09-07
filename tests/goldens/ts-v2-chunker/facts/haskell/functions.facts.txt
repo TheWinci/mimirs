@@ -1,0 +1,6 @@
+tests/fixtures/haskell/functions.hs
+├── call multiply in function square [3]
+├── call > in function factorial [7]
+├── call * in function factorial [7]
+├── call factorial in function factorial [7]
+└── call - in function factorial [7]

@@ -1,0 +1,4 @@
+tests/fixtures/source-windows/kotlin/modern-comments.kt
+└── package windows.modern [1–17]
+    ├── window [1–8] (173 chars) “package windows.modern sealed interface RetryPolicy { val delayMilliseconds: Int data object No…”
+    └── window [9–17] (206 chars) “data class Delayed( override val delayMilliseconds: Int, ) : RetryPolicy } fun RetryPolicy.isDe…”

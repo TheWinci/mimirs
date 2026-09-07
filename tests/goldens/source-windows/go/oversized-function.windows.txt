@@ -1,0 +1,10 @@
+tests/fixtures/source-windows/go/oversized-function.go
+├── package windows [1]
+│   └── window [1] (16 chars) “package windows”
+├── import [3–6]
+│   └── window [3–6] (30 chars) “import ( "sort" "strings" )”
+├── struct ReportRow [8–13]
+│   └── window [8–13] (100 chars) “type ReportRow struct { Title string Owner string Archived bool CreatedAt string }”
+└── function BuildReport [15–37]
+    ├── window [15–27] (377 chars) “func BuildReport(rows []ReportRow, includeArchived bool) string { visible := make([]ReportRow,…”
+    └── window [28–37] (186 chars) “for _, row := range visible { owner := row.Owner if owner == "" { owner = "unassigned" } lines…”

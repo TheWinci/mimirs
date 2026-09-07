@@ -1,0 +1,9 @@
+tests/fixtures/scala/scope.scala
+└── package fixtures.scope [1–20]
+    ├── import [3]
+    ├── class Scope [5–19]
+    │   ├── field service [6]
+    │   ├── method run [8–18]
+    │   │   └── function callback [14]
+    │   └── method helper [18]
+    └── class LocalWorker [20]

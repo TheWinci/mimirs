@@ -1,0 +1,6 @@
+tests/fixtures/source-windows/cpp/implementation.cc
+├── import [1]
+│   └── window [1] (28 chars) “#include "declarations.hpp"”
+└── module reports [3–11]
+    ├── window [3–11] (152 chars) “namespace reports { Report::Report(std::string title) : title_(std::move(title)) {} const std::…”
+    └── window [11] (21 chars) “// namespace reports”

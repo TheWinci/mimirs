@@ -1,0 +1,3 @@
+csharp/ambiguity
+├── import App/Main.cs -> package Duplicate via "Duplicate" [1]
+└── unresolved call App/Main.cs:method Launch -> Worker.Start [7]

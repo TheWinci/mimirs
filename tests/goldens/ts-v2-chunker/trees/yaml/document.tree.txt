@@ -1,0 +1,10 @@
+tests/fixtures/yaml/document.yaml
+└── section [1–8]
+    ├── property name [1]
+    ├── property enabled [2]
+    ├── property server [3–5]
+    │   ├── property host [4]
+    │   └── property port [5]
+    └── property features [6–8]
+        ├── section [7]
+        └── section [8]

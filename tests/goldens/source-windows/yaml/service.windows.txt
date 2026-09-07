@@ -1,0 +1,5 @@
+tests/fixtures/source-windows/yaml/service.yaml
+└── section [1–17]
+    ├── window [1–2] (35 chars) “name: report-service enabled: true”
+    ├── window [3–11] (127 chars) “server: host: 127.0.0.1 port: 8080 routes: - path: /reports method: GET - path: /health method:…”
+    └── window [12–17] (80 chars) “logging: level: info outputs: - stdout - ./logs/report-service.log”

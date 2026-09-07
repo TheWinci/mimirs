@@ -1,0 +1,9 @@
+tests/fixtures/source-windows/toml/config.toml
+├── property title [1]
+│   └── window [1] (25 chars) “title = "Report service"”
+├── property enabled [2]
+│   └── window [2] (15 chars) “enabled = true”
+├── section server [4–8]
+│   └── window [4–8] (70 chars) “# HTTP server configuration. [server] host = "127.0.0.1" port = 8080”
+└── section server.limits [9–13]
+    └── window [9–13] (104 chars) “[server.limits] requests_per_minute = 120 burst = 20 # This final comment is intentionally stan…”

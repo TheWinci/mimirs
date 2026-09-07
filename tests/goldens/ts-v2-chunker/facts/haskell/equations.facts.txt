@@ -1,0 +1,4 @@
+tests/fixtures/haskell/equations.hs
+├── call combine in function describe [2]
+├── call describe in function describe [2]
+└── call describe in function run [4]

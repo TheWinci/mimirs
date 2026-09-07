@@ -1,0 +1,5 @@
+typescript/barrel-cycle
+├── import src/main.ts -> src/a.ts via "./a" [2]
+├── re-export src/a.ts -> src/b.ts via "./b" [1]
+├── re-export src/b.ts -> src/a.ts via "./a" [1]
+└── unresolved call src/main.ts:function start -> missing [5]

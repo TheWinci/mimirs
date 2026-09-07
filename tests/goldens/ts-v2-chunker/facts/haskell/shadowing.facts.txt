@@ -1,0 +1,7 @@
+tests/fixtures/haskell/shadowing.hs
+├── import External (transform) [3]
+├── import External (describe) [3]
+├── call transform in function run [5]
+├── call describe in function render [8]
+├── call combine in function describe [10]
+└── call describe in function describe [10]

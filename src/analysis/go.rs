@@ -10,7 +10,7 @@ use crate::source::SourceFile;
 
 const GROUPS: &[&str] = &["const_group", "variable_group", "type_group"];
 pub(super) const LANGUAGE: Language = Language {
-    identity: "go/default/tree-sitter-0.27.0/go-0.25.0/extractor-1",
+    identity: "go/default/tree-sitter-0.27.0/go-0.25.0/extractor-1/source-facts-1",
     extensions: &["go"],
     extract,
     is_native: true,
@@ -110,6 +110,12 @@ fn extract(source: SourceFile) -> Result<Analysis> {
         "go",
         &analysis.entities,
     )?;
+    analysis.source_facts = super::source_facts::extract(
+        "go",
+        &analysis.source.text,
+        tree.root_node(),
+        &analysis.source_chunks,
+    );
     Ok(analysis)
 }
 

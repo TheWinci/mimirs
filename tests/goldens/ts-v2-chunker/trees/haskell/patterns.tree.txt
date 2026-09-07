@@ -1,0 +1,6 @@
+tests/fixtures/haskell/patterns.hs
+├── function caseScope [1–5]
+│   └── variable result [2–4]
+├── function pairScope [7–9]
+├── function doScope [11–13]
+└── function comprehensionScope [15–16]

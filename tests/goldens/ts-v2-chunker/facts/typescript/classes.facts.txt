@@ -1,0 +1,8 @@
+tests/fixtures/typescript/classes.ts
+├── export MemoryStore [5–39]
+├── call super in method constructor [10]
+├── call this.#items.set in method constructor [12]
+├── call this.#items.get in method get [17]
+├── call this.#items.set in method set [21]
+├── call this.get in method load [29]
+└── call this.#items.entries in method entries [33]

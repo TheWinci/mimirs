@@ -1,0 +1,6 @@
+tests/fixtures/cpp/functions.cpp
+├── call create in function make [9]
+├── call compute in constant LIMIT [12]
+├── call callback in function run [16]
+├── call declared in function run [17]
+└── call add in function run [17]

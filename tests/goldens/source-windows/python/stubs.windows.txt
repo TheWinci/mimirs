@@ -1,0 +1,12 @@
+tests/fixtures/source-windows/python/stubs.pyi
+├── import [1–2]
+│   └── window [1–2] (65 chars) “from collections.abc import Iterable from typing import overload”
+├── class Report [4–7]
+│   └── window [4–7] (60 chars) “class Report: id: str title: str archived: bool”
+├── class ReportStore [9–12]
+│   ├── window [9–11] (144 chars) “class ReportStore: def __init__(self, reports: Iterable[Report] = ...) -> None: ... def get(sel…”
+│   └── window [12] (72 chars) “def list(self, *, archived: bool | None = ...) -> list[Report]: ...”
+├── function format_report [14–15]
+│   └── window [14–15] (56 chars) “@overload def format_report(report: Report) -> str: ...”
+└── function format_report [16–17]
+    └── window [16–17] (55 chars) “@overload def format_report(report: None) -> None: ...”

@@ -1,0 +1,8 @@
+typescript/scope
+├── import src/main.ts -> src/worker.ts via "./worker" [1]
+├── call src/main.ts:function nested -> src/main.ts:function helper via helper [7]
+├── call src/main.ts:function outer -> src/main.ts:function nested via nested [10]
+├── call src/main.ts:function unrelated -> src/main.ts:function helper via helper [16]
+├── call src/main.ts:function execute -> src/main.ts:function outer via outer [21]
+├── call src/main.ts:function execute -> src/main.ts:function unrelated via unrelated [22]
+└── unresolved call src/main.ts:function execute -> run [20]

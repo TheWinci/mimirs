@@ -1,0 +1,4 @@
+include: settings.yml
+imports:
+  - vendor/library
+command: run()

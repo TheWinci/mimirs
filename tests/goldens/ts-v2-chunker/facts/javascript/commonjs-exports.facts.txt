@@ -1,0 +1,13 @@
+tests/fixtures/javascript/commonjs-exports.cjs
+├── import picked from "./dep.cjs" [1]
+├── import other from "./dep.cjs" [2]
+├── import computed from "./dep.cjs" [3]
+├── export picked [6]
+├── export other as renamed [7]
+├── export default as factory from "./factory.cjs" [8]
+├── import "./factory.cjs" [8]
+├── export third from "./dep.cjs" [9]
+├── import "./dep.cjs" [9]
+├── export computed as computedObject [10]
+├── export method [11]
+└── call picked in module [12]

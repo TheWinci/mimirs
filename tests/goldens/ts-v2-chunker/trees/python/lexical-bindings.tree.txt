@@ -1,0 +1,3 @@
+tests/fixtures/python/lexical-bindings.py
+├── function exercise_bindings [1–35]
+└── function default_scope [38–39]

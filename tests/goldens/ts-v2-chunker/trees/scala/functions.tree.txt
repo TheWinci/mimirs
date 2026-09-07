@@ -1,0 +1,8 @@
+tests/fixtures/scala/functions.scala
+└── package fixtures.functions [1–15]
+    ├── function clean [3]
+    ├── function transform [5–8]
+    └── class Functions [9–15]
+        ├── function normalize [10]
+        └── method run [12–15]
+            └── function local [13]

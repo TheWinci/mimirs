@@ -1,0 +1,5 @@
+tests/fixtures/go/shadowing.go
+├── package sample [1]
+├── function target [3]
+└── function Shadowing [5–32]
+    └── function target [6–8]

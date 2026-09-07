@@ -1,0 +1,3 @@
+tests/fixtures/javascript/function-expressions.js
+├── function handler [1–3]
+└── block [4–5]

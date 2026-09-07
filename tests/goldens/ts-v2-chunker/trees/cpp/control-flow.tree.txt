@@ -1,0 +1,9 @@
+tests/fixtures/cpp/control-flow.cpp
+├── type Callback [1]
+├── function fail [3]
+├── struct Error [5–7]
+│   └── method handle [6]
+└── function control_flow [9–42]
+    ├── variable loop [10]
+    ├── variable handler [26]
+    └── variable next [31]

@@ -1,0 +1,11 @@
+tests/fixtures/typescript/commonjs-chained.cts
+├── import picked from "./dep.cjs" [2]
+├── import computed from "./dep.cjs" [3]
+├── export picked as first [5]
+├── export picked as second [5]
+├── export picked as alias from "./dep.cjs" [6]
+├── import "./dep.cjs" [6]
+├── export computed as literal [7]
+├── export picked as literalAlias [8]
+├── export picked as computedModule [9]
+└── call Object.defineProperty in module [13]

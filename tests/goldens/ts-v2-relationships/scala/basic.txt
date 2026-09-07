@@ -1,0 +1,9 @@
+scala/basic
+├── import app/Main.scala -> package project via "project" [6]
+├── import app/Main.scala -> project/Tools.scala via "project" [3–4]
+├── import app/Main.scala -> project/Tools.scala via "project.Tools" [5]
+├── call app/Main.scala:method launch -> project/Tools.scala:method run via Tools.run [10]
+├── call app/Main.scala:method launch -> project/Tools.scala:method run via execute [11]
+├── call app/Main.scala:method launch -> project/Tools.scala:class Job via Work [12]
+├── call app/Main.scala:method launch -> app/Local.scala:method start via Local.start [13]
+└── unresolved call app/Main.scala:method launch -> Missing.run [14]

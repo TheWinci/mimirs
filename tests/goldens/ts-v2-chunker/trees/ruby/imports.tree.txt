@@ -1,0 +1,3 @@
+tests/fixtures/ruby/imports.rb
+├── block [1–5]
+└── method load_dependencies [6–10]

@@ -1,0 +1,3 @@
+tests/fixtures/javascript/default-class.js
+└── class default [1–5]
+    └── method render [2–4]

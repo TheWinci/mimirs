@@ -1,0 +1,3 @@
+tests/fixtures/bash/variables.sh
+├── call load in variable result [7]
+└── call command in module [9]

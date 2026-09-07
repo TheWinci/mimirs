@@ -1,0 +1,7 @@
+tests/fixtures/bash/scope.sh
+├── call normalize in function helper [2]
+├── call load in variable value [6]
+├── call "$callback" in function run [10]
+├── call helper in function run [11]
+├── call missing in function run [12]
+└── call run in module [15]

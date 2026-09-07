@@ -1,0 +1,16 @@
+tests/fixtures/source-windows/lua/table-module.lua
+├── variable ReportBook [1]
+│   └── window [1] (22 chars) “local ReportBook = {}”
+├── variable ReportBook.__index [2]
+│   └── window [2] (32 chars) “ReportBook.__index = ReportBook”
+├── function ReportBook.new [4–6]
+│   └── window [4–6] (82 chars) “function ReportBook.new() return setmetatable({ entries = {} }, ReportBook) end”
+├── method ReportBook:add [8–10]
+│   └── window [8–10] (105 chars) “function ReportBook:add(title, owner) table.insert(self.entries, { title = title, owner = owner…”
+├── method ReportBook:render [12–19]
+│   ├── window [12–15] (136 chars) “function ReportBook:render() local lines = {} for _, entry in ipairs(self.entries) do local own…”
+│   └── window [16–19] (80 chars) “table.insert(lines, entry.title .. " — " .. owner) end return lines end”
+├── method ReportBook:size [21–23]
+│   └── window [21–23] (54 chars) “function ReportBook:size() return #self.entries end”
+└── block [24–25]
+    └── window [24–25] (19 chars) “return ReportBook”

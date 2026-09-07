@@ -1,0 +1,6 @@
+tests/fixtures/source-windows/zig/container.zig
+└── struct ReportBook [1–21]
+    ├── window [1–7] (146 chars) “const ReportBook = struct { entries: []const Entry, const Entry = struct { title: []const u8, o…”
+    ├── window [8–13] (175 chars) “pub fn init(entries: []const Entry) ReportBook { return .{ .entries = entries }; } pub fn rende…”
+    ├── window [14–16] (179 chars) “var lines = try allocator.alloc([]const u8, self.entries.len); for (self.entries, 0..) |entry,…”
+    └── window [17–21] (116 chars) “lines[index] = try formatEntry(allocator, entry.title, owner); } return lines; } };”

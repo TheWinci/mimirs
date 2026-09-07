@@ -1,0 +1,4 @@
+tests/fixtures/c/macros.c
+├── call MAX in function clamp [9]
+├── call CALLBACK in function run_callback [13]
+└── call TEMPORARY in function after_undef [17]

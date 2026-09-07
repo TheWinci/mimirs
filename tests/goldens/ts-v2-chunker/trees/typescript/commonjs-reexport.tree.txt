@@ -1,0 +1,3 @@
+tests/fixtures/typescript/commonjs-reexport.cts
+├── comment [1]
+└── block [2]

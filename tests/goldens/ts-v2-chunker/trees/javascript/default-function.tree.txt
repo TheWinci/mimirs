@@ -1,0 +1,2 @@
+tests/fixtures/javascript/default-function.js
+└── function default [1–3]

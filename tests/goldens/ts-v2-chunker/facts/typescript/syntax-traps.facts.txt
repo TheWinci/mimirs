@@ -1,0 +1,4 @@
+tests/fixtures/typescript/syntax-traps.ts
+├── export render [10–19]
+├── call values.map in function render [11–16]
+└── call descriptions.join in function render [18]

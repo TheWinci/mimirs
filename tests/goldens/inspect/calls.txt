@@ -73,3 +73,9 @@ fact f13: macro_invocation bytes 123..144 lines 5..5 owner e0 text "opaque!(not_
   scope s2
   path bytes 123..129 text "opaque"
   tokens bytes 130..144 text "(not_a_call())"
+source fact: {"endLine":1,"endOffset":16,"global":false,"imported":"*","kind":"import","local":"crate","owner":null,"source":"crate","startLine":1,"startOffset":12,"static":false,"typeOnly":false}
+source fact: {"endLine":1,"endOffset":34,"global":false,"imported":"*","kind":"import","local":"renamed","owner":null,"source":"crate::thing","startLine":1,"startOffset":18,"static":false,"typeOnly":false}
+source fact: {"binding":"source-chunk","callee":"local","endLine":4,"endOffset":117,"kind":"call","owner":{"endLine":6,"endOffset":148,"kind":"function","name":"call","startLine":2,"startOffset":37},"startLine":4,"startOffset":87,"target":{"endLine":3,"endOffset":83,"kind":"function","name":"local","startLine":3,"startOffset":56}}
+source fact: {"binding":"local","callee":"x.method::<T>","endLine":4,"endOffset":116,"kind":"call","owner":{"endLine":6,"endOffset":148,"kind":"function","name":"call","startLine":2,"startOffset":37},"startLine":4,"startOffset":93,"target":null}
+source fact: {"binding":"unknown","callee":"nested","endLine":4,"endOffset":115,"kind":"call","owner":{"endLine":6,"endOffset":148,"kind":"function","name":"call","startLine":2,"startOffset":37},"startLine":4,"startOffset":107,"target":null}
+source fact: {"binding":"unknown","callee":"opaque!","endLine":5,"endOffset":144,"kind":"call","owner":{"endLine":6,"endOffset":148,"kind":"function","name":"call","startLine":2,"startOffset":37},"startLine":5,"startOffset":123,"target":null}

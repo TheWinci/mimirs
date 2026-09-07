@@ -1,0 +1,8 @@
+tests/fixtures/toml/comments.toml
+├── property name [1–2]
+│   ├── comment [1]
+│   └── comment [2]
+└── section database [4–7]
+    ├── comment [4]
+    └── property pool_size [6–7]
+        └── comment [6]

@@ -1,0 +1,9 @@
+tests/fixtures/php/comments.php
+├── block [1]
+└── class Coordinator [2–16]
+    ├── comment [2]
+    ├── field worker [6–7]
+    │   └── comment [6]
+    └── method run [9–15]
+        ├── comment [9]
+        └── comment [13]

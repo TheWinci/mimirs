@@ -1,0 +1,5 @@
+Mimirs keeps the original source text available for later expansion.
+
+Search results return a compact preview with the file path and exact line range. An agent can then read the surrounding source when it needs more context.
+
+Embedding windows remain connected to their parent source chunk through stored ownership rather than duplicated parent ranges.

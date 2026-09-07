@@ -6,7 +6,7 @@ use super::{Analysis, Diagnostic, Entity, Fact, LineIndex, Scope, Span, language
 use crate::{retrieval::ts_v2, source::SourceFile};
 
 pub(super) const JAVA: Language = Language {
-    identity: "java/default/tree-sitter-0.27.0/java-0.23.5/extractor-2",
+    identity: "java/default/tree-sitter-0.27.0/java-0.23.5/extractor-3/source-facts-1",
     extensions: &["java"],
     extract: |source| extract(source, tree_sitter_java::LANGUAGE.into(), "java"),
     is_native: true,
@@ -15,7 +15,7 @@ pub(super) const JAVA: Language = Language {
 };
 
 pub(super) const C: Language = Language {
-    identity: "c/default/tree-sitter-0.27.0/tree-sitter-c-0.24.1/extractor-2",
+    identity: "c/default/tree-sitter-0.27.0/tree-sitter-c-0.24.1/extractor-2/source-facts-1",
     extensions: &["c", "h"],
     extract: |source| extract(source, tree_sitter_c::LANGUAGE.into(), "c"),
     is_native: true,
@@ -24,7 +24,7 @@ pub(super) const C: Language = Language {
 };
 
 pub(super) const CPP: Language = Language {
-    identity: "cpp/default/tree-sitter-0.27.0/tree-sitter-cpp-0.23.4/extractor-2",
+    identity: "cpp/default/tree-sitter-0.27.0/tree-sitter-cpp-0.23.4/extractor-2/source-facts-1",
     extensions: &["cpp", "cc", "cxx", "hpp", "hh", "hxx"],
     extract: |source| extract(source, tree_sitter_cpp::LANGUAGE.into(), "cpp"),
     is_native: true,
@@ -33,7 +33,7 @@ pub(super) const CPP: Language = Language {
 };
 
 pub(super) const CSHARP: Language = Language {
-    identity: "csharp/default/tree-sitter-0.27.0/tree-sitter-c-sharp-0.23.1/extractor-2",
+    identity: "csharp/default/tree-sitter-0.27.0/tree-sitter-c-sharp-0.23.1/extractor-3/source-facts-1",
     extensions: &["cs"],
     extract: |source| extract(source, tree_sitter_c_sharp::LANGUAGE.into(), "csharp"),
     is_native: true,
@@ -42,7 +42,7 @@ pub(super) const CSHARP: Language = Language {
 };
 
 pub(super) const RUBY: Language = Language {
-    identity: "ruby/default/tree-sitter-0.27.0/tree-sitter-ruby-0.23.1/extractor-2",
+    identity: "ruby/default/tree-sitter-0.27.0/tree-sitter-ruby-0.23.1/extractor-2/source-facts-1",
     extensions: &["rb"],
     extract: |source| extract(source, tree_sitter_ruby::LANGUAGE.into(), "ruby"),
     is_native: true,
@@ -51,7 +51,7 @@ pub(super) const RUBY: Language = Language {
 };
 
 pub(super) const PHP: Language = Language {
-    identity: "php/default/tree-sitter-0.27.0/tree-sitter-php-0.24.2/extractor-2",
+    identity: "php/default/tree-sitter-0.27.0/tree-sitter-php-0.24.2/extractor-3/source-facts-1",
     extensions: &["php"],
     extract: |source| extract(source, tree_sitter_php::LANGUAGE_PHP.into(), "php"),
     is_native: true,
@@ -60,7 +60,7 @@ pub(super) const PHP: Language = Language {
 };
 
 pub(super) const SCALA: Language = Language {
-    identity: "scala/default/tree-sitter-0.27.0/tree-sitter-scala-0.24.0/extractor-2",
+    identity: "scala/default/tree-sitter-0.27.0/tree-sitter-scala-0.24.0/extractor-2/source-facts-1",
     extensions: &["scala", "sc"],
     extract: |source| extract(source, tree_sitter_scala::LANGUAGE.into(), "scala"),
     is_native: true,
@@ -69,7 +69,7 @@ pub(super) const SCALA: Language = Language {
 };
 
 pub(super) const HTML: Language = Language {
-    identity: "html/default/tree-sitter-0.27.0/tree-sitter-html-0.23.2/extractor-2",
+    identity: "html/default/tree-sitter-0.27.0/tree-sitter-html-0.23.2/extractor-2/source-facts-1",
     extensions: &["html", "htm"],
     extract: |source| extract(source, tree_sitter_html::LANGUAGE.into(), "html"),
     is_native: true,
@@ -78,7 +78,7 @@ pub(super) const HTML: Language = Language {
 };
 
 pub(super) const CSS: Language = Language {
-    identity: "css/default/tree-sitter-0.27.0/tree-sitter-css-0.25.0/extractor-2",
+    identity: "css/default/tree-sitter-0.27.0/tree-sitter-css-0.25.0/extractor-2/source-facts-1",
     extensions: &["css"],
     extract: |source| extract(source, tree_sitter_css::LANGUAGE.into(), "css"),
     is_native: true,
@@ -87,7 +87,7 @@ pub(super) const CSS: Language = Language {
 };
 
 pub(super) const KOTLIN: Language = Language {
-    identity: "kotlin/default/tree-sitter-0.27.0/tree-sitter-kotlin-ng-1.1.0/extractor-2",
+    identity: "kotlin/default/tree-sitter-0.27.0/tree-sitter-kotlin-ng-1.1.0/extractor-3/source-facts-1",
     extensions: &["kt", "kts"],
     extract: |source| extract(source, tree_sitter_kotlin_ng::LANGUAGE.into(), "kotlin"),
     is_native: true,
@@ -96,7 +96,7 @@ pub(super) const KOTLIN: Language = Language {
 };
 
 pub(super) const LUA: Language = Language {
-    identity: "lua/default/tree-sitter-0.27.0/tree-sitter-lua-0.4.1/extractor-2",
+    identity: "lua/default/tree-sitter-0.27.0/tree-sitter-lua-0.4.1/extractor-2/source-facts-1",
     extensions: &["lua"],
     extract: |source| extract(source, tree_sitter_lua::LANGUAGE.into(), "lua"),
     is_native: true,
@@ -105,7 +105,7 @@ pub(super) const LUA: Language = Language {
 };
 
 pub(super) const ZIG: Language = Language {
-    identity: "zig/default/tree-sitter-0.27.0/tree-sitter-zig-1.1.2/extractor-2",
+    identity: "zig/default/tree-sitter-0.27.0/tree-sitter-zig-1.1.2/extractor-3/source-facts-1",
     extensions: &["zig"],
     extract: |source| extract(source, tree_sitter_zig::LANGUAGE.into(), "zig"),
     is_native: true,
@@ -114,7 +114,7 @@ pub(super) const ZIG: Language = Language {
 };
 
 pub(super) const ELIXIR: Language = Language {
-    identity: "elixir/default/tree-sitter-0.27.0/tree-sitter-elixir-0.3.5/extractor-2",
+    identity: "elixir/default/tree-sitter-0.27.0/tree-sitter-elixir-0.3.5/extractor-3/source-facts-1",
     extensions: &["ex", "exs"],
     extract: |source| extract(source, tree_sitter_elixir::LANGUAGE.into(), "elixir"),
     is_native: true,
@@ -123,7 +123,7 @@ pub(super) const ELIXIR: Language = Language {
 };
 
 pub(super) const BASH: Language = Language {
-    identity: "bash/default/tree-sitter-0.27.0/tree-sitter-bash-0.25.1/extractor-2",
+    identity: "bash/default/tree-sitter-0.27.0/tree-sitter-bash-0.25.1/extractor-2/source-facts-1",
     extensions: &["sh", "bash"],
     extract: |source| extract(source, tree_sitter_bash::LANGUAGE.into(), "bash"),
     is_native: true,
@@ -132,7 +132,7 @@ pub(super) const BASH: Language = Language {
 };
 
 pub(super) const TOML: Language = Language {
-    identity: "toml/default/tree-sitter-0.27.0/tree-sitter-toml-ng-0.7.0/extractor-2",
+    identity: "toml/default/tree-sitter-0.27.0/tree-sitter-toml-ng-0.7.0/extractor-2/source-facts-1",
     extensions: &["toml"],
     extract: |source| extract(source, tree_sitter_toml_ng::LANGUAGE.into(), "toml"),
     is_native: true,
@@ -141,7 +141,7 @@ pub(super) const TOML: Language = Language {
 };
 
 pub(super) const YAML: Language = Language {
-    identity: "yaml/default/tree-sitter-0.27.0/tree-sitter-yaml-0.7.1/extractor-2",
+    identity: "yaml/default/tree-sitter-0.27.0/tree-sitter-yaml-0.7.1/extractor-2/source-facts-1",
     extensions: &["yaml", "yml"],
     extract: |source| extract(source, tree_sitter_yaml::LANGUAGE.into(), "yaml"),
     is_native: true,
@@ -150,7 +150,7 @@ pub(super) const YAML: Language = Language {
 };
 
 pub(super) const HASKELL: Language = Language {
-    identity: "haskell/default/tree-sitter-0.27.0/tree-sitter-haskell-0.23.1/extractor-2",
+    identity: "haskell/default/tree-sitter-0.27.0/tree-sitter-haskell-0.23.1/extractor-2/source-facts-1",
     extensions: &["hs"],
     extract: |source| extract(source, tree_sitter_haskell::LANGUAGE.into(), "haskell"),
     is_native: true,
@@ -159,7 +159,7 @@ pub(super) const HASKELL: Language = Language {
 };
 
 pub(super) const OCAML: Language = Language {
-    identity: "ocaml/default/tree-sitter-0.27.0/tree-sitter-ocaml-0.24.2/extractor-2",
+    identity: "ocaml/default/tree-sitter-0.27.0/tree-sitter-ocaml-0.24.2/extractor-2/source-facts-1",
     extensions: &["ml"],
     extract: |source| extract(source, tree_sitter_ocaml::LANGUAGE_OCAML.into(), "ocaml"),
     is_native: true,
@@ -168,7 +168,7 @@ pub(super) const OCAML: Language = Language {
 };
 
 pub(super) const OCAML_INTERFACE: Language = Language {
-    identity: "ocaml/interface/tree-sitter-0.27.0/ocaml-0.24.2/extractor-2",
+    identity: "ocaml/interface/tree-sitter-0.27.0/ocaml-0.24.2/extractor-2/source-facts-1",
     extensions: &["mli"],
     extract: |source| {
         extract(
@@ -183,7 +183,7 @@ pub(super) const OCAML_INTERFACE: Language = Language {
 };
 
 pub(super) const DART: Language = Language {
-    identity: "dart/default/tree-sitter-0.27.0/dart-orchard-0.6.0/extractor-2",
+    identity: "dart/default/tree-sitter-0.27.0/dart-orchard-0.6.0/extractor-3/source-facts-1",
     extensions: &["dart"],
     extract: |source| extract(source, tree_sitter_dart::LANGUAGE.into(), "dart"),
     is_native: true,
@@ -313,6 +313,12 @@ fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analy
         language,
         &analysis.entities,
         declarations,
+    );
+    analysis.source_facts = super::source_facts::extract(
+        language,
+        &analysis.source.text,
+        root,
+        &analysis.source_chunks,
     );
     Ok(analysis)
 }

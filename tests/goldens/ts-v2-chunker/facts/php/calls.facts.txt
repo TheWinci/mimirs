@@ -1,0 +1,12 @@
+tests/fixtures/php/calls.php
+├── call self in method create [4]
+├── call resolve in method create [4]
+├── call $loader in function run [9]
+├── call helper in function run [10]
+├── call Service::create in function run [11]
+├── call $service->execute in function run [12]
+├── call $service?->maybe in function run [13]
+├── call factory in function run [14]
+├── call factory()->build in function run [14]
+├── call Worker in function run [15]
+└── call build in function run [15]

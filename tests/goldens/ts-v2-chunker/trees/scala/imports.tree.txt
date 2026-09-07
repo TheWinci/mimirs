@@ -1,0 +1,5 @@
+tests/fixtures/scala/imports.scala
+└── package fixtures.imports [1–15]
+    ├── import [3–8]
+    └── class Imports [10–15]
+        └── method run [11–15]

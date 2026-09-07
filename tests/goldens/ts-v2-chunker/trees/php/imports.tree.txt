@@ -1,0 +1,4 @@
+tests/fixtures/php/imports.php
+├── block [1]
+└── module Fixtures\Imports [2–18]
+    └── import [4–18]

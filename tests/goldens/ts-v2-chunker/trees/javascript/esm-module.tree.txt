@@ -1,0 +1,5 @@
+tests/fixtures/javascript/esm-module.mjs
+├── import [1]
+├── variable root [3]
+├── function locate [5–7]
+└── block [8–9]

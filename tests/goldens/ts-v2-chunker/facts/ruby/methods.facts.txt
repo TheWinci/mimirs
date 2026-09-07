@@ -1,0 +1,11 @@
+tests/fixtures/ruby/methods.rb
+├── call fallback in method run [2]
+├── call helper in method run [3]
+├── call callback.call in method run [4]
+├── call yield in method run [5]
+├── call super in method run [6]
+├── call clean in method helper [10]
+├── call new in method build [13]
+├── call fetch in method [] [15]
+├── call check in method ready? [16]
+└── call persist in method save! [17]

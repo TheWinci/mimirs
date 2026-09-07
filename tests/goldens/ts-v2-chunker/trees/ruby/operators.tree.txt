@@ -1,0 +1,2 @@
+tests/fixtures/ruby/operators.rb
+└── method operate [1–7]

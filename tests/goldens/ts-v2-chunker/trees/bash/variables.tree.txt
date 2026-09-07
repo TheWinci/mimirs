@@ -1,0 +1,9 @@
+tests/fixtures/bash/variables.sh
+├── variable NAME [1]
+├── constant LIMIT [2]
+├── variable PATH [3]
+├── constant FIXED [4]
+├── constant COUNT [5]
+├── variable result [7]
+├── variable items [8]
+└── block [9]

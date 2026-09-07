@@ -1,0 +1,5 @@
+tests/fixtures/cpp/classes.cpp
+├── call cleanup in method ~Worker [7]
+├── call service_.execute in method run [11]
+├── call Worker in method Worker::create [22]
+└── call default_service in method Worker::create [22]

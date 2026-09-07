@@ -1,0 +1,4 @@
+tests/fixtures/c/conditional-macros.c
+├── call ACTIVE in function feature [4]
+├── call ACTIVE in function fallback [9]
+└── call ACTIVE in function after_conditional [14]

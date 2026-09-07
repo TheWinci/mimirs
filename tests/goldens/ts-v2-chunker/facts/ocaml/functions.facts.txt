@@ -1,0 +1,11 @@
+tests/fixtures/ocaml/functions.ml
+├── call multiply in function square [1]
+├── call = in function even, odd [4]
+├── call || in function even, odd [4]
+├── call odd in function even, odd [4]
+├── call - in function even, odd [4]
+├── call <> in function even, odd [6]
+├── call && in function even, odd [6]
+├── call even in function even, odd [6]
+├── call - in function even, odd [6]
+└── call clock in function now [10]

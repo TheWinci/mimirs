@@ -1,0 +1,9 @@
+tests/fixtures/rust/scope.rs
+├── use crate::runner::run [1]
+├── call run in function execute [4]
+├── call callback in function execute [7]
+├── use crate::nested::run in function execute [10]
+├── call run in function execute [11]
+├── call late_run in function execute [15]
+├── use crate::late::late_run in function execute [16]
+└── call helper in function execute [19]

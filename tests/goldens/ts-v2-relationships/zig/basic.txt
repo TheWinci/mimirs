@@ -1,0 +1,5 @@
+zig/basic
+├── import src/main.zig -> shared.zig via "../shared.zig" [2]
+├── import src/main.zig -> src/tools.zig via "tools.zig" [1]
+├── call src/main.zig:function launch -> src/tools.zig:function run via tools.run [5]
+└── call src/main.zig:function launch -> shared.zig:function start via shared.start [6]

@@ -1,0 +1,5 @@
+tests/fixtures/zig/tests.zig
+├── call execute in function run [5]
+├── call run in function run works [9]
+├── call helper in function (anonymous test) [13]
+└── call register in initializer comptime [17]

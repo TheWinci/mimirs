@@ -61,7 +61,7 @@ fn is_catch_all(pattern: &str) -> bool {
     matches!(pattern, "*" | "**" | "**/*")
 }
 
-pub(super) fn discover(
+pub(crate) fn discover(
     root: &Path,
     config: &Config,
     mut progress: impl FnMut(&str, usize) -> std::io::Result<()>,

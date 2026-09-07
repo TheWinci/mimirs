@@ -13,7 +13,7 @@ mod lock;
 mod parallel;
 mod pipeline;
 mod progress;
-mod walk;
+pub(super) mod walk;
 
 use progress::Progress;
 

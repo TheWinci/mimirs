@@ -1,0 +1,10 @@
+tests/fixtures/kotlin/scope.kt
+└── package fixtures.scope [1–20]
+    ├── import [3]
+    ├── class Worker [5]
+    │   └── field name [5]
+    ├── function callback [7]
+    ├── variable eager [8]
+    ├── function helper [10]
+    └── function run [12–20]
+        └── function local [13]

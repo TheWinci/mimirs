@@ -1,0 +1,3 @@
+void run() {}
+
+class Worker {}

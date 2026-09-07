@@ -1,0 +1,3 @@
+tests/fixtures/javascript/default-class.js
+├── export default [1–5]
+└── call String in method render [3]

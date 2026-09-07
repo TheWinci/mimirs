@@ -1,0 +1,11 @@
+kotlin/basic
+├── import app/Main.kt -> package project via "project" [7]
+├── import app/Main.kt -> project/Functions.kt via "project" [6]
+├── import app/Main.kt -> project/Tools.kt via "project" [3–4]
+├── import app/Main.kt -> project/Tools.kt via "project.Tools" [5]
+├── call app/Main.kt:function launch -> project/Tools.kt:method run via Tools.run [10]
+├── call app/Main.kt:function launch -> project/Tools.kt:method run via execute [11]
+├── call app/Main.kt:function launch -> project/Tools.kt:class Job via Work [12]
+├── call app/Main.kt:function launch -> project/Functions.kt:function build via make [13]
+├── call app/Main.kt:function launch -> app/Local.kt:method start via Local.start [14]
+└── unresolved call app/Main.kt:function launch -> Missing.run [15]

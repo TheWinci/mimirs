@@ -1,0 +1,16 @@
+@import url("./tokens.css");
+
+/* Responsive report layout. */
+@media (min-width: 48rem) {
+  .report {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @supports (container-type: inline-size) {
+    .report {
+      container-type: inline-size;
+    }
+  }
+}
+
+/* This final comment is intentionally standalone. */

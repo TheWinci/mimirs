@@ -1,0 +1,9 @@
+tests/fixtures/c/macros.c
+├── macro LIMIT [1]
+├── macro MAX [2]
+├── macro CALLBACK [3]
+├── macro TEMPORARY [5]
+├── directive #undef TEMPORARY [6]
+├── function clamp [8–10]
+├── function run_callback [12–14]
+└── function after_undef [16–18]

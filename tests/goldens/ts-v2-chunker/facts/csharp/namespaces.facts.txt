@@ -1,0 +1,3 @@
+tests/fixtures/csharp/namespaces.cs
+├── using Local = Project.Local in module Fixtures.Outer [3]
+└── call Local.Start in method Run [9]

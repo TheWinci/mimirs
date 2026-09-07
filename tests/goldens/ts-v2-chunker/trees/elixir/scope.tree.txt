@@ -1,0 +1,6 @@
+tests/fixtures/elixir/scope.ex
+└── module Fixtures.Scope [1–14]
+    ├── import [2]
+    ├── function helper [4]
+    └── function run [6–13]
+        └── function callback [7]

@@ -1,0 +1,5 @@
+tests/fixtures/css/imports.css
+├── directive [1]
+├── import [2–3]
+├── directive [4]
+└── selector :root [6–8]

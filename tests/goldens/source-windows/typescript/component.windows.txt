@@ -1,0 +1,8 @@
+tests/fixtures/source-windows/typescript/component.tsx
+├── import [1–2]
+│   └── window [1–2] (120 chars) “// @ts-nocheck -- standalone TSX parser fixture; no UI runtime is installed. import type { Repo…”
+├── interface ReportListProps [4–7]
+│   └── window [4–7] (85 chars) “interface ReportListProps { reports: Report[]; onSelect(report: Report): void; }”
+└── function ReportList [9–22]
+    ├── window [9–14] (213 chars) “/** Render selectable reports. */ export function ReportList({ reports, onSelect }: ReportListP…”
+    └── window [15–22] (173 chars) “{active.map((report) => ( <button key={report.id} onClick={() => onSelect(report)}> {report.tit…”

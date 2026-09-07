@@ -1,0 +1,8 @@
+tests/fixtures/python/classes.py
+├── function traced [1–5]
+│   └── function wrapper [2–3]
+└── class Repository [8–22]
+    ├── comment [10]
+    ├── method __init__ [12–13]
+    ├── method size [15–17]
+    └── method create [19–22]

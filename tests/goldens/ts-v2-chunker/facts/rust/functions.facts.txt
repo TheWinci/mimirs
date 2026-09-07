@@ -1,0 +1,5 @@
+tests/fixtures/rust/functions.rs
+├── call format_name in function greet [2]
+├── call loader in function fetch [6]
+├── call clean in function normalize [10]
+└── call normalize in function transform [11]

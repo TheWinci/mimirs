@@ -1,0 +1,9 @@
+tests/fixtures/cpp/calls.cpp
+└── class Calls [1–30]
+    ├── method run [3–24]
+    │   ├── function local [12–14]
+    │   └── function normalize [17–19]
+    ├── method helper [26]
+    ├── method method [27]
+    ├── method configure [28]
+    └── method configure [29]

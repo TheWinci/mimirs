@@ -1,0 +1,4 @@
+tests/fixtures/go/imports.go
+├── package sample [1]
+├── import [3–9]
+└── function UseImports [11–15]

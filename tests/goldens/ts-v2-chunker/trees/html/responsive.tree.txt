@@ -1,0 +1,10 @@
+tests/fixtures/html/responsive.html
+└── element main [1–16]
+    ├── element picture [2–7]
+    │   ├── element source [3]
+    │   └── element img [4–6]
+    ├── element link [8]
+    ├── element link [9–11]
+    └── element svg [12–15]
+        ├── element image [13]
+        └── element use [14]

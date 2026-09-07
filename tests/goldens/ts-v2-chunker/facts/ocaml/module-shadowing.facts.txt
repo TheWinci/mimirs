@@ -1,0 +1,5 @@
+tests/fixtures/ocaml/module-shadowing.ml
+├── module Alias = External [1]
+├── module Alias = Internal in function local [4]
+├── call Alias.execute in function local [5]
+└── call Alias.execute in function outside [7]

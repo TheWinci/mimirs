@@ -1,0 +1,2 @@
+tests/fixtures/rust/comments.rs
+└── call check in function ping [10]

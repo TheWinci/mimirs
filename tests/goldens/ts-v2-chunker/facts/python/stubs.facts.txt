@@ -1,0 +1,7 @@
+tests/fixtures/python/stubs.pyi
+├── from collections.abc import Callable [1]
+├── from collections.abc import Iterator [1]
+├── from typing import Protocol [2]
+├── from typing import TypeAlias [2]
+├── from typing import TypeVar [2]
+└── from typing import overload [2]

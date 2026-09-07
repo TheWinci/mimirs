@@ -1,0 +1,5 @@
+tests/fixtures/c/declarations.c
+├── call make in variable local [8]
+├── call callback in function execute [10]
+├── call handler in function execute [11]
+└── call consume in function execute [12]

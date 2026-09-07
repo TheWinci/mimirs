@@ -1,0 +1,4 @@
+tests/fixtures/dart/scope.dart
+└── function run [1–6]
+    ├── variable value [2]
+    └── function callback [3]

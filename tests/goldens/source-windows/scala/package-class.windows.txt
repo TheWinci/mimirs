@@ -1,0 +1,5 @@
+tests/fixtures/source-windows/scala/package-class.scala
+└── package windows [1–18]
+    ├── window [1–7] (206 chars) “package windows final case class ReportEntry(title: String, owner: Option[String]) /** Keep rep…”
+    ├── window [8–11] (109 chars) “def add(title: String, owner: Option[String]): Unit = entries = entries :+ ReportEntry(title, o…”
+    └── window [12–18] (183 chars) “def render: Vector[String] = entries.map { entry => val owner = entry.owner.getOrElse("unassign…”

@@ -1,0 +1,12 @@
+tests/fixtures/typescript/commonjs-shadowing.cts
+├── variable real [1–2]
+│   └── comment [1]
+├── function shadowRequire [4–6]
+├── function shadowModule [8–10]
+├── function shadowExports [12–14]
+├── function lexicalRequire [16–19]
+├── function lexicalModule [21–24]
+├── function lexicalExports [26–29]
+├── block [30–31]
+├── variable later [32]
+└── block [33–38]

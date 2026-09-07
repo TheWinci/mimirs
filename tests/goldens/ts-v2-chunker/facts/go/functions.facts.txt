@@ -1,0 +1,5 @@
+tests/fixtures/go/functions.go
+├── call FormatName in function Greet [4]
+├── call loader in function Fetch [8]
+├── call Clean in function normalize [13]
+└── call normalize in function Transform [16]

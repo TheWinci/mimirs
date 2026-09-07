@@ -9,7 +9,9 @@ mod javascript;
 pub mod language;
 mod native;
 mod python;
+pub mod relationships;
 mod rust;
+pub mod source_facts;
 mod text;
 
 #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -135,6 +137,7 @@ impl Diagnostic {
 
 #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Analysis {
+    pub source_facts: Vec<source_facts::Fact>,
     pub source_chunks: Vec<crate::retrieval::ts_v2::Chunk>,
     pub source: SourceFile,
     pub diagnostics: Vec<Diagnostic>,
@@ -146,6 +149,7 @@ pub struct Analysis {
 impl Analysis {
     fn new(source: SourceFile, lines: &LineIndex) -> Self {
         Self {
+            source_facts: Vec::new(),
             scopes: vec![Scope {
                 kind: "file".into(),
                 span: lines.span(0, source.text.len()),
@@ -189,6 +193,25 @@ pub fn extract(source: SourceFile) -> Result<Analysis> {
     }
     for scope in &mut analysis.scopes {
         map(&mut scope.span)?;
+    }
+    for fact in &mut analysis.source_facts {
+        let remap = |location: &mut source_facts::Location| -> Result<()> {
+            let mut span = location.span();
+            map(&mut span)?;
+            *location = source_facts::Location::from_span(&span);
+            Ok(())
+        };
+        remap(&mut fact.location)?;
+        if let Some(owner) = &mut fact.owner {
+            remap(&mut owner.location)?;
+        }
+        if let source_facts::Kind::Call {
+            target: Some(target),
+            ..
+        } = &mut fact.kind
+        {
+            remap(&mut target.location)?;
+        }
     }
     analysis.scopes[0].span = lines.span(0, source.text.len());
     for diagnostic in &mut analysis.diagnostics {
@@ -270,6 +293,9 @@ pub fn report(analysis: &Analysis) -> String {
                 &analysis.source.text[evidence.span.start..evidence.span.end]
             ));
         }
+    }
+    for fact in &analysis.source_facts {
+        output.push_str(&format!("source fact: {}\n", serde_json::json!(fact)));
     }
     for diagnostic in &analysis.diagnostics {
         output.push_str(&format!(

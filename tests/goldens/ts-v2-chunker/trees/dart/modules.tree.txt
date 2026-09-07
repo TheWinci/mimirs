@@ -1,0 +1,6 @@
+tests/fixtures/dart/modules.dart
+├── module app.main [1]
+├── import [3–5]
+├── export [6]
+├── import [7]
+└── function run [9–11]

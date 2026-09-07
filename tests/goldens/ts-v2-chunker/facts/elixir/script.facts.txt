@@ -1,0 +1,4 @@
+tests/fixtures/elixir/script.exs
+├── alias Jason.Encoder [1]
+├── call Encoder.encode in module [4]
+└── call IO.puts in module [6]

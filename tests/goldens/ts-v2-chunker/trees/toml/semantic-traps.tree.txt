@@ -1,0 +1,6 @@
+tests/fixtures/toml/semantic-traps.toml
+├── property include [1]
+├── property extends [2]
+├── property command [3]
+└── section imports [5–6]
+    └── property source [6]

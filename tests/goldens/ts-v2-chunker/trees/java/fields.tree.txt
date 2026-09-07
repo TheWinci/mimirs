@@ -1,0 +1,10 @@
+tests/fixtures/java/fields.java
+├── package fixtures.fields [1]
+└── class Configuration [3–22]
+    ├── field PRIMARY, SECONDARY [4]
+    ├── field callback [5]
+    ├── initializer [7–9]
+    ├── initializer [11–13]
+    └── method execute [15–21]
+        ├── function local [16]
+        └── function normalize [19]

@@ -1,0 +1,10 @@
+dart/basic
+├── import lib/main.dart -> lib/src/functions.dart via "src/functions.dart" [4]
+├── import lib/main.dart -> lib/src/tools.dart via "src/tools.dart" [3]
+├── import lib/main.dart -> lib/worker.dart via "worker.dart" [6]
+├── import lib/worker.dart -> lib/main.dart via "app.main" [1]
+├── re-export lib/main.dart -> lib/src/api.dart via "src/api.dart" [5]
+├── call lib/main.dart:function launch -> lib/src/tools.dart:function run via tools.run [9]
+├── call lib/main.dart:function launch -> lib/src/functions.dart:function build via build [10]
+├── call lib/main.dart:function launch -> lib/src/tools.dart:class Worker via tools.Worker [11]
+└── unresolved call lib/main.dart:function launch -> Missing [12]

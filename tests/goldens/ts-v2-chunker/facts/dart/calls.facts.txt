@@ -1,0 +1,10 @@
+tests/fixtures/dart/calls.dart
+├── call service?.execute in function run [2]
+├── call build in function run [3]
+├── call build().start in function run [3]
+├── call values.map in function run [4]
+├── call values.map().toList in function run [4]
+├── call transform in function run [4]
+├── call Worker.create in variable worker [6]
+├── call worker..prepare in variable worker [7]
+└── call worker..start in variable worker [8]

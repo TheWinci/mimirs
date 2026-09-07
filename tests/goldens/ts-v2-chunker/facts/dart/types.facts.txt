@@ -1,0 +1,3 @@
+tests/fixtures/dart/types.dart
+├── call print in method log [8]
+└── call trim in method clean [13]

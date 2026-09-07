@@ -1,0 +1,8 @@
+tests/fixtures/c/declarations.c
+├── constant LIMIT, RETRIES [1]
+├── variable message [2]
+├── variable values [3]
+├── function handler [5]
+└── function execute [7–13]
+    ├── variable local [8]
+    └── variable callback [9]

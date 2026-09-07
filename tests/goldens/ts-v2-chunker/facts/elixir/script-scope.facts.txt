@@ -1,0 +1,8 @@
+tests/fixtures/elixir/script-scope.exs
+├── call build in function make [1]
+├── call make in module [2]
+├── call fetch in module [4]
+├── call value in module [5]
+├── call value in module [7]
+├── call item in module [10]
+└── call item in module [12]

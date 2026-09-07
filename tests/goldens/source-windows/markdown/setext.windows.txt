@@ -1,0 +1,5 @@
+tests/fixtures/source-windows/markdown/setext.markdown
+└── section Report format [1–14]
+    ├── window [1–5] (102 chars) “Report format ============= This document uses Setext headings through the long Markdown extens…”
+    ├── window [6–10] (86 chars) “Output ------ The generated report keeps exact source ranges and a compact preview.”
+    └── window [11–14] (97 chars) “### Notes - Windows retain their full text. - Parent ownership remains available for expansion.”

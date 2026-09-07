@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 mod analysis;
+mod collation;
 mod commands;
 mod config;
 mod embedding;
@@ -34,6 +35,13 @@ enum Command {
         source_chunks: bool,
     },
 
+    /// Resolve project imports, re-exports and calls without loading a model.
+    Relationships {
+        /// Print complete relationships and source evidence as JSON.
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Index current directory with config defined in .mimirs folder.
     Index {
         /// Write exclusive phase timings and counters to a new JSON file.
@@ -64,6 +72,7 @@ fn main() -> Result<()> {
             stored,
             source_chunks,
         } => commands::inspect::run(&file, stored, source_chunks),
+        Command::Relationships { json } => commands::relationships::run(json),
         Command::Init => commands::init::run(),
         Command::Index {
             profile,

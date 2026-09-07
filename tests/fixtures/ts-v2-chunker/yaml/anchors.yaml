@@ -1,0 +1,11 @@
+defaults: &defaults
+  retries: 3
+  timeout: 30
+
+development:
+  <<: *defaults
+  endpoint: !env DEV_ENDPOINT
+
+production:
+  <<: *defaults
+  endpoint: https://example.test

@@ -1,0 +1,2 @@
+tests/fixtures/typescript/default-function.ts
+└── function default [1–3]

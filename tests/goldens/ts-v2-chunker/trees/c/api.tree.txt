@@ -1,0 +1,12 @@
+tests/fixtures/c/api.h
+└── conditional !defined(FIXTURES_API_H) [1–18]
+    ├── macro FIXTURES_API_H [2]
+    ├── import [4]
+    ├── type Store [6]
+    ├── type StoreCallback [7]
+    ├── struct Store [9–12]
+    │   ├── field size [10]
+    │   └── field callback [11]
+    ├── function store_create [14]
+    ├── function store_destroy [15]
+    └── constant STORE_VERSION [16]

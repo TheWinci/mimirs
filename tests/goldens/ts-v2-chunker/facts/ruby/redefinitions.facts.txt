@@ -1,0 +1,2 @@
+tests/fixtures/ruby/redefinitions.rb
+└── call duplicate in method run [3]

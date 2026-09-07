@@ -1,0 +1,9 @@
+haskell/basic
+├── import App/Main.hs -> App/Open.hs via "App.Open" [5]
+├── import App/Main.hs -> App/Tools.hs via "App.Tools" [4]
+├── import App/Main.hs -> App/Worker.hs via "App.Worker" [3]
+├── call App/Main.hs:function run -> App/Worker.hs:function execute via Worker.execute [7]
+├── call App/Main.hs:function make -> App/Tools.hs:function build via build [8]
+├── call App/Main.hs:function wrap -> App/Tools.hs:type Tool via Tool [9]
+├── call App/Main.hs:function direct -> App/Tools.hs:function direct via App.Tools.direct [10]
+└── unresolved call App/Main.hs:function missing -> Missing.run [11]

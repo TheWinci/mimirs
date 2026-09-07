@@ -1,0 +1,2 @@
+tests/fixtures/go/generics.go
+└── call Identity[string] in function UseGeneric [8]

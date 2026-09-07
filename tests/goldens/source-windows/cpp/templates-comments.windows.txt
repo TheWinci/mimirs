@@ -1,0 +1,9 @@
+tests/fixtures/source-windows/cpp/templates-comments.cpp
+├── import [1]
+│   └── window [1] (20 chars) “#include <optional>”
+├── class Cache [3–11]
+│   └── window [3–11] (210 chars) “template <typename Value> class Cache { public: void set(Value value) { value_ = std::move(valu…”
+├── conditional defined(ENABLE_CACHE_TRACE) [13–17]
+│   └── window [13–17] (128 chars) “#if defined(ENABLE_CACHE_TRACE) #define CACHE_TRACE(message) trace(message) #else #define CACHE…”
+└── comment [19]
+    └── window [19] (51 chars) “// This final comment is intentionally standalone.”

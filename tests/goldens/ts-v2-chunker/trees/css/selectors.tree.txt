@@ -1,0 +1,4 @@
+tests/fixtures/css/selectors.css
+├── selector .card, .panel:hover [1–5]
+│   └── comment [1]
+└── selector main > article[data-state="ready"]::before [7–9]

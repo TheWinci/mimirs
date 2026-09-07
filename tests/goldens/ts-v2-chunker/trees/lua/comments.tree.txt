@@ -1,0 +1,6 @@
+tests/fixtures/lua/comments.lua
+├── comment [1]
+├── function documented [3–6]
+│   └── comment [3]
+└── function callback [8–11]
+    └── comment [8]

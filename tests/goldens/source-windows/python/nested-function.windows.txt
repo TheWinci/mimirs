@@ -1,0 +1,6 @@
+tests/fixtures/source-windows/python/nested-function.py
+└── function build_report [1–15]
+    ├── window [1–2] (109 chars) “def build_report(rows: list[dict[str, object]]) -> str: """Normalize, filter, and render report…”
+    ├── window [3–6] (162 chars) “def normalize(row: dict[str, object]) -> dict[str, object]: title = str(row.get("title", "untit…”
+    ├── window [7–10] (128 chars) “normalized = [normalize(row) for row in rows] visible = [row for row in normalized if not row.g…”
+    └── window [11–15] (196 chars) “def render(row: dict[str, object]) -> str: owner = str(row.get("owner", "unassigned")) return f…”

@@ -1,0 +1,7 @@
+# File settings.
+name = "demo" # trailing note
+
+# Database settings.
+[database]
+# Connection pool size.
+pool_size = 10

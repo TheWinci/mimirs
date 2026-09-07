@@ -1,0 +1,6 @@
+tests/fixtures/python/rebindings.py
+├── from package.handlers import global_handler [1]
+├── call global_handler in function use_global [6]
+├── call global_handler in function replace_global [12]
+├── call handler in function inherited [18]
+└── call handler in function replaced [23]

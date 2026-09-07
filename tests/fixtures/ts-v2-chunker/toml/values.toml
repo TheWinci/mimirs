@@ -1,0 +1,10 @@
+string = "hello"
+multiline = """first
+second"""
+integer = 42
+float = 3.14
+boolean = false
+date = 2026-07-15
+time = 12:30:00
+array = [1, 2, 3]
+inline = { name = "Ada", active = true }

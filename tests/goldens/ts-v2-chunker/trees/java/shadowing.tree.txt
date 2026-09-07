@@ -1,0 +1,8 @@
+tests/fixtures/java/shadowing.java
+├── package fixtures.shadowing [1]
+└── class Shadowing [3–38]
+    ├── interface Callback [4–6]
+    │   └── method run [5]
+    ├── method make [8–10]
+    ├── method target [12–14]
+    └── method shadowing [16–37]

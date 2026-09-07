@@ -1,0 +1,11 @@
+tests/fixtures/scala/control-flow.scala
+├── class ControlFlow [1–40]
+│   └── method run [2–40]
+├── class Factory [41–43]
+│   └── field current [42]
+├── function helper [44]
+├── variable scala2Reference [46]
+├── variable scala3Reference [47]
+└── function timing [49–60]
+    ├── function before [51]
+    └── function callback [54]

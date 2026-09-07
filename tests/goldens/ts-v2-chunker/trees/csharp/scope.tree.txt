@@ -1,0 +1,11 @@
+tests/fixtures/csharp/scope.cs
+├── import [1]
+├── class Scope [3–27]
+│   ├── field service [5]
+│   ├── method Run [7–24]
+│   │   ├── function normalize [14]
+│   │   └── function Local [17]
+│   └── method Helper [26]
+└── class Worker [29–33]
+    ├── method Create [31]
+    └── method Execute [32]

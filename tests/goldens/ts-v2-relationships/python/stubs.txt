@@ -1,0 +1,5 @@
+python/stubs
+├── import src/main.py -> src/api.pyi via "api" [1]
+├── import src/main.py -> src/live.py via "live" [2]
+├── call src/main.py:function start -> src/api.pyi:function declared via declared [6]
+└── call src/main.py:function start -> src/live.py:function run via run [6]

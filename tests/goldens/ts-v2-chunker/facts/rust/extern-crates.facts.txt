@@ -1,0 +1,5 @@
+tests/fixtures/rust/extern-crates.rs
+├── use alloc [1]
+├── use core as rust_core [2]
+├── call alloc::boxed::Box::new in function dependencies [5]
+└── call rust_core::mem::size_of::<usize> in function dependencies [6]

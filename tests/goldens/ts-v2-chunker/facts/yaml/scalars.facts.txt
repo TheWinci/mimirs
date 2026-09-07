@@ -1,0 +1,2 @@
+tests/fixtures/yaml/scalars.yaml
+└── (no facts)

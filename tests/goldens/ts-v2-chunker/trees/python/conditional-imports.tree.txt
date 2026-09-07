@@ -1,0 +1,7 @@
+tests/fixtures/python/conditional-imports.py
+├── function choose [1–7]
+│   ├── import [3]
+│   └── import [5]
+└── function optional [10–16]
+    ├── import [12]
+    └── import [14]

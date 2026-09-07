@@ -1,0 +1,6 @@
+tests/fixtures/scala/functions.scala
+├── call validate in function transform [6]
+├── call clean in function normalize [10]
+├── call normalize in function local [13]
+├── call loader in method run [14]
+└── call local in method run [15]

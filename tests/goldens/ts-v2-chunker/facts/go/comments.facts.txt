@@ -1,0 +1,2 @@
+tests/fixtures/go/comments.go
+└── call Check in function Ping [10]

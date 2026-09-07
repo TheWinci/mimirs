@@ -1,0 +1,3 @@
+tests/fixtures/scala/comments.scala
+├── call createWorker in field worker [7]
+└── call worker.run in method run [12]

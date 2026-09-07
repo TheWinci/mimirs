@@ -1,0 +1,10 @@
+tests/fixtures/lua/loaders.lua
+├── local real = require "real" in variable real [1]
+├── dofile "scripts/setup.lua" [2]
+├── local compiled = loadfile "scripts/task.lua" in variable compiled [3]
+├── call require in function parameter [6]
+├── call dofile in function parameter [7]
+├── call require in module [14]
+├── require "after-block" [17]
+├── call makeLoader in variable require [19]
+└── call require in module [20]

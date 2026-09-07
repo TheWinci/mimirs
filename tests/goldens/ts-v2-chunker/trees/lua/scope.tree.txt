@@ -1,0 +1,6 @@
+tests/fixtures/lua/scope.lua
+├── function helper [1–3]
+├── function callback [5–7]
+├── variable first, second [9]
+└── function run [11–20]
+    └── function local_callback [12–14]

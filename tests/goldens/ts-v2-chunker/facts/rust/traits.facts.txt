@@ -1,0 +1,3 @@
+tests/fixtures/rust/traits.rs
+├── call check_ready in method ready [5]
+└── call self.validate in method run [13]

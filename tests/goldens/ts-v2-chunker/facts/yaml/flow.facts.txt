@@ -1,0 +1,2 @@
+tests/fixtures/yaml/flow.yaml
+└── (no facts)

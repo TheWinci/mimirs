@@ -1,0 +1,6 @@
+tests/fixtures/php/captures.php
+├── block [1]
+└── function captures [2–20]
+    ├── function arrow [4]
+    ├── function explicit [6–8]
+    └── function missing [10–12]

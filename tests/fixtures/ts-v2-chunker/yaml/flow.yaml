@@ -1,0 +1,3 @@
+metadata: { owner: "Ada", labels: { tier: backend, stable: true } }
+ports: [80, 443]
+quoted: { "display name": "Search", 'literal key': value }

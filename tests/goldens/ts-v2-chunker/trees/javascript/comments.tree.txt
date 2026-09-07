@@ -1,0 +1,6 @@
+tests/fixtures/javascript/comments.js
+├── function documented [1–5]
+│   ├── comment [1]
+│   └── comment [3]
+└── variable defaultValue [7–8]
+    └── comment [7]

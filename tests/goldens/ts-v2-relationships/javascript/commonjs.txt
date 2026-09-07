@@ -1,0 +1,5 @@
+javascript/commonjs
+├── import src/main.cjs -> src/named.cjs via "./named.cjs" [2]
+├── import src/main.cjs -> src/worker.cjs via "./worker.cjs" [1]
+├── call src/main.cjs:function start -> src/worker.cjs:function run via worker.run [5]
+└── call src/main.cjs:function start -> src/named.cjs:function execute via execute [5]

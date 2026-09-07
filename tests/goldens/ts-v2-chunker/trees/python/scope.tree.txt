@@ -1,0 +1,4 @@
+tests/fixtures/python/scope.py
+├── import [1]
+├── function execute [4–5]
+└── function start [8–9]

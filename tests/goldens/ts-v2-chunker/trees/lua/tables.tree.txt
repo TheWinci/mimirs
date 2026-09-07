@@ -1,0 +1,6 @@
+tests/fixtures/lua/tables.lua
+├── variable M [1–9]
+│   ├── function run [3–5]
+│   └── function named [6–8]
+├── function M.handler [11–13]
+└── block [14–15]

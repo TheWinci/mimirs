@@ -1,0 +1,7 @@
+tests/fixtures/source-windows/cpp/namespace-class.cpp
+├── import [1–2]
+│   └── window [1–2] (36 chars) “#include <string> #include <vector>”
+└── module windows [4–29]
+    ├── window [4–10] (166 chars) “namespace windows { class ReportBook { public: void add(std::string title, std::string owner) {…”
+    ├── window [11–20] (219 chars) “std::vector<std::string> render() const { std::vector<std::string> lines; for (const auto& entr…”
+    └── window [21–29] (128 chars) “struct Entry { std::string title; std::string owner; }; std::vector<Entry> entries_; }; } // na…”

@@ -1,0 +1,8 @@
+tests/fixtures/php/namespaces.php
+├── use Vendor\FirstTool as Tool in module First [4]
+├── call Tool::run in function first [5]
+├── use Vendor\SecondTool as Tool in module Second [9]
+├── call Tool::run in function second [10]
+├── use Vendor\ThirdTool as Tool in module Third [13]
+├── call Tool::run in function third [14]
+└── call finish in function fallback [18]

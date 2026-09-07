@@ -1,0 +1,13 @@
+tests/fixtures/dart/control-flow.dart
+├── type Callback [1]
+├── class Failure [3–5]
+│   └── method report [4]
+├── function make [7]
+├── function ready [8]
+├── function fallback [9]
+├── function work [10]
+├── function pair [12]
+└── function control [14–68]
+    ├── variable loop [19]
+    ├── variable first, second [44]
+    └── variable rendered [62–65]

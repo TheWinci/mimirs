@@ -1,0 +1,10 @@
+tests/fixtures/elixir/filters.ex
+├── import Enum, only: [map: 2] in module Fixtures.Filters [2]
+├── import Enum, only: [filter: 2] in module Fixtures.Filters [2]
+├── import List, except: [flatten: 1] in module Fixtures.Filters [3]
+├── import List, except: [first: 1] in module Fixtures.Filters [3]
+├── import String in module Fixtures.Filters [4]
+├── call map in function run [7]
+├── call filter in function run [8]
+├── call flatten in function run [9]
+└── call upcase in function run [10]

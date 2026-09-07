@@ -1,0 +1,2 @@
+tests/fixtures/javascript/class-fields.js
+└── export Store [1–5]

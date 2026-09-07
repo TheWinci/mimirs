@@ -1,0 +1,5 @@
+tests/fixtures/html/templates.html
+└── element template [1–6]
+    └── element article [2–5]
+        ├── element slot [3]
+        └── element custom-element [4]

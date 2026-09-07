@@ -1,0 +1,15 @@
+.hero {
+  background-image: url(images/hero.png);
+  cursor: url("cursors/pointer.cur"), pointer;
+}
+
+.gallery {
+  background-image: image-set(
+    url("images/photo.png") 1x,
+    url("images/photo@2x.png") 2x
+  );
+}
+
+.remote {
+  background: url("https://cdn.example.com/pattern.svg");
+}

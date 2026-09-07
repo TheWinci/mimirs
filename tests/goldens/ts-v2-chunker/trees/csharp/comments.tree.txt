@@ -1,0 +1,11 @@
+tests/fixtures/csharp/comments.cs
+├── comment [1]
+├── class Coordinator [3–17]
+│   ├── comment [3]
+│   ├── field worker [7–8]
+│   │   └── comment [7]
+│   └── method Run [10–16]
+│       ├── comment [10]
+│       └── comment [14]
+└── class Coordinator [19–22]
+    └── method Hook [21]

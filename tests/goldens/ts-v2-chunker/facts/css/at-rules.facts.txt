@@ -1,0 +1,2 @@
+tests/fixtures/css/at-rules.css
+└── url "fonts/inter.woff2" in rule @font-face [3]

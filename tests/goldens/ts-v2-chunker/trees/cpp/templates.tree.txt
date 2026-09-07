@@ -1,0 +1,9 @@
+tests/fixtures/cpp/templates.cpp
+├── class Box [1–10]
+│   ├── method get [4–6]
+│   └── field value_ [9]
+├── function identity [12–15]
+├── function identity<int> [17–20]
+├── function use_identity [22–24]
+├── type Name [26]
+└── type Size [27]

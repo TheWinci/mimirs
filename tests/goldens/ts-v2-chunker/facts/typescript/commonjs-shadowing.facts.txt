@@ -1,0 +1,7 @@
+tests/fixtures/typescript/commonjs-shadowing.cts
+├── import * as real from "./real.cjs" [2]
+├── call require in function shadowRequire [5]
+├── call makeLoader in function lexicalRequire [17]
+├── call require in function lexicalRequire [18]
+├── call makeLoader in module [31]
+└── call require in variable later [32]

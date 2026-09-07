@@ -1,0 +1,9 @@
+tests/fixtures/source-windows/javascript/esm-module.mjs
+├── import [1]
+│   └── window [1] (45 chars) “import { readFile } from "node:fs/promises";”
+├── variable reportPath [3]
+│   └── window [3] (67 chars) “export const reportPath = new URL("./report.md", import.meta.url);”
+├── function loadReport [5–9]
+│   └── window [5–9] (173 chars) “/** Load and normalize one ESM report. */ export async function loadReport(path = reportPath) {…”
+└── block [10–11]
+    └── window [10–11] (28 chars) “export default loadReport;”

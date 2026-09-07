@@ -1,0 +1,5 @@
+tests/fixtures/haskell/declarations.hs
+├── call Ok in function build [4]
+├── call Err in function failWith [5]
+├── call User in function create [6]
+└── call name in function readName [7]

@@ -1,0 +1,7 @@
+tests/fixtures/javascript/esm-module.mjs
+├── import resolve from "node:path" [1]
+├── export root [3]
+├── call resolve in variable root [3]
+├── export locate [5–7]
+├── call resolve in function locate [6]
+└── export default [9]

@@ -1,0 +1,8 @@
+tests/fixtures/source-windows/cpp/declarations.hpp
+├── directive #pragma once [1]
+│   └── window [1] (13 chars) “#pragma once”
+├── import [3]
+│   └── window [3] (18 chars) “#include <string>”
+└── module reports [5–16]
+    ├── window [5–16] (173 chars) “namespace reports { class Report { public: explicit Report(std::string title); [[nodiscard]] co…”
+    └── window [16] (21 chars) “// namespace reports”

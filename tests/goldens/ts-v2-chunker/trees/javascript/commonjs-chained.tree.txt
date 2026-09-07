@@ -1,0 +1,8 @@
+tests/fixtures/javascript/commonjs-chained.cjs
+├── variable picked [1]
+├── variable computed [2]
+├── block [3–9]
+├── variable dynamicName [10]
+├── block [11–12]
+├── variable indirect [13]
+└── block [14]

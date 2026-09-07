@@ -1,0 +1,9 @@
+tests/fixtures/source-windows/html/comments-assets.html
+├── directive [1]
+│   └── window [1] (16 chars) “<!doctype html>”
+├── element link [2–3]
+│   └── window [2–3] (94 chars) “<!-- The stylesheet belongs to this document. --> <link rel="stylesheet" href="./report.css">”
+├── element div [5–8]
+│   └── window [5–8] (147 chars) “<div class="report" data-state="ready"> <img src="./report.png" alt="Report preview"> <script t…”
+└── comment [10]
+    └── window [10] (57 chars) “<!-- This final comment is intentionally standalone. -->”

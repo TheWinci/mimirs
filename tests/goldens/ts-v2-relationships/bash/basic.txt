@@ -1,0 +1,6 @@
+bash/basic
+├── import main.sh -> lib/config.bash via "./lib/config.bash" [2]
+├── import main.sh -> lib/functions.sh via "./lib/functions.sh" [1]
+├── call main.sh:module -> lib/functions.sh:function run via run [4]
+├── call main.sh:module -> lib/config.bash:function configure via configure [5]
+└── unresolved call main.sh:module -> missing [6]

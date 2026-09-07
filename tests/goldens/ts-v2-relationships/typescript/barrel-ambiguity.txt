@@ -1,0 +1,5 @@
+typescript/barrel-ambiguity
+├── import src/main.ts -> src/index.ts via "./index" [1]
+├── re-export src/index.ts -> src/left.ts via "./left" [1]
+├── re-export src/index.ts -> src/right.ts via "./right" [3]
+└── unresolved call src/main.ts:function start -> run [4]

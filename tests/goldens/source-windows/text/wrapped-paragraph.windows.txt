@@ -1,0 +1,7 @@
+tests/fixtures/source-windows/text/wrapped-paragraph.txt
+├── paragraph [1–3]
+│   ├── window [1] (79 chars) “The first line introduces a deliberately long paragraph for projection review.”
+│   ├── window [2] (126 chars) “The second line carries enough additional detail to cross the small window target while remaini…”
+│   └── window [3] (127 chars) “The third line verifies that splitting follows whole-line boundaries and reconstructs the parag…”
+└── paragraph [5]
+    └── window [5] (43 chars) “A short final paragraph stays independent.”

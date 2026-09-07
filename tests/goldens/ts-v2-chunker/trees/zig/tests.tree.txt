@@ -1,0 +1,7 @@
+tests/fixtures/zig/tests.zig
+├── comment [1]
+├── function run [3–6]
+│   └── comment [3]
+├── function run works [8–10]
+├── function (anonymous test) [12–14]
+└── initializer comptime [16–18]

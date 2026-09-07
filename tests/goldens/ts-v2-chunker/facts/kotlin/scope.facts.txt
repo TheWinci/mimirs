@@ -1,0 +1,12 @@
+tests/fixtures/kotlin/scope.kt
+├── import vendor.Worker as ImportedWorker in package fixtures.scope [3]
+├── call normalize in function callback [7]
+├── call ImportedWorker.create in variable eager [8]
+├── call Worker in function helper [10]
+├── call helper in function local [13]
+├── call factory in function run [14]
+├── call callback in function run [15]
+├── call local in function run [16]
+├── call helper in function run [17]
+├── call ImportedWorker.create in function run [18]
+└── call missing in function run [19]

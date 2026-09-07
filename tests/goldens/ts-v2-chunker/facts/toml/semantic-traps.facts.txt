@@ -1,0 +1,2 @@
+tests/fixtures/toml/semantic-traps.toml
+└── (no facts)

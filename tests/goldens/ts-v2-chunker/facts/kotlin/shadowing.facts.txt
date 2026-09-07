@@ -1,0 +1,12 @@
+tests/fixtures/kotlin/shadowing.kt
+├── call Target in variable target [9]
+├── call target in function shadowing [10]
+├── call Make in function shadowing [12]
+├── call target in function shadowing [13]
+├── call Make in variable nested [16]
+├── call nested in function shadowing [17]
+├── call nested in function shadowing [19]
+├── call Make in function shadowing [21]
+├── call receiver in function shadowing [22]
+├── call Make in function shadowing [23]
+└── call values in function shadowing [24]

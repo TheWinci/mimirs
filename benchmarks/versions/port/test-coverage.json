@@ -1,0 +1,941 @@
+{
+  "revision": "122674c8bfbbc3549390743f51396c5f0e4e3537",
+  "assessments": {
+    "facts": {
+      "status": "covered",
+      "reason": "All fixtures used by the archived language fact and JS/TS variant suites are included in the 272-case corpus. Rust production dispatch compares the complete import/export/call model, owners, bindings, targets and UTF-8 spans with pinned TS output. TOML/YAML/text explicitly retain empty fact arrays.",
+      "evidence": [
+        "tests/unit/ts_v2_source/chunker.rs::facts",
+        "tests/unit/ts_v2_source/chunker.rs::text_and_configuration_have_no_semantic_facts",
+        "tests/unit/ts_v2_source/chunker.rs::every_language_fact_survives_raw_offsets_and_storage_round_trips"
+      ]
+    },
+    "trees": {
+      "status": "covered",
+      "reason": "All 272 original general chunker fixtures and both original goldens are preserved with SHA-256 checks. Production Rust compares every tree node and complete fact array with the pinned TS capture, including parent indices and byte/line spans.",
+      "evidence": [
+        "tests/unit/ts_v2_source/chunker.rs::check",
+        "tests/unit/ts_v2_source/chunker.rs::facts",
+        "tests/unit/ts_v2_source/chunker.rs::imported_chunker_fixtures_and_both_goldens_keep_their_original_hashes"
+      ]
+    },
+    "relationships": {
+      "status": "covered",
+      "reason": "All 107 original multi-file projects compare complete imports, re-exports, calls, unresolved facts and original rendered goldens with pinned TS output. Coverage includes binary resource paths, Go modules, aliases, ambiguity and cycles. Saved analyses produce identical relationships, independent of file enumeration order.",
+      "evidence": [
+        "tests/unit/ts_v2_source/relationship_projects.rs::relationships",
+        "tests/unit/ts_v2_source/relationship_projects.rs::parses_plain_and_quoted_go_module_directives",
+        "tests/unit/ts_v2_source/relationship_projects.rs::stored_relationships_match_direct_for_every_project"
+      ]
+    },
+    "windows": {
+      "status": "covered",
+      "reason": "Every archived source-window fixture is unchanged. Rust compares the full tree, parent indices, byte and line spans, owning window indices, original displayed golden, exact source coverage, repeatability, and BOM/CRLF variants at three target sizes.",
+      "evidence": [
+        "tests/unit/ts_v2_source/reviewed.rs::check",
+        "tests/unit/ts_v2_source/reviewed.rs::language"
+      ]
+    },
+    "window-inventory": {
+      "status": "covered",
+      "reason": "The manifest checks all 84 fixtures and goldens, original SHA-256 hashes, every archived native extension, and the three required projection targets.",
+      "evidence": [
+        "tests/unit/ts_v2_source/reviewed.rs::every_archived_fixture_and_golden_is_checked_without_changes"
+      ]
+    },
+    "window-edges": {
+      "status": "covered",
+      "reason": "The TS compact-preview and indivisible-line examples are checked directly, as is rejection of a zero window target. Rust uses usize for target sizes and exposes no caller-configurable preview-size option; TS preview argument validation is not a shared public contract.",
+      "evidence": [
+        "tests/unit/ts_v2_source/reviewed.rs::preview_and_soft_target_edges_match_ts",
+        "src/main.rs"
+      ]
+    },
+    "chunk-cli": {
+      "status": "outside scope",
+      "reason": "The TS chunk/analyze commands, JSON and source-facts/tree renderers, and configurable window flags are not the Rust CLI contract. Rust has inspect and inspect --source-chunks. The underlying source-window behavior is covered separately; the TS CLI output is not claimed compatible.",
+      "evidence": [
+        "src/main.rs",
+        "tests/inspect.rs"
+      ]
+    },
+    "missing-file": {
+      "status": "covered",
+      "reason": "Rust exercises missing-file errors through source reading and inspect CLI behavior, including retaining the path and avoiding project state writes.",
+      "evidence": [
+        "tests/unit/source.rs::missing_file_error_names_the_path_and_retains_the_cause",
+        "tests/inspect.rs::inspection_needs_no_project_and_does_not_write"
+      ]
+    },
+    "native-structure": {
+      "status": "covered",
+      "reason": "Rust has explicit structural ownership/name/span checks for this behavior, supplemented by the archived source-window trees. This classification covers the structural assertion, not TS resolved fact fields.",
+      "evidence": [
+        "tests/unit/native_languages.rs::native_languages_match_pinned_ts_chunks",
+        "tests/unit/ts_v2_source/reviewed.rs::check",
+        "tests/unit/native_languages.rs::bash_environment_bindings_are_not_persistent_declarations",
+        "tests/unit/native_languages.rs::html_void_tags_do_not_swallow_the_following_elements",
+        "tests/unit/native_languages.rs::lua_assignments_methods_and_function_fields_keep_written_names",
+        "tests/unit/native_languages.rs::zig_containers_tests_and_errors_keep_distinct_names",
+        "tests/unit/native_languages.rs::ocaml_interfaces_bindings_and_functions_use_the_selected_grammar"
+      ]
+    },
+    "markdown-facts": {
+      "status": "covered",
+      "reason": "Production Markdown analysis matches every captured resource/import fact, including normalized reference definitions, destinations and ownership.",
+      "evidence": [
+        "tests/unit/ts_v2_source/chunker.rs::markdown_facts"
+      ]
+    },
+    "markdown-structure": {
+      "status": "covered",
+      "reason": "The archived Markdown fixtures check exact section ownership and source retention for ATX and Setext headings, fenced code, lists, and quotes, including .markdown dispatch.",
+      "evidence": [
+        "tests/unit/ts_v2_source/reviewed.rs::check"
+      ]
+    },
+    "text-cases": {
+      "status": "covered",
+      "reason": "Rust checks empty text, whitespace-only gaps, arbitrary extensions and no semantic inference from code-looking prose. All archived text fixtures are additionally compared in full.",
+      "evidence": [
+        "tests/unit/ts_v2_source/chunker.rs::text_fallback_preserves_whitespace_and_never_infers_semantics",
+        "tests/unit/ts_v2_source/chunker.rs::text_and_configuration_have_no_semantic_facts"
+      ]
+    },
+    "text-normalization": {
+      "status": "covered",
+      "reason": "All archived text fixtures check paragraph/gap spans, full leaf coverage, determinism, and BOM/CRLF normalization through production analysis.",
+      "evidence": [
+        "tests/unit/ts_v2_source/reviewed.rs::check",
+        "tests/unit/ts_v2_source/reviewed.rs::language"
+      ]
+    },
+    "doc-explicit": {
+      "status": "covered",
+      "reason": "Strict reference extraction rejects bare symbols and external URLs and retains explicit paths and qualified symbols.",
+      "evidence": [
+        "tests/unit/storage/hybrid.rs::strict_reference_forms_do_not_guess_bare_symbols_or_outside_files"
+      ]
+    },
+    "doc-later": {
+      "status": "missing",
+      "reason": "No equivalent regression demonstrates a reference beyond the preview in a lower-ranked document window, best-document-score inheritance from that window, or reference expansion across every aggregated document window. Existing segmentation fixtures cover simpler inputs.",
+      "evidence": [
+        "tests/unit/storage/hybrid.rs::document_segmentation_matches_ts_on_equivalent_windows",
+        "tests/unit/commands/search.rs::documentation_is_a_separate_segment_with_exact_reference_evidence"
+      ]
+    },
+    "doc-range": {
+      "status": "missing",
+      "reason": "Rust checks that qualified references have a source range, but does not pin this TS case's exact qualified-definition span. An exact-range regression is still needed.",
+      "evidence": [
+        "tests/unit/storage/hybrid.rs::qualified_modules_and_unresolved_reference_caps_follow_ts_policy"
+      ]
+    },
+    "doc-cap": {
+      "status": "covered",
+      "reason": "The command test requests one source result and separately asserts the documentation segment and exact saved reference evidence.",
+      "evidence": [
+        "tests/unit/commands/search.rs::documentation_is_a_separate_segment_with_exact_reference_evidence"
+      ]
+    },
+    "doc-active": {
+      "status": "covered",
+      "reason": "References resolve only indexed sources and disappear after invalidation; deleted on-disk content does not replace the saved evidence. Search uses the persisted snapshot rather than TS live discovery.",
+      "evidence": [
+        "tests/unit/storage/hybrid.rs::references_only_resolve_indexed_sources_and_preserve_snapshot_evidence",
+        "benchmarks/versions/port/CONTRACT.md"
+      ]
+    },
+    "perspectives": {
+      "status": "outside scope",
+      "reason": "Independent fact/relation embedding stores, optional perspective fusion, and public per-channel search APIs were not adopted. Production ordering uses source windows and documentation reference expansion.",
+      "evidence": [
+        "benchmarks/versions/port/CONTRACT.md"
+      ]
+    },
+    "index-cli-contract": {
+      "status": "outside scope",
+      "reason": "Watch/status modes, project-selection arguments, and durable generation-status manifests are absent from the Rust command contract. One-shot indexing and its failures have separate Rust tests.",
+      "evidence": [
+        "src/main.rs",
+        "tests/unit/commands/index.rs"
+      ]
+    },
+    "index-init": {
+      "status": "covered",
+      "reason": "Missing configuration and malformed config fail before model creation or database mutation. The CLI requires init to create project state.",
+      "evidence": [
+        "tests/unit/commands/index.rs::config_errors_precede_model_creation_and_database_changes",
+        "tests/unit/config.rs::load_reports_a_missing_file"
+      ]
+    },
+    "index-reuse": {
+      "status": "covered",
+      "reason": "Rust verifies initial indexing, reopening/reuse, changed-source replacement, and deletion across the supported language union.",
+      "evidence": [
+        "tests/unit/commands/index.rs::the_language_union_shares_reuse_replacement_and_failed_cleanup",
+        "tests/unit/commands/index.rs::reuse_skips_parsing_and_inference_and_preserves_rows"
+      ]
+    },
+    "index-progress": {
+      "status": "covered",
+      "reason": "Rust checks one-shot progress, completed/reused work, redirected output, and terminal updates. Output formatting and progress cadence follow the Rust contract rather than TS text goldens.",
+      "evidence": [
+        "tests/unit/commands/index.rs::redirected_output_and_stored_relationships_match_the_contract",
+        "tests/unit/commands/index.rs::batches_update_only_terminal_progress",
+        "tests/unit/commands/index/progress.rs::terminal_redraws_preserve_diagnostics_and_round_elapsed_seconds"
+      ]
+    },
+    "progress-cadence": {
+      "status": "outside scope",
+      "reason": "The TS ten-percent redirected milestone policy is not the Rust output contract. Rust tests its phase/completion output and terminal redraws separately.",
+      "evidence": [
+        "tests/unit/commands/index.rs::redirected_output_and_stored_relationships_match_the_contract",
+        "src/commands/index/progress.rs"
+      ]
+    },
+    "writer-lock": {
+      "status": "covered",
+      "reason": "Rust uses an OS lock to exclude concurrent writers and release ownership on exit. Tests exercise contention in one process and a killed child process. TS malformed lock-file reclamation is not applicable to this mechanism.",
+      "evidence": [
+        "tests/unit/commands/index/lock.rs::lock_excludes_another_writer_and_releases_with_its_owner",
+        "tests/unit/commands/index/lock.rs::killed_writer_releases_the_os_lock"
+      ]
+    },
+    "writer-owner": {
+      "status": "missing",
+      "reason": "Rust tests contention and release, but has no equivalent regression for an old owner releasing after lock-file replacement. Review the OS-lock contract before porting the TS token-owner case.",
+      "evidence": [
+        "tests/unit/commands/index/lock.rs",
+        "src/commands/index/lock.rs"
+      ]
+    },
+    "config-contract": {
+      "status": "outside scope",
+      "reason": "TS JSON configuration, absolute source fields, canonical project selection, omitted-field inheritance, and unknown-field rules differ from Rust's project-local TOML config. This is a contract difference, not config compatibility coverage.",
+      "evidence": [
+        "src/config.rs",
+        "src/main.rs"
+      ]
+    },
+    "init-contract": {
+      "status": "outside scope",
+      "reason": "The TS interactive index prompt, explicit project/source arguments, package script registration, canonical source field, and root-ignore editing are not Rust init behavior. Rust creates .mimirs state and prepares the model.",
+      "evidence": [
+        "src/commands/init.rs",
+        "src/main.rs"
+      ]
+    },
+    "init-preserve": {
+      "status": "covered",
+      "reason": "Repeated init preserves existing config and stored database data; initial init checks the local ignore policy.",
+      "evidence": [
+        "tests/unit/commands/init.rs::first_init_creates_the_project_files_and_database",
+        "tests/unit/commands/init.rs::repeated_init_preserves_config_and_database_data"
+      ]
+    },
+    "init-concurrent": {
+      "status": "missing",
+      "reason": "No concurrent-init regression exists. Existing tests cover sequential idempotence only.",
+      "evidence": [
+        "tests/unit/commands/init.rs::repeated_init_preserves_config_and_database_data"
+      ]
+    },
+    "init-invalid": {
+      "status": "missing",
+      "reason": "Missing/file project roots and reporting an invalid existing config have no equivalent Rust init regression. Rust currently preserves edited config without validating it during init; test and define that contract explicitly.",
+      "evidence": [
+        "src/commands/init.rs",
+        "tests/unit/commands/init.rs"
+      ]
+    },
+    "discovery": {
+      "status": "covered",
+      "reason": "Rust checks the delivered language/format union, include/exclude selection, useful explicit paths, and default directory exclusions. TS project-analysis rendering is not included.",
+      "evidence": [
+        "tests/unit/commands/index/walk.rs::default_discovery_covers_the_v1_v2_union_and_keeps_exclusions",
+        "tests/unit/commands/index/walk.rs::custom_include_selects_another_extension",
+        "tests/unit/commands/index/walk.rs::default_target_exclusion_is_rooted_and_custom_rules_stay_explicit"
+      ]
+    },
+    "discovery-hidden": {
+      "status": "missing",
+      "reason": "Rust covers explicit includes and ignores, but the TS mixed hidden-path/include/exclude example has no equivalent combined regression.",
+      "evidence": [
+        "tests/unit/commands/index/walk.rs"
+      ]
+    },
+    "discovery-git": {
+      "status": "outside scope",
+      "reason": "Rust walks with ignore rules and permits named includes to override gitignore; it does not use TS Git-result-only discovery. This is a discovery contract difference. Binary resource relationships are now covered separately.",
+      "evidence": [
+        "tests/unit/commands/index/walk.rs::a_named_include_beats_gitignore",
+        "src/commands/index/walk.rs",
+        "src/source.rs"
+      ]
+    },
+    "project-analyze": {
+      "status": "outside scope",
+      "reason": "Rust exposes model-free project relationships and single-file live/stored inspection. The TS combined project analysis report, root-selection API and exact renderer remain a different public contract; underlying language facts and relationships are covered separately.",
+      "evidence": [
+        "tests/unit/commands/relationships.rs::connects_project_code_and_binary_assets_without_setup_or_model",
+        "tests/unit/ts_v2_source/relationship_projects.rs::relationships"
+      ]
+    },
+    "index-read-failure": {
+      "status": "covered",
+      "reason": "Failed reads, failed parsing, and reconciliation remove stale snapshots and vectors under the Rust indexing contract.",
+      "evidence": [
+        "tests/unit/commands/index.rs::cleanup_removes_deleted_excluded_and_unreadable_files_with_vectors",
+        "tests/unit/commands/index.rs::fatal_parser_error_removes_previous_analysis_and_vectors"
+      ]
+    },
+    "index-interrupted": {
+      "status": "covered",
+      "reason": "Interrupted discovery must not reconcile unseen files; completed earlier publications remain intact.",
+      "evidence": [
+        "tests/unit/commands/index.rs::interrupted_parallel_discovery_never_reconciles_unseen_files",
+        "tests/unit/commands/index.rs::embedding_failure_preserves_earlier_commits_and_omits_cleanup"
+      ]
+    },
+    "project-layout": {
+      "status": "missing",
+      "reason": "Local .mimirs placement is tested, but TS canonical-path/symlink behavior and the complete project-layout cases are not demonstrated by equivalent tests. Rust has no persisted absolute source field.",
+      "evidence": [
+        "tests/unit/commands/init.rs::first_init_creates_the_project_files_and_database",
+        "src/commands/init.rs"
+      ]
+    },
+    "session-contract": {
+      "status": "outside scope",
+      "reason": "The TS mutable project-search session refreshes source/config and owns queued operations. Rust search reads the indexed snapshot; index explicitly refreshes it. A TS session lifecycle test cannot be counted as Rust snapshot parity.",
+      "evidence": [
+        "benchmarks/versions/port/CONTRACT.md",
+        "tests/unit/commands/search.rs::search_golden_preserves_stored_text_and_ignores_source_and_config_changes",
+        "src/main.rs"
+      ]
+    },
+    "generated-config": {
+      "status": "covered",
+      "reason": "Search reads current generated-path rules without replacing the saved source snapshot; the command regression changes rules and checks lexical ranking with missing vectors.",
+      "evidence": [
+        "tests/unit/commands/search.rs::lexical_results_survive_missing_vectors_and_use_current_generated_rules"
+      ]
+    },
+    "readonly-schema": {
+      "status": "covered",
+      "reason": "Read-only search rejects incompatible schemas without changing the index, reports compatibility errors, and rejects writes.",
+      "evidence": [
+        "tests/unit/storage/open.rs::pre_revision_schemas_rebuild_only_on_writable_open",
+        "tests/unit/storage/open.rs::a_future_schema_is_rejected_without_mutation",
+        "tests/unit/storage/open.rs::search_connection_rejects_writes",
+        "tests/unit/commands/search.rs::bad_databases_fail_before_embedding_and_remain_unchanged"
+      ]
+    },
+    "search-citations": {
+      "status": "covered",
+      "reason": "Rust checks compact result output against goldens and exact stored text, including multiple chunks, later windows, and deleted source snapshots.",
+      "evidence": [
+        "tests/unit/commands/search.rs::search_golden_preserves_stored_text_and_ignores_source_and_config_changes",
+        "tests/unit/commands/search.rs::multiple_matching_chunks_show_later_answer_from_deleted_snapshot"
+      ]
+    },
+    "search-empty": {
+      "status": "covered",
+      "reason": "Empty indexes skip embedder construction and return successful, empty output.",
+      "evidence": [
+        "tests/search_cli.rs::empty_search_prints_only_the_result_summary",
+        "tests/unit/commands/search.rs::empty_indexes_skip_embedder_creation"
+      ]
+    },
+    "search-errors": {
+      "status": "covered",
+      "reason": "Rust tests invalid arguments before database access, embedding failures without stdout, and CLI errors on stderr with a nonzero exit.",
+      "evidence": [
+        "tests/unit/commands/search.rs::invalid_arguments_fail_before_database_access_even_with_an_empty_index",
+        "tests/unit/commands/search.rs::embedding_failures_leave_stdout_empty_and_preserve_the_index",
+        "tests/search_cli.rs::search_errors_use_stderr_and_nonzero_exit"
+      ]
+    },
+    "search-cli-contract": {
+      "status": "outside scope",
+      "reason": "Legacy TS short/long argument forms, package scripts, configurable presentation, and TS warning text are not the Rust CLI contract.",
+      "evidence": [
+        "src/main.rs",
+        "tests/search_cli.rs"
+      ]
+    },
+    "relevance-cases": {
+      "status": "missing",
+      "reason": "The saved 382-query corpus benchmark is strong retrieval evidence, but these small mixed-intent and duplicate-boilerplate counterexamples are not direct Rust regression tests. Port them with deterministic embeddings.",
+      "evidence": [
+        "benchmarks/versions/port/CONTRACT.md",
+        "benchmarks/versions/port/kubernetes/FOUR-CORPUS.md"
+      ]
+    },
+    "file-grouping": {
+      "status": "covered",
+      "reason": "Differential fixtures check chunk/file fusion, and command regressions check sibling chunks and later windows retain their exact saved citations.",
+      "evidence": [
+        "tests/unit/storage/ranking.rs::chunk_and_file_grouping_match_ts_reference",
+        "tests/unit/storage/candidates.rs::native_grouping_and_reranking_match_ts_reference",
+        "tests/unit/commands/search.rs::multiple_matching_chunks_show_later_answer_from_deleted_snapshot"
+      ]
+    },
+    "lexical-terms": {
+      "status": "covered",
+      "reason": "Pinned TS lexical fixtures check Unicode normalization, camel case/acronym/snake/path terms and safe FTS query construction.",
+      "evidence": [
+        "tests/unit/storage/lexical.rs::terms_and_safe_queries_match_ts_reference"
+      ]
+    },
+    "lexical-ties": {
+      "status": "covered",
+      "reason": "Rust checks punctuation-only queries and explicit Bun/UTF-16 collation ties independent of insertion order.",
+      "evidence": [
+        "tests/unit/storage/candidates.rs::lexical_only_search_survives_unavailable_vectors_and_validates_queries",
+        "tests/unit/storage/candidates.rs::channel_collation_matches_bun_and_final_ties_use_utf16"
+      ]
+    },
+    "completed-fusion": {
+      "status": "covered",
+      "reason": "Captured TS candidates compare incomplete and completed channel membership, scores and fusion, followed by native grouping/reranking. These checks run without a model.",
+      "evidence": [
+        "tests/unit/storage/candidates.rs::completed_channels_and_fusion_match_ts_reference",
+        "tests/unit/storage/candidates.rs::native_grouping_and_reranking_match_ts_reference"
+      ]
+    },
+    "signals": {
+      "status": "covered",
+      "reason": "Rust compares TS identifier/path signals and explicitly tests distinct-file symbol uniqueness, ambiguity, and signal order. The separate constant-exclusion scenario remains missing.",
+      "evidence": [
+        "tests/unit/storage/ranking.rs::signal_identifiers_and_paths_match_ts_reference",
+        "tests/unit/storage/ranking.rs::unique_symbol_counts_distinct_files_and_signals_precede_confirmation"
+      ]
+    },
+    "search-missing": {
+      "status": "missing",
+      "reason": "Related Rust differential tests exist, but this specific adversarial score, duplication, malformed-candidate, or query-validation scenario is not demonstrated by an equivalent active-path test. Preserve it as a test gap.",
+      "evidence": [
+        "tests/unit/storage/candidates.rs",
+        "tests/unit/commands/search.rs"
+      ]
+    },
+    "alternate-policy": {
+      "status": "outside scope",
+      "reason": "The test targets an optional TS exact/text/v1-like/name-projection policy or caller tuning API that was not adopted. Current policy and candidate caps are fixed; retired Rust test-only builders do not count as production support.",
+      "evidence": [
+        "benchmarks/versions/port/CONTRACT.md"
+      ]
+    },
+    "query-validation": {
+      "status": "covered",
+      "reason": "Rust rejects bad query arguments before storage/inference and validates dimensions and non-finite backend outputs. TS configurable embedder identity APIs are outside the public contract.",
+      "evidence": [
+        "tests/unit/commands/search.rs::invalid_arguments_fail_before_database_access_even_with_an_empty_index",
+        "tests/unit/embedding.rs::vector_dimension_is_validated",
+        "tests/unit/embedding.rs::non_finite_values_are_rejected"
+      ]
+    },
+    "input-parity": {
+      "status": "covered",
+      "reason": "Pinned tokenizer and q8 model fixtures compare actual path-prefixed document and query inputs and vectors. These two tests are ignored by default and need an explicit cached-assets run.",
+      "evidence": [
+        "tests/unit/embedding/ts_v2.rs::final_document_inputs_match_ts_text_and_token_ids",
+        "tests/unit/embedding/ts_v2.rs::real_model_inputs_and_vectors_match_ts_reference"
+      ]
+    },
+    "embedding-progress": {
+      "status": "missing",
+      "reason": "Rust verifies phase and batch progress, but the TS nested-inference progress/restart and monotonicity cases have no direct equivalent assertion.",
+      "evidence": [
+        "tests/unit/commands/index.rs::batches_update_only_terminal_progress",
+        "tests/unit/embedding.rs::documents_keep_order_across_256_item_batches_and_report_progress"
+      ]
+    },
+    "embedding-batches": {
+      "status": "missing",
+      "reason": "Rust tests ordering and reuse, but the TS source persistence batch/page-boundary cases are not directly covered. The old 256-item generic document batch test alone does not cover the active source-window staging path.",
+      "evidence": [
+        "tests/unit/embedding.rs::documents_keep_order_across_256_item_batches_and_report_progress",
+        "tests/unit/commands/index.rs::bounded_pipeline_runs_files_concurrently_and_commits_in_source_order"
+      ]
+    },
+    "embedding-dedup": {
+      "status": "outside scope",
+      "reason": "TS raw/name-projection cross-file deduplication and duplicate-path disambiguation policies are not the adopted path-average document policy.",
+      "evidence": [
+        "benchmarks/versions/port/CONTRACT.md"
+      ]
+    },
+    "embedding-resume": {
+      "status": "covered",
+      "reason": "Rust checks that failed embedding leaves earlier file commits intact, omits cleanup, and discards abandoned staged work on reopening. Rust publishes whole files, so TS per-window partial publication is not promised.",
+      "evidence": [
+        "tests/unit/commands/index.rs::embedding_failure_preserves_earlier_commits_and_omits_cleanup",
+        "tests/unit/storage_staging.rs::abandoned_stages_are_discarded_while_committed_files_remain_reusable"
+      ]
+    },
+    "embedding-stale": {
+      "status": "outside scope",
+      "reason": "TS checks a source-row version during in-flight embedding. Rust workers intentionally publish the immutable read snapshot even when disk content changes, with staged generation validation. The lifecycle contract differs.",
+      "evidence": [
+        "tests/unit/commands/index.rs::parallel_workers_publish_the_read_snapshot_after_disk_changes",
+        "tests/unit/storage_staging.rs::conflicting_generations_duplicates_and_missing_mappings_are_rejected"
+      ]
+    },
+    "embedding-atomic": {
+      "status": "covered",
+      "reason": "Malformed vectors and staged publication failures cannot commit a partial replacement. Rust validates backend count/dimensions/finiteness and rolls back failed publication.",
+      "evidence": [
+        "tests/unit/embedding.rs::backend_result_count_is_validated",
+        "tests/unit/embedding.rs::vector_dimension_is_validated",
+        "tests/unit/embedding.rs::non_finite_values_are_rejected",
+        "tests/unit/storage_staging.rs::failed_publication_rolls_back_the_entire_replacement"
+      ]
+    },
+    "storage-reopen": {
+      "status": "covered",
+      "reason": "File-backed reopen and row preservation are explicitly tested. Source chunks, windows, raw evidence and replacement survive SQL round trips.",
+      "evidence": [
+        "tests/unit/storage/open.rs::reopening_a_database_preserves_data",
+        "tests/unit/storage/hybrid.rs::ts_source_chunks_roundtrip_and_keep_raw_evidence_through_replacement"
+      ]
+    },
+    "storage-schema": {
+      "status": "covered",
+      "reason": "Rust tests initialization, current schema, foreign keys, newer-schema rejection and immutable read-only compatibility failures.",
+      "evidence": [
+        "tests/unit/storage/open.rs::a_new_database_reaches_the_current_schema",
+        "tests/unit/storage/open.rs::an_opened_connection_enables_foreign_keys",
+        "tests/unit/storage/open.rs::a_future_schema_is_rejected_without_mutation"
+      ]
+    },
+    "storage-migration": {
+      "status": "outside scope",
+      "reason": "TS historical v1-v8 SQLite migrations, configurable embedding dimensions, and in-place vector-store rotation do not describe the Rust schema. Rust explicitly rebuilds recognized old schemas and uses a pinned embedding space.",
+      "evidence": [
+        "tests/unit/storage/open.rs::recognized_v1_is_rebuilt_and_open_reports_each_outcome",
+        "tests/unit/storage/open.rs::pre_revision_schemas_rebuild_only_on_writable_open",
+        "benchmarks/versions/port/CONTRACT.md"
+      ]
+    },
+    "normalized-identity": {
+      "status": "outside scope",
+      "reason": "TS reuses rows for equal normalized text. Rust retains the raw snapshot and hashes raw content for exact citations; BOM/line-ending edits can require replacement.",
+      "evidence": [
+        "tests/unit/commands/index.rs::content_hash_detects_same_length_edit_with_same_timestamp",
+        "tests/unit/storage/hybrid.rs::ts_source_chunks_roundtrip_and_keep_raw_evidence_through_replacement"
+      ]
+    },
+    "atomic-replace": {
+      "status": "covered",
+      "reason": "Rust verifies atomic replacement and rollback of analysis, documents, vectors, and source evidence. Database IDs are implementation details rather than a public cross-language identity contract.",
+      "evidence": [
+        "tests/unit/storage_staging.rs::failed_publication_rolls_back_the_entire_replacement",
+        "tests/unit/storage/hybrid.rs::ts_source_chunks_roundtrip_and_keep_raw_evidence_through_replacement"
+      ]
+    },
+    "storage-missing": {
+      "status": "missing",
+      "reason": "The matching TS corruption/recovery/binary-index scenario is not demonstrated by an equivalent active-path regression. Related storage validation tests are insufficient to call this case covered.",
+      "evidence": [
+        "tests/unit/storage/open.rs",
+        "tests/unit/storage_documents.rs",
+        "tests/unit/storage/save.rs"
+      ]
+    },
+    "native-structure-missing": {
+      "status": "covered",
+      "reason": "The original Dart constructors fixture now checks the entire tree and facts, including factories, getters and setters. Dart annotation attachments also match TS.",
+      "evidence": [
+        "tests/unit/ts_v2_source/chunker.rs::check",
+        "tests/unit/ts_v2_source/chunker.rs::dart_facts"
+      ]
+    },
+    "extension-dispatch": {
+      "status": "covered",
+      "reason": "All archived native extensions have fixture evidence and dispatch through the production native analyzer, with exact expected source chunks.",
+      "evidence": [
+        "tests/unit/ts_v2_source/reviewed.rs::every_archived_fixture_and_golden_is_checked_without_changes",
+        "tests/unit/ts_v2_source/reviewed.rs::check"
+      ]
+    },
+    "unique-constant-gap": {
+      "status": "missing",
+      "reason": "Rust checks duplicate names within and across files and multiplier order. There is no equivalent assertion that a constant with the queried name does not earn unique-definition confirmation.",
+      "evidence": [
+        "tests/unit/storage/ranking.rs::unique_symbol_counts_distinct_files_and_signals_precede_confirmation"
+      ]
+    },
+    "resource-assets": {
+      "status": "covered",
+      "reason": "The project command resolves binary resource targets by path without attempting source parsing or creating an index.",
+      "evidence": [
+        "tests/unit/commands/relationships.rs::connects_project_code_and_binary_assets_without_setup_or_model"
+      ]
+    },
+    "indexed-project-contract": {
+      "status": "outside scope",
+      "reason": "Complete source facts now survive Rust storage across all 272 language fixtures, and stored cross-file results match all 107 projects. These TS tests additionally require analyzeIndexedProject and the combined project renderer/config API, which are not Rust public contracts.",
+      "evidence": [
+        "tests/unit/ts_v2_source/chunker.rs::every_language_fact_survives_raw_offsets_and_storage_round_trips",
+        "tests/unit/ts_v2_source/relationship_projects.rs::stored_relationships_match_direct_for_every_project"
+      ]
+    }
+  },
+  "suites": {
+    "tests/bash-facts.test.ts": {
+      "default": "facts",
+      "overrides": {
+        "74": "native-structure"
+      }
+    },
+    "tests/c-facts.test.ts": {
+      "default": "facts",
+      "overrides": {}
+    },
+    "tests/cpp-facts.test.ts": {
+      "default": "facts",
+      "overrides": {}
+    },
+    "tests/csharp-facts.test.ts": {
+      "default": "facts",
+      "overrides": {}
+    },
+    "tests/css-facts.test.ts": {
+      "default": "facts",
+      "overrides": {}
+    },
+    "tests/dart-facts.test.ts": {
+      "default": "facts",
+      "overrides": {
+        "62": "native-structure-missing"
+      }
+    },
+    "tests/elixir-facts.test.ts": {
+      "default": "facts",
+      "overrides": {}
+    },
+    "tests/go-facts.test.ts": {
+      "default": "facts",
+      "overrides": {}
+    },
+    "tests/haskell-facts.test.ts": {
+      "default": "facts",
+      "overrides": {}
+    },
+    "tests/html-facts.test.ts": {
+      "default": "facts",
+      "overrides": {
+        "64": "native-structure",
+        "78": "extension-dispatch"
+      }
+    },
+    "tests/java-facts.test.ts": {
+      "default": "facts",
+      "overrides": {}
+    },
+    "tests/kotlin-facts.test.ts": {
+      "default": "facts",
+      "overrides": {}
+    },
+    "tests/lua-facts.test.ts": {
+      "default": "facts",
+      "overrides": {
+        "79": "native-structure"
+      }
+    },
+    "tests/markdown-facts.test.ts": {
+      "default": "markdown-facts",
+      "overrides": {
+        "56": "markdown-structure",
+        "63": "markdown-structure"
+      }
+    },
+    "tests/ocaml-facts.test.ts": {
+      "default": "facts",
+      "overrides": {
+        "174": "native-structure"
+      }
+    },
+    "tests/php-facts.test.ts": {
+      "default": "facts",
+      "overrides": {}
+    },
+    "tests/python-facts.test.ts": {
+      "default": "facts",
+      "overrides": {}
+    },
+    "tests/ruby-facts.test.ts": {
+      "default": "facts",
+      "overrides": {}
+    },
+    "tests/rust-facts.test.ts": {
+      "default": "facts",
+      "overrides": {}
+    },
+    "tests/scala-facts.test.ts": {
+      "default": "facts",
+      "overrides": {}
+    },
+    "tests/toml-facts.test.ts": {
+      "default": "facts",
+      "overrides": {}
+    },
+    "tests/yaml-facts.test.ts": {
+      "default": "facts",
+      "overrides": {
+        "22": "extension-dispatch"
+      }
+    },
+    "tests/zig-facts.test.ts": {
+      "default": "facts",
+      "overrides": {
+        "76": "native-structure"
+      }
+    },
+    "tests/javascript-variants.test.ts": {
+      "default": "facts",
+      "overrides": {}
+    },
+    "tests/typescript-variants.test.ts": {
+      "default": "facts",
+      "overrides": {}
+    },
+    "tests/chunker.test.ts": {
+      "default": "trees",
+      "overrides": {}
+    },
+    "tests/source-relationships.test.ts": {
+      "default": "relationships",
+      "overrides": {}
+    },
+    "tests/source-windows.test.ts": {
+      "default": "windows",
+      "overrides": {
+        "160": "window-edges",
+        "171": "window-edges",
+        "182": "window-edges",
+        "1229": "window-inventory",
+        "1246": "window-inventory"
+      }
+    },
+    "tests/text-chunker.test.ts": {
+      "default": "text-cases",
+      "overrides": {
+        "14": "text-normalization",
+        "31": "text-normalization"
+      }
+    },
+    "tests/chunk-cli.test.ts": {
+      "default": "chunk-cli",
+      "overrides": {
+        "757": "missing-file"
+      }
+    },
+    "tests/document-search.test.ts": {
+      "default": "doc-later",
+      "overrides": {
+        "85": "doc-explicit",
+        "166": "doc-range",
+        "205": "doc-cap",
+        "290": "doc-active"
+      }
+    },
+    "tests/fact-embeddings.test.ts": {
+      "default": "perspectives",
+      "overrides": {}
+    },
+    "tests/relation-embeddings.test.ts": {
+      "default": "perspectives",
+      "overrides": {}
+    },
+    "tests/perspective-fusion-production.test.ts": {
+      "default": "perspectives",
+      "overrides": {}
+    },
+    "tests/source-channel-search.test.ts": {
+      "default": "perspectives",
+      "overrides": {}
+    },
+    "tests/index-watch.test.ts": {
+      "default": "index-cli-contract",
+      "overrides": {}
+    },
+    "tests/index-cli.test.ts": {
+      "default": "index-cli-contract",
+      "overrides": {
+        "218": "index-init",
+        "227": "index-reuse",
+        "254": "index-progress",
+        "275": "index-progress",
+        "333": "writer-lock"
+      }
+    },
+    "tests/index-config.test.ts": {
+      "default": "config-contract",
+      "overrides": {}
+    },
+    "tests/index-progress.test.ts": {
+      "default": "progress-cadence",
+      "overrides": {
+        "21": "index-progress"
+      }
+    },
+    "tests/init-cli.test.ts": {
+      "default": "init-contract",
+      "overrides": {
+        "203": "init-preserve",
+        "283": "init-preserve",
+        "240": "init-concurrent",
+        "256": "init-invalid",
+        "270": "init-invalid"
+      }
+    },
+    "tests/lexical-search.test.ts": {
+      "default": "relevance-cases",
+      "overrides": {
+        "19": "lexical-terms",
+        "52": "lexical-ties"
+      }
+    },
+    "tests/project-analysis.test.ts": {
+      "default": "project-analyze",
+      "overrides": {
+        "33": "discovery",
+        "96": "discovery",
+        "114": "discovery-hidden",
+        "144": "discovery-git",
+        "166": "discovery-git",
+        "243": "resource-assets"
+      }
+    },
+    "tests/project-index-lock.test.ts": {
+      "default": "writer-lock",
+      "overrides": {
+        "69": "writer-owner"
+      }
+    },
+    "tests/project-index.test.ts": {
+      "default": "indexed-project-contract",
+      "overrides": {
+        "58": "index-reuse",
+        "148": "index-reuse",
+        "182": "index-read-failure",
+        "210": "index-interrupted"
+      }
+    },
+    "tests/project-layout.test.ts": {
+      "default": "project-layout",
+      "overrides": {
+        "58": "init-preserve"
+      }
+    },
+    "tests/project-search.test.ts": {
+      "default": "session-contract",
+      "overrides": {
+        "54": "index-reuse",
+        "299": "generated-config"
+      }
+    },
+    "tests/search-cli.test.ts": {
+      "default": "search-cli-contract",
+      "overrides": {
+        "175": "readonly-schema",
+        "191": "readonly-schema",
+        "200": "readonly-schema",
+        "241": "search-citations",
+        "377": "search-empty",
+        "442": "search-errors",
+        "473": "search-errors"
+      }
+    },
+    "tests/search-relevance.test.ts": {
+      "default": "relevance-cases",
+      "overrides": {
+        "138": "file-grouping"
+      }
+    },
+    "tests/search.test.ts": {
+      "default": "search-missing",
+      "overrides": {
+        "60": "completed-fusion",
+        "221": "completed-fusion",
+        "623": "completed-fusion",
+        "166": "lexical-ties",
+        "269": "signals",
+        "299": "signals",
+        "396": "signals",
+        "408": "unique-constant-gap",
+        "336": "alternate-policy",
+        "483": "alternate-policy",
+        "591": "alternate-policy",
+        "765": "alternate-policy",
+        "824": "alternate-policy",
+        "523": "generated-config",
+        "710": "file-grouping",
+        "900": "search-empty",
+        "920": "query-validation",
+        "970": "query-validation",
+        "1005": "storage-migration"
+      }
+    },
+    "tests/source-embeddings.test.ts": {
+      "default": "embedding-batches",
+      "overrides": {
+        "75": "alternate-policy",
+        "96": "alternate-policy",
+        "652": "alternate-policy",
+        "132": "input-parity",
+        "180": "embedding-progress",
+        "225": "embedding-progress",
+        "359": "embedding-dedup",
+        "387": "embedding-dedup",
+        "429": "embedding-dedup",
+        "461": "embedding-dedup",
+        "496": "embedding-dedup",
+        "568": "embedding-dedup",
+        "587": "embedding-dedup",
+        "667": "storage-migration",
+        "766": "storage-migration",
+        "706": "index-read-failure",
+        "745": "storage-reopen",
+        "798": "embedding-resume",
+        "845": "embedding-stale",
+        "871": "embedding-atomic"
+      }
+    },
+    "tests/source-index.test.ts": {
+      "default": "storage-missing",
+      "overrides": {
+        "86": "storage-schema",
+        "101": "storage-schema",
+        "110": "storage-schema",
+        "138": "storage-migration",
+        "170": "storage-migration",
+        "194": "storage-migration",
+        "222": "storage-migration",
+        "261": "storage-migration",
+        "298": "storage-migration",
+        "313": "storage-migration",
+        "340": "storage-migration",
+        "556": "storage-migration",
+        "421": "signals",
+        "445": "storage-reopen",
+        "580": "storage-reopen",
+        "496": "normalized-identity",
+        "523": "atomic-replace"
+      }
+    },
+    "tests/source-search-candidates.test.ts": {
+      "default": "storage-missing",
+      "overrides": {
+        "113": "storage-reopen",
+        "175": "embedding-atomic",
+        "202": "storage-migration"
+      }
+    }
+  }
+}

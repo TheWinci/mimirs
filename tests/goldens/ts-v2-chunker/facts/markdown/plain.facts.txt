@@ -1,0 +1,2 @@
+tests/fixtures/markdown/plain.md
+└── (no facts)

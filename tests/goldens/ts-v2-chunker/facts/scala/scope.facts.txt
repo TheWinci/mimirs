@@ -1,0 +1,11 @@
+tests/fixtures/scala/scope.scala
+├── import vendor.Worker as ImportedWorker in package fixtures.scope [3]
+├── call createService in field service [6]
+├── call loader in method run [9]
+├── call helper in method run [10]
+├── call service.execute in method run [11]
+├── call ImportedWorker.create in method run [12]
+├── call perform in function callback [14]
+├── call callback in method run [15]
+├── call LocalWorker in method run [16]
+└── call build in method run [16]

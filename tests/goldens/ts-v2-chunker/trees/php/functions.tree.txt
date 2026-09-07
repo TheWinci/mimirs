@@ -1,0 +1,6 @@
+tests/fixtures/php/functions.php
+├── block [1]
+├── function clean [2–5]
+└── function transform [7–18]
+    ├── function normalize [9]
+    └── function map [12–14]

@@ -1,0 +1,9 @@
+tests/fixtures/kotlin/shadowing.kt
+└── package fixtures.shadowing [1–27]
+    ├── type Callback [3]
+    ├── function Make [5]
+    ├── function Target [6]
+    └── function shadowing [8–27]
+        ├── variable target [9]
+        ├── variable nested [16]
+        └── variable reference [26]

@@ -1,0 +1,4 @@
+javascript/scope
+├── import src/main.js -> src/worker.js via "./worker.js" [1]
+├── call src/main.js:function start -> src/worker.js:function run via run [8]
+└── unresolved call src/main.js:function execute -> run [4]

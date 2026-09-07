@@ -1,0 +1,5 @@
+tests/fixtures/rust/shadowing.rs
+├── function target [1]
+└── function shadowing [3–28]
+    ├── function target [4–6]
+    └── function callback [9]

@@ -1,0 +1,7 @@
+tests/fixtures/cpp/types.cpp
+├── namespace alias = app::core [15]
+├── using app::core::Worker [16]
+├── using namespace std [17]
+├── call Worker::start in function use_types [24]
+├── call alias::run in function use_types [25]
+└── call move in function use_types [26]

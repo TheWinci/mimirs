@@ -1,0 +1,18 @@
+# Shared retry policy.
+defaults: &defaults
+  retries: 3
+  timeout: 30
+
+jobs:
+  build:
+    <<: *defaults
+    command: |
+      bun install
+      bun test
+  publish:
+    <<: *defaults
+    command: >-
+      bun run publish
+      --access public
+
+# This final comment is intentionally standalone.

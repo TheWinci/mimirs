@@ -1,0 +1,7 @@
+cpp/basic
+├── import src/main.cpp -> include/api.hpp via "../include/api.hpp" [1]
+├── call src/main.cpp:function main -> src/main.cpp:function local via local [11]
+├── call src/main.cpp:function main -> include/api.hpp:function run via run [12]
+├── call src/main.cpp:function main -> include/api.hpp:function run via api::run [13]
+├── call src/main.cpp:function main -> include/api.hpp:method create via service::Worker::create [14]
+└── call src/main.cpp:function main -> include/api.hpp:macro READY via READY [15]

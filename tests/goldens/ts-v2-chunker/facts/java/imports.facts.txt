@@ -1,0 +1,9 @@
+tests/fixtures/java/imports.java
+├── import java.util.List [3]
+├── import java.util.* [4]
+├── import static java.util.Collections.emptyList [5]
+├── import static java.util.Collections.* [6]
+├── call emptyList in method values [10]
+├── call singletonList in method values [11]
+├── call Set.of in method values [12]
+└── call List.of in method values [13]

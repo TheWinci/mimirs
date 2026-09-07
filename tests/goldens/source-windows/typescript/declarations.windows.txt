@@ -1,0 +1,9 @@
+tests/fixtures/source-windows/typescript/declarations.d.ts
+├── interface Report [1–5]
+│   └── window [1–5] (90 chars) “export interface Report { readonly id: string; title: string; archived?: boolean; }”
+├── class ReportStore [7–11]
+│   └── window [7–11] (181 chars) “export declare class ReportStore { constructor(initial?: readonly Report[]); get(id: string): R…”
+├── function formatReport [13–14]
+│   └── window [13–14] (122 chars) “/** Format a report without providing an implementation. */ export declare function formatRepor…”
+└── module formatReport [16–18]
+    └── window [16–18] (67 chars) “export declare namespace formatReport { const version: string; }”

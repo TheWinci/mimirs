@@ -1,0 +1,2 @@
+tests/fixtures/text/semantic-traps.txt
+└── (no facts)

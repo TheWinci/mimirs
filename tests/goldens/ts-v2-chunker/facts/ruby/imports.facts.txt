@@ -1,0 +1,8 @@
+tests/fixtures/ruby/imports.rb
+├── require "json" [1]
+├── require "set" [2]
+├── require_relative "support/worker" [3]
+├── call require in module [4]
+├── call require in method load_dependencies [7]
+├── call loader.require in method load_dependencies [8]
+└── load "setup.rb" in method load_dependencies [9]

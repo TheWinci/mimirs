@@ -1,0 +1,9 @@
+tests/fixtures/yaml/scalars.yaml
+└── section [1–11]
+    ├── property plain [1]
+    ├── property single [2]
+    ├── property double [3]
+    ├── property literal [4–6]
+    ├── property folded [7–9]
+    ├── property date [10]
+    └── property nullable [11]

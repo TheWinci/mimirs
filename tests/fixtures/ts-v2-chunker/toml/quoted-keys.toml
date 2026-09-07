@@ -1,0 +1,9 @@
+"quoted key" = "value"
+'literal key' = "literal"
+site."google.com" = true
+
+["service name"]
+"display name" = "Search"
+
+[["service name".instances]]
+id = "primary"

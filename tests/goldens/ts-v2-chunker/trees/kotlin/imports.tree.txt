@@ -1,0 +1,4 @@
+tests/fixtures/kotlin/imports.kt
+└── package fixtures.imports [1–11]
+    ├── import [3–5]
+    └── function create [7–11]

@@ -1,0 +1,6 @@
+include: shared.yaml
+extends:
+  - base.yaml
+imports:
+  source: theme.css
+command: build()

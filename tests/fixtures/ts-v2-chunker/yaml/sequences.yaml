@@ -1,0 +1,10 @@
+services:
+  - name: api
+    ports:
+      - 8080
+      - 8081
+  - name: worker
+    ports: [9000, 9001]
+matrix:
+  - [linux, x64]
+  - [macos, arm64]

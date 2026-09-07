@@ -1,0 +1,9 @@
+tests/fixtures/ruby/comments.rb
+├── comment [1]
+└── class Coordinator [3–13]
+    ├── comment [3]
+    ├── constant WORKER [5–6]
+    │   └── comment [5]
+    └── method run [8–12]
+        ├── comment [8]
+        └── comment [10]

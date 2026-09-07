@@ -1,0 +1,7 @@
+tests/fixtures/python/rebindings.py
+├── import [1]
+├── function use_global [4–6]
+├── function replace_global [9–12]
+└── function outer [15–25]
+    ├── function inherited [16–18]
+    └── function replaced [20–23]

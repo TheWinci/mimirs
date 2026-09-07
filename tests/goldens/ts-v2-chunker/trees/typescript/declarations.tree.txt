@@ -1,0 +1,13 @@
+tests/fixtures/typescript/declarations.d.ts
+├── function parse [1–2]
+├── class Transport [4–8]
+│   ├── field protocol [5]
+│   ├── method send [6]
+│   └── method close [7]
+├── module Protocol [10–19]
+│   ├── type Version [11]
+│   ├── interface Message [13–16]
+│   │   ├── property version [14]
+│   │   └── property payload [15]
+│   └── function encode [18]
+└── export [21]

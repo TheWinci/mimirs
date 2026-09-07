@@ -1,0 +1,8 @@
+tests/fixtures/go/comments.go
+├── package sample [1–2]
+│   └── comment [1]
+├── constant Version [4–5]
+│   └── comment [4]
+└── function Ping [7–11]
+    ├── comment [7]
+    └── comment [9]

@@ -1,0 +1,2 @@
+tests/fixtures/bash/control.sh
+└── block [1–11]

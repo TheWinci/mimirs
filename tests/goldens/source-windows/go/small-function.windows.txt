@@ -1,0 +1,5 @@
+tests/fixtures/source-windows/go/small-function.go
+├── package windows [1–2]
+│   └── window [1–2] (68 chars) “// Package windows contains source-window fixtures. package windows”
+└── function FormatAccount [4–11]
+    └── window [4–11] (213 chars) “// FormatAccount formats one account label for a search result. func FormatAccount(name string,…”

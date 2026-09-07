@@ -1,0 +1,6 @@
+tests/fixtures/source-windows/javascript/oversized-class.js
+└── class JobQueue [1–30]
+    ├── window [1–7] (151 chars) “/** Keep pending jobs in insertion order. */ export class JobQueue { #jobs = []; constructor(in…”
+    ├── window [8–15] (98 chars) “enqueue(job) { this.#jobs.push(job); } peek() { return this.#jobs[0] ?? null; }”
+    ├── window [16–21] (154 chars) “drain(limit = this.#jobs.length) { const selected = this.#jobs.slice(0, limit); this.#jobs = th…”
+    └── window [22–30] (103 chars) “get size() { return this.#jobs.length; } static empty() { return new JobQueue(); } }”

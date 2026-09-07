@@ -1,9 +1,8 @@
 //! TS v2's bounded candidate union. Completion can enlarge either channel, but
 //! never introduces a document outside the initial lexical/semantic union.
-use std::{cmp::Ordering, collections::BTreeMap, sync::LazyLock};
+use std::{cmp::Ordering, collections::BTreeMap};
 
 use anyhow::{Context, Result, ensure};
-use icu_collator::{Collator, CollatorBorrowed};
 use rusqlite::{Connection, OptionalExtension, params};
 
 use super::lexical;
@@ -11,15 +10,7 @@ use super::lexical;
 pub const LEXICAL_LIMIT: usize = 100;
 pub const SEMANTIC_LIMIT: usize = 150;
 
-// The frozen Bun reference uses English locale collation for channel ties.
-// Final hit ties use JavaScript's UTF-16 ordinal ordering instead.
-static COLLATOR: LazyLock<CollatorBorrowed<'static>> = LazyLock::new(|| {
-    Collator::try_new(Default::default(), Default::default()).expect("compiled root collation")
-});
-
-pub fn locale_compare(left: &str, right: &str) -> Ordering {
-    COLLATOR.compare(left, right)
-}
+pub use crate::collation::locale_compare;
 
 pub fn ordinal_compare(left: &str, right: &str) -> Ordering {
     left.encode_utf16().cmp(right.encode_utf16())

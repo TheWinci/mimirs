@@ -1,0 +1,6 @@
+tests/fixtures/typescript/functions.ts
+├── function add [1–3]
+├── function fetchLabel [5–7]
+├── function integerRange [9–13]
+├── function double [15]
+└── function identity [17–19]

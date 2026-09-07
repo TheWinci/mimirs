@@ -1,0 +1,4 @@
+tests/fixtures/ocaml/interface-modules.mli
+├── import open as null from "Core" [1]
+├── import include as null from "Base" [2]
+└── import module as Alias from "Existing" [4]

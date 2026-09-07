@@ -1,0 +1,2 @@
+tests/fixtures/markdown/links.md
+└── section Resources [1–11]

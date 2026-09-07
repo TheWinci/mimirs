@@ -1,0 +1,4 @@
+bash/ambiguity
+├── import main.sh -> left.sh via "./left.sh" [1]
+├── import main.sh -> right.sh via "./right.sh" [2]
+└── unresolved call main.sh:module -> run [4]

@@ -1,0 +1,7 @@
+tests/fixtures/scala/script-scope.sc
+├── call make in function callback [3]
+├── call callback in module [4]
+├── call make in function nested [7]
+├── call nested in module [8]
+├── call make in module [10]
+└── call nested in module [11]

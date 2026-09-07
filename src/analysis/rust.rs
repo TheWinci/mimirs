@@ -15,7 +15,7 @@ mod scopes;
 mod signatures;
 
 pub(super) const LANGUAGE: Language = Language {
-    identity: "rust/default/tree-sitter-0.27.0/rust-0.24.2/extractor-2",
+    identity: "rust/default/tree-sitter-0.27.0/rust-0.24.2/extractor-2/source-facts-1",
     extensions: &["rs"],
     extract,
     is_native: true,
@@ -82,6 +82,12 @@ fn extract(source: SourceFile) -> Result<Analysis> {
                     &entities,
                 )?;
                 return Ok(Analysis {
+                    source_facts: super::source_facts::extract(
+                        "rust",
+                        &source.text,
+                        tree.root_node(),
+                        &source_chunks,
+                    ),
                     source_chunks,
                     source,
                     diagnostics,

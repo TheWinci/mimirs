@@ -1,0 +1,4 @@
+cpp/ambiguity
+├── import app/main.cpp -> left/api.hpp via "../left/api.hpp" [1]
+├── import app/main.cpp -> right/api.hpp via "../right/api.hpp" [2]
+└── unresolved call app/main.cpp:function main -> api::run [5]

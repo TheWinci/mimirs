@@ -1,0 +1,8 @@
+tests/fixtures/ruby/closures.rb
+├── call value.strip in function NORMALIZE [1]
+├── call clean in function normalize [4]
+├── call normalize.call in method transform [5]
+├── call items.map in method transform [7–10]
+├── call item.call in method transform [8]
+├── call process in method transform [9]
+└── call NORMALIZE.call in module [13]

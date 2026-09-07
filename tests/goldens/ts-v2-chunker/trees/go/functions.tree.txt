@@ -1,0 +1,6 @@
+tests/fixtures/go/functions.go
+├── package sample [1]
+├── function Greet [3–5]
+├── function Fetch [7–9]
+└── function Transform [11–17]
+    └── function normalize [12–14]

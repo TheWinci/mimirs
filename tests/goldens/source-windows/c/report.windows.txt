@@ -1,0 +1,4 @@
+tests/fixtures/source-windows/c/report.h
+└── conditional !defined(REPORT_H) [1–13]
+    ├── window [1–10] (180 chars) “#ifndef REPORT_H #define REPORT_H /** Public report metadata. */ typedef struct { const char *i…”
+    └── window [11–13] (86 chars) “void report_format(const report_t *report, char *output, unsigned long size); #endif”

@@ -1,0 +1,5 @@
+tests/fixtures/source-windows/markdown/fences-lists.md
+└── section Verification [1–23]
+    ├── window [1–11] (172 chars) “# Verification Use the following command to run the focused checks: ```sh bun test tests/source…”
+    ├── window [12–13] (59 chars) “- parent ownership; - whitespace inside meaningful chunks.”
+    └── window [14–23] (157 chars) “## Example configuration ```yaml reports: output: ./reports format: markdown ``` > Keep the sou…”

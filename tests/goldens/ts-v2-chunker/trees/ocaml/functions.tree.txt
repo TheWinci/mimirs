@@ -1,0 +1,5 @@
+tests/fixtures/ocaml/functions.ml
+├── function square [1]
+├── function even, odd [3–6]
+├── function clock [8]
+└── function now [10]

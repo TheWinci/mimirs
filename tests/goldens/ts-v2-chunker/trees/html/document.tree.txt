@@ -1,0 +1,13 @@
+tests/fixtures/html/document.html
+├── directive [1]
+└── element html [2–16]
+    ├── element head [3–9]
+    │   ├── element link [4]
+    │   ├── element link [5]
+    │   ├── element script [6]
+    │   ├── element script [7]
+    │   └── element style [8]
+    └── element body [10–15]
+        └── element main [11–14]
+            ├── element h1 [12]
+            └── element img [13]

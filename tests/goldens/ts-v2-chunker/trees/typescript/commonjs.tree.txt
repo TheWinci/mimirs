@@ -1,0 +1,7 @@
+tests/fixtures/typescript/commonjs.cts
+├── import [1–2]
+│   ├── comment [1]
+│   └── block [2]
+├── variable fs [4]
+├── function load [6–8]
+└── block [9–10]

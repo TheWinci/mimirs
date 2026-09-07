@@ -1,0 +1,7 @@
+tests/fixtures/haskell/declarations.hs
+├── type Result [1]
+├── type User [2]
+├── function build [4]
+├── function failWith [5]
+├── function create [6]
+└── function readName [7]

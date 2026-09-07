@@ -1,0 +1,8 @@
+tests/fixtures/c/comments.c
+├── struct Coordinator [1–5]
+│   ├── comment [1]
+│   └── field state [3–4]
+│       └── comment [3]
+└── function coordinator_ready [7–11]
+    ├── comment [7]
+    └── comment [9]

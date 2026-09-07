@@ -1,0 +1,7 @@
+tests/fixtures/bash/functions.sh
+├── comment [1]
+├── function helper [3–6]
+│   └── comment [3]
+├── function run [8–12]
+├── function isolated [14–16]
+└── block [17–18]

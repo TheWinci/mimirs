@@ -1,0 +1,6 @@
+tests/fixtures/go/method-expressions.go
+├── call Handler.Run in function MethodExpressions [10]
+├── call (*Handler).Stop in function MethodExpressions [11]
+├── call handler.Run in function MethodExpressions [12]
+├── call pointer.Stop in function MethodExpressions [13]
+└── call missing in function MethodExpressions [16]

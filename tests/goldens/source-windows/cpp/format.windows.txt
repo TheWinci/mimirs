@@ -1,0 +1,7 @@
+tests/fixtures/source-windows/cpp/format.cxx
+├── import [1–2]
+│   └── window [1–2] (37 chars) “#include <sstream> #include <string>”
+├── function format_value [4–9]
+│   └── window [4–9] (146 chars) “template <typename Value> std::string format_value(const Value& value) { std::ostringstream out…”
+└── block [10–11]
+    └── window [10–11] (59 chars) “template std::string format_value<int>(const int& value);”

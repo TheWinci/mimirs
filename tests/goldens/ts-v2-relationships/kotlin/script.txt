@@ -1,0 +1,3 @@
+kotlin/script
+├── import main.kts -> tools/Tools.kt via "tools.Tools" [1]
+└── call main.kts:module -> tools/Tools.kt:method run via run [3]

@@ -1,0 +1,5 @@
+import shared from "./shared.js"
+build()
+
+include: shared.yaml
+https://example.com/resource

@@ -1,0 +1,6 @@
+tests/fixtures/ruby/operators.rb
+├── call left.+ in method operate [2]
+├── call left.-@ in method operate [3]
+├── call container.[] in method operate [4]
+├── call container.[]= in method operate [5]
+└── call container.value= in method operate [6]

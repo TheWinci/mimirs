@@ -1,0 +1,4 @@
+tests/fixtures/rust/modules.rs
+├── mod external [1]
+├── call helper in function run [5]
+└── call nested::run in function start [12]

@@ -1,0 +1,9 @@
+tests/fixtures/markdown/links.md
+├── link "docs/guide.md" in section Resources [3]
+├── link "docs/api reference.md" in section Resources [3]
+├── link "https://example.com/docs" in section Resources [4]
+├── image "images/diagram.svg" in section Resources [4]
+├── reference "docs/architecture.md" in section Resources [6]
+├── reference "images/logo.png" in section Resources [7]
+├── link "docs/architecture.md" in section Resources [9]
+└── image "images/logo.png" in section Resources [9]

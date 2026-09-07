@@ -1,0 +1,6 @@
+tests/fixtures/ocaml/visibility.ml
+├── function before [1]
+├── function later [2]
+├── function recurse [4]
+└── function outer [6–8]
+    └── function local [7]

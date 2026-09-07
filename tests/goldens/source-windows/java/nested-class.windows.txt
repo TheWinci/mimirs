@@ -1,0 +1,9 @@
+tests/fixtures/source-windows/java/nested-class.java
+├── package windows [1]
+│   └── window [1] (17 chars) “package windows;”
+├── import [3–4]
+│   └── window [3–4] (51 chars) “import java.util.ArrayList; import java.util.List;”
+└── class ReportBook [6–29]
+    ├── window [6–12] (231 chars) “/** Keep report entries in insertion order. */ public final class ReportBook { private final Li…”
+    ├── window [13–22] (200 chars) “public List<String> render() { return entries.stream() .map(entry -> entry.title() + " — " + en…”
+    └── window [23–29] (136 chars) “public record Entry(String title, String owner) { public Entry { owner = owner == null ? "unass…”

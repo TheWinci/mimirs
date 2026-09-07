@@ -18,7 +18,7 @@ use kinds::node_kind;
 mod windows;
 pub use windows::project;
 
-pub const POLICY: &str = "ts-v2-source-windows-4000-path-average-256-32-1";
+pub const POLICY: &str = "ts-v2-source-windows-4000-path-average-256-32-2";
 
 pub fn documents(analysis: &crate::analysis::Analysis) -> Result<Vec<super::split::Document>> {
     crate::storage::analysis::validate(analysis)?;
@@ -783,10 +783,15 @@ fn decorator(line: &str, language: &str) -> bool {
     let line = line.trim();
     match language {
         "python" => line.starts_with('@'),
-        "typescript" | "tsx" | "javascript" => {
+        "typescript" | "tsx" | "javascript" | "java" | "kotlin" | "dart" => {
             line.starts_with('@') && !line.starts_with("@interface")
         }
-        "rust" => line.starts_with("#[") || line.starts_with("#!["),
+        "php" => line.starts_with("#["),
+        "rust" | "zig" => line.starts_with("#[") || line.starts_with("#!["),
+        "csharp" => line.starts_with('[') && line.ends_with(']'),
+        "elixir" => {
+            line.starts_with('@') && !line.starts_with("@doc") && !line.starts_with("@moduledoc")
+        }
         _ => false,
     }
 }

@@ -139,3 +139,49 @@ fn invalid_facts_and_forced_save_failure_leave_no_mixed_snapshot() {
         .unwrap();
     assert!(load(&connection, "a.rs").is_err());
 }
+
+#[test]
+fn corrupt_source_facts_are_rejected_on_write_and_load() {
+    use crate::analysis::source_facts::{Binding, Kind};
+    let (_dir, mut db) = database();
+    for change in 0..5 {
+        let mut a = analysis("fn café() {}\r\nfn run() { café(); }\r\n");
+        let fact = a
+            .source_facts
+            .iter_mut()
+            .find(|f| matches!(f.kind, Kind::Call { .. }))
+            .unwrap();
+        match change {
+            0 => fact.location.end_offset = 999,
+            1 => fact.location.start_line = 99,
+            2 => fact.owner.as_mut().unwrap().name = "missing".into(),
+            3 => {
+                if let Kind::Call {
+                    target: Some(target),
+                    ..
+                } = &mut fact.kind
+                {
+                    target.name = "missing".into();
+                }
+            }
+            _ => {
+                if let Kind::Call { binding, .. } = &mut fact.kind {
+                    *binding = Binding::Unknown;
+                }
+            }
+        }
+        {
+            let tx = db.transaction().unwrap();
+            assert!(write(&tx, 1, &a).is_err());
+        }
+        let valid = analysis("fn café() {}\r\nfn run() { café(); }\r\n");
+        let tx = db.transaction().unwrap();
+        write(&tx, 1, &valid).unwrap();
+        tx.commit().unwrap();
+        let payload =
+            serde_json::to_string(&(&a.facts, &a.scopes, &a.diagnostics, &a.source_facts)).unwrap();
+        db.execute("UPDATE analysis_records SET payload=?1", [payload])
+            .unwrap();
+        assert!(load(&db, "a.rs").is_err(), "corruption {change}");
+    }
+}

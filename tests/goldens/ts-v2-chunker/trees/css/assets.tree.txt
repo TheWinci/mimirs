@@ -1,0 +1,4 @@
+tests/fixtures/css/assets.css
+├── selector .hero [1–4]
+├── selector .gallery [6–11]
+└── selector .remote [13–15]

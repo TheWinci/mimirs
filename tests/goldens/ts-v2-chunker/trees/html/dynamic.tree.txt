@@ -1,0 +1,7 @@
+tests/fixtures/html/dynamic.html
+└── element section [1–7]
+    ├── element img [2]
+    ├── element script [3]
+    ├── element img [4]
+    ├── element a [5]
+    └── element form [6]

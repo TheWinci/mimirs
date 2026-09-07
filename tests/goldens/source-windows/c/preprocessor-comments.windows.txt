@@ -1,0 +1,11 @@
+tests/fixtures/source-windows/c/preprocessor-comments.c
+├── import [1]
+│   └── window [1] (19 chars) “#include <stdio.h>”
+├── macro RETRY_DELAY_MS [3]
+│   └── window [3] (27 chars) “#define RETRY_DELAY_MS 250”
+├── conditional defined(ENABLE_TRACE) [5–9]
+│   └── window [5–9] (128 chars) “#if defined(ENABLE_TRACE) #define TRACE(message) fprintf(stderr, "%s\n", message) #else #define…”
+├── function initialize [11–13]
+│   └── window [11–13] (49 chars) “void initialize(void) { TRACE("initialize"); }”
+└── comment [15]
+    └── window [15] (51 chars) “// This final comment is intentionally standalone.”

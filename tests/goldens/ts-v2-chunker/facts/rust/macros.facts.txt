@@ -1,0 +1,3 @@
+tests/fixtures/rust/macros.rs
+├── call trace! in function log [10]
+└── call trace in function log [11]

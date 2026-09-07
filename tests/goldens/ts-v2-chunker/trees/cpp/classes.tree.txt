@@ -1,0 +1,10 @@
+tests/fixtures/cpp/classes.cpp
+└── module app::core [1–24]
+    ├── class Worker [2–19]
+    │   ├── method Worker [4]
+    │   ├── method ~Worker [6–8]
+    │   ├── method run [10–12]
+    │   ├── method create [14]
+    │   ├── method operator= [15]
+    │   └── field service_ [18]
+    └── method Worker::create [21–23]

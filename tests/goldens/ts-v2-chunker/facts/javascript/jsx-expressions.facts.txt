@@ -1,0 +1,13 @@
+tests/fixtures/javascript/jsx-expressions.jsx
+├── import Card from "./ui.js" [1]
+├── import formatTitle from "./ui.js" [1]
+├── import makeProps from "./ui.js" [1]
+├── import renderItem from "./ui.js" [1]
+├── call makeProps in function propsFor [4]
+├── export Gallery [7–21]
+├── call items.at in function Gallery [8]
+├── call propsFor in function Gallery [12]
+├── call formatTitle in function Gallery [13]
+├── call onSelect in function Gallery [14]
+├── call items.map in function Gallery [17]
+└── call renderItem in function Gallery [17]

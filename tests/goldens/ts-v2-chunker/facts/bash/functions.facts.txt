@@ -1,0 +1,7 @@
+tests/fixtures/bash/functions.sh
+├── call clean in function helper [5]
+├── call helper in function run [9]
+├── call run_child in function run [10]
+├── call run in function run [11]
+├── call execute in function isolated [15]
+└── call run in module [18]

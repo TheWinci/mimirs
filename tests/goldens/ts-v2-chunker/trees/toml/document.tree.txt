@@ -1,0 +1,8 @@
+tests/fixtures/toml/document.toml
+├── property title [1]
+├── property enabled [2]
+├── section server [4–7]
+│   ├── property host [5]
+│   └── property port [6]
+└── section server.tls [8–9]
+    └── property certificate [9]

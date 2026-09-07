@@ -1,0 +1,7 @@
+tests/fixtures/kotlin/functions.kt
+└── package fixtures.functions [1–18]
+    ├── function load [3]
+    ├── function normalized [5]
+    ├── function transform [7–10]
+    │   └── function local [8]
+    └── function run [12–18]

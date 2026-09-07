@@ -1,0 +1,9 @@
+tests/fixtures/source-windows/typescript/module-blocks.ts
+├── type RuntimeConfig [1–4]
+│   └── window [1–4] (72 chars) “export type RuntimeConfig = { endpoint: string; retries: number; };”
+├── variable config [6–9]
+│   └── window [6–9] (85 chars) “const config: RuntimeConfig = { endpoint: "https://example.test", retries: 3, };”
+├── function initialize [11–13]
+│   └── window [11–13] (79 chars) “function initialize(value: RuntimeConfig): void { new URL(value.endpoint); }”
+└── block [14–19]
+    └── window [14–19] (106 chars) “initialize(config); if (config.retries > 0) { setTimeout(() => initialize(config), config.retri…”

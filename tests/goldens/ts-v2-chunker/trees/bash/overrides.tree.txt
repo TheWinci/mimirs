@@ -1,0 +1,7 @@
+tests/fixtures/bash/overrides.sh
+├── function task [1–3]
+├── block [4–6]
+├── function task [7–9]
+├── block [10–13]
+├── function branch [14–16]
+└── block [17–20]

@@ -1,0 +1,3 @@
+tests/fixtures/css/image-set.css
+├── selector .hero [1–7]
+└── selector .legacy [9–11]

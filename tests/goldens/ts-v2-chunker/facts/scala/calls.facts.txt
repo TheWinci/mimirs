@@ -1,0 +1,12 @@
+tests/fixtures/scala/calls.scala
+├── call loader in method run [3]
+├── call helper in method run [4]
+├── call helper(1) in method run [4]
+├── call service.execute in method run [5]
+├── call Type.create[String] in method run [6]
+├── call items map in method run [7]
+├── call head :: in method run [8]
+├── call Worker in method run [9]
+├── call build in method run [9]
+├── call summon[Ordering[String]] in method run [10]
+└── call first + in method helper [12]

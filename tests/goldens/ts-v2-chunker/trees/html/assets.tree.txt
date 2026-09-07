@@ -1,0 +1,10 @@
+tests/fixtures/html/assets.html
+└── element main [1–9]
+    ├── element video [2]
+    ├── element audio [3]
+    ├── element iframe [4]
+    ├── element object [5]
+    ├── element svg [6]
+    │   └── element use [6]
+    ├── element input [7]
+    └── element input [8]

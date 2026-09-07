@@ -1,0 +1,12 @@
+tests/fixtures/java/control-flow.java
+├── package fixtures.control [1]
+├── import [3]
+└── class ControlFlow [5–72]
+    ├── interface Callback [6–8]
+    │   └── method run [7]
+    ├── interface Resource [10]
+    ├── method make [12–14]
+    ├── method open [16–18]
+    ├── method ready [20–22]
+    ├── method work [24]
+    └── method control [26–71]

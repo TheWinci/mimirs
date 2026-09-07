@@ -1,0 +1,10 @@
+tests/fixtures/typescript/nesting.ts
+├── export createFormatter [1–15]
+├── call value.trim in function normalize [3]
+├── call value.trim().toLowerCase in function normalize [3]
+├── call surround in function decorate [11]
+├── call normalize in function decorate [11]
+├── export Formatter [17–26]
+├── call text.trim in function trim [20]
+├── call appendPeriod in method format [24]
+└── call trim in method format [24]

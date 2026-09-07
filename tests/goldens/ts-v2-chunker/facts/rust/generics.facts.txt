@@ -1,0 +1,3 @@
+tests/fixtures/rust/generics.rs
+├── call identity::<String> in function make_name [6]
+└── call String::new in function make_name [6]

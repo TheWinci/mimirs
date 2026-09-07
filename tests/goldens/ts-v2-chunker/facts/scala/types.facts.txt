@@ -1,0 +1,4 @@
+tests/fixtures/scala/types.scala
+├── call Client.create in field client [9]
+├── call loadLimit in field DefaultLimit [13]
+└── call transform in method run [15]

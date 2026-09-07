@@ -1,0 +1,8 @@
+tests/fixtures/ruby/loaders.rb
+├── require "real" [1]
+├── require_relative "support/local" [2]
+├── load "config/setup.rb" [3]
+├── autoload :Worker, "workers/worker.rb" [4]
+├── call require in method shadowed [7]
+├── call require in method run [16]
+└── require "after-class" [20]

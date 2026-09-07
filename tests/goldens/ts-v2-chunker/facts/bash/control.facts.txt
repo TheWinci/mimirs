@@ -1,0 +1,8 @@
+tests/fixtures/bash/control.sh
+├── call produce in module [1]
+├── call transform in module [1]
+├── call consume in module [1]
+├── call check_ready in module [3]
+├── call start_service in module [4]
+├── call report_failure in module [6]
+└── call process in module [10]

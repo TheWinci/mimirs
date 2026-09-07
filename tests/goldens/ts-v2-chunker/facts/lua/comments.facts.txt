@@ -1,0 +1,3 @@
+tests/fixtures/lua/comments.lua
+├── call render in function documented [5]
+└── call build in function callback [10]

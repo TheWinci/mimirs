@@ -1,0 +1,7 @@
+tests/fixtures/php/functions.php
+├── call trim in function clean [4]
+├── call clean in function normalize [9]
+├── call $normalize in function transform [10]
+├── call $loader in function map [13]
+├── call $map in function transform [15]
+└── call array_map in function transform [17]

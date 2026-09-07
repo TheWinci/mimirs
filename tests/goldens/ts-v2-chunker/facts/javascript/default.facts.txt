@@ -1,0 +1,2 @@
+tests/fixtures/javascript/default.cjs
+└── export create as default [5]

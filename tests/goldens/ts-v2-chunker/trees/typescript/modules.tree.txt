@@ -1,0 +1,9 @@
+tests/fixtures/typescript/modules.ts
+├── import [1–4]
+├── variable VERSION [6]
+├── variable internalValue [7]
+├── export [9]
+├── export [10]
+├── export [11]
+├── export [12]
+└── function configure [14–22]

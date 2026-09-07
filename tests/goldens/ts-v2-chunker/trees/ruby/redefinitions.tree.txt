@@ -1,0 +1,5 @@
+tests/fixtures/ruby/redefinitions.rb
+└── class Redefined [1–11]
+    ├── method run [2–4]
+    ├── method duplicate [6–7]
+    └── method duplicate [9–10]

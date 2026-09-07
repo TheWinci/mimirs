@@ -53,6 +53,14 @@ mimirs index
 mimirs search 'valid_username check for trailing newline' --limit 5
 ```
 
+For source analysis without an index or model:
+
+```sh
+mimirs inspect src/main.rs
+mimirs relationships
+mimirs relationships --json
+```
+
 Run these commands from the project root. Fresh config includes the
 [languages and formats supported by v1 and TS v2](docs/languages.md), with
 native grammars for 24 languages plus Markdown sections and explicit text

@@ -1,0 +1,3 @@
+c/missing
+├── unresolved import main.c -> "missing.h" [1]
+└── unresolved call main.c:function main -> missing [4]

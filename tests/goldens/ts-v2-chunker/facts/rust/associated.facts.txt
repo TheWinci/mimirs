@@ -1,0 +1,9 @@
+tests/fixtures/rust/associated.rs
+├── call Self::helper in method new [9]
+├── call self.helper in method execute [16]
+├── call self.helper in method execute [26]
+├── call State::Done in function associated [31]
+├── call String::new in function associated [31]
+├── call Worker::new in function associated [32]
+├── call worker.execute in function associated [33]
+└── call Runner::execute in function associated [34]

@@ -1,0 +1,6 @@
+tests/fixtures/html/comments.htm
+├── comment [1]
+└── element section [3–7]
+    ├── comment [3]
+    └── element p [5–6]
+        └── comment [5]

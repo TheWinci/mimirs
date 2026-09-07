@@ -1,0 +1,13 @@
+tests/fixtures/source-windows/go/types-and-methods.go
+├── package windows [1]
+│   └── window [1] (16 chars) “package windows”
+├── struct JobQueue [3–5]
+│   └── window [3–5] (40 chars) “type JobQueue struct { jobs []string }”
+├── function NewJobQueue [7–9]
+│   └── window [7–9] (109 chars) “func NewJobQueue(initial ...string) *JobQueue { return &JobQueue{jobs: append([]string(nil), in…”
+├── method Enqueue [11–13]
+│   └── window [11–13] (85 chars) “func (queue *JobQueue) Enqueue(job string) { queue.jobs = append(queue.jobs, job) }”
+├── method Peek [15–20]
+│   └── window [15–20] (126 chars) “func (queue *JobQueue) Peek() (string, bool) { if len(queue.jobs) == 0 { return "", false } ret…”
+└── method Drain [22–29]
+    └── window [22–29] (220 chars) “func (queue *JobQueue) Drain(limit int) []string { if limit > len(queue.jobs) { limit = len(que…”

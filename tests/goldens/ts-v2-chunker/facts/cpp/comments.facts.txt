@@ -1,0 +1,2 @@
+tests/fixtures/cpp/comments.cpp
+└── call worker_.run in method run [7]

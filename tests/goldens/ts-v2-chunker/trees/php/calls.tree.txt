@@ -1,0 +1,6 @@
+tests/fixtures/php/calls.php
+├── block [1]
+├── class Worker [2–5]
+│   └── method create [4]
+├── function run [7–16]
+└── function helper [18]

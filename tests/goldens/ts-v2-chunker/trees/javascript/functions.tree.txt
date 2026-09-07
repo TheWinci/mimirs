@@ -1,0 +1,5 @@
+tests/fixtures/javascript/functions.js
+├── function formatLabel [1–3]
+├── function loadValue [5–7]
+├── function double [9]
+└── function integerRange [11–15]

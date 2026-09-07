@@ -1,0 +1,11 @@
+javascript/commonjs-forwarding
+├── import src/main.cjs -> src/chained.cjs via "./chained.cjs" [3]
+├── import src/main.cjs -> src/object.cjs via "./object.cjs" [1]
+├── import src/main.cjs -> src/proxy.cjs via "./proxy.cjs" [2]
+├── import src/proxy.cjs -> src/object.cjs via "./object.cjs" [1]
+├── re-export src/proxy.cjs -> src/object.cjs via "./object.cjs" [1]
+├── call src/main.cjs:function start -> src/object.cjs:function picked via picked [6]
+├── call src/main.cjs:function start -> src/object.cjs:function other via proxy.alias [6]
+├── call src/main.cjs:function start -> src/chained.cjs:function run via chained.run [6]
+├── call src/main.cjs:function start -> src/chained.cjs:function run via chained.execute [6]
+└── unresolved call src/main.cjs:function start -> proxy.inline [6]

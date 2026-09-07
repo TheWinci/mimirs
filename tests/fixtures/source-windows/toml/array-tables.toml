@@ -1,0 +1,13 @@
+[[reports]]
+name = "active"
+include_archived = false
+owners = ["Ada", "Grace"]
+
+[[reports]]
+name = "history"
+include_archived = true
+owners = []
+
+[[reports.outputs]]
+format = "markdown"
+path = "./reports/history.md"

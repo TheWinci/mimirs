@@ -1,0 +1,5 @@
+tests/fixtures/source-windows/elixir/module-functions.ex
+└── module Windows.ReportBook [1–21]
+    ├── window [1–6] (142 chars) “defmodule Windows.ReportBook do @moduledoc "Keep report entries in insertion order." defstruct…”
+    ├── window [7–11] (129 chars) “def add(book, title, owner) do entry = %{title: title, owner: owner} %{book | entries: book.ent…”
+    └── window [12–21] (201 chars) “def render(book) do Enum.map(book.entries, fn entry -> owner = entry.owner || "unassigned" "#{e…”

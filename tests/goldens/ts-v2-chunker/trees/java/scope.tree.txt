@@ -1,0 +1,7 @@
+tests/fixtures/java/scope.java
+├── package fixtures.scope [1]
+├── import [3–4]
+└── class Scope [6–24]
+    ├── method execute [7–17]
+    ├── method helper [19]
+    └── method copy [21–23]

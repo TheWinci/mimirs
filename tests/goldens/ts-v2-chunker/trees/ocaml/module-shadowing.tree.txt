@@ -1,0 +1,5 @@
+tests/fixtures/ocaml/module-shadowing.ml
+├── module Alias [1]
+├── function local [3–5]
+│   └── module Alias [4]
+└── function outside [7]

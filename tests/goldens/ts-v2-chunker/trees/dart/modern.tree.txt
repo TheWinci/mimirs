@@ -1,0 +1,12 @@
+tests/fixtures/dart/modern.dart
+├── class Identifier [1–3]
+│   └── method render [2]
+├── enum Status [5]
+│   └── constant ready [5]
+├── function identity [7]
+└── function modern [9–22]
+    ├── variable status [10]
+    ├── variable parsed [11]
+    ├── variable identifier [12]
+    ├── variable normalized [13]
+    └── variable tearOff [16]

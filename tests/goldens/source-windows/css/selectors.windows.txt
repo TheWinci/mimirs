@@ -1,0 +1,9 @@
+tests/fixtures/source-windows/css/selectors.css
+├── selector :root [1–4]
+│   └── window [1–4] (60 chars) “:root { --report-gap: 1rem; --report-accent: #4f46e5; }”
+├── selector .report [6–10]
+│   └── window [6–10] (72 chars) “.report { display: grid; gap: var(--report-gap); padding: 1rem; }”
+├── selector .report__entry [12–15]
+│   └── window [12–15] (111 chars) “.report__entry { border-inline-start: 0.25rem solid var(--report-accent); padding-inline-start:…”
+└── selector .report__entry[data-state="archived"] [17–19]
+    └── window [17–19] (58 chars) “.report__entry[data-state="archived"] { opacity: 0.6; }”

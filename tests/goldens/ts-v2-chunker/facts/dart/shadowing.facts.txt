@@ -1,0 +1,12 @@
+tests/fixtures/dart/shadowing.dart
+├── call Target in variable target [7]
+├── call target in function shadowing [8]
+├── call Make in function shadowing [10]
+├── call target in function shadowing [11]
+├── call Make in variable nested [14]
+├── call nested in function shadowing [15]
+├── call nested in function shadowing [17]
+├── call Make in function shadowing [19]
+├── call receiver in function shadowing [20]
+├── call Make in function shadowing [21]
+└── call values in function shadowing [22]

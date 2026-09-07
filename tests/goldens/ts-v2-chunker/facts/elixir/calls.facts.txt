@@ -1,0 +1,6 @@
+tests/fixtures/elixir/calls.ex
+├── call normalize in function run [4]
+├── call Renderer.render in function run [5]
+├── call service.execute in function run [7]
+├── call local in function run [8]
+└── call apply in function run [9]

@@ -1,0 +1,9 @@
+tests/fixtures/kotlin/script-scope.kts
+├── type Callback [1]
+├── function make [3]
+├── variable callback [5]
+├── block [6–7]
+├── function scoped [8–11]
+│   └── variable nested [9]
+├── block [12–14]
+└── variable reference [15]

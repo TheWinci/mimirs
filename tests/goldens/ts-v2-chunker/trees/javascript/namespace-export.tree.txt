@@ -1,0 +1,2 @@
+tests/fixtures/javascript/namespace-export.js
+└── export utils [1]

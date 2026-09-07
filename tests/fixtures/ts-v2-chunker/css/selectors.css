@@ -1,0 +1,9 @@
+/* Component states stay with their selector. */
+.card,
+.panel:hover {
+  color: var(--accent);
+}
+
+main > article[data-state="ready"]::before {
+  content: "ready";
+}

@@ -1,0 +1,7 @@
+tests/fixtures/source-windows/javascript/commonjs.cjs
+├── variable { readFileSync } [1]
+│   └── window [1] (45 chars) “const { readFileSync } = require("node:fs");”
+├── function loadReport [3–7]
+│   └── window [3–7] (144 chars) “/** Load one report through CommonJS. */ function loadReport(path) { const contents = readFileS…”
+└── block [8–12]
+    └── window [8–12] (67 chars) “module.exports = { loadReport, defaultPath: "./report.md", };”

@@ -1,0 +1,7 @@
+python/conditional-imports
+├── import main.py -> package/fallback.py via "package.fallback" [13]
+├── import main.py -> package/fast.py via "package.fast" [3]
+├── import main.py -> package/optional.py via "package.optional" [11]
+├── import main.py -> package/slow.py via "package.slow" [5]
+├── unresolved call main.py:function choose -> selected [6]
+└── unresolved call main.py:function optional -> load [14]

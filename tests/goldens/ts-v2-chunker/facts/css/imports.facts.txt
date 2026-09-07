@@ -1,0 +1,3 @@
+tests/fixtures/css/imports.css
+├── @import "reset.css" [2]
+└── @import "theme.css" [3]

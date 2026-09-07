@@ -1,0 +1,5 @@
+tests/fixtures/java/imports.java
+├── package fixtures.imports [1]
+├── import [3–6]
+└── class Imports [8–15]
+    └── method values [9–14]

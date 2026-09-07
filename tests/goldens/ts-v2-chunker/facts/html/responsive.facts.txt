@@ -1,0 +1,11 @@
+tests/fixtures/html/responsive.html
+├── source.srcset "small.webp" in element picture [3]
+├── source.srcset "images/photo,wide.webp" in element picture [3]
+├── img.src "fallback.png" in element picture [5]
+├── img.srcset "small.png" in element picture [6]
+├── img.srcset "large.png" in element picture [6]
+├── stylesheet "responsive.css" in element main [8]
+├── preload "responsive.css" in element main [8]
+├── link.imagesrcset "preview.png" in element main [11]
+├── image.href "diagram.svg" in element svg [13]
+└── use.xlink:href "icons.svg#check" in element svg [14]

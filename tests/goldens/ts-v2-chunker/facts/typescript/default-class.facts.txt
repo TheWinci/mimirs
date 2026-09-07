@@ -1,0 +1,2 @@
+tests/fixtures/typescript/default-class.ts
+└── export default [1–15]

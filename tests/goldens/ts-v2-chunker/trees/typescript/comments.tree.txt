@@ -1,0 +1,13 @@
+tests/fixtures/typescript/comments.ts
+├── function registered [1–3]
+├── function documented [5–8]
+│   └── comment [5]
+├── comment [10]
+├── variable DEFAULT_VALUE [12]
+├── function previous [14]
+│   └── comment [14]
+├── function next [15]
+└── class Service [17–24]
+    ├── comment [17]
+    └── method status [20–23]
+        └── comment [20]

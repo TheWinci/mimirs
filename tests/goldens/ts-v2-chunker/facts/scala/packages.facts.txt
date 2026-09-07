@@ -1,0 +1,3 @@
+tests/fixtures/scala/packages.scala
+├── call loadRoot in variable RootValue [3]
+└── call loadNested in field value [8]

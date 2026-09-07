@@ -1,0 +1,12 @@
+tests/fixtures/csharp/bindings.cs
+├── block [1–2]
+├── import [3–4]
+└── module Fixtures.Bindings [6–64]
+    ├── delegate Callback [8]
+    ├── class Worker [10–14]
+    │   ├── method IsReady [12]
+    │   └── method Render [13]
+    └── class Bindings [16–64]
+        ├── method Pair [18]
+        ├── method TryGet [20–24]
+        └── method Run [26–63]

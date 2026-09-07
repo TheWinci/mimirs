@@ -1,0 +1,8 @@
+tests/fixtures/haskell/imports.hs
+├── import qualified Data.Map as Map [3]
+├── import Data.Text (Text) [4]
+├── import Data.Text (pack) [4]
+├── import Data.List hiding (sort) [5]
+├── import Control.Monad.* [6]
+├── call Map.lookup in function run [8]
+└── call pack in function run [8]

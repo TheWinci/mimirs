@@ -1,0 +1,16 @@
+<main>
+  <picture>
+    <source srcset="small.webp 1x, images/photo,wide.webp 2x">
+    <img
+      src="fallback.png"
+      srcset="small.png 320w, large.png 640w">
+  </picture>
+  <link rel="preload stylesheet" href="responsive.css">
+  <link
+    rel="preload"
+    imagesrcset="data:image/png;base64,AAAA 1x, preview.png 2x">
+  <svg>
+    <image href="diagram.svg"></image>
+    <use xlink:href="icons.svg#check"></use>
+  </svg>
+</main>

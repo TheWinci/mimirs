@@ -1,0 +1,4 @@
+tests/fixtures/markdown/headings.markdown
+└── section Document title [1–13]
+    └── section Setext section [6–13]
+        └── section ATX child [11–13]

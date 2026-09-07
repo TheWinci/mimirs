@@ -1,0 +1,10 @@
+tests/fixtures/source-windows/typescript/esm-module.mts
+├── import [1]
+│   └── window [1] (45 chars) “import { readFile } from "node:fs/promises";”
+├── type ReportConfig [3–6]
+│   └── window [3–6] (76 chars) “export type ReportConfig = { path: string; encoding: BufferEncoding; };”
+├── function readReport [8–12]
+│   ├── window [8] (41 chars) “/** Read one report using native ESM. */”
+│   └── window [9–12] (167 chars) “export async function readReport(config: ReportConfig): Promise<string> { const contents = awai…”
+└── variable defaultConfig [14–17]
+    └── window [14–17] (91 chars) “export const defaultConfig: ReportConfig = { path: "./report.md", encoding: "utf8", };”

@@ -1,0 +1,8 @@
+tests/fixtures/haskell/scope.hs
+├── call loader in function callback [2]
+├── call callback in variable result [3]
+├── call consume in function run [4]
+├── call map in function transform [6]
+├── call normalize in function transform [6]
+├── call traverse in function process [9]
+└── call finalize in function process [10]

@@ -1,0 +1,8 @@
+tests/fixtures/elixir/definitions.ex
+└── module Fixtures.Service [1–17]
+    ├── function zero [2]
+    ├── function run [4]
+    ├── function run [6–8]
+    ├── function helper [10]
+    ├── function is_ready [12]
+    └── function build [14–16]

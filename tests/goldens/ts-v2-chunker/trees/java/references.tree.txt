@@ -1,0 +1,10 @@
+tests/fixtures/java/references.java
+├── package fixtures.references [1]
+├── import [3]
+└── class References [5–22]
+    ├── field methodReference [7]
+    ├── field constructorReference [8]
+    ├── field anonymous [9–14]
+    │   └── method get [10–13]
+    ├── method execute [16–19]
+    └── method run [21]

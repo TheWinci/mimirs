@@ -1,5 +1,11 @@
 use super::*;
 
+#[path = "ts_v2_source/reviewed.rs"]
+mod reviewed;
+
+#[path = "ts_v2_source/chunker.rs"]
+mod chunker;
+
 fn build(path: &str, source: &str) -> Vec<Chunk> {
     let language = match path.rsplit('.').next().unwrap() {
         "rs" => "rust",
@@ -144,3 +150,6 @@ fn native_grammars_preserve_leaf_coverage_and_parent_windows() {
         }
     }
 }
+
+#[path = "ts_v2_source/relationship_projects.rs"]
+mod relationship_projects;

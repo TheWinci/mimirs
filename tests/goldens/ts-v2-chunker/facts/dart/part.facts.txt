@@ -1,0 +1,3 @@
+tests/fixtures/dart/part.dart
+├── part of "app.main" [1]
+└── call execute in function work [4]

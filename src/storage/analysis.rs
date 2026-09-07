@@ -93,8 +93,12 @@ pub fn write(transaction: &Transaction<'_>, file_id: i64, analysis: &Analysis) -
             ],
         )?;
     }
-    let payload =
-        serde_json::to_string(&(&analysis.facts, &analysis.scopes, &analysis.diagnostics))?;
+    let payload = serde_json::to_string(&(
+        &analysis.facts,
+        &analysis.scopes,
+        &analysis.diagnostics,
+        &analysis.source_facts,
+    ))?;
     transaction.execute(
         "INSERT INTO analysis_records VALUES (?1, ?2)",
         params![file_id, payload],
@@ -234,6 +238,41 @@ pub fn validate(analysis: &Analysis) -> Result<()> {
         let column = lines.column(diagnostic.span.start);
         ensure!(diagnostic.column == column, "invalid diagnostic column");
     }
+    for fact in &analysis.source_facts {
+        validate_span(source, &fact.location.span(), &lines)?;
+        for reference in fact.owner.iter().chain(match &fact.kind {
+            crate::analysis::source_facts::Kind::Call { target, .. } => target.as_ref(),
+            _ => None,
+        }) {
+            validate_span(source, &reference.location.span(), &lines)?;
+            ensure!(
+                analysis
+                    .source_chunks
+                    .iter()
+                    .any(|chunk| chunk.kind == reference.kind
+                        && chunk.name.as_deref() == Some(&reference.name)
+                        && chunk.span == reference.location.span()),
+                "source fact references an unknown chunk"
+            );
+        }
+        if let Some(owner) = &fact.owner {
+            ensure!(
+                owner.location.start_offset <= fact.location.start_offset
+                    && owner.location.end_offset >= fact.location.end_offset,
+                "source fact escapes its owner"
+            );
+        }
+        if let crate::analysis::source_facts::Kind::Call {
+            binding, target, ..
+        } = &fact.kind
+        {
+            ensure!(
+                (*binding == crate::analysis::source_facts::Binding::SourceChunk)
+                    == target.is_some(),
+                "source call target disagrees with binding"
+            );
+        }
+    }
     Ok(())
 }
 
@@ -242,7 +281,7 @@ pub fn load(connection: &Connection, path: &str) -> Result<Option<Analysis>> {
         return Ok(None);
     };
     let payload: String = connection.query_row("SELECT r.payload FROM analysis_records r JOIN files f ON f.id = r.file_id WHERE f.path = ?1", [path], |row| row.get(0)).context("missing stored analysis records")?;
-    let (facts, scopes, diagnostics) =
+    let (facts, scopes, diagnostics, source_facts) =
         serde_json::from_str(&payload).context("invalid stored analysis payload")?;
     let mut stmt=connection.prepare("SELECT c.ordinal,c.kind,c.name,c.byte_start,c.byte_end,c.line_start,c.line_end,c.parent,c.owner FROM source_chunks c JOIN files f ON f.id=c.file_id WHERE f.path=?1 ORDER BY c.ordinal")?;
     let mut rows = stmt.query([path])?;
@@ -273,6 +312,7 @@ pub fn load(connection: &Connection, path: &str) -> Result<Option<Analysis>> {
         });
     }
     let analysis = Analysis {
+        source_facts,
         source_chunks,
         source,
         entities,

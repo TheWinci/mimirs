@@ -1,0 +1,9 @@
+tests/fixtures/go/generic-bindings.go
+├── call factory in function GenericBindings [7]
+├── call finish in function GenericBindings [8]
+├── call T in function GenericBindings [9]
+├── call F in function GenericBindings [10–12]
+├── call T in function GenericBindings [11]
+├── call T in method Convert [19]
+├── call string in function LocalType [24]
+└── call Converter in function LocalType [24]

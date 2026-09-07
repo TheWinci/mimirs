@@ -1,0 +1,5 @@
+tests/fixtures/ocaml/scope.ml
+├── function run [1–4]
+│   ├── function callback [2]
+│   └── variable result [3]
+└── function transform [6–7]

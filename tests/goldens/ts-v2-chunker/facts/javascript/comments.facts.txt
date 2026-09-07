@@ -1,0 +1,4 @@
+tests/fixtures/javascript/comments.js
+├── export documented [2–5]
+├── call String in function documented [4]
+└── export defaultValue [8]

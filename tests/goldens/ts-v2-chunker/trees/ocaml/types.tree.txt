@@ -1,0 +1,9 @@
+tests/fixtures/ocaml/types.ml
+├── type result [1–3]
+├── type user [5–8]
+├── type Failed [10]
+├── type SERVICE [12–15]
+│   ├── type t [13]
+│   └── function run [14]
+├── function succeed [17]
+└── function fail [18]

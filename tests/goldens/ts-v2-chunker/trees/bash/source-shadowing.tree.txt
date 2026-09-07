@@ -1,0 +1,4 @@
+tests/fixtures/bash/source-shadowing.sh
+├── import [1]
+├── function source [3–5]
+└── import [7]

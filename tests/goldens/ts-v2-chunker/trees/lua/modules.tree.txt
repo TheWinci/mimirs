@@ -1,0 +1,7 @@
+tests/fixtures/lua/modules.lua
+├── variable json [1]
+├── variable util [2]
+├── block [3–4]
+├── variable dynamic [5]
+├── function decode [7–10]
+└── block [11–12]

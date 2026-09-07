@@ -1,0 +1,3 @@
+tests/fixtures/rust/extern-crates.rs
+├── import [1–2]
+└── function dependencies [4–7]

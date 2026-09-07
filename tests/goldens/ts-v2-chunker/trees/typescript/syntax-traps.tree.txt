@@ -1,0 +1,8 @@
+tests/fixtures/typescript/syntax-traps.ts
+├── variable fakeFunction [1]
+├── variable fakeClass [2]
+├── variable bracePattern [3]
+├── comment [5]
+├── variable π [7]
+├── variable 名前 [8]
+└── function render [10–19]

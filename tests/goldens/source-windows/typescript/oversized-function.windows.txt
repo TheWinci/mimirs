@@ -1,0 +1,10 @@
+tests/fixtures/source-windows/typescript/oversized-function.ts
+├── type ReportEntry [1–6]
+│   └── window [1–6] (126 chars) “type ReportEntry = { title: string; archivedAt: string | null; createdAt: string; owner?: { dis…”
+├── type ReportServices [8–12]
+│   └── window [8–12] (213 chars) “type ReportServices = { loadAccount(id: string): Promise<{ id: string; name: string }>; loadEnt…”
+└── function assembleReport [14–37]
+    ├── window [14–20] (251 chars) “export async function assembleReport( accountId: string, includeArchived: boolean, services: Re…”
+    ├── window [21–28] (229 chars) “const visible = entries.filter((entry) => { return includeArchived || entry.archivedAt === null…”
+    ├── window [29–35] (206 chars) “const lines = ordered.map((entry) => { const owner = entry.owner?.displayName ?? "unassigned";…”
+    └── window [36–37] (64 chars) “return [`Report for ${account.name}`, ...lines].join("\n"); }”

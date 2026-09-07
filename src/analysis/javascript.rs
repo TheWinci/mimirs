@@ -16,7 +16,7 @@ const RULES: Chunking = Chunking::Declarations(DeclarationRules {
 });
 
 pub(super) const JAVASCRIPT: Language = Language {
-    identity: "javascript/jsx/tree-sitter-0.27.0/javascript-0.25.0/extractor-1",
+    identity: "javascript/jsx/tree-sitter-0.27.0/javascript-0.25.0/extractor-1/source-facts-1",
     extensions: &["js", "mjs", "cjs", "jsx"],
     extract: |source| extract(source, tree_sitter_javascript::LANGUAGE.into()),
     is_native: true,
@@ -24,7 +24,7 @@ pub(super) const JAVASCRIPT: Language = Language {
     chunking: RULES,
 };
 pub(super) const TYPESCRIPT: Language = Language {
-    identity: "typescript/default/tree-sitter-0.27.0/typescript-0.23.2/extractor-1",
+    identity: "typescript/default/tree-sitter-0.27.0/typescript-0.23.2/extractor-1/source-facts-1",
     extensions: &["ts", "mts", "cts"],
     extract: |source| extract(source, tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into()),
     is_native: true,
@@ -32,7 +32,7 @@ pub(super) const TYPESCRIPT: Language = Language {
     chunking: RULES,
 };
 pub(super) const TSX: Language = Language {
-    identity: "typescript/tsx/tree-sitter-0.27.0/typescript-0.23.2/extractor-1",
+    identity: "typescript/tsx/tree-sitter-0.27.0/typescript-0.23.2/extractor-1/source-facts-1",
     extensions: &["tsx"],
     extract: |source| extract(source, tree_sitter_typescript::LANGUAGE_TSX.into()),
     is_native: true,
@@ -126,6 +126,22 @@ fn extract(source: SourceFile, language: tree_sitter::Language) -> Result<Analys
         },
         &analysis.entities,
     )?;
+    analysis.source_facts = super::source_facts::extract(
+        if analysis
+            .source
+            .path
+            .rsplit('.')
+            .next()
+            .is_some_and(|extension| matches!(extension, "ts" | "mts" | "cts" | "tsx"))
+        {
+            "typescript"
+        } else {
+            "javascript"
+        },
+        &analysis.source.text,
+        tree.root_node(),
+        &analysis.source_chunks,
+    );
     Ok(analysis)
 }
 

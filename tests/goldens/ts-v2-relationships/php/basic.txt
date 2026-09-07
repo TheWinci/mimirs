@@ -1,0 +1,10 @@
+php/basic
+├── import app/main.php -> bootstrap.php via "../bootstrap.php" [7]
+├── import app/main.php -> src/Project/Helpers.php via "Project\Helpers\run" [5]
+├── import app/main.php -> src/Project/Service/Worker.php via "Project\Service\Worker" [4]
+├── call app/main.php:module App -> src/Project/Service/Worker.php:method start via Worker::start [9]
+├── call app/main.php:module App -> src/Project/Service/Worker.php:class Worker via Worker [10]
+├── call app/main.php:module App -> src/Project/Helpers.php:function run via execute [11]
+├── call app/main.php:module App -> app/Local.php:method start via Local::start [12]
+├── call app/main.php:module App -> bootstrap.php:function bootstrap via bootstrap [13]
+└── unresolved call app/main.php:module App -> Worker::missing [14]

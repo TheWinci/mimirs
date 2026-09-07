@@ -1,0 +1,7 @@
+tests/fixtures/php/captures.php
+├── call $outer in function arrow [4]
+├── call $outer in function explicit [7]
+├── call $outer in function missing [11]
+├── call $arrow in function captures [17]
+├── call $explicit in function captures [18]
+└── call $missing in function captures [19]

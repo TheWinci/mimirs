@@ -1,0 +1,9 @@
+tests/fixtures/source-windows/java/module-comments.java
+├── package windows [1–2]
+│   └── window [1–2] (78 chars) “/** Source-window fixtures for Java package declarations. */ package windows;”
+├── import [4]
+│   └── window [4] (27 chars) “import java.time.Duration;”
+├── enum RetryPolicy [6–19]
+│   └── window [6–19] (218 chars) “enum RetryPolicy { NONE(Duration.ZERO), STANDARD(Duration.ofMillis(250)); private final Duratio…”
+└── comment [21]
+    └── window [21] (51 chars) “// This final comment is intentionally standalone.”

@@ -1,0 +1,13 @@
+title = "Report service"
+enabled = true
+
+# HTTP server configuration.
+[server]
+host = "127.0.0.1"
+port = 8080
+
+[server.limits]
+requests_per_minute = 120
+burst = 20
+
+# This final comment is intentionally standalone.

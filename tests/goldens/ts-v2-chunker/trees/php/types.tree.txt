@@ -1,0 +1,13 @@
+tests/fixtures/php/types.php
+├── block [1]
+└── module Fixtures\Types [2–27]
+    ├── trait Logs [4–7]
+    │   └── method log [6]
+    ├── interface Runner [9–12]
+    │   └── method run [11]
+    ├── enum State [14–20]
+    │   ├── constant Ready [16]
+    │   ├── constant Done [17]
+    │   └── method label [19]
+    └── class Worker [22–27]
+        └── method run [26]

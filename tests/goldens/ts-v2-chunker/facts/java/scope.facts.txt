@@ -1,0 +1,11 @@
+tests/fixtures/java/scope.java
+├── import fixtures.runner.Runner [3]
+├── import static fixtures.helpers.Tools.run [4]
+├── call run.run in method execute [8]
+├── call callback.run in method execute [11]
+├── call helper in method execute [13]
+├── call Runner.start in method execute [14]
+├── call run in method execute [15]
+├── call Worker in method execute [16]
+├── call build in method execute [16]
+└── call Scope in method copy [22]

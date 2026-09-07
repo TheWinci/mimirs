@@ -1,0 +1,6 @@
+tests/fixtures/python/class-fields.py
+└── class Settings [1–6]
+    ├── comment [2]
+    ├── field mode [4]
+    ├── field retries [5]
+    └── field cache [6]

@@ -1,0 +1,2 @@
+tests/fixtures/toml/arrays.toml
+└── (no facts)

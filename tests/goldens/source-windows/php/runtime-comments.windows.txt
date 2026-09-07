@@ -1,0 +1,11 @@
+tests/fixtures/source-windows/php/runtime-comments.php
+├── block [1]
+│   └── window [1] (6 chars) “<?php”
+├── import [2]
+│   └── window [2] (41 chars) “require_once __DIR__ . '/bootstrap.php';”
+├── constant RETRY_DELAY_MS [4]
+│   └── window [4] (28 chars) “const RETRY_DELAY_MS = 250;”
+├── function retry_delay [6–10]
+│   └── window [6–10] (101 chars) “/** Return the configured retry delay. */ function retry_delay(): int { return RETRY_DELAY_MS; }”
+└── comment [12]
+    └── window [12] (51 chars) “// This final comment is intentionally standalone.”

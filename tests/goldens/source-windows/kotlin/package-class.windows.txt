@@ -1,0 +1,5 @@
+tests/fixtures/source-windows/kotlin/package-class.kt
+└── package windows [1–20]
+    ├── window [1–7] (201 chars) “package windows data class ReportEntry(val title: String, val owner: String?) /** Keep report e…”
+    ├── window [8–11] (97 chars) “fun add(title: String, owner: String?) { entries += ReportEntry(title, owner) }”
+    └── window [12–20] (195 chars) “fun render(): List<String> = entries.map { entry -> val owner = entry.owner ?: "unassigned" "${…”

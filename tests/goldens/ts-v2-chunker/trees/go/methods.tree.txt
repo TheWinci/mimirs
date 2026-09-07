@@ -1,0 +1,7 @@
+tests/fixtures/go/methods.go
+├── package sample [1]
+├── struct Cache [3–5]
+│   └── field items [4]
+├── method Get [7–9]
+├── method Load [11–13]
+└── method Refresh [15–17]

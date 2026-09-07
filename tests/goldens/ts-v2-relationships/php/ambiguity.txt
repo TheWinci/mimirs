@@ -1,0 +1,3 @@
+php/ambiguity
+├── unresolved import app/main.php -> "Duplicate\Worker" [4]
+└── unresolved call app/main.php:module App -> Worker::start [6]

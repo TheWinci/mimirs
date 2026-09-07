@@ -1,0 +1,7 @@
+tests/fixtures/ocaml/modules.ml
+├── open Core [1]
+├── include Utilities [2]
+├── module Alias = App.Service [4]
+├── call Map.Make in module Built [5]
+├── call Alias.execute in function run [7]
+└── call Built.find in function run [7]

@@ -1,0 +1,6 @@
+tests/fixtures/javascript/component.jsx
+├── import track from "./analytics.js" [1]
+├── call value.toUpperCase in function label [4]
+├── export Button [7–10]
+├── call label in function Button [8]
+└── call track in function Button [9]

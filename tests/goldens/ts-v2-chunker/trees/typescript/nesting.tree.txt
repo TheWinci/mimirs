@@ -1,0 +1,9 @@
+tests/fixtures/typescript/nesting.ts
+├── function createFormatter [1–15]
+│   ├── function normalize [2–4]
+│   └── function decorate [6–12]
+│       └── function surround [7–9]
+└── class Formatter [17–26]
+    └── method format [18–25]
+        ├── function trim [19–21]
+        └── function appendPeriod [23]

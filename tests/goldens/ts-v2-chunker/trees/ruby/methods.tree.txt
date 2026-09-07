@@ -1,0 +1,8 @@
+tests/fixtures/ruby/methods.rb
+└── class Processor [1–18]
+    ├── method run [2–7]
+    ├── method helper [9–11]
+    ├── method build [13]
+    ├── method [] [15]
+    ├── method ready? [16]
+    └── method save! [17]

@@ -1,0 +1,11 @@
+tests/fixtures/source-windows/dart/imports-comments.dart
+├── import [1]
+│   └── window [1] (21 chars) “import 'dart:async';”
+├── constant retryDelay [3]
+│   └── window [3] (48 chars) “const retryDelay = Duration(milliseconds: 250);”
+├── function configuredDelay [5–6]
+│   └── window [5–6] (81 chars) “/// Return the configured retry delay. Duration configuredDelay() => retryDelay;”
+├── function waitForRetry [8–10]
+│   └── window [8–10] (80 chars) “Future<void> waitForRetry() async { await Future<void>.delayed(retryDelay); }”
+└── comment [12]
+    └── window [12] (51 chars) “// This final comment is intentionally standalone.”

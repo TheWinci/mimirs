@@ -1,0 +1,5 @@
+tests/fixtures/elixir/definitions.ex
+├── call ready in function zero [2]
+├── call helper in function run [4]
+├── call is_binary in function run [6]
+└── call normalize in function run [7]

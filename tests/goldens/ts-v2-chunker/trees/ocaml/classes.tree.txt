@@ -1,0 +1,5 @@
+tests/fixtures/ocaml/classes.ml
+├── class worker [1–3]
+│   └── method run [2]
+├── function execute [5]
+└── function create [6]

@@ -1,0 +1,11 @@
+tests/fixtures/c/includes.c
+├── import [1–2]
+├── conditional defined(FEATURE) [4–6]
+│   └── import [5]
+├── conditional defined(DEBUG) && LEVEL > 1 [8–14]
+│   ├── import [9]
+│   └── conditional FALLBACK [10–13]
+│       ├── import [11]
+│       └── conditional else [12–13]
+│           └── import [13]
+└── function print_value [16–18]
