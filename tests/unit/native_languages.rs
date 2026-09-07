@@ -386,6 +386,33 @@ fn lua_assignments_methods_and_function_fields_keep_written_names() {
 }
 
 #[test]
+fn zig_containers_tests_and_errors_keep_distinct_names() {
+    let result = analyze(
+        "store.zig",
+        "const State = enum { ready, failed };\nconst Errors = error { Missing, Corrupt };\nconst Store = struct { count: usize, fn recover() void {} };\ntest \"recover archive\" {}\ncomptime {}\n",
+    );
+    for (name, kind) in [
+        ("State", "enum"),
+        ("ready", "constant"),
+        ("Errors", "type"),
+        ("Missing", "constant"),
+        ("Store", "struct"),
+        ("recover", "method"),
+        ("recover archive", "function"),
+        ("comptime", "initializer"),
+    ] {
+        assert!(
+            result
+                .entities
+                .iter()
+                .any(|e| e.name.as_deref() == Some(name) && e.kind == kind),
+            "{name}: {:?}",
+            result.entities
+        );
+    }
+}
+
+#[test]
 fn native_snapshots_round_trip_replace_rollback_and_delete() {
     for case in fixture_cases() {
         let path = case["path"].as_str().unwrap();

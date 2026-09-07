@@ -146,6 +146,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
     static CSS: OnceLock<Result<Query, String>> = OnceLock::new();
     static KOTLIN: OnceLock<Result<Query, String>> = OnceLock::new();
     static LUA: OnceLock<Result<Query, String>> = OnceLock::new();
+    static ZIG: OnceLock<Result<Query, String>> = OnceLock::new();
     static JAVA: OnceLock<Result<Query, String>> = OnceLock::new();
     let (slot, text) = match language {
         "rust" => (&RUST, include_str!("ts_v2/queries/rust.scm")),
@@ -164,6 +165,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
         "css" => (&CSS, include_str!("ts_v2/queries/css.scm")),
         "kotlin" => (&KOTLIN, include_str!("ts_v2/queries/kotlin.scm")),
         "lua" => (&LUA, include_str!("ts_v2/queries/lua.scm")),
+        "zig" => (&ZIG, include_str!("ts_v2/queries/zig.scm")),
         "java" => (&JAVA, include_str!("ts_v2/queries/java.scm")),
         _ => anyhow::bail!("unsupported retrieval grammar {language}"),
     };
@@ -359,6 +361,18 @@ pub(crate) fn declarations(
                 kind = "function".into();
             }
         }
+        if language == "zig" {
+            if node.kind() == "variable_declaration" {
+                kind = names::zig_kind(node, source).into();
+            }
+            if node.kind() == "identifier"
+                && node
+                    .parent()
+                    .is_some_and(|n| n.kind() == "error_set_declaration")
+            {
+                kind = "constant".into();
+            }
+        }
         let name = declared_name(node, source, language)
             .or(captured)
             .or_else(|| special("default_export").then(|| "default".into()));
@@ -458,6 +472,19 @@ fn contains(node: Option<Node<'_>>, kind: &str) -> bool {
 }
 
 fn declared_name(node: Node<'_>, source: &str, language: &str) -> Option<String> {
+    if language == "zig" {
+        if node.kind() == "test_declaration" {
+            return Some(
+                node.named_children(&mut node.walk())
+                    .find(|n| n.kind() == "string")
+                    .map_or("(anonymous test)", |n| names::unquote(text(n, source)))
+                    .into(),
+            );
+        }
+        if node.kind() == "comptime_declaration" {
+            return Some("comptime".into());
+        }
+    }
     if language == "lua" {
         return names::lua(node, source);
     }
@@ -694,6 +721,14 @@ pub(crate) fn classified_kind<'a>(
         }
         if node_type == "property_declaration" {
             return "field";
+        }
+    }
+    if language == "zig" {
+        if matches!(parent, Some("struct" | "enum" | "type")) && kind == "function" {
+            return "method";
+        }
+        if parent == Some("enum") && node_type == "container_field" {
+            return "constant";
         }
     }
     kind

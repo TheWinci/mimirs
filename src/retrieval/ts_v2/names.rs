@@ -2,6 +2,36 @@
 use super::text;
 use tree_sitter::Node;
 
+pub(super) fn zig_kind(node: Node<'_>, source: &str) -> &'static str {
+    for (syntax, kind) in [
+        ("struct_declaration", "struct"),
+        ("enum_declaration", "enum"),
+        ("union_declaration", "struct"),
+        ("opaque_declaration", "type"),
+        ("error_set_declaration", "type"),
+    ] {
+        if node
+            .named_children(&mut node.walk())
+            .any(|n| n.kind() == syntax)
+        {
+            return kind;
+        }
+    }
+    if text(node, source)
+        .trim_start()
+        .strip_prefix("const")
+        .is_some_and(|s| {
+            s.chars()
+                .next()
+                .is_none_or(|c| !c.is_alphanumeric() && c != '_')
+        })
+    {
+        "constant"
+    } else {
+        "variable"
+    }
+}
+
 fn lua_assignment(node: Node<'_>) -> Option<Node<'_>> {
     if node.kind() == "variable_declaration" {
         node.named_children(&mut node.walk())

@@ -104,6 +104,15 @@ pub(super) const LUA: Language = Language {
     chunking: super::language::Chunking::Paragraphs,
 };
 
+pub(super) const ZIG: Language = Language {
+    identity: "zig/default/tree-sitter-0.27.0/tree-sitter-zig-1.1.2/extractor-1",
+    extensions: &["zig"],
+    extract: |source| extract(source, tree_sitter_zig::LANGUAGE.into(), "zig"),
+    is_native: true,
+    #[cfg(test)]
+    chunking: super::language::Chunking::Paragraphs,
+};
+
 fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analysis> {
     let mut parser = Parser::new();
     parser

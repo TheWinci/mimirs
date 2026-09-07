@@ -281,3 +281,7 @@ fields, companion objects, properties and methods retain their owners.
 Lua uses the native 0.4.1 grammar for `.lua`. Existing projects can add
 `"**/*.lua"` and reindex. Method syntax, assigned functions, table function fields
 and multiple assignment names remain distinct source declarations.
+
+Zig uses the native 1.1.2 grammar for `.zig`. Existing projects can add
+`"**/*.zig"` and reindex. Structs, enums, error sets, container methods,
+compile-time blocks and named tests retain their source identities.
