@@ -147,6 +147,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
     static KOTLIN: OnceLock<Result<Query, String>> = OnceLock::new();
     static LUA: OnceLock<Result<Query, String>> = OnceLock::new();
     static ZIG: OnceLock<Result<Query, String>> = OnceLock::new();
+    static ELIXIR: OnceLock<Result<Query, String>> = OnceLock::new();
     static JAVA: OnceLock<Result<Query, String>> = OnceLock::new();
     let (slot, text) = match language {
         "rust" => (&RUST, include_str!("ts_v2/queries/rust.scm")),
@@ -166,6 +167,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
         "kotlin" => (&KOTLIN, include_str!("ts_v2/queries/kotlin.scm")),
         "lua" => (&LUA, include_str!("ts_v2/queries/lua.scm")),
         "zig" => (&ZIG, include_str!("ts_v2/queries/zig.scm")),
+        "elixir" => (&ELIXIR, include_str!("ts_v2/queries/elixir.scm")),
         "java" => (&JAVA, include_str!("ts_v2/queries/java.scm")),
         _ => anyhow::bail!("unsupported retrieval grammar {language}"),
     };
@@ -234,6 +236,11 @@ pub(crate) fn declarations(
             .iter()
             .find(|c| names[c.index as usize] == "name")
             .map(|c| text(c.node, source).to_owned());
+        let context = m
+            .captures()
+            .iter()
+            .find(|c| names[c.index as usize] == "context")
+            .map(|c| text(c.node, source));
         let special = |name: &str| m.captures().iter().any(|c| names[c.index as usize] == name);
         let mut kind = node_kind(node.kind()).to_owned();
         if special("docstring") {
@@ -373,6 +380,29 @@ pub(crate) fn declarations(
                 kind = "constant".into();
             }
         }
+        if language == "elixir" {
+            if node.kind() == "binary_operator"
+                && contains(node.child_by_field_name("right"), "anonymous_function")
+            {
+                kind = "function".into();
+            }
+            kind = match context {
+                Some("defmodule") => "module",
+                Some("defprotocol") => "trait",
+                Some("defimpl") => "impl",
+                Some("defstruct") => "struct",
+                Some("type" | "typep" | "opaque") => "type",
+                Some("callback" | "macrocallback") => "method",
+                Some("import" | "alias" | "use" | "require") => "import",
+                _ => &kind,
+            }
+            .into();
+        }
+        let captured = if language == "elixir" {
+            names::elixir(node, source, context, captured.as_deref())
+        } else {
+            captured
+        };
         let name = declared_name(node, source, language)
             .or(captured)
             .or_else(|| special("default_export").then(|| "default".into()));

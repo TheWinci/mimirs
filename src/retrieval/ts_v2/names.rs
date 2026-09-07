@@ -2,6 +2,69 @@
 use super::text;
 use tree_sitter::Node;
 
+pub(super) fn elixir(
+    node: Node<'_>,
+    source: &str,
+    context: Option<&str>,
+    captured: Option<&str>,
+) -> Option<String> {
+    if context == Some("defimpl") {
+        let args = node
+            .named_children(&mut node.walk())
+            .find(|n| n.kind() == "arguments");
+        let protocol = args
+            .and_then(|n| {
+                n.named_children(&mut n.walk())
+                    .find(|n| n.kind() == "alias")
+            })
+            .map(|n| text(n, source));
+        let keywords = args.and_then(|n| {
+            n.named_children(&mut n.walk())
+                .find(|n| n.kind() == "keywords")
+        });
+        let implementation = keywords
+            .and_then(|n| {
+                n.named_children(&mut n.walk())
+                    .flat_map(|n| n.named_children(&mut n.walk()).collect::<Vec<_>>())
+                    .find(|n| n.kind() == "alias")
+            })
+            .map(|n| text(n, source));
+        return match (protocol, implementation) {
+            (Some(p), Some(i)) => Some(format!("{p} for {i}")),
+            _ => protocol.or(captured).map(str::to_owned),
+        };
+    }
+    if context == Some("defstruct") {
+        let mut current = node.parent();
+        while let Some(node) = current {
+            if node.kind() == "call"
+                && node
+                    .child_by_field_name("target")
+                    .is_some_and(|n| text(n, source) == "defmodule")
+            {
+                let module = node
+                    .named_children(&mut node.walk())
+                    .find(|n| n.kind() == "arguments")
+                    .and_then(|n| {
+                        n.named_children(&mut n.walk())
+                            .find(|n| n.kind() == "alias")
+                    });
+                return Some(
+                    module
+                        .map_or("struct", |n| text(n, source).rsplit('.').next().unwrap())
+                        .into(),
+                );
+            }
+            current = node.parent();
+        }
+        return Some("struct".into());
+    }
+    if matches!(context, Some("callback" | "macrocallback")) {
+        return captured.map(|s| s.split('(').next().unwrap().into());
+    }
+    captured.map(str::to_owned)
+}
+
 pub(super) fn zig_kind(node: Node<'_>, source: &str) -> &'static str {
     for (syntax, kind) in [
         ("struct_declaration", "struct"),

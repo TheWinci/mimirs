@@ -413,6 +413,29 @@ fn zig_containers_tests_and_errors_keep_distinct_names() {
 }
 
 #[test]
+fn elixir_definition_keywords_distinguish_protocols_structs_and_implementations() {
+    let result = analyze(
+        "store.exs",
+        "defprotocol Recover do\n def recover(path)\nend\ndefmodule Archive.Store do\n defstruct [:count]\n @callback restore(String.t()) :: String.t()\nend\ndefimpl Recover, for: Archive.Store do\n def recover(path), do: path\nend\n",
+    );
+    for (name, kind) in [
+        ("Recover", "trait"),
+        ("Store", "struct"),
+        ("restore", "method"),
+        ("Recover for Archive.Store", "impl"),
+    ] {
+        assert!(
+            result
+                .entities
+                .iter()
+                .any(|e| e.name.as_deref() == Some(name) && e.kind == kind),
+            "{name}: {:?}",
+            result.entities
+        );
+    }
+}
+
+#[test]
 fn native_snapshots_round_trip_replace_rollback_and_delete() {
     for case in fixture_cases() {
         let path = case["path"].as_str().unwrap();

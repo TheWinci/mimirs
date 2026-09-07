@@ -113,6 +113,15 @@ pub(super) const ZIG: Language = Language {
     chunking: super::language::Chunking::Paragraphs,
 };
 
+pub(super) const ELIXIR: Language = Language {
+    identity: "elixir/default/tree-sitter-0.27.0/tree-sitter-elixir-0.3.5/extractor-1",
+    extensions: &["ex", "exs"],
+    extract: |source| extract(source, tree_sitter_elixir::LANGUAGE.into(), "elixir"),
+    is_native: true,
+    #[cfg(test)]
+    chunking: super::language::Chunking::Paragraphs,
+};
+
 fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analysis> {
     let mut parser = Parser::new();
     parser
@@ -179,7 +188,7 @@ fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analy
                 .child_by_field_name("body")
                 .or_else(|| {
                     node.named_children(&mut node.walk())
-                        .find(|n| matches!(n.kind(), "block" | "declaration_list"))
+                        .find(|n| matches!(n.kind(), "block" | "declaration_list" | "do_block"))
                 })
                 .map_or(declaration.syntax_end, |body| body.start_byte())
                 .min(declaration.node_end);

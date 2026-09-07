@@ -285,3 +285,7 @@ and multiple assignment names remain distinct source declarations.
 Zig uses the native 1.1.2 grammar for `.zig`. Existing projects can add
 `"**/*.zig"` and reindex. Structs, enums, error sets, container methods,
 compile-time blocks and named tests retain their source identities.
+
+Elixir uses the native 0.3.5 grammar for `.ex` and `.exs`. Existing projects can
+add `"**/*.ex"` and `"**/*.exs"` and reindex. Definition keywords distinguish
+modules, protocols, implementations, structs, types, callbacks and imports.
