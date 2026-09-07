@@ -14,6 +14,15 @@ pub(super) const JAVA: Language = Language {
     chunking: super::language::Chunking::Paragraphs,
 };
 
+pub(super) const C: Language = Language {
+    identity: "c/default/tree-sitter-0.27.0/tree-sitter-c-0.24.1/extractor-1",
+    extensions: &["c", "h"],
+    extract: |source| extract(source, tree_sitter_c::LANGUAGE.into(), "c"),
+    is_native: true,
+    #[cfg(test)]
+    chunking: super::language::Chunking::Paragraphs,
+};
+
 fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analysis> {
     let mut parser = Parser::new();
     parser

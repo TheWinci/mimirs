@@ -9,6 +9,7 @@ use std::{
 };
 use tree_sitter::{Node, Query, QueryCursor, StreamingIterator};
 
+mod declarators;
 mod markdown;
 mod windows;
 pub use windows::project;
@@ -130,6 +131,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
     static TS: OnceLock<Result<Query, String>> = OnceLock::new();
     static TSX: OnceLock<Result<Query, String>> = OnceLock::new();
     static GO: OnceLock<Result<Query, String>> = OnceLock::new();
+    static C: OnceLock<Result<Query, String>> = OnceLock::new();
     static JAVA: OnceLock<Result<Query, String>> = OnceLock::new();
     let (slot, text) = match language {
         "rust" => (&RUST, include_str!("ts_v2/queries/rust.scm")),
@@ -138,6 +140,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
         "typescript" => (&TS, include_str!("ts_v2/queries/typescript.scm")),
         "tsx" => (&TSX, include_str!("ts_v2/queries/typescript.scm")),
         "go" => (&GO, include_str!("ts_v2/queries/go.scm")),
+        "c" => (&C, include_str!("ts_v2/queries/c.scm")),
         "java" => (&JAVA, include_str!("ts_v2/queries/java.scm")),
         _ => anyhow::bail!("unsupported retrieval grammar {language}"),
     };
@@ -223,6 +226,9 @@ pub(crate) fn declarations(
         if language == "java" && node.kind() == "block" {
             kind = "initializer".into();
         }
+        if language == "c" && node.kind() == "declaration" {
+            kind = declarators::kind(node, source).into();
+        }
         let name = declared_name(node, source, language)
             .or(captured)
             .or_else(|| special("default_export").then(|| "default".into()));
@@ -285,6 +291,9 @@ fn contains(node: Option<Node<'_>>, kind: &str) -> bool {
 }
 
 fn declared_name(node: Node<'_>, source: &str, language: &str) -> Option<String> {
+    if language == "c" {
+        return declarators::declared_name(node, source);
+    }
     if language == "rust" && node.kind() == "impl_item" {
         let ty = text(node.child_by_field_name("type")?, source);
         return Some(node.child_by_field_name("trait").map_or_else(
@@ -399,6 +408,14 @@ fn node_kind(kind: &str) -> &str {
         "static_initializer" => "initializer",
         "enum_constant" => "constant",
         "formal_parameter" => "field",
+        "preproc_include" => "import",
+        "preproc_def" | "preproc_function_def" => "macro",
+        "preproc_ifdef" | "preproc_if" | "preproc_elif" | "preproc_else" => "conditional",
+        "preproc_call" => "directive",
+        "struct_specifier" | "union_specifier" => "struct",
+        "enum_specifier" => "enum",
+        "type_definition" => "type",
+        "enumerator" => "constant",
         _ => "block",
     }
 }

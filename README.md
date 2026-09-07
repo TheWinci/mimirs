@@ -55,7 +55,7 @@ mimirs search 'valid_username check for trailing newline' --limit 5
 
 Run these commands from the project root. Fresh config includes Rust `.rs`,
 Python `.py` and `.pyi`, TypeScript `.ts`, `.mts`, `.cts`, and `.tsx`,
-JavaScript `.js`, `.mjs`, `.cjs`, and `.jsx`, Go `.go`, and Java `.java` files. This includes
+JavaScript `.js`, `.mjs`, `.cjs`, and `.jsx`, Go `.go`, Java `.java`, and C `.c`/`.h` files. This includes
 `.d.ts` declarations. `node_modules` and common Python environment directories `.venv`,
 `venv`, and `__pycache__` are excluded. Customize `include` and `exclude` in
 `.mimirs/config.toml` for your project.
@@ -79,7 +79,7 @@ model session; sessions are created only as files need more workers and reused.
 Search embeds its single query with one worker.
 
 Native tree-sitter grammars identify retrieval chunks for Rust, Python,
-TypeScript, JavaScript, JSX, TSX, Go, and Java. The grammars ship in the binary and
+TypeScript, JavaScript, JSX, TSX, Go, Java, and C. The grammars ship in the binary and
 need no language servers or language runtimes. Written declarations, attached
 comments, decorators, imports, and incomplete source remain searchable. Retrieval
 follows TS v2's chunk boundaries, including collapsed import groups and overloads.
@@ -236,3 +236,7 @@ To enable Java in an existing project, add `"**/*.java"` to `include` in
 `.mimirs/config.toml` and run `mimirs index`. Existing configuration rules are
 preserved. Java uses the native 0.23.5 grammar, with declaration owners, leading
 documentation, signatures and parse diagnostics. It does not resolve classpaths.
+
+C uses the native 0.24.1 grammar. Add `"**/*.c"` and `"**/*.h"` to an existing
+config to enable it. Headers use C by default. Names follow pointer, array and
+function declarators; preprocessor branches remain source-backed chunks.

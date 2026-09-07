@@ -119,6 +119,31 @@ fn java_owners_signatures_docs_and_recovery_are_source_backed() {
 }
 
 #[test]
+fn c_names_follow_declarators_without_confusing_function_pointers() {
+    let result = analyze(
+        "bindings.h",
+        "#ifndef ARCHIVE_H\n#define ARCHIVE_H\ntypedef int (*Callback)(int);\nint recover(int count);\nint (*callback)(int);\nconst int first = 1, second = 2;\nstruct Archive { int count, size; };\n#endif\n",
+    );
+    for (name, kind) in [
+        ("!defined(ARCHIVE_H)", "conditional"),
+        ("Callback", "type"),
+        ("recover", "function"),
+        ("callback", "variable"),
+        ("first, second", "constant"),
+        ("count, size", "field"),
+    ] {
+        assert!(
+            result
+                .entities
+                .iter()
+                .any(|e| e.name.as_deref() == Some(name) && e.kind == kind),
+            "{name}: {:?}",
+            result.entities
+        );
+    }
+}
+
+#[test]
 fn native_snapshots_round_trip_replace_rollback_and_delete() {
     for case in fixture_cases() {
         let path = case["path"].as_str().unwrap();
