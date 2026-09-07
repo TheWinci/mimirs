@@ -178,6 +178,31 @@ fn cpp_templates_qualified_methods_and_header_aliases_keep_names() {
 }
 
 #[test]
+fn csharp_file_namespace_operators_and_fields_retain_their_owners() {
+    let result = analyze(
+        "Store.cs",
+        "namespace Archive;\nclass Store {\n int count, size;\n public int this[int index] => index;\n public static Store operator +(Store a, Store b) => a;\n public static implicit operator int(Store a) => 1;\n void Recover() { System.Func<int,int> callback = x => x; }\n}\n",
+    );
+    assert_eq!(result.entities[0].span.end, result.source.text.len());
+    for (name, kind) in [
+        ("count, size", "field"),
+        ("this", "property"),
+        ("operator +", "method"),
+        ("implicit operator int", "method"),
+        ("callback", "function"),
+    ] {
+        assert!(
+            result
+                .entities
+                .iter()
+                .any(|e| e.name.as_deref() == Some(name) && e.kind == kind),
+            "{name}: {:?}",
+            result.entities
+        );
+    }
+}
+
+#[test]
 fn native_snapshots_round_trip_replace_rollback_and_delete() {
     for case in fixture_cases() {
         let path = case["path"].as_str().unwrap();

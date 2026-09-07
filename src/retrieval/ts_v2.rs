@@ -12,6 +12,7 @@ use tree_sitter::{Node, Query, QueryCursor, StreamingIterator};
 mod declarators;
 mod kinds;
 mod markdown;
+mod names;
 use kinds::node_kind;
 mod windows;
 pub use windows::project;
@@ -94,6 +95,7 @@ pub(crate) struct Entity {
     pub name: Option<String>,
     pub node_start: usize,
     pub node_end: usize,
+    pub syntax_end: usize,
     start_row: usize,
     start: usize,
     end: usize,
@@ -136,6 +138,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
     static GO: OnceLock<Result<Query, String>> = OnceLock::new();
     static C: OnceLock<Result<Query, String>> = OnceLock::new();
     static CPP: OnceLock<Result<Query, String>> = OnceLock::new();
+    static CSHARP: OnceLock<Result<Query, String>> = OnceLock::new();
     static JAVA: OnceLock<Result<Query, String>> = OnceLock::new();
     let (slot, text) = match language {
         "rust" => (&RUST, include_str!("ts_v2/queries/rust.scm")),
@@ -146,6 +149,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
         "go" => (&GO, include_str!("ts_v2/queries/go.scm")),
         "c" => (&C, include_str!("ts_v2/queries/c.scm")),
         "cpp" => (&CPP, include_str!("ts_v2/queries/cpp.scm")),
+        "csharp" => (&CSHARP, include_str!("ts_v2/queries/csharp.scm")),
         "java" => (&JAVA, include_str!("ts_v2/queries/java.scm")),
         _ => anyhow::bail!("unsupported retrieval grammar {language}"),
     };
@@ -256,18 +260,31 @@ pub(crate) fn declarations(
                 kind = "function".into();
             }
         }
+        if language == "csharp"
+            && node.kind() == "variable_declarator"
+            && contains(Some(node), "lambda_expression")
+        {
+            kind = "function".into();
+        }
         let name = declared_name(node, source, language)
             .or(captured)
             .or_else(|| special("default_export").then(|| "default".into()));
+        let node_end = if language == "csharp" && node.kind() == "file_scoped_namespace_declaration"
+        {
+            root.end_byte()
+        } else {
+            node.end_byte()
+        };
         flat.push(Entity {
             node_type: node.kind().into(),
             kind,
             name,
             node_start: node.start_byte(),
-            node_end: node.end_byte(),
+            node_end,
+            syntax_end: node.end_byte(),
             start_row: node.start_position().row,
             start: node.start_byte(),
-            end: node.end_byte(),
+            end: node_end,
             overload: special("overload"),
             children: Vec::new(),
         });
@@ -319,6 +336,9 @@ fn contains(node: Option<Node<'_>>, kind: &str) -> bool {
 }
 
 fn declared_name(node: Node<'_>, source: &str, language: &str) -> Option<String> {
+    if language == "csharp" {
+        return names::csharp(node, source);
+    }
     if matches!(language, "c" | "cpp") {
         return declarators::declared_name(node, source);
     }

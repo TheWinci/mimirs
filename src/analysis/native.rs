@@ -32,6 +32,15 @@ pub(super) const CPP: Language = Language {
     chunking: super::language::Chunking::Paragraphs,
 };
 
+pub(super) const CSHARP: Language = Language {
+    identity: "csharp/default/tree-sitter-0.27.0/tree-sitter-c-sharp-0.23.1/extractor-1",
+    extensions: &["cs"],
+    extract: |source| extract(source, tree_sitter_c_sharp::LANGUAGE.into(), "csharp"),
+    is_native: true,
+    #[cfg(test)]
+    chunking: super::language::Chunking::Paragraphs,
+};
+
 fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analysis> {
     let mut parser = Parser::new();
     parser
@@ -91,12 +100,12 @@ fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analy
         });
         ancestors.push(id);
         if let Some(node) =
-            root.descendant_for_byte_range(declaration.node_start, declaration.node_end)
+            root.descendant_for_byte_range(declaration.node_start, declaration.syntax_end)
         {
             let start = declaration.node_start;
             let end = node
                 .child_by_field_name("body")
-                .map_or(declaration.node_end, |body| body.start_byte());
+                .map_or(declaration.syntax_end, |body| body.start_byte());
             let end = start + analysis.source.text[start..end].trim_end().len();
             if end > start {
                 analysis
