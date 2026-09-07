@@ -13,6 +13,7 @@ struct State {
     start: Instant,
     stack: HashMap<ThreadId, Vec<Frame>>,
     stages: BTreeMap<&'static str, StageReport>,
+    queues: BTreeMap<&'static str, QueueReport>,
     phases: BTreeMap<&'static str, f64>,
     counters: BTreeMap<&'static str, u64>,
     batch_sizes: BTreeMap<usize, u64>,
@@ -43,6 +44,7 @@ pub struct Report {
     pub wall_seconds: f64,
     pub phases_seconds: BTreeMap<&'static str, f64>,
     pub stages: BTreeMap<&'static str, StageReport>,
+    pub queues: BTreeMap<&'static str, QueueReport>,
     pub unassigned_seconds: f64,
     pub counters: BTreeMap<&'static str, u64>,
     pub embedding_batch_sizes: BTreeMap<usize, u64>,
@@ -62,6 +64,39 @@ pub struct StageReport {
     pub items: u64,
     pub peak_queued_items: usize,
     pub peak_queued_bytes: usize,
+}
+
+/// Item residence from enqueue to dequeue, excluding producer backpressure and
+/// consumer processing. Admission is measured separately as request-to-grant.
+/// Samples exist only with profiling enabled; percentiles use nearest rank.
+#[derive(Default, Serialize)]
+pub struct QueueReport {
+    pub items: u64,
+    pub total_seconds: f64,
+    pub mean_seconds: f64,
+    pub p50_seconds: f64,
+    pub p95_seconds: f64,
+    pub max_seconds: f64,
+    #[serde(skip)]
+    samples: Vec<f64>,
+}
+
+impl QueueReport {
+    fn record(&mut self, seconds: f64) {
+        self.items += 1;
+        self.total_seconds += seconds;
+        self.max_seconds = self.max_seconds.max(seconds);
+        self.samples.push(seconds);
+    }
+
+    fn summarize(&mut self) {
+        if !self.samples.is_empty() {
+            self.samples.sort_unstable_by(f64::total_cmp);
+            self.mean_seconds = self.total_seconds / self.items as f64;
+            self.p50_seconds = self.samples[self.samples.len().div_ceil(2) - 1];
+            self.p95_seconds = self.samples[(self.samples.len() * 95).div_ceil(100) - 1];
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -98,6 +133,7 @@ impl Profiler {
             start: Instant::now(),
             stack: HashMap::new(),
             stages: BTreeMap::new(),
+            queues: BTreeMap::new(),
             phases: BTreeMap::new(),
             counters: BTreeMap::new(),
             batch_sizes: BTreeMap::new(),
@@ -129,6 +165,24 @@ impl Profiler {
             name,
             activity,
             start: self.0.as_ref().map(|_| Instant::now()),
+        }
+    }
+
+    pub fn queue_start(&self) -> Option<Instant> {
+        self.0.as_ref().map(|_| Instant::now())
+    }
+
+    pub fn queue_end(&self, name: &'static str, start: Option<Instant>) {
+        if let (Some(state), Some(start)) = (&self.0, start) {
+            // Read the clock before taking the reporting lock.
+            let seconds = start.elapsed().as_secs_f64();
+            state
+                .lock()
+                .unwrap()
+                .queues
+                .entry(name)
+                .or_default()
+                .record(seconds);
         }
     }
 
@@ -245,6 +299,12 @@ impl Profiler {
                 stage.peak_queued_items = stage.peak_queued_items.max(value.peak_queued_items);
                 stage.peak_queued_bytes = stage.peak_queued_bytes.max(value.peak_queued_bytes);
             }
+            for (key, value) in report.queues {
+                let queue = state.queues.entry(key).or_default();
+                for seconds in value.samples {
+                    queue.record(seconds);
+                }
+            }
             state.files.extend(report.files);
         }
     }
@@ -256,13 +316,18 @@ impl Profiler {
         assert!(state.stack.values().all(Vec::is_empty) && state.current_file.is_none());
         let wall_seconds = state.start.elapsed().as_secs_f64();
         let unassigned_seconds = (wall_seconds - state.phases.values().sum::<f64>()).max(0.0);
+        let mut queues = std::mem::take(&mut state.queues);
+        for queue in queues.values_mut() {
+            queue.summarize();
+        }
         Some(Report {
-            version: 2,
+            version: 3,
             complete: error.is_none(),
             error,
             wall_seconds,
             phases_seconds: std::mem::take(&mut state.phases),
             stages: std::mem::take(&mut state.stages),
+            queues,
             unassigned_seconds,
             counters: std::mem::take(&mut state.counters),
             embedding_batch_sizes: std::mem::take(&mut state.batch_sizes),

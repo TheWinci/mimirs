@@ -2,6 +2,7 @@
 //! consumers; queued values are dropped outside the channel lock.
 use std::collections::VecDeque;
 use std::sync::{Arc, Condvar, Mutex, Weak};
+use std::time::Instant;
 
 use crate::profiling::{Activity, Profiler};
 
@@ -58,7 +59,7 @@ impl Drop for Guard {
 }
 
 struct State<T> {
-    values: VecDeque<(T, usize)>,
+    values: VecDeque<(T, usize, Option<Instant>)>,
     bytes: usize,
     senders: usize,
     closed: bool,
@@ -132,7 +133,9 @@ impl<T: Send> Sender<T> {
             return Err(value);
         }
         state.bytes += bytes;
-        state.values.push_back((value, bytes));
+        state
+            .values
+            .push_back((value, bytes, self.0.profile.queue_start()));
         self.0
             .profile
             .stage_queue(self.0.name, state.values.len(), state.bytes);
@@ -156,7 +159,8 @@ impl<T: Send> Receiver<T> {
             let _wait = self.0.profile.stage(self.0.name, Activity::Input);
             state = self.0.readable.wait(state).unwrap();
         }
-        let (value, bytes) = state.values.pop_front()?;
+        let (value, bytes, queued) = state.values.pop_front()?;
+        self.0.profile.queue_end(self.0.name, queued);
         state.bytes -= bytes;
         drop(state);
         self.0.writable.notify_one();

@@ -18,7 +18,8 @@ fn failed_index_writes_an_incomplete_profile_and_never_overwrites_it() {
     let saved = std::fs::read(&report).unwrap();
     let json: serde_json::Value = serde_json::from_slice(&saved).unwrap();
     assert_eq!(json["complete"], false);
-    assert_eq!(json["version"], 2);
+    assert_eq!(json["version"], 3);
+    assert!(json["queues"].is_object());
     assert!(json["error"].as_str().unwrap().contains("mimirs init"));
     assert!(json["phases_seconds"]["config"].is_number());
     assert!(!dir.path().join(".mimirs").exists());

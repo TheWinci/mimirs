@@ -54,3 +54,23 @@ fn receiver_drop_and_late_channels_observe_cancellation() {
     assert_eq!(tx.send(2, 1), Err(2));
     assert_eq!(rx.recv(), None);
 }
+
+#[test]
+fn residence_counts_dequeued_items_and_excludes_cancelled_items() {
+    let cancel = Cancel::default();
+    let profile = Profiler::enabled();
+    let (tx, rx) = bounded(2, "test", &profile, &cancel);
+    tx.send(1, 1).unwrap();
+    tx.send(2, 1).unwrap();
+    // Age only the first queued item without sleeping or relying on scheduling.
+    tx.0.state.lock().unwrap().values.front_mut().unwrap().2 =
+        Some(Instant::now() - Duration::from_secs(2));
+    assert_eq!(rx.recv(), Some(1));
+    cancel.cancel();
+    assert_eq!(rx.recv(), None);
+    let report = profile.finish(None).unwrap();
+    assert_eq!(report.queues["test"].items, 1);
+    assert!(report.queues["test"].mean_seconds >= 2.0);
+    assert_eq!(report.stages["test"].output_wait_seconds, 0.0);
+    assert_eq!(report.stages["test"].input_wait_seconds, 0.0);
+}

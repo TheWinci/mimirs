@@ -4,6 +4,7 @@ use std::collections::VecDeque;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::JoinHandle;
+use std::time::Instant;
 
 use crate::profiling::{Activity, Profiler};
 
@@ -19,6 +20,7 @@ struct State {
 }
 
 struct Work {
+    queued: Option<Instant>,
     texts: Arc<Vec<String>>,
     state: Mutex<State>,
     changed: Condvar,
@@ -149,7 +151,8 @@ impl Pool {
 
     pub(crate) fn submit(&self, texts: Vec<String>) -> Job {
         let count = texts.len();
-        let job = Arc::new(Work {
+        let mut work = Work {
+            queued: None,
             texts: Arc::new(texts),
             state: Mutex::new(State {
                 next: 0,
@@ -160,9 +163,11 @@ impl Pool {
                 vectors: vec![None; count],
             }),
             changed: Condvar::new(),
-        });
+        };
+        let mut queue = self.shared.queue.lock().unwrap();
+        work.queued = self.shared.profile.queue_start();
+        let job = Arc::new(work);
         if count != 0 {
-            let mut queue = self.shared.queue.lock().unwrap();
             queue.items += count;
             queue.bytes += job
                 .texts
@@ -208,6 +213,7 @@ fn next(shared: &Shared) -> Option<(Arc<Work>, usize)> {
                 queue.jobs.pop_front();
             }
             drop(state);
+            shared.profile.queue_end("inference", job.queued);
             return Some((job, ordinal));
         }
         let idle = shared.profile.stage("inference", Activity::Input);

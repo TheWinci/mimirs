@@ -58,6 +58,7 @@ impl Admission {
     }
 
     pub fn acquire(&self, bytes: usize) -> Option<Permit> {
+        let requested = self.0.profile.queue_start();
         let mut state = self.0.state.lock().unwrap();
         while !state.closed
             && (state.files == self.0.limit
@@ -70,6 +71,7 @@ impl Admission {
             return None;
         }
         state.files += 1;
+        self.0.profile.queue_end("admission", requested);
         state.bytes = state.bytes.saturating_add(bytes);
         self.0
             .profile
@@ -98,6 +100,7 @@ impl Permit {
         if bytes <= self.bytes {
             return true;
         }
+        let requested = self.shared.profile.queue_start();
         let mut state = self.shared.state.lock().unwrap();
         while !state.closed && state.files > 1 && state.bytes - self.bytes + bytes > PAYLOAD_TARGET
         {
@@ -108,6 +111,7 @@ impl Permit {
             return false;
         }
         state.bytes = state.bytes - self.bytes + bytes;
+        self.shared.profile.queue_end("admission_growth", requested);
         self.bytes = bytes;
         self.shared
             .profile

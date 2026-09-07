@@ -8,6 +8,38 @@ fn disabled_measurements_have_no_report_and_preserve_results() {
     profile.batch(4);
     assert_eq!(profile.measure("work", || 42), 42);
     assert!(profile.finish(None).is_none());
+    assert!(profile.queue_start().is_none());
+}
+
+#[test]
+fn queue_distributions_merge_samples_before_computing_percentiles() {
+    let parent = Profiler::enabled();
+    for values in [vec![0.001, 0.003], vec![0.002, 0.1]] {
+        let child = Profiler::enabled();
+        for value in values {
+            child
+                .0
+                .as_ref()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .queues
+                .entry("test")
+                .or_default()
+                .record(value);
+        }
+        parent.merge(child.finish(None).unwrap());
+    }
+    let report = parent.finish(None).unwrap();
+    let queue = &report.queues["test"];
+    assert_eq!(queue.items, 4);
+    assert!((queue.total_seconds - 0.106).abs() < 1e-12);
+    assert!((queue.mean_seconds - 0.0265).abs() < 1e-12);
+    assert_eq!(queue.p50_seconds, 0.002);
+    assert_eq!(queue.p95_seconds, 0.1);
+    assert_eq!(queue.max_seconds, 0.1);
+    let json = serde_json::to_value(&report).unwrap();
+    assert!(json["queues"]["test"].get("samples").is_none());
 }
 
 #[test]
@@ -40,7 +72,7 @@ fn nested_phases_count_exclusive_time_and_keep_file_totals() {
     assert_eq!(report.files[0].counters["source_bytes"], 17);
     assert!(report.files[0].language.starts_with("python/"));
     let json = serde_json::to_value(report).unwrap();
-    assert_eq!(json["version"], 2);
+    assert_eq!(json["version"], 3);
     assert!(json["phases_seconds"].is_object());
 }
 

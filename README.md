@@ -197,6 +197,22 @@ in the queue and can overlap each other. Do not add them together. Phase times
 measure exclusive coordinator work; nested work is subtracted from its enclosing
 phase.
 
+Profile version 3 adds `queues`, with item counts, total, mean, median, 95th
+percentile, and maximum residence in seconds. Channel residence starts after a
+send is accepted and ends at dequeue. Inference residence starts at submission
+and ends separately when each window is dispatched to a worker. The `admission`
+entry measures a file's request-to-grant delay at the capacity gate. Cancelled
+items that never dequeue are excluded. Channel counts include control messages;
+writer counts include intermediate stages as well as file completions.
+Percentiles use nearest rank and retain one timing sample per item only while
+profiling is enabled. Queue totals overlap across items and stages and must not
+be added to estimate elapsed indexing time.
+
+Stage input/output wait counters measure worker idle time and producer blocking,
+not item residence. `inference_completion.input_wait_seconds` measures the
+merger waiting for submitted vectors; older reports labelled this time as
+`windows.output_wait_seconds`.
+
 `model_assets` includes cache lookup or downloads and asset reads.
 `model_startup` measures tokenizer and ONNX session creation. `embedding_prepare`
 measures token-window planning and job submission. `embedding_wait` measures only

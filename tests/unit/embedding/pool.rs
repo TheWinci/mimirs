@@ -128,4 +128,29 @@ fn worker_metrics_survive_file_completion_and_account_for_cancelled_work() {
     assert_eq!(stage.items, 1);
     assert_eq!(stage.peak_queued_items, 7);
     assert!(stage.active_seconds > 0.0);
+    assert_eq!(report.queues["inference"].items, 1);
+}
+
+#[test]
+fn each_window_is_timed_until_dispatch_from_the_same_submission() {
+    let profile = Profiler::enabled();
+    let shared = Shared {
+        profile: profile.clone(),
+        ..Shared::default()
+    };
+    let pool = Pool {
+        shared: Arc::new(shared),
+        threads: Vec::new(),
+    };
+    let job = pool.submit(vec!["one".into(), "two".into()]);
+    // No workers: explicitly dispatch both windows, then cancel the unfinished job.
+    let first = next(&pool.shared).unwrap();
+    let second = next(&pool.shared).unwrap();
+    assert_eq!(first.1, 0);
+    assert_eq!(second.1, 1);
+    drop(job);
+    let report = profile.finish(None).unwrap();
+    assert_eq!(report.queues["inference"].items, 2);
+    assert!(report.queues["inference"].max_seconds > 0.0);
+    assert!(report.stages["inference"].active_seconds == 0.0);
 }

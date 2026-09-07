@@ -117,7 +117,8 @@ impl SourceTask {
             Task::Ready(vectors) => Ok(std::mem::take(vectors)),
             Task::Pending { job, plans } => {
                 let result = profile.measure("embedding_wait", || {
-                    let _wait = profile.stage("windows", crate::profiling::Activity::Output);
+                    let _wait =
+                        profile.stage("inference_completion", crate::profiling::Activity::Input);
                     job.wait()
                 });
                 for _ in 0..job.calls() {
