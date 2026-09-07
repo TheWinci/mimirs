@@ -40,6 +40,7 @@ const REGISTERED: &[Language] = &[
     super::javascript::TSX,
     super::go::LANGUAGE,
     super::native::JAVA,
+    super::native::YAML,
     super::native::TOML,
     super::native::BASH,
     super::native::ELIXIR,

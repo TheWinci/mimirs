@@ -150,6 +150,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
     static ELIXIR: OnceLock<Result<Query, String>> = OnceLock::new();
     static BASH: OnceLock<Result<Query, String>> = OnceLock::new();
     static TOML: OnceLock<Result<Query, String>> = OnceLock::new();
+    static YAML: OnceLock<Result<Query, String>> = OnceLock::new();
     static JAVA: OnceLock<Result<Query, String>> = OnceLock::new();
     let (slot, text) = match language {
         "rust" => (&RUST, include_str!("ts_v2/queries/rust.scm")),
@@ -172,6 +173,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
         "elixir" => (&ELIXIR, include_str!("ts_v2/queries/elixir.scm")),
         "bash" => (&BASH, include_str!("ts_v2/queries/bash.scm")),
         "toml" => (&TOML, include_str!("ts_v2/queries/toml.scm")),
+        "yaml" => (&YAML, include_str!("ts_v2/queries/yaml.scm")),
         "java" => (&JAVA, include_str!("ts_v2/queries/java.scm")),
         _ => anyhow::bail!("unsupported retrieval grammar {language}"),
     };
@@ -238,7 +240,11 @@ pub(crate) fn declarations(
         {
             continue;
         }
-        if !seen.insert(node.start_byte()) {
+        if !seen.insert(if language == "yaml" {
+            node.id()
+        } else {
+            node.start_byte()
+        }) {
             continue;
         }
         let captured = m

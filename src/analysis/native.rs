@@ -140,6 +140,15 @@ pub(super) const TOML: Language = Language {
     chunking: super::language::Chunking::Paragraphs,
 };
 
+pub(super) const YAML: Language = Language {
+    identity: "yaml/default/tree-sitter-0.27.0/tree-sitter-yaml-0.7.1/extractor-1",
+    extensions: &["yaml", "yml"],
+    extract: |source| extract(source, tree_sitter_yaml::LANGUAGE.into(), "yaml"),
+    is_native: true,
+    #[cfg(test)]
+    chunking: super::language::Chunking::Paragraphs,
+};
+
 fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analysis> {
     let mut parser = Parser::new();
     parser

@@ -495,6 +495,35 @@ fn toml_tables_dotted_and_quoted_keys_keep_scopes() {
 }
 
 #[test]
+fn yaml_documents_sequences_and_repeated_keys_keep_their_own_ranges() {
+    let result = analyze(
+        "store.yml",
+        "---\nprimary:\n  name: first\n  options: {count: 4, enabled: true}\n---\nsecondary:\n  name: second\n  stores:\n    - name: backup\n",
+    );
+    assert_eq!(
+        result
+            .entities
+            .iter()
+            .filter(|e| e.kind == "section" && e.parent.is_none())
+            .count(),
+        2
+    );
+    let names: Vec<_> = result
+        .entities
+        .iter()
+        .filter(|e| e.name.as_deref() == Some("name"))
+        .collect();
+    assert_eq!(names.len(), 3);
+    assert_ne!(names[0].parent, names[1].parent);
+    assert!(
+        result
+            .entities
+            .iter()
+            .any(|e| e.name.as_deref() == Some("count") && e.kind == "property")
+    );
+}
+
+#[test]
 fn native_snapshots_round_trip_replace_rollback_and_delete() {
     for case in fixture_cases() {
         let path = case["path"].as_str().unwrap();

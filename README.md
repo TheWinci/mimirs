@@ -298,3 +298,7 @@ assignments stay inside command source instead of becoming separate owners.
 TOML uses the native TOML NG 0.7.0 grammar for `.toml`. Existing projects can
 add `"**/*.toml"` and reindex. Tables, table arrays, quoted and dotted keys retain
 their names and source ranges. Configuration values remain exact source.
+
+YAML uses the native 0.7.1 grammar for `.yaml` and `.yml`. Existing projects
+can add `"**/*.yaml"` and `"**/*.yml"` and reindex. Document sections, nested keys,
+flow mappings, sequences and directives retain their written source structure.
