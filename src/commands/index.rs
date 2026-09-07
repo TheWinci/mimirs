@@ -157,6 +157,7 @@ fn index_with_profiled(
         walk::discover(root, &config, |file, found| progress.walking(file, found))
     })?;
     profile.count("files_discovered", walk.paths.len());
+    profile.stage_items("discovery", walk.paths.len());
     for error in &walk.errors {
         progress.diagnostic(&format!("walk_error: {error}"))?;
     }

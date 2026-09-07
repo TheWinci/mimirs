@@ -5,6 +5,8 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::JoinHandle;
 
+use crate::profiling::{Activity, Profiler};
+
 use anyhow::{Context, Result, anyhow, ensure};
 
 struct State {
@@ -66,12 +68,15 @@ impl Drop for Job {
 struct Queue {
     stopped: bool,
     jobs: VecDeque<Arc<Work>>,
+    items: usize,
+    bytes: usize,
 }
 
 #[derive(Default)]
 struct Shared {
     queue: Mutex<Queue>,
     changed: Condvar,
+    profile: Profiler,
 }
 
 pub(crate) struct Pool {
@@ -80,13 +85,25 @@ pub(crate) struct Pool {
 }
 
 impl Pool {
+    #[cfg(test)]
     pub(crate) fn new<W: Send + 'static>(
         workers: Vec<W>,
         operation: impl Fn(&mut W, &str) -> Result<Vec<f32>> + Send + Sync + 'static,
     ) -> Result<Self> {
+        Self::profiled(workers, Profiler::default(), operation)
+    }
+
+    pub(crate) fn profiled<W: Send + 'static>(
+        workers: Vec<W>,
+        profile: Profiler,
+        operation: impl Fn(&mut W, &str) -> Result<Vec<f32>> + Send + Sync + 'static,
+    ) -> Result<Self> {
         ensure!(!workers.is_empty(), "embedding needs at least one worker");
         let mut pool = Self {
-            shared: Arc::default(),
+            shared: Arc::new(Shared {
+                profile,
+                ..Shared::default()
+            }),
             threads: Vec::new(),
         };
         let operation = Arc::new(operation);
@@ -98,11 +115,14 @@ impl Pool {
                     .name("mimirs-embedding".into())
                     .spawn(move || {
                         while let Some((job, ordinal)) = next(&shared) {
+                            let active = shared.profile.stage("inference", Activity::Active);
                             let result = catch_unwind(AssertUnwindSafe(|| {
                                 operation(&mut worker, &job.texts[ordinal])
                                     .with_context(|| format!("embedding chunk {ordinal}"))
                             }))
                             .unwrap_or_else(|_| Err(anyhow!("embedding worker panicked")));
+                            drop(active);
+                            shared.profile.stage_items("inference", 1);
                             let mut state = job.state.lock().unwrap();
                             state.active -= 1;
                             match result {
@@ -138,12 +158,18 @@ impl Pool {
             changed: Condvar::new(),
         });
         if count != 0 {
+            let mut queue = self.shared.queue.lock().unwrap();
+            queue.items += count;
+            queue.bytes += job
+                .texts
+                .iter()
+                .map(|s| s.len() + crate::embedding::DIMENSION * 4)
+                .sum::<usize>();
+            queue.jobs.push_back(job.clone());
             self.shared
-                .queue
-                .lock()
-                .unwrap()
-                .jobs
-                .push_back(job.clone());
+                .profile
+                .stage_queue("inference", queue.items, queue.bytes);
+            drop(queue);
             self.shared.changed.notify_all();
         }
         Job(job)
@@ -159,11 +185,18 @@ fn next(shared: &Shared) -> Option<(Arc<Work>, usize)> {
         if let Some(job) = queue.jobs.front().cloned() {
             let mut state = job.state.lock().unwrap();
             if state.cancelled {
+                queue.items -= job.texts.len() - state.next;
+                queue.bytes -= job.texts[state.next..]
+                    .iter()
+                    .map(|s| s.len() + crate::embedding::DIMENSION * 4)
+                    .sum::<usize>();
                 queue.jobs.pop_front();
                 job.changed.notify_all();
                 continue;
             }
             let ordinal = state.next;
+            queue.items -= 1;
+            queue.bytes -= job.texts[ordinal].len() + crate::embedding::DIMENSION * 4;
             state.next += 1;
             state.active += 1;
             state.calls += 1;
@@ -173,7 +206,9 @@ fn next(shared: &Shared) -> Option<(Arc<Work>, usize)> {
             drop(state);
             return Some((job, ordinal));
         }
+        let idle = shared.profile.stage("inference", Activity::Input);
         queue = shared.changed.wait(queue).unwrap();
+        drop(idle);
     }
 }
 

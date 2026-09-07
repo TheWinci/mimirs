@@ -182,6 +182,14 @@ serialization. Ordinary index output and saved embeddings keep their format.
 An index error writes `complete: false` and the error when the report can be
 saved. Abrupt process termination may prevent a report from being written.
 
+Profile version 2 also records `stages`: active time, input/output wait time,
+item counts, and queued item/payload peaks. Inference active and idle times sum
+the persistent workers from pool startup through shutdown. They can exceed
+elapsed process time. Inference activity includes tokenization, model execution,
+and pooling; it is not a sample of CPU usage. Nested phase stacks are local to
+each thread. With concurrent stages, phase totals are summed thread work and
+must not be added to process wall time.
+
 Use `--model-cache /path/to/separate-cache` to measure model acquisition without
 clearing the normal cache. `init` ordinarily prepares the model first, so a
 cold-cache index experiment includes work that a user may already have waited

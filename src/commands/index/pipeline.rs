@@ -92,6 +92,7 @@ pub(super) fn run<'a>(
                     Err(error) => return Ok(Outcome::Skipped(error)),
                 };
                 file_profile.count("files_read", 1);
+                file_profile.stage_items("source", 1);
                 file_profile.count("source_bytes", source.text.len());
                 if file_profile.measure("reuse_check", || {
                     storage::processing::reusable(connection, &source, policy)
@@ -108,10 +109,12 @@ pub(super) fn run<'a>(
                             diagnostic.span.line_start, diagnostic.column, diagnostic.kind
                         ))?;
                     }
+                    file_profile.stage_items("parsing", 1);
                     let documents = file_profile.measure("chunking_token_budget", || {
                         crate::retrieval::ts_v2::documents(&analysis)
                     })?;
                     file_profile.count("documents", documents.len());
+                    file_profile.stage_items("windows", documents.len());
                     let texts: Vec<_> = file_profile.measure("document_texts", || {
                         documents.iter().map(|d| d.text.clone()).collect()
                     });
@@ -163,6 +166,7 @@ pub(super) fn run<'a>(
             });
             profile.maximum("index_queue_peak_files", pending.len());
             profile.maximum("index_queue_peak_payload_bytes", bytes);
+            profile.stage_queue("windows", pending.len(), bytes);
             if failed {
                 break;
             }
@@ -250,6 +254,7 @@ fn finish<'a>(
             successful.push(path);
             summary.indexed += 1;
             profile.count("files_indexed", 1);
+            profile.stage_items("database", 1);
             progress.indexing(
                 path,
                 (documents.len(), documents.len()),

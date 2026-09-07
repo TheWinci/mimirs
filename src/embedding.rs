@@ -223,6 +223,7 @@ struct OnnxBackend {
     models: Vec<Model>,
     pool: Option<pool::Pool>,
     source_tokenizer: Option<tokenizers::Tokenizer>,
+    worker_profile: Profiler,
     workers: usize,
     profile: Profiler,
 }
@@ -234,6 +235,7 @@ impl OnnxBackend {
             models: Vec::new(),
             pool: None,
             source_tokenizer: None,
+            worker_profile: Profiler::default(),
             workers: 1,
             profile: Profiler::default(),
         }
@@ -315,8 +317,9 @@ impl OnnxBackend {
         if self.pool.is_none() {
             self.ensure_models(self.workers)?;
             self.source_tokenizer = Some(ts_v2::unbounded(self.models[0].tokenizer.clone())?);
-            self.pool = Some(pool::Pool::new(
+            self.pool = Some(pool::Pool::profiled(
                 std::mem::take(&mut self.models),
+                self.worker_profile.clone(),
                 |model, text| {
                     let mut vectors = model.embed(&[text])?;
                     validate(&vectors, 1)?;
@@ -445,6 +448,7 @@ pub fn production_profiled(
         None => model_cache_dir()?,
     });
     backend.profile = profile.clone();
+    backend.worker_profile = profile.clone();
     Ok(Embedder::new(backend).with_profile(profile))
 }
 

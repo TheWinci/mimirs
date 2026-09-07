@@ -103,3 +103,29 @@ fn cancelled_queued_files_never_reach_the_model() {
     drop(pool);
     assert_eq!(calls.load(Ordering::SeqCst), 1);
 }
+
+#[test]
+fn worker_metrics_survive_file_completion_and_account_for_cancelled_work() {
+    let profile = Profiler::enabled();
+    let (started, start) = mpsc::channel();
+    let (release, released) = mpsc::channel();
+    let released = Mutex::new(released);
+    let pool = Pool::profiled(vec![()], profile.clone(), move |_, _| {
+        started.send(()).unwrap();
+        released.lock().unwrap().recv().unwrap();
+        Ok(vec![0.0])
+    })
+    .unwrap();
+    let mut first = pool.submit(vec!["active".into()]);
+    start.recv().unwrap();
+    let second = pool.submit(vec!["cancelled".into(); 7]);
+    drop(second);
+    release.send(()).unwrap();
+    first.wait().unwrap();
+    drop(pool);
+    let report = profile.finish(None).unwrap();
+    let stage = &report.stages["inference"];
+    assert_eq!(stage.items, 1);
+    assert_eq!(stage.peak_queued_items, 7);
+    assert!(stage.active_seconds > 0.0);
+}

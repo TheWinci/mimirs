@@ -69,13 +69,17 @@ impl SourceTask {
         match &mut self.inner {
             Task::Ready(vectors) => Ok(std::mem::take(vectors)),
             Task::Pending { job, plans } => {
-                let result = profile.measure("embedding_wait", || job.wait());
+                let result = profile.measure("embedding_wait", || {
+                    let _wait = profile.stage("windows", crate::profiling::Activity::Output);
+                    job.wait()
+                });
                 for _ in 0..job.calls() {
                     profile.batch(1);
                 }
                 self.counted = true;
                 let vectors = result?;
                 validate(&vectors, vectors.len())?;
+                let _merge = profile.scope("vector_merge");
                 let total = plans.len();
                 let mut output = Vec::with_capacity(total);
                 for batch in plans.chunks(1024) {
@@ -89,6 +93,7 @@ impl SourceTask {
                     }
                     progress(output.len(), total)?;
                 }
+                profile.stage_items("merge", output.len());
                 Ok(output)
             }
         }
