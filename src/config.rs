@@ -26,6 +26,7 @@ impl Default for Config {
             embedding_workers: None,
             generated: Vec::new(),
             include: [
+                "**/*.toml",
                 "**/*.sh",
                 "**/*.bash",
                 "**/*.ex",

@@ -294,3 +294,7 @@ Bash uses the native 0.25.1 grammar for `.sh` and `.bash`. Existing projects
 can add `"**/*.sh"` and `"**/*.bash"` and reindex. Functions, persistent variables,
 readonly declarations and sourced files become chunks. Command-local environment
 assignments stay inside command source instead of becoming separate owners.
+
+TOML uses the native TOML NG 0.7.0 grammar for `.toml`. Existing projects can
+add `"**/*.toml"` and reindex. Tables, table arrays, quoted and dotted keys retain
+their names and source ranges. Configuration values remain exact source.

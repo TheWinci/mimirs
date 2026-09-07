@@ -131,6 +131,15 @@ pub(super) const BASH: Language = Language {
     chunking: super::language::Chunking::Paragraphs,
 };
 
+pub(super) const TOML: Language = Language {
+    identity: "toml/default/tree-sitter-0.27.0/tree-sitter-toml-ng-0.7.0/extractor-1",
+    extensions: &["toml"],
+    extract: |source| extract(source, tree_sitter_toml_ng::LANGUAGE.into(), "toml"),
+    is_native: true,
+    #[cfg(test)]
+    chunking: super::language::Chunking::Paragraphs,
+};
+
 fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analysis> {
     let mut parser = Parser::new();
     parser

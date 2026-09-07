@@ -149,6 +149,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
     static ZIG: OnceLock<Result<Query, String>> = OnceLock::new();
     static ELIXIR: OnceLock<Result<Query, String>> = OnceLock::new();
     static BASH: OnceLock<Result<Query, String>> = OnceLock::new();
+    static TOML: OnceLock<Result<Query, String>> = OnceLock::new();
     static JAVA: OnceLock<Result<Query, String>> = OnceLock::new();
     let (slot, text) = match language {
         "rust" => (&RUST, include_str!("ts_v2/queries/rust.scm")),
@@ -170,6 +171,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
         "zig" => (&ZIG, include_str!("ts_v2/queries/zig.scm")),
         "elixir" => (&ELIXIR, include_str!("ts_v2/queries/elixir.scm")),
         "bash" => (&BASH, include_str!("ts_v2/queries/bash.scm")),
+        "toml" => (&TOML, include_str!("ts_v2/queries/toml.scm")),
         "java" => (&JAVA, include_str!("ts_v2/queries/java.scm")),
         _ => anyhow::bail!("unsupported retrieval grammar {language}"),
     };

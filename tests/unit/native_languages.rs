@@ -465,6 +465,36 @@ fn bash_environment_bindings_are_not_persistent_declarations() {
 }
 
 #[test]
+fn toml_tables_dotted_and_quoted_keys_keep_scopes() {
+    let result = analyze(
+        "store.toml",
+        "[archive.primary]\n\"cache path\" = \"manifest\"\nlimits.count = 4\n[[archive.stores]]\nname = \"backup\"\n",
+    );
+    for (name, kind) in [
+        ("archive.primary", "section"),
+        ("\"cache path\"", "property"),
+        ("limits.count", "property"),
+        ("archive.stores", "section"),
+    ] {
+        assert!(
+            result
+                .entities
+                .iter()
+                .any(|e| e.name.as_deref() == Some(name) && e.kind == kind),
+            "{name}: {:?}",
+            result.entities
+        );
+    }
+    assert!(
+        result
+            .entities
+            .iter()
+            .filter(|e| e.kind == "property")
+            .all(|e| e.parent.is_some())
+    );
+}
+
+#[test]
 fn native_snapshots_round_trip_replace_rollback_and_delete() {
     for case in fixture_cases() {
         let path = case["path"].as_str().unwrap();
