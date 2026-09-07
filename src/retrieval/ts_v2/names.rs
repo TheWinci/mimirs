@@ -2,6 +2,52 @@
 use super::text;
 use tree_sitter::Node;
 
+pub(super) fn php(node: Node<'_>, source: &str) -> Option<String> {
+    match node.kind() {
+        "namespace_definition" => Some(
+            node.child_by_field_name("name")
+                .map_or("(global)", |n| text(n, source))
+                .into(),
+        ),
+        "property_declaration" | "const_declaration" => {
+            let property = node.kind() == "property_declaration";
+            let names: Vec<_> = node
+                .named_children(&mut node.walk())
+                .filter(|n| {
+                    n.kind()
+                        == if property {
+                            "property_element"
+                        } else {
+                            "const_element"
+                        }
+                })
+                .filter_map(|n| {
+                    if property {
+                        n.child_by_field_name("name")
+                    } else {
+                        n.named_child(0)
+                    }
+                })
+                .map(|n| text(n, source).strip_prefix('$').unwrap_or(text(n, source)))
+                .collect();
+            (!names.is_empty()).then(|| names.join(", "))
+        }
+        "property_promotion_parameter" | "assignment_expression" => node
+            .child_by_field_name(if node.kind() == "assignment_expression" {
+                "left"
+            } else {
+                "name"
+            })
+            .map(|n| {
+                text(n, source)
+                    .strip_prefix('$')
+                    .unwrap_or(text(n, source))
+                    .into()
+            }),
+        _ => None,
+    }
+}
+
 pub(super) fn csharp(node: Node<'_>, source: &str) -> Option<String> {
     match node.kind() {
         "field_declaration" | "event_field_declaration" => {

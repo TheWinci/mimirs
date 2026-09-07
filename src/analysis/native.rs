@@ -50,6 +50,15 @@ pub(super) const RUBY: Language = Language {
     chunking: super::language::Chunking::Paragraphs,
 };
 
+pub(super) const PHP: Language = Language {
+    identity: "php/default/tree-sitter-0.27.0/tree-sitter-php-0.24.2/extractor-1",
+    extensions: &["php"],
+    extract: |source| extract(source, tree_sitter_php::LANGUAGE_PHP.into(), "php"),
+    is_native: true,
+    #[cfg(test)]
+    chunking: super::language::Chunking::Paragraphs,
+};
+
 fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analysis> {
     let mut parser = Parser::new();
     parser

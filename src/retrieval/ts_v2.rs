@@ -140,6 +140,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
     static CPP: OnceLock<Result<Query, String>> = OnceLock::new();
     static CSHARP: OnceLock<Result<Query, String>> = OnceLock::new();
     static RUBY: OnceLock<Result<Query, String>> = OnceLock::new();
+    static PHP: OnceLock<Result<Query, String>> = OnceLock::new();
     static JAVA: OnceLock<Result<Query, String>> = OnceLock::new();
     let (slot, text) = match language {
         "rust" => (&RUST, include_str!("ts_v2/queries/rust.scm")),
@@ -152,6 +153,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
         "cpp" => (&CPP, include_str!("ts_v2/queries/cpp.scm")),
         "csharp" => (&CSHARP, include_str!("ts_v2/queries/csharp.scm")),
         "ruby" => (&RUBY, include_str!("ts_v2/queries/ruby.scm")),
+        "php" => (&PHP, include_str!("ts_v2/queries/php.scm")),
         "java" => (&JAVA, include_str!("ts_v2/queries/java.scm")),
         _ => anyhow::bail!("unsupported retrieval grammar {language}"),
     };
@@ -276,15 +278,43 @@ pub(crate) fn declarations(
             }
             .into();
         }
+        if language == "php" {
+            if node.kind() == "property_declaration" {
+                kind = "field".into();
+            }
+            if node.kind() == "assignment_expression"
+                && node
+                    .child_by_field_name("right")
+                    .is_some_and(|n| matches!(n.kind(), "arrow_function" | "anonymous_function"))
+            {
+                kind = "function".into();
+            }
+        }
+        let captured = captured.map(|n| {
+            if language == "php" {
+                n.strip_prefix('$').unwrap_or(&n).to_owned()
+            } else {
+                n
+            }
+        });
         let name = declared_name(node, source, language)
             .or(captured)
             .or_else(|| special("default_export").then(|| "default".into()));
-        let node_end = if language == "csharp" && node.kind() == "file_scoped_namespace_declaration"
+        let mut node_end =
+            if language == "csharp" && node.kind() == "file_scoped_namespace_declaration" {
+                root.end_byte()
+            } else {
+                node.end_byte()
+            };
+        if language == "php"
+            && node.kind() == "namespace_definition"
+            && node.child_by_field_name("body").is_none()
         {
-            root.end_byte()
-        } else {
-            node.end_byte()
-        };
+            node_end = root
+                .named_children(&mut root.walk())
+                .find(|n| n.kind() == "namespace_definition" && n.start_byte() > node.start_byte())
+                .map_or(root.end_byte(), |n| n.start_byte());
+        }
         flat.push(Entity {
             node_type: node.kind().into(),
             kind,
@@ -346,6 +376,9 @@ fn contains(node: Option<Node<'_>>, kind: &str) -> bool {
 }
 
 fn declared_name(node: Node<'_>, source: &str, language: &str) -> Option<String> {
+    if language == "php" {
+        return names::php(node, source);
+    }
     if language == "ruby" {
         if node.kind() == "singleton_class" {
             return Some(format!(

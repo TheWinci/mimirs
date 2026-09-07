@@ -226,6 +226,37 @@ fn ruby_singleton_classes_constants_and_lambdas_have_distinct_kinds() {
 }
 
 #[test]
+fn php_namespaces_end_before_the_next_namespace_and_strip_property_sigils() {
+    let source = "<?php\nnamespace First;\nclass Store { public $count, $size; public function __construct(public int $limit) {} }\n$recover = fn($path) => $path;\nnamespace Second;\nclass Store {}\n";
+    let result = analyze("store.php", source);
+    assert_eq!(
+        result.entities[0].span.end,
+        source.find("namespace Second").unwrap()
+    );
+    for (name, kind) in [
+        ("count, size", "field"),
+        ("limit", "field"),
+        ("recover", "function"),
+    ] {
+        assert!(
+            result
+                .entities
+                .iter()
+                .any(|e| e.name.as_deref() == Some(name) && e.kind == kind),
+            "{name}: {:?}",
+            result.entities
+        );
+    }
+    let stores: Vec<_> = result
+        .entities
+        .iter()
+        .filter(|e| e.name.as_deref() == Some("Store"))
+        .collect();
+    assert_eq!(stores.len(), 2);
+    assert_ne!(stores[0].parent, stores[1].parent);
+}
+
+#[test]
 fn native_snapshots_round_trip_replace_rollback_and_delete() {
     for case in fixture_cases() {
         let path = case["path"].as_str().unwrap();

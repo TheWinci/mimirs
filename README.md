@@ -253,3 +253,8 @@ remaining source, and property, event, operator and lambda names are retained.
 Ruby uses the native 0.23.1 grammar for `.rb`, included by fresh configs. Add
 `"**/*.rb"` to existing configs and reindex. Modules, singleton methods and
 classes, constant assignments and assigned lambdas retain their source names.
+
+PHP uses the native 0.24.2 grammar for `.php`, including PHP tags and embedded
+text. Fresh configs include it; existing projects can add `"**/*.php"` and
+reindex. Namespace boundaries, promoted properties and assigned functions keep
+source ownership. Property names omit their leading dollar sign.
