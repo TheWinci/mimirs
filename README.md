@@ -85,6 +85,10 @@ replacement is invalidated, and later queued results are discarded. In-flight
 model calls finish before indexing returns. The scheduling change preserves
 existing index compatibility and singleton inference inputs.
 
+File discovery streams through a bounded channel while indexing runs. Until
+discovery finishes, progress reports completed files without inventing a final
+total. Paths still publish in the same canonical order as a fully sorted walk.
+
 Native tree-sitter grammars identify retrieval chunks for the
 [languages listed here](docs/languages.md#native-syntax). They ship in the binary and
 need no language servers or language runtimes. Written declarations, attached

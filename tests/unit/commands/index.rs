@@ -1509,3 +1509,39 @@ fn out_of_order_failure_preserves_earlier_commits_and_later_snapshots() {
     assert_eq!(report.counters["files_indexed"], 1);
     assert!(report.counters["embedding_calls"] >= 2);
 }
+#[test]
+fn streamed_index_reads_source_before_discovery_finishes() {
+    let dir = project(&[]);
+    for n in 0..200 {
+        fs::write(dir.path().join(format!("f{n:03}.rs")), "fn example() {}\n").unwrap();
+    }
+    let profile = Profiler::enabled();
+    let mut stderr = Vec::new();
+    let mut progress = Progress::new(dir.path(), &mut stderr, false, &|| Duration::ZERO);
+    let first = std::cell::Cell::new(true);
+    let summary = index_with_mode(
+        dir.path(),
+        || Ok(Embedder::new(backend())),
+        &mut progress,
+        |root, path| {
+            if first.replace(false) {
+                assert!(profile.counter("files_discovered") < 200);
+            }
+            source::read(root, path)
+        },
+        crate::analysis::extract,
+        &profile,
+        true,
+    )
+    .unwrap();
+    assert_eq!(summary.indexed, 200);
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("discovery in progress")
+    );
+    assert_eq!(
+        profile.finish(None).unwrap().counters["files_discovered"],
+        200
+    );
+}

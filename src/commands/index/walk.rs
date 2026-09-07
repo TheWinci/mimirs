@@ -1,5 +1,7 @@
 use std::path::Path;
 
+pub(super) mod stream;
+
 use ignore::WalkBuilder;
 use ignore::overrides::{Override, OverrideBuilder};
 

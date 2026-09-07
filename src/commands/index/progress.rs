@@ -57,6 +57,12 @@ impl<'a> Progress<'a> {
         finished: bool,
     ) -> io::Result<()> {
         let _scope = self.profile.scope("progress_output");
+        if files.1 == usize::MAX {
+            return self.render(&format!(
+                "indexing: {}\nphase: indexing\nfile: {}\nfile_progress: {}% ({}/{} documents)\nfiles_completed: {} (discovery in progress)\nelapsed_time: {:.2} seconds\n",
+                self.root, plain(file), percent(documents, finished), documents.0, documents.1,
+                files.0, (self.elapsed)().as_secs_f64()));
+        }
         self.render(&format!(
             "indexing: {}\nphase: indexing\nfile: {}\nfile_progress: {}% ({}/{} documents)\nindex_progress: {}% ({}/{} files)\nelapsed_time: {:.2} seconds\n",
             self.root, plain(file), percent(documents, finished), documents.0, documents.1,

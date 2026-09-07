@@ -7,6 +7,7 @@ use anyhow::{Context, ensure};
 
 use crate::{config::Config, embedding, source, storage};
 
+mod channel;
 mod pipeline;
 mod progress;
 mod walk;
@@ -115,13 +116,14 @@ fn index_profiled(
     progress: &mut Progress<'_>,
     profile: &Profiler,
 ) -> anyhow::Result<Summary> {
-    index_with_profiled(
+    index_with_mode(
         root,
         make_embedder,
         progress,
         source::read,
         crate::analysis::extract,
         profile,
+        !cfg!(test),
     )
 }
 
@@ -143,6 +145,7 @@ fn index_with(
     )
 }
 
+#[cfg(test)]
 fn index_with_profiled(
     root: &Path,
     make_embedder: impl FnOnce() -> anyhow::Result<embedding::Embedder>,
@@ -151,16 +154,53 @@ fn index_with_profiled(
     extract: impl Fn(source::SourceFile) -> anyhow::Result<crate::analysis::Analysis>,
     profile: &Profiler,
 ) -> anyhow::Result<Summary> {
+    index_with_mode(root, make_embedder, progress, read, extract, profile, false)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn index_with_mode(
+    root: &Path,
+    make_embedder: impl FnOnce() -> anyhow::Result<embedding::Embedder>,
+    progress: &mut Progress<'_>,
+    read: impl Fn(&Path, &str) -> anyhow::Result<source::SourceFile>,
+    extract: impl Fn(source::SourceFile) -> anyhow::Result<crate::analysis::Analysis>,
+    profile: &Profiler,
+    streaming: bool,
+) -> anyhow::Result<Summary> {
     let config = profile.measure("config", || Config::load(root))?;
     progress.walking("-", 0)?;
-    let walk = profile.measure("discovery", || {
-        walk::discover(root, &config, |file, found| progress.walking(file, found))
-    })?;
-    profile.count("files_discovered", walk.paths.len());
-    profile.stage_items("discovery", walk.paths.len());
-    for error in &walk.errors {
-        progress.diagnostic(&format!("walk_error: {error}"))?;
-    }
+    let cancel = channel::Cancel::default();
+    let _cancel_on_exit = cancel.guard();
+    let (paths, total): (
+        Box<dyn Iterator<Item = anyhow::Result<walk::stream::Event>>>,
+        _,
+    ) = if streaming {
+        (
+            Box::new(walk::stream::Stream::start(
+                root, &config, profile, &cancel,
+            )?),
+            None,
+        )
+    } else {
+        let walk = profile.measure("discovery", || {
+            walk::discover(root, &config, |file, found| progress.walking(file, found))
+        })?;
+        profile.count("files_discovered", walk.paths.len());
+        profile.stage_items("discovery", walk.paths.len());
+        let count = walk.paths.len();
+        let events = walk
+            .errors
+            .into_iter()
+            .map(walk::stream::Event::Error)
+            .chain(
+                walk.paths
+                    .into_iter()
+                    .enumerate()
+                    .map(|(ordinal, path)| walk::stream::Event::Path { path, ordinal }),
+            )
+            .chain(std::iter::once(walk::stream::Event::End { found: count }));
+        (Box::new(events.map(Ok)), Some(count))
+    };
 
     let database_path = root.join(".mimirs/index.db");
     let mut database = profile.measure("database_open", || storage::open(&database_path))?;
@@ -184,13 +224,11 @@ fn index_with_profiled(
         storage::policy::configure(&mut database.connection, &document_policy)
     })?;
 
-    let mut summary = Summary {
-        walk_errors: walk.errors.len(),
-        ..Summary::default()
-    };
+    let mut summary = Summary::default();
     let successful = pipeline::run(
         root,
-        &walk.paths,
+        paths,
+        total,
         &mut database.connection,
         &mut embedder,
         &document_policy,
@@ -201,7 +239,10 @@ fn index_with_profiled(
         extract,
     )?;
     profile.measure("reconciliation", || {
-        storage::reconcile(&mut database.connection, &successful)
+        storage::reconcile(
+            &mut database.connection,
+            &successful.iter().map(String::as_str).collect::<Vec<_>>(),
+        )
     })?;
     Ok(summary)
 }

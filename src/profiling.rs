@@ -86,6 +86,13 @@ pub struct FileScope {
 }
 
 impl Profiler {
+    #[cfg(test)]
+    pub fn counter(&self, name: &'static str) -> u64 {
+        self.0.as_ref().map_or(0, |state| {
+            *state.lock().unwrap().counters.get(name).unwrap_or(&0)
+        })
+    }
+
     pub fn enabled() -> Self {
         Self(Some(Arc::new(Mutex::new(State {
             start: Instant::now(),

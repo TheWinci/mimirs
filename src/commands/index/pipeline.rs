@@ -23,17 +23,17 @@ enum Outcome {
     Changed(anyhow::Result<Box<Prepared>>),
 }
 
-struct Pending<'a> {
+struct Pending {
     // Drop/cancel the job before merging its profiling counters.
     outcome: anyhow::Result<Outcome>,
     profile: Profiler,
     _scope: FileScope,
-    path: &'a str,
+    path: String,
     ordinal: usize,
     bytes: usize,
 }
 
-impl Pending<'_> {
+impl Pending {
     fn ready(&self) -> bool {
         match &self.outcome {
             Ok(Outcome::Changed(Ok(prepared))) => prepared.task.ready(),
@@ -43,9 +43,10 @@ impl Pending<'_> {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn run<'a>(
+pub(super) fn run(
     root: &Path,
-    paths: &'a [String],
+    paths: impl Iterator<Item = anyhow::Result<walk::stream::Event>>,
+    mut total: Option<usize>,
     connection: &mut rusqlite::Connection,
     embedder: &mut embedding::Embedder,
     policy: &str,
@@ -54,15 +55,28 @@ pub(super) fn run<'a>(
     summary: &mut Summary,
     read: impl Fn(&Path, &str) -> anyhow::Result<source::SourceFile>,
     extract: impl Fn(source::SourceFile) -> anyhow::Result<Analysis>,
-) -> anyhow::Result<Vec<&'a str>> {
-    let mut pending = VecDeque::<Pending<'a>>::new();
+) -> anyhow::Result<Vec<String>> {
+    let mut pending = VecDeque::<Pending>::new();
     let mut bytes = 0usize;
     let mut successful = Vec::new();
     let limit = embedder.pending_files().max(1);
     profile.count("index_queue_file_limit", limit);
     profile.count("index_queue_payload_target_bytes", PAYLOAD_TARGET);
     let result = (|| {
-        for (ordinal, path) in paths.iter().enumerate() {
+        for event in paths {
+            let (owned_path, ordinal) = match event? {
+                walk::stream::Event::Path { path, ordinal } => (path, ordinal),
+                walk::stream::Event::Error(error) => {
+                    progress.diagnostic(&format!("walk_error: {error}"))?;
+                    summary.walk_errors += 1;
+                    continue;
+                }
+                walk::stream::Event::End { found } => {
+                    total = Some(found);
+                    continue;
+                }
+            };
+            let path = owned_path.as_str();
             // The payload threshold stops read-ahead. A single additional file
             // may exceed it, so unusually large files still remain indexable.
             while !pending.is_empty()
@@ -79,14 +93,19 @@ pub(super) fn run<'a>(
                     progress,
                     summary,
                     &mut successful,
-                    paths.len(),
+                    total.unwrap_or(usize::MAX),
                 )?;
             }
             let (file_profile, scope) = profile.fork_file(path);
             progress.set_profile(file_profile.clone());
             let completed = summary.indexed + summary.unchanged + summary.skipped;
             let outcome = (|| {
-                progress.indexing(path, (0, 0), (completed, paths.len()), false)?;
+                progress.indexing(
+                    path,
+                    (0, 0),
+                    (completed, total.unwrap_or(usize::MAX)),
+                    false,
+                )?;
                 let source = match file_profile.measure("source_read", || read(root, path)) {
                     Ok(source) => source,
                     Err(error) => return Ok(Outcome::Skipped(error)),
@@ -122,17 +141,17 @@ pub(super) fn run<'a>(
                         progress.indexing(
                             path,
                             (0, texts.len()),
-                            (completed, paths.len()),
+                            (completed, total.unwrap_or(usize::MAX)),
                             false,
                         )?;
                     }
                     let task = embedder
-                        .submit_ts_documents(&texts, &file_profile, |done, total| {
+                        .submit_ts_documents(&texts, &file_profile, |done, document_total| {
                             if progress.is_terminal() {
                                 progress.indexing(
                                     path,
-                                    (done, total),
-                                    (completed, paths.len()),
+                                    (done, document_total),
+                                    (completed, total.unwrap_or(usize::MAX)),
                                     false,
                                 )?;
                             }
@@ -160,7 +179,7 @@ pub(super) fn run<'a>(
                 outcome,
                 profile: file_profile,
                 _scope: scope,
-                path,
+                path: path.to_owned(),
                 ordinal,
                 bytes: retained,
             });
@@ -179,7 +198,7 @@ pub(super) fn run<'a>(
                 progress,
                 summary,
                 &mut successful,
-                paths.len(),
+                total.unwrap_or(usize::MAX),
             )?;
         }
         Ok(successful)
@@ -191,13 +210,13 @@ pub(super) fn run<'a>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn finish<'a>(
-    file: Pending<'a>,
+fn finish(
+    file: Pending,
     connection: &mut rusqlite::Connection,
     policy: &str,
     progress: &mut Progress<'_>,
     summary: &mut Summary,
-    successful: &mut Vec<&'a str>,
+    successful: &mut Vec<String>,
     total: usize,
 ) -> anyhow::Result<()> {
     let Pending {
@@ -208,6 +227,7 @@ fn finish<'a>(
         ordinal,
         ..
     } = file;
+    let path = path.as_str();
     progress.set_profile(profile.clone());
     match outcome? {
         Outcome::Skipped(error) => {
@@ -217,7 +237,7 @@ fn finish<'a>(
             progress.indexing(path, (0, 0), (ordinal + 1, total), true)?;
         }
         Outcome::Reused => {
-            successful.push(path);
+            successful.push(path.to_owned());
             summary.unchanged += 1;
             profile.count("files_reused", 1);
             progress.indexing(path, (0, 0), (ordinal + 1, total), true)?;
@@ -251,7 +271,7 @@ fn finish<'a>(
                 )
             })?;
             progress.diagnostic(&format!("documents: {path}: {}", documents.len()))?;
-            successful.push(path);
+            successful.push(path.to_owned());
             summary.indexed += 1;
             profile.count("files_indexed", 1);
             profile.stage_items("database", 1);
