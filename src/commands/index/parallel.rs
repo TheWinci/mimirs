@@ -41,6 +41,19 @@ enum Prepared {
     Failed(anyhow::Error),
 }
 
+struct Complete {
+    analysis: Arc<Analysis>,
+    documents: Arc<Vec<Document>>,
+    vectors: Result<Vec<Vec<f32>>>,
+}
+
+enum Completed {
+    Reused,
+    Skipped(anyhow::Error),
+    Changed(Result<Complete>),
+    Failed(anyhow::Error),
+}
+
 enum Message<T> {
     // Drop/cancel work before the last file profile and admission lease.
     File(T, Arc<File>),
@@ -75,6 +88,7 @@ pub(super) fn run(
     let capacity = workers.saturating_mul(2).max(1);
     let (parsed_tx, parsed_rx) = channel::bounded(capacity, "parsed", profile, &cancel);
     let (ready_tx, ready_rx) = channel::bounded(capacity, "prepared", profile, &cancel);
+    let (write_tx, write_rx) = channel::bounded(capacity, "writer", profile, &cancel);
     let (_shutdown_tx, shutdown_rx) =
         channel::bounded::<()>(1, "planner_shutdown", profile, &cancel);
     std::thread::scope(|scope| {
@@ -85,10 +99,11 @@ pub(super) fn run(
             }
         });
         let planner = scope.spawn(move || prepare(worker, parsed_rx, ready_tx, shutdown_rx));
-        let result = consume(&ready_rx, connection, policy, progress, profile, summary);
+        let merger = scope.spawn(move || merge(ready_rx, write_tx));
+        let result = consume(&write_rx, connection, policy, progress, profile, summary);
         cancel.cancel();
-        drop(ready_rx);
-        let joined = [parser.join(), planner.join()];
+        drop(write_rx);
+        let joined = [parser.join(), planner.join(), merger.join()];
         if joined.iter().any(Result::is_err) {
             anyhow::bail!("index worker panicked");
         }
@@ -226,8 +241,46 @@ fn prepare(
     shutdown.recv();
 }
 
+fn merge(receive: channel::Receiver<Message<Prepared>>, send: channel::Sender<Message<Completed>>) {
+    while let Some(message) = receive.recv() {
+        let message = match message {
+            Message::File(prepared, file) => {
+                let completed = match prepared {
+                    Prepared::Reused => Completed::Reused,
+                    Prepared::Skipped(error) => Completed::Skipped(error),
+                    Prepared::Failed(error) => Completed::Failed(error),
+                    Prepared::Changed(work) => Completed::Changed(work.map(
+                        |Work {
+                             task,
+                             analysis,
+                             documents,
+                         }| {
+                            let vectors = task
+                                .finish(&file.profile, |_, _| Ok(()))
+                                .with_context(|| format!("cannot embed source file {}", file.path));
+                            Complete {
+                                analysis,
+                                documents,
+                                vectors,
+                            }
+                        },
+                    )),
+                };
+                Message::File(completed, file)
+            }
+            Message::WalkError(error) => Message::WalkError(error),
+            Message::End(found) => Message::End(found),
+            Message::Fatal(error) => Message::Fatal(error),
+        };
+        let bytes = message.bytes();
+        if send.send(message, bytes).is_err() {
+            return;
+        }
+    }
+}
+
 fn consume(
-    receive: &channel::Receiver<Message<Prepared>>,
+    receive: &channel::Receiver<Message<Completed>>,
     connection: &mut rusqlite::Connection,
     policy: &str,
     progress: &mut Progress<'_>,
@@ -262,25 +315,25 @@ fn consume(
             );
             progress.set_profile(file.profile.clone());
             match prepared {
-                Prepared::Reused => {
+                Completed::Reused => {
                     successful.push(file.path.clone());
                     summary.unchanged += 1;
                     file.profile.count("files_reused", 1);
                 }
-                Prepared::Skipped(error) => {
+                Completed::Skipped(error) => {
                     progress.diagnostic(&format!("skipped: {error:#}"))?;
                     summary.skipped += 1;
                     file.profile.count("files_skipped", 1);
                 }
-                Prepared::Failed(error) => return Err(error),
-                Prepared::Changed(work) => {
+                Completed::Failed(error) => return Err(error),
+                Completed::Changed(work) => {
                     file.profile.measure("invalidation", || {
                         storage::invalidate(connection, &file.path)
                     })?;
-                    let Work {
-                        task,
+                    let Complete {
                         analysis,
                         documents,
+                        vectors,
                     } = work?;
                     for diagnostic in &analysis.diagnostics {
                         progress.diagnostic(&format!(
@@ -291,19 +344,7 @@ fn consume(
                             diagnostic.kind
                         ))?;
                     }
-                    let vectors = task
-                        .finish(&file.profile, |done, count| {
-                            if progress.is_terminal() {
-                                progress.indexing(
-                                    &file.path,
-                                    (done, count),
-                                    (file.ordinal, usize::MAX),
-                                    false,
-                                )?;
-                            }
-                            Ok(())
-                        })
-                        .with_context(|| format!("cannot embed source file {}", file.path))?;
+                    let vectors = vectors?;
                     ensure!(
                         file.source_hash == storage::processing::source_hash(&analysis.source.text),
                         "source generation changed"

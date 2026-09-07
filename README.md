@@ -73,7 +73,8 @@ Each worker uses one inference thread. Larger values are clamped to available
 CPUs; zero and non-integer values are invalid. Remove the entry to restore the
 automatic default. This controls inference concurrency, not a hard CPU percentage.
 A reader/parser worker and a window preparation worker run alongside inference.
-Each owns its data and SQLite connections stay on their owning threads. Each worker
+A separate merger collects ordered vectors, and one writer owns SQLite
+mutations. Database writes can overlap the next file's preparation and inference. Each worker
 owns a model session, and its thread and session persist across files. The pool
 starts when a file needs embeddings. Changing the worker setting does not
 require rebuilding unchanged files. Search embeds its query with one worker.

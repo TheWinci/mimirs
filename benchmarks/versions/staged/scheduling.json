@@ -1,0 +1,1611 @@
+{
+  "binarySha256": "fe2b4d4baf689b7148e7dfb8e2d175f3130d45e9ce51e0e27b9239cb2636864e",
+  "workers": 3,
+  "corpora": {
+    "mimirs": {
+      "manifestSha256": "4ae72d580987826041a56e5fce02463ca7986c6c76b86f4d93c8848b31c7160c",
+      "querySha256": "13c243a6e86c666f5dc5d2bc41d7ddcf6e24c2eaa87beeb4ccb17b708ba986c6",
+      "runs": {
+        "fresh": {
+          "timing": {
+            "command": [
+              "/private/tmp/mimirs-staged-s4/engines/mimirs",
+              "index",
+              "--profile",
+              "/private/tmp/mimirs-staged-s4/results/mimirs/fresh-profile.json"
+            ],
+            "wall_seconds": 12.91391558299074,
+            "exit_code": 0,
+            "user_seconds": 35.87,
+            "system_seconds": 0.47,
+            "peak_rss_bytes": 274628608
+          },
+          "counters": {
+            "documents": 859,
+            "embedding_calls": 1572,
+            "embedding_documents": 1572,
+            "embedding_worker_limit": 3,
+            "files_discovered": 80,
+            "files_indexed": 80,
+            "files_read": 80,
+            "index_queue_file_limit": 6,
+            "index_queue_payload_target_bytes": 33554432,
+            "index_queue_peak_files": 6,
+            "index_queue_peak_payload_bytes": 11084544,
+            "model_asset_bytes": 71052093,
+            "model_assets_cached": 6,
+            "source_bytes": 765926
+          },
+          "stages": {
+            "admission": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 6,
+              "peak_queued_bytes": 11084544
+            },
+            "database": {
+              "active_seconds": 0.251839699,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 80,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "discovery": {
+              "active_seconds": 0.004581999000000003,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 80,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "inference": {
+              "active_seconds": 35.22780430199995,
+              "input_wait_seconds": 0.051458249,
+              "output_wait_seconds": 0.0,
+              "items": 1572,
+              "peak_queued_items": 301,
+              "peak_queued_bytes": 640310
+            },
+            "merge": {
+              "active_seconds": 0.000533329,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 859,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "parsed": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 10.099962833999998,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 5,
+              "peak_queued_bytes": 3431168
+            },
+            "parsing": {
+              "active_seconds": 0.21186762999999997,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 80,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "paths": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.9493082930000001,
+              "items": 0,
+              "peak_queued_items": 64,
+              "peak_queued_bytes": 1490
+            },
+            "planner_shutdown": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.873741125,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "prepared": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.113210333,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 5,
+              "peak_queued_bytes": 10146880
+            },
+            "source": {
+              "active_seconds": 0.007173341999999995,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 10.726808081999996,
+              "items": 80,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "windows": {
+              "active_seconds": 0.806235211,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 11.745989995000004,
+              "items": 859,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "writer": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 11.614534163999998,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 2,
+              "peak_queued_bytes": 3431168
+            }
+          }
+        },
+        "unchanged": {
+          "timing": {
+            "command": [
+              "/private/tmp/mimirs-staged-s4/engines/mimirs",
+              "index",
+              "--profile",
+              "/private/tmp/mimirs-staged-s4/results/mimirs/unchanged-profile.json"
+            ],
+            "wall_seconds": 0.13088041596347466,
+            "exit_code": 0,
+            "user_seconds": 0.09,
+            "system_seconds": 0.03,
+            "peak_rss_bytes": 131055616
+          },
+          "counters": {
+            "embedding_worker_limit": 3,
+            "files_discovered": 80,
+            "files_read": 80,
+            "files_reused": 80,
+            "index_queue_file_limit": 6,
+            "index_queue_payload_target_bytes": 33554432,
+            "index_queue_peak_files": 2,
+            "index_queue_peak_payload_bytes": 6540544,
+            "model_asset_bytes": 23684031,
+            "model_assets_cached": 2,
+            "source_bytes": 765926
+          },
+          "stages": {
+            "admission": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 2,
+              "peak_queued_bytes": 6540544
+            },
+            "database": {
+              "active_seconds": 7.0209e-05,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "discovery": {
+              "active_seconds": 0.0022412479999999735,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 80,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "parsed": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.028949743999999996,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 2,
+              "peak_queued_bytes": 3431168
+            },
+            "paths": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.07201316599999998,
+              "items": 0,
+              "peak_queued_items": 64,
+              "peak_queued_bytes": 1490
+            },
+            "planner_shutdown": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 2.8125e-05,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "prepared": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.028984288999999993,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 2,
+              "peak_queued_bytes": 3431168
+            },
+            "source": {
+              "active_seconds": 0.027756173,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 80,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "writer": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.028112338,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 2,
+              "peak_queued_bytes": 3431168
+            }
+          }
+        },
+        "edited": {
+          "timing": {
+            "command": [
+              "/private/tmp/mimirs-staged-s4/engines/mimirs",
+              "index",
+              "--profile",
+              "/private/tmp/mimirs-staged-s4/results/mimirs/edited-profile.json"
+            ],
+            "wall_seconds": 2.0037395829567686,
+            "exit_code": 0,
+            "user_seconds": 4.99,
+            "system_seconds": 0.1,
+            "peak_rss_bytes": 261357568
+          },
+          "counters": {
+            "documents": 107,
+            "embedding_calls": 211,
+            "embedding_documents": 211,
+            "embedding_worker_limit": 3,
+            "files_discovered": 80,
+            "files_indexed": 2,
+            "files_read": 80,
+            "files_reused": 78,
+            "index_queue_file_limit": 6,
+            "index_queue_payload_target_bytes": 33554432,
+            "index_queue_peak_files": 6,
+            "index_queue_peak_payload_bytes": 7596608,
+            "model_asset_bytes": 71052093,
+            "model_assets_cached": 6,
+            "source_bytes": 766002
+          },
+          "stages": {
+            "admission": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 6,
+              "peak_queued_bytes": 7596608
+            },
+            "database": {
+              "active_seconds": 0.0343145,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 2,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "discovery": {
+              "active_seconds": 0.0020417129999999867,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 80,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "inference": {
+              "active_seconds": 4.749119788999997,
+              "input_wait_seconds": 0.5601063749999999,
+              "output_wait_seconds": 0.0,
+              "items": 211,
+              "peak_queued_items": 127,
+              "peak_queued_bytes": 253054
+            },
+            "merge": {
+              "active_seconds": 6.975e-05,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 107,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "parsed": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.8524430850000002,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 5,
+              "peak_queued_bytes": 4163008
+            },
+            "parsing": {
+              "active_seconds": 0.038566833,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 2,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "paths": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.07141049999999999,
+              "items": 0,
+              "peak_queued_items": 64,
+              "peak_queued_bytes": 1490
+            },
+            "planner_shutdown": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.846277208,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "prepared": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.288523214,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 6,
+              "peak_queued_bytes": 7596608
+            },
+            "source": {
+              "active_seconds": 0.034683794999999996,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.931758625,
+              "items": 80,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "windows": {
+              "active_seconds": 0.10903571,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 1.592300833,
+              "items": 107,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "writer": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 1.8640952950000003,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 6,
+              "peak_queued_bytes": 7596608
+            }
+          }
+        },
+        "restore": {
+          "timing": {
+            "command": [
+              "/private/tmp/mimirs-staged-s4/engines/mimirs",
+              "index",
+              "--profile",
+              "/private/tmp/mimirs-staged-s4/results/mimirs/restore-profile.json"
+            ],
+            "wall_seconds": 2.0015836670063436,
+            "exit_code": 0,
+            "user_seconds": 4.98,
+            "system_seconds": 0.11,
+            "peak_rss_bytes": 283590656
+          },
+          "counters": {
+            "documents": 105,
+            "embedding_calls": 209,
+            "embedding_documents": 209,
+            "embedding_worker_limit": 3,
+            "files_discovered": 80,
+            "files_indexed": 2,
+            "files_read": 80,
+            "files_reused": 78,
+            "index_queue_file_limit": 6,
+            "index_queue_payload_target_bytes": 33554432,
+            "index_queue_peak_files": 6,
+            "index_queue_peak_payload_bytes": 7594176,
+            "model_asset_bytes": 71052093,
+            "model_assets_cached": 6,
+            "source_bytes": 765926
+          },
+          "stages": {
+            "admission": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 6,
+              "peak_queued_bytes": 7594176
+            },
+            "database": {
+              "active_seconds": 0.035786086,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 2,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "discovery": {
+              "active_seconds": 0.001768581000000019,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 80,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "inference": {
+              "active_seconds": 4.753045629,
+              "input_wait_seconds": 0.550616459,
+              "output_wait_seconds": 0.0,
+              "items": 209,
+              "peak_queued_items": 126,
+              "peak_queued_bytes": 251455
+            },
+            "merge": {
+              "active_seconds": 6.8209e-05,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 105,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "parsed": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.8692839529999997,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 5,
+              "peak_queued_bytes": 4163008
+            },
+            "parsing": {
+              "active_seconds": 0.038116958,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 2,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "paths": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.073029998,
+              "items": 0,
+              "peak_queued_items": 64,
+              "peak_queued_bytes": 1490
+            },
+            "planner_shutdown": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.826554,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "prepared": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.27857096000000003,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 6,
+              "peak_queued_bytes": 7594176
+            },
+            "source": {
+              "active_seconds": 0.02531396,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.957120375,
+              "items": 80,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "windows": {
+              "active_seconds": 0.10986325000000002,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 1.5974065419999999,
+              "items": 105,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "writer": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 1.8584569969999998,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 6,
+              "peak_queued_bytes": 7594176
+            }
+          }
+        }
+      },
+      "storedTableSha256": {
+        "files": "c62919ae7495cba35bf79295a059f9b86216081cd05c27825fd72e8a2db2771e",
+        "source_snapshots": "20d2a35aa61151530f0d1e080364c509f109de1ca544ae35810cb8d9bed517b3",
+        "entities": "7f490c7b042a2e6ba50710a2df625c9a7957b43257dad90fdef7399153418dc5",
+        "analysis_records": "f7d0587755a17f93db4bca499094bb180e823fccdb992c8b4ae6ec142dbfd56e",
+        "source_chunks": "8d85994e6299926efb5cd304408c0a15866e84709a00fcc1296f6ffc5efcb790",
+        "retrieval_documents": "5e5d53286833c2b46c63c1f70b7d10baf783786f1bcae69cf57ebdb88c69f497",
+        "retrieval_processing": "feec93c8d74989606dcc8f20dc04b0107475ccf0d374a34c737b04d748ef43bd",
+        "index_metadata": "8501654c51e1f26a30eefd10808f8aee71e5c2d6881b414f5f2a6d55f92c3921",
+        "document_embeddings_rowids": "fecd80d3a9addf70cb6afa5dc0b97dd1e3f8b84aafa0dc75f5d660cdc282ee26",
+        "document_embeddings_chunks": "a1a92ab028f67ab16229ac4b2e1680a3e88e04495c1965a2594518748df3c229",
+        "document_embeddings_vector_chunks00": "194bebd8dbd8b90fedbe5818265362fc226d7ecec1b4b6955d357b9b18f811c5"
+      },
+      "indexBytes": 7880704
+    },
+    "excalidraw": {
+      "manifestSha256": "7cebac3207fce4a93cc1201236c172eb9acb7c4bacac7ff2a438bfcc25e43d09",
+      "querySha256": "e02e06b4977048c762527af3f9f27e5546d29b3d9740e9fc6e005e39cff06630",
+      "runs": {
+        "fresh": {
+          "timing": {
+            "command": [
+              "/private/tmp/mimirs-staged-s4/engines/mimirs",
+              "index",
+              "--profile",
+              "/private/tmp/mimirs-staged-s4/results/excalidraw/fresh-profile.json"
+            ],
+            "wall_seconds": 97.21444883401273,
+            "exit_code": 0,
+            "user_seconds": 286.9,
+            "system_seconds": 3.38,
+            "peak_rss_bytes": 376651776
+          },
+          "counters": {
+            "documents": 7791,
+            "embedding_calls": 13388,
+            "embedding_documents": 13388,
+            "embedding_worker_limit": 3,
+            "files_discovered": 628,
+            "files_indexed": 628,
+            "files_read": 628,
+            "index_queue_file_limit": 6,
+            "index_queue_payload_target_bytes": 33554432,
+            "index_queue_peak_files": 6,
+            "index_queue_peak_payload_bytes": 62277568,
+            "model_asset_bytes": 71052093,
+            "model_assets_cached": 6,
+            "source_bytes": 6919578
+          },
+          "stages": {
+            "admission": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 6,
+              "peak_queued_bytes": 62277568
+            },
+            "database": {
+              "active_seconds": 2.935681252,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 628,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "discovery": {
+              "active_seconds": 0.02207873100005031,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 628,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "inference": {
+              "active_seconds": 280.7355778040011,
+              "input_wait_seconds": 9.741197129000003,
+              "output_wait_seconds": 0.0,
+              "items": 13388,
+              "peak_queued_items": 687,
+              "peak_queued_bytes": 2036008
+            },
+            "merge": {
+              "active_seconds": 0.0035533810000000026,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 7791,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "parsed": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 88.08332010900004,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 5,
+              "peak_queued_bytes": 62277568
+            },
+            "parsing": {
+              "active_seconds": 1.2460456689999997,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 628,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "paths": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 90.12520087199995,
+              "items": 0,
+              "peak_queued_items": 64,
+              "peak_queued_bytes": 3845
+            },
+            "planner_shutdown": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.535048416,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "prepared": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 3.288389459,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 6,
+              "peak_queued_bytes": 62277568
+            },
+            "source": {
+              "active_seconds": 0.06160626700000001,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 95.080606068,
+              "items": 628,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "windows": {
+              "active_seconds": 8.23203953300001,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 93.632864243,
+              "items": 7791,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "writer": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 93.97425579099992,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 3,
+              "peak_queued_bytes": 62277568
+            }
+          }
+        },
+        "unchanged": {
+          "timing": {
+            "command": [
+              "/private/tmp/mimirs-staged-s4/engines/mimirs",
+              "index",
+              "--profile",
+              "/private/tmp/mimirs-staged-s4/results/excalidraw/unchanged-profile.json"
+            ],
+            "wall_seconds": 0.5035961249959655,
+            "exit_code": 0,
+            "user_seconds": 0.31,
+            "system_seconds": 0.2,
+            "peak_rss_bytes": 139247616
+          },
+          "counters": {
+            "embedding_worker_limit": 3,
+            "files_discovered": 628,
+            "files_read": 628,
+            "files_reused": 628,
+            "index_queue_file_limit": 6,
+            "index_queue_payload_target_bytes": 33554432,
+            "index_queue_peak_files": 2,
+            "index_queue_peak_payload_bytes": 62277568,
+            "model_asset_bytes": 23684031,
+            "model_assets_cached": 2,
+            "source_bytes": 6919578
+          },
+          "stages": {
+            "admission": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 2,
+              "peak_queued_bytes": 62277568
+            },
+            "database": {
+              "active_seconds": 0.000161916,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "discovery": {
+              "active_seconds": 0.013796554000000127,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 628,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "parsed": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.230475852,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 2,
+              "peak_queued_bytes": 62277568
+            },
+            "paths": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.34821154200000004,
+              "items": 0,
+              "peak_queued_items": 64,
+              "peak_queued_bytes": 3845
+            },
+            "planner_shutdown": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 2.9083e-05,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "prepared": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.23108774300000004,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 2,
+              "peak_queued_bytes": 62277568
+            },
+            "source": {
+              "active_seconds": 0.22191648499999986,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.00018841699999999997,
+              "items": 628,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "writer": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.2245464099999995,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 2,
+              "peak_queued_bytes": 62277568
+            }
+          }
+        },
+        "edited": {
+          "timing": {
+            "command": [
+              "/private/tmp/mimirs-staged-s4/engines/mimirs",
+              "index",
+              "--profile",
+              "/private/tmp/mimirs-staged-s4/results/excalidraw/edited-profile.json"
+            ],
+            "wall_seconds": 3.748994000023231,
+            "exit_code": 0,
+            "user_seconds": 7.33,
+            "system_seconds": 0.78,
+            "peak_rss_bytes": 277823488
+          },
+          "counters": {
+            "documents": 96,
+            "embedding_calls": 252,
+            "embedding_documents": 252,
+            "embedding_worker_limit": 3,
+            "files_discovered": 628,
+            "files_indexed": 2,
+            "files_read": 628,
+            "files_reused": 626,
+            "index_queue_file_limit": 6,
+            "index_queue_payload_target_bytes": 33554432,
+            "index_queue_peak_files": 6,
+            "index_queue_peak_payload_bytes": 62277568,
+            "model_asset_bytes": 71052093,
+            "model_assets_cached": 6,
+            "source_bytes": 6919654
+          },
+          "stages": {
+            "admission": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 6,
+              "peak_queued_bytes": 62277568
+            },
+            "database": {
+              "active_seconds": 0.070955082,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 2,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "discovery": {
+              "active_seconds": 0.013751573000002182,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 628,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "inference": {
+              "active_seconds": 6.57227697,
+              "input_wait_seconds": 3.390346541,
+              "output_wait_seconds": 0.0,
+              "items": 252,
+              "peak_queued_items": 146,
+              "peak_queued_bytes": 323654
+            },
+            "merge": {
+              "active_seconds": 5.5832000000000003e-05,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 96,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "parsed": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 3.211012087000003,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 5,
+              "peak_queued_bytes": 62277568
+            },
+            "parsing": {
+              "active_seconds": 0.048988623999999995,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 2,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "paths": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 3.5069452049999996,
+              "items": 0,
+              "peak_queued_items": 64,
+              "peak_queued_bytes": 3845
+            },
+            "planner_shutdown": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 2.9542e-05,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "prepared": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 1.2792512870000017,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 6,
+              "peak_queued_bytes": 62277568
+            },
+            "source": {
+              "active_seconds": 0.8987038149999996,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 2.516842956999999,
+              "items": 628,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "windows": {
+              "active_seconds": 0.171192791,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 2.194750625,
+              "items": 96,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "writer": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 3.3952613279999957,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 6,
+              "peak_queued_bytes": 62277568
+            }
+          }
+        },
+        "restore": {
+          "timing": {
+            "command": [
+              "/private/tmp/mimirs-staged-s4/engines/mimirs",
+              "index",
+              "--profile",
+              "/private/tmp/mimirs-staged-s4/results/excalidraw/restore-profile.json"
+            ],
+            "wall_seconds": 3.067161082988605,
+            "exit_code": 0,
+            "user_seconds": 7.13,
+            "system_seconds": 0.29,
+            "peak_rss_bytes": 279674880
+          },
+          "counters": {
+            "documents": 94,
+            "embedding_calls": 250,
+            "embedding_documents": 250,
+            "embedding_worker_limit": 3,
+            "files_discovered": 628,
+            "files_indexed": 2,
+            "files_read": 628,
+            "files_reused": 626,
+            "index_queue_file_limit": 6,
+            "index_queue_payload_target_bytes": 33554432,
+            "index_queue_peak_files": 6,
+            "index_queue_peak_payload_bytes": 62277568,
+            "model_asset_bytes": 71052093,
+            "model_assets_cached": 6,
+            "source_bytes": 6919578
+          },
+          "stages": {
+            "admission": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 6,
+              "peak_queued_bytes": 62277568
+            },
+            "database": {
+              "active_seconds": 0.051402125,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 2,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "discovery": {
+              "active_seconds": 0.013342661000003808,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 628,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "inference": {
+              "active_seconds": 6.555113917000002,
+              "input_wait_seconds": 1.322782417,
+              "output_wait_seconds": 0.0,
+              "items": 250,
+              "peak_queued_items": 145,
+              "peak_queued_bytes": 322043
+            },
+            "merge": {
+              "active_seconds": 5.5167e-05,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 94,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "parsed": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 2.5141742219999954,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 5,
+              "peak_queued_bytes": 62277568
+            },
+            "parsing": {
+              "active_seconds": 0.049311166000000003,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 2,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "paths": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 2.9071151170000067,
+              "items": 0,
+              "peak_queued_items": 64,
+              "peak_queued_bytes": 3845
+            },
+            "planner_shutdown": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 2.5833e-05,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "prepared": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.5879022580000005,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 6,
+              "peak_queued_bytes": 62277568
+            },
+            "source": {
+              "active_seconds": 0.2194087339999999,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 2.5009685829999997,
+              "items": 628,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "windows": {
+              "active_seconds": 0.174079792,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 2.190792499,
+              "items": 94,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "writer": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 2.7214760120000028,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 6,
+              "peak_queued_bytes": 62277568
+            }
+          }
+        }
+      },
+      "storedTableSha256": {
+        "files": "cb311f0ae10d812ddc38871e7ea443489b9582dcfa796a49326fd7e7c74185c1",
+        "source_snapshots": "b291c781a23d1b463623a9a0f26cb90b7171dcf5851fb9c5d5f9d032c26224c7",
+        "entities": "3dca3258174e4527ddf683449ff5b0dd323745976f8da27b001c5e2af3a5203b",
+        "analysis_records": "9ebcf134708085daf00bc76ab5e197516b09db4daa4b3958f40073ac9e53c89b",
+        "source_chunks": "a087583cbb6ec6bf4a42104bc5ad2298527e21e1653ece433f8c9cf9bc3dba62",
+        "retrieval_documents": "98f5f1caf890464b3d3a8981b3507b187373dd1f72992cec740267edb9ee5e94",
+        "retrieval_processing": "91d77db26dc534b14983eede2fec868ee2e9b8872d83d04756e93e556a329f3c",
+        "index_metadata": "8501654c51e1f26a30eefd10808f8aee71e5c2d6881b414f5f2a6d55f92c3921",
+        "document_embeddings_rowids": "a1d435bd0fce645fa2c0603b612ee091b0b3a6ee2fc402e03526bb8007d84e4e",
+        "document_embeddings_chunks": "d6de48b7791092917fb84b59f6f8176fcab972a2b57d49274d1daaf97860f93a",
+        "document_embeddings_vector_chunks00": "5f218d978c08bcdf413dd3c4ec3c1d4d413207d4a615a1054bfce3f56f9d9c6a"
+      },
+      "indexBytes": 66977792
+    },
+    "django": {
+      "manifestSha256": "0afc1a57f8261e68b328e5b0d8eb96bae97c9a951a8aed0154eab54fc81e2ca1",
+      "querySha256": "77beb21701933d7b6bb21bfeb3ff7aa7d09f49e2ce1f9ed7dddeef01aa2a9502",
+      "runs": {
+        "fresh": {
+          "timing": {
+            "command": [
+              "/private/tmp/mimirs-staged-s4/engines/mimirs",
+              "index",
+              "--profile",
+              "/private/tmp/mimirs-staged-s4/results/django/fresh-profile.json"
+            ],
+            "wall_seconds": 273.38497666601324,
+            "exit_code": 0,
+            "user_seconds": 830.48,
+            "system_seconds": 10.74,
+            "peak_rss_bytes": 281804800
+          },
+          "counters": {
+            "documents": 18645,
+            "embedding_calls": 36967,
+            "embedding_documents": 36967,
+            "embedding_worker_limit": 3,
+            "files_discovered": 2919,
+            "files_indexed": 2919,
+            "files_read": 2919,
+            "index_queue_file_limit": 6,
+            "index_queue_payload_target_bytes": 33554432,
+            "index_queue_peak_files": 6,
+            "index_queue_peak_payload_bytes": 31866304,
+            "model_asset_bytes": 71052093,
+            "model_assets_cached": 6,
+            "source_bytes": 19173107
+          },
+          "stages": {
+            "admission": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 6,
+              "peak_queued_bytes": 31866304
+            },
+            "database": {
+              "active_seconds": 16.916791480000015,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 2919,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "discovery": {
+              "active_seconds": 0.11900884200008477,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 2919,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "inference": {
+              "active_seconds": 808.407625808994,
+              "input_wait_seconds": 8.455104081,
+              "output_wait_seconds": 0.0,
+              "items": 36967,
+              "peak_queued_items": 680,
+              "peak_queued_bytes": 1551775
+            },
+            "merge": {
+              "active_seconds": 0.010554492999999965,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 18645,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "parsed": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 252.90606880200008,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 5,
+              "peak_queued_bytes": 26064384
+            },
+            "parsing": {
+              "active_seconds": 3.6073068610000005,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 2919,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "paths": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 266.6037391860002,
+              "items": 0,
+              "peak_queued_items": 64,
+              "peak_queued_bytes": 4856
+            },
+            "planner_shutdown": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.117094958,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "prepared": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 2.208802462999999,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 6,
+              "peak_queued_bytes": 26845952
+            },
+            "source": {
+              "active_seconds": 0.2670150299999997,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 268.3809765350004,
+              "items": 2919,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "windows": {
+              "active_seconds": 19.32144217200004,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 270.1812130630002,
+              "items": 18645,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "writer": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 255.39336543800016,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 6,
+              "peak_queued_bytes": 26064384
+            }
+          }
+        },
+        "unchanged": {
+          "timing": {
+            "command": [
+              "/private/tmp/mimirs-staged-s4/engines/mimirs",
+              "index",
+              "--profile",
+              "/private/tmp/mimirs-staged-s4/results/django/unchanged-profile.json"
+            ],
+            "wall_seconds": 1.773626875015907,
+            "exit_code": 0,
+            "user_seconds": 1.07,
+            "system_seconds": 0.82,
+            "peak_rss_bytes": 140738560
+          },
+          "counters": {
+            "embedding_worker_limit": 3,
+            "files_discovered": 2919,
+            "files_read": 2919,
+            "files_reused": 2919,
+            "index_queue_file_limit": 6,
+            "index_queue_payload_target_bytes": 33554432,
+            "index_queue_peak_files": 4,
+            "index_queue_peak_payload_bytes": 27055296,
+            "model_asset_bytes": 23684031,
+            "model_assets_cached": 2,
+            "source_bytes": 19173107
+          },
+          "stages": {
+            "admission": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 4,
+              "peak_queued_bytes": 27055296
+            },
+            "database": {
+              "active_seconds": 0.000571875,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "discovery": {
+              "active_seconds": 0.06560814799999992,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 2919,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "parsed": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.9249872850000009,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 2,
+              "peak_queued_bytes": 26064384
+            },
+            "paths": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 1.2034751540000022,
+              "items": 0,
+              "peak_queued_items": 64,
+              "peak_queued_bytes": 4856
+            },
+            "planner_shutdown": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 2.725e-05,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "prepared": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.9278684480000019,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 2,
+              "peak_queued_bytes": 26064384
+            },
+            "source": {
+              "active_seconds": 0.8926877439999991,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 2919,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "writer": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.9010345099999996,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 2,
+              "peak_queued_bytes": 26064384
+            }
+          }
+        },
+        "edited": {
+          "timing": {
+            "command": [
+              "/private/tmp/mimirs-staged-s4/engines/mimirs",
+              "index",
+              "--profile",
+              "/private/tmp/mimirs-staged-s4/results/django/edited-profile.json"
+            ],
+            "wall_seconds": 6.940693416981958,
+            "exit_code": 0,
+            "user_seconds": 10.65,
+            "system_seconds": 2.19,
+            "peak_rss_bytes": 286539776
+          },
+          "counters": {
+            "documents": 107,
+            "embedding_calls": 323,
+            "embedding_documents": 323,
+            "embedding_worker_limit": 3,
+            "files_discovered": 2919,
+            "files_indexed": 2,
+            "files_read": 2919,
+            "files_reused": 2917,
+            "index_queue_file_limit": 6,
+            "index_queue_payload_target_bytes": 33554432,
+            "index_queue_peak_files": 6,
+            "index_queue_peak_payload_bytes": 27055296,
+            "model_asset_bytes": 71052093,
+            "model_assets_cached": 6,
+            "source_bytes": 19173181
+          },
+          "stages": {
+            "admission": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 6,
+              "peak_queued_bytes": 27055296
+            },
+            "database": {
+              "active_seconds": 0.10118621,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 2,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "discovery": {
+              "active_seconds": 0.07083978600001917,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 2919,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "inference": {
+              "active_seconds": 8.725218450000002,
+              "input_wait_seconds": 9.052368957999999,
+              "output_wait_seconds": 0.0,
+              "items": 323,
+              "peak_queued_items": 163,
+              "peak_queued_bytes": 388439
+            },
+            "merge": {
+              "active_seconds": 8.145900000000001e-05,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 107,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "parsed": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 5.7573493700000125,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 5,
+              "peak_queued_bytes": 26064384
+            },
+            "parsing": {
+              "active_seconds": 0.039038583,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 2,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "paths": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 6.32982892099999,
+              "items": 0,
+              "peak_queued_items": 64,
+              "peak_queued_bytes": 4856
+            },
+            "planner_shutdown": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 2.3708e-05,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "prepared": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 3.1650771309999923,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 6,
+              "peak_queued_bytes": 26064384
+            },
+            "source": {
+              "active_seconds": 2.679265294,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 3.3202244160000003,
+              "items": 2919,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "windows": {
+              "active_seconds": 0.227989917,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 2.911822124,
+              "items": 107,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "writer": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 5.943098864999989,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 6,
+              "peak_queued_bytes": 26064384
+            }
+          }
+        },
+        "restore": {
+          "timing": {
+            "command": [
+              "/private/tmp/mimirs-staged-s4/engines/mimirs",
+              "index",
+              "--profile",
+              "/private/tmp/mimirs-staged-s4/results/django/restore-profile.json"
+            ],
+            "wall_seconds": 5.230147791968193,
+            "exit_code": 0,
+            "user_seconds": 10.12,
+            "system_seconds": 0.94,
+            "peak_rss_bytes": 287309824
+          },
+          "counters": {
+            "documents": 105,
+            "embedding_calls": 321,
+            "embedding_documents": 321,
+            "embedding_worker_limit": 3,
+            "files_discovered": 2919,
+            "files_indexed": 2,
+            "files_read": 2919,
+            "files_reused": 2917,
+            "index_queue_file_limit": 6,
+            "index_queue_payload_target_bytes": 33554432,
+            "index_queue_peak_files": 6,
+            "index_queue_peak_payload_bytes": 27055296,
+            "model_asset_bytes": 71052093,
+            "model_assets_cached": 6,
+            "source_bytes": 19173107
+          },
+          "stages": {
+            "admission": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 6,
+              "peak_queued_bytes": 27055296
+            },
+            "database": {
+              "active_seconds": 0.142197333,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 2,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "discovery": {
+              "active_seconds": 0.0658736860000042,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 2919,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "inference": {
+              "active_seconds": 8.675480870000001,
+              "input_wait_seconds": 3.9305196250000005,
+              "output_wait_seconds": 0.0,
+              "items": 321,
+              "peak_queued_items": 162,
+              "peak_queued_bytes": 386835
+            },
+            "merge": {
+              "active_seconds": 6.6917e-05,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 105,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "parsed": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 4.032417955999998,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 5,
+              "peak_queued_bytes": 26064384
+            },
+            "parsing": {
+              "active_seconds": 0.038463334,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 0.0,
+              "items": 2,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "paths": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 4.650769439000015,
+              "items": 0,
+              "peak_queued_items": 64,
+              "peak_queued_bytes": 4856
+            },
+            "planner_shutdown": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 6.4875e-05,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "prepared": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 1.4566680690000036,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 6,
+              "peak_queued_bytes": 26064384
+            },
+            "source": {
+              "active_seconds": 0.9246590210000031,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 3.356077042,
+              "items": 2919,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "windows": {
+              "active_seconds": 0.229931043,
+              "input_wait_seconds": 0.0,
+              "output_wait_seconds": 2.8984550000000002,
+              "items": 105,
+              "peak_queued_items": 0,
+              "peak_queued_bytes": 0
+            },
+            "writer": {
+              "active_seconds": 0.0,
+              "input_wait_seconds": 4.179250022000004,
+              "output_wait_seconds": 0.0,
+              "items": 0,
+              "peak_queued_items": 6,
+              "peak_queued_bytes": 26064384
+            }
+          }
+        }
+      },
+      "storedTableSha256": {
+        "files": "73313540c27e2c6d1670c3af754d3d2881fa1769eadaf8fa50b5012a75bd92fc",
+        "source_snapshots": "69ec869362a11df3e2f7b49984f0498e908be7241c0bbebaf70a4d5421364ebe",
+        "entities": "540b4bbee7d62b03fb08c7227a9c7e480521b000cb324e1fbf8fa5c1ef5f8d3e",
+        "analysis_records": "214d76b4de6a35999481e1509ebc8d927eb55978b3d091b3e37e28762d9613d4",
+        "source_chunks": "c4a0d24a44658ae985da69ed7d1a61a071f06cc40809b489ac1ba940d7072ef4",
+        "retrieval_documents": "fdbb397252647690008fd0d569b3c9e841676de32aae3a0d90a1ec97b4413e24",
+        "retrieval_processing": "30afcd943b5bec508c1c8ca0766d7aaf3873a440abc15df6038ccc9c9adab5c3",
+        "index_metadata": "8501654c51e1f26a30eefd10808f8aee71e5c2d6881b414f5f2a6d55f92c3921",
+        "document_embeddings_rowids": "c6875730dd86e2f80e3adfc3aef6caab59334878efd4e3199792d3e41f59ee2f",
+        "document_embeddings_chunks": "ed75bfd87f4a61e1cd5fd68a510d88f5ca8e22e24935a02f735475183488b02b",
+        "document_embeddings_vector_chunks00": "e4284e7f5d8f4ead8f5304f26940d3c0971afc2d470547abe97d5bddb66d3930"
+      },
+      "indexBytes": 186892288
+    }
+  }
+}

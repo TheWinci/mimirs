@@ -1,0 +1,23 @@
+{
+  "binarySha256": "fe2b4d4baf689b7148e7dfb8e2d175f3130d45e9ce51e0e27b9239cb2636864e",
+  "corpora": {
+    "mimirs": {
+      "queries": 74,
+      "responseMismatches": 0,
+      "filesReused": 80,
+      "embeddingCalls": 0
+    },
+    "excalidraw": {
+      "queries": 72,
+      "responseMismatches": 0,
+      "filesReused": 628,
+      "embeddingCalls": 0
+    },
+    "django": {
+      "queries": 116,
+      "responseMismatches": 0,
+      "filesReused": 2919,
+      "embeddingCalls": 0
+    }
+  }
+}

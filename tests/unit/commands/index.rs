@@ -1765,3 +1765,49 @@ fn parallel_workers_publish_the_read_snapshot_after_disk_changes() {
             .unwrap()
     );
 }
+
+#[test]
+fn parallel_writer_failure_cancels_pending_work_at_the_failed_path() {
+    let dir = project(&[
+        ("a.rs", "old a"),
+        ("b.rs", "old b"),
+        ("c.rs", "old c"),
+        ("stale.rs", "keep"),
+    ]);
+    run(&dir, backend(), false).0.unwrap();
+    for path in ["a", "b", "c"] {
+        fs::write(dir.path().join(format!("{path}.rs")), format!("new {path}")).unwrap();
+    }
+    fs::remove_file(dir.path().join("stale.rs")).unwrap();
+    for i in 0..30 {
+        fs::write(dir.path().join(format!("z{i:02}.rs")), "queued source").unwrap();
+    }
+    let pool = embedding::pool::Pool::new(vec![(); 3], |_, text| Ok(fake_vector(text))).unwrap();
+    let result = run_parallel_test(
+        dir.path(),
+        || {
+            // Install only after normal schema validation, before the writer runs.
+            connection(&dir).execute_batch("CREATE TRIGGER fail_writer BEFORE INSERT ON files WHEN NEW.path='b.rs' BEGIN SELECT RAISE(FAIL, 'injected writer failure'); END;").unwrap();
+            Ok(Embedder::new(AsyncBackend { pool, limit: 6 }))
+        },
+        &mut Vec::new(),
+        &mut Vec::new(),
+        false,
+        &|| Duration::ZERO,
+        &Profiler::default(),
+    );
+    assert!(format!("{:#}", result.unwrap_err()).contains("injected writer failure"));
+    // Remove the test-only trigger before checking the public schema again.
+    storage::index_reader(&dir.path().join(".mimirs/index.db")).unwrap();
+    let db = rusqlite::Connection::open(dir.path().join(".mimirs/index.db")).unwrap();
+    db.execute_batch("DROP TRIGGER fail_writer").unwrap();
+    drop(db);
+    assert_eq!(
+        files(&dir),
+        [
+            ("a.rs".into(), "new a".into()),
+            ("c.rs".into(), "old c".into()),
+            ("stale.rs".into(), "keep".into())
+        ]
+    );
+}
