@@ -269,3 +269,47 @@ fn real_workers_match_serial_vectors_and_load_sessions_only_when_needed() {
     assert_eq!(parallel, serial);
     assert_eq!(backend.models.len(), 1);
 }
+
+#[test]
+#[ignore = "loads the real MiniLM model from the local cache"]
+fn real_worker_costs_cover_calls_and_preserve_unprofiled_vectors() {
+    tokenizers::utils::parallelism::set_parallelism(false);
+    let profile = Profiler::enabled();
+    let mut backend = OnnxBackend::new(model_cache_dir().unwrap());
+    backend.ensure_models(1).unwrap();
+    let texts = vec![
+        "fn main() {}".to_owned(),
+        "Remove expired sessions from persistent storage.".repeat(35),
+        "class Café:\n    def close(self): pass".to_owned(),
+        "import os\nprint(os.environ)".to_owned(),
+    ];
+    let expected = texts
+        .iter()
+        .map(|text| backend.models[0].embed(&[text]).unwrap().remove(0))
+        .collect::<Vec<_>>();
+    backend.set_workers(3);
+    backend.worker_profile = profile.clone();
+    assert_eq!(backend.embed(&texts).unwrap(), expected);
+    drop(backend);
+    let report = profile.finish(None).unwrap();
+    assert_eq!(
+        report.counters["embedding_profiled_calls"],
+        texts.len() as u64
+    );
+    assert_eq!(report.stages["inference"].items, texts.len() as u64);
+    let measured = [
+        "embedding_tokenization",
+        "embedding_inputs",
+        "embedding_runtime",
+        "embedding_pooling",
+        "embedding_cleanup",
+    ]
+    .iter()
+    .map(|name| {
+        let seconds = report.phases_seconds[name];
+        assert!(seconds > 0.0, "missing {name}");
+        seconds
+    })
+    .sum::<f64>();
+    assert!(measured <= report.stages["inference"].active_seconds);
+}

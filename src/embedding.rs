@@ -342,11 +342,12 @@ impl OnnxBackend {
         if self.pool.is_none() {
             self.ensure_models(self.workers)?;
             self.source_tokenizer = Some(ts_v2::unbounded(self.models[0].tokenizer.clone())?);
+            let model_profile = self.worker_profile.clone();
             self.pool = Some(pool::Pool::profiled(
                 std::mem::take(&mut self.models),
                 self.worker_profile.clone(),
-                |model, text| {
-                    let mut vectors = model.embed(&[text])?;
+                move |model, text| {
+                    let mut vectors = model.embed_profiled(&[text], &model_profile)?;
                     validate(&vectors, 1)?;
                     Ok(vectors.remove(0))
                 },

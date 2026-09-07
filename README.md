@@ -213,6 +213,18 @@ not item residence. `inference_completion.input_wait_seconds` measures the
 merger waiting for submitted vectors; older reports labelled this time as
 `windows.output_wait_seconds`.
 
+Worker embedding costs are split into `embedding_tokenization`,
+`embedding_inputs`, `embedding_runtime`, `embedding_pooling`, and
+`embedding_cleanup` under `phases_seconds`. These cover token encoding,
+constructing input arrays and tensors, the synchronous ONNX Runtime call,
+extracting and pooling/normalizing its output, and releasing temporary buffers.
+The runtime timer includes binding overhead; it is not an operator-level kernel
+profile. `embedding_profiled_calls` counts measured model calls. The difference
+between their summed phases and `inference.active_seconds` includes validation,
+call overhead, and instrumentation. These are summed worker wall times, not CPU
+times or additional serial stages. Window planning before submission remains
+under `embedding_prepare` and is separate from these costs.
+
 `model_assets` includes cache lookup or downloads and asset reads.
 `model_startup` measures tokenizer and ONNX session creation. `embedding_prepare`
 measures token-window planning and job submission. `embedding_wait` measures only

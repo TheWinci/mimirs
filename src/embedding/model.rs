@@ -1,6 +1,7 @@
 //! Fixed MiniLM inference with one CPU thread per session. Keeping pooling here
 //! makes TS's float64 accumulation and float32 storage explicit.
 use super::DIMENSION;
+use crate::profiling::Profiler;
 use anyhow::{Context, Result, ensure};
 use ort::{
     session::{Session, builder::GraphOptimizationLevel},
@@ -33,46 +34,62 @@ impl Model {
     }
 
     pub fn embed(&mut self, texts: &[&str]) -> Result<Vec<Vec<f32>>> {
+        self.embed_profiled(texts, &Profiler::default())
+    }
+
+    pub fn embed_profiled(&mut self, texts: &[&str], profile: &Profiler) -> Result<Vec<Vec<f32>>> {
         if texts.is_empty() {
             return Ok(Vec::new());
         }
-        let encodings = self
-            .tokenizer
-            .encode_batch(texts.to_vec(), true)
-            .map_err(anyhow::Error::msg)?;
-        let length = encodings.first().context("empty tokenization")?.len();
-        let shape = [texts.len(), length];
-        ensure!(
-            encodings.iter().all(|e| e.len() == length),
-            "inconsistent padded input lengths"
-        );
-        let ids = encodings
-            .iter()
-            .flat_map(|e| e.get_ids().iter().map(|&v| v as i64))
-            .collect::<Vec<_>>();
-        let mask = encodings
-            .iter()
-            .flat_map(|e| e.get_attention_mask().iter().map(|&v| v as i64))
-            .collect::<Vec<_>>();
-        let types = encodings
-            .iter()
-            .flat_map(|e| e.get_type_ids().iter().map(|&v| v as i64))
-            .collect::<Vec<_>>();
-        let outputs = self.session.run(ort::inputs![
-            "input_ids" => Tensor::from_array((shape, ids))?,
-            "attention_mask" => Tensor::from_array((shape, mask.clone()))?,
-            "token_type_ids" => Tensor::from_array((shape, types))?,
-        ])?;
-        let (dims, hidden) = outputs["last_hidden_state"].try_extract_tensor::<f32>()?;
-        ensure!(
-            dims.as_ref() == [texts.len() as i64, length as i64, DIMENSION as i64],
-            "unexpected MiniLM output shape"
-        );
-        hidden
-            .chunks_exact(length * DIMENSION)
-            .zip(mask.chunks_exact(length))
-            .map(|(hidden, mask)| pool(hidden, mask))
-            .collect()
+        profile.count("embedding_profiled_calls", 1);
+        let encodings = profile.measure("embedding_tokenization", || {
+            self.tokenizer
+                .encode_batch(texts.to_vec(), true)
+                .map_err(anyhow::Error::msg)
+        })?;
+        let (length, mask, inputs) = profile.measure("embedding_inputs", || -> Result<_> {
+            let length = encodings.first().context("empty tokenization")?.len();
+            let shape = [texts.len(), length];
+            ensure!(
+                encodings.iter().all(|e| e.len() == length),
+                "inconsistent padded input lengths"
+            );
+            let ids = encodings
+                .iter()
+                .flat_map(|e| e.get_ids().iter().map(|&v| v as i64))
+                .collect::<Vec<_>>();
+            let mask = encodings
+                .iter()
+                .flat_map(|e| e.get_attention_mask().iter().map(|&v| v as i64))
+                .collect::<Vec<_>>();
+            let types = encodings
+                .iter()
+                .flat_map(|e| e.get_type_ids().iter().map(|&v| v as i64))
+                .collect::<Vec<_>>();
+            let inputs = ort::inputs![
+                "input_ids" => Tensor::from_array((shape, ids))?,
+                "attention_mask" => Tensor::from_array((shape, mask.clone()))?,
+                "token_type_ids" => Tensor::from_array((shape, types))?,
+            ];
+            Ok((length, mask, inputs))
+        })?;
+        // Includes the synchronous ORT call and its binding overhead. Input
+        // tensor construction is above; output extraction and pooling are below.
+        let outputs = profile.measure("embedding_runtime", || self.session.run(inputs))?;
+        let vectors = profile.measure("embedding_pooling", || -> Result<_> {
+            let (dims, hidden) = outputs["last_hidden_state"].try_extract_tensor::<f32>()?;
+            ensure!(
+                dims.as_ref() == [texts.len() as i64, length as i64, DIMENSION as i64],
+                "unexpected MiniLM output shape"
+            );
+            hidden
+                .chunks_exact(length * DIMENSION)
+                .zip(mask.chunks_exact(length))
+                .map(|(hidden, mask)| pool(hidden, mask))
+                .collect()
+        })?;
+        profile.measure("embedding_cleanup", || drop((outputs, mask, encodings)));
+        Ok(vectors)
     }
 }
 
