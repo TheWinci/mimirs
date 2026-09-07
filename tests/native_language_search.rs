@@ -27,7 +27,9 @@ fn native_language_search_uses_saved_source_and_reuses_unchanged_files() {
         .as_array()
         .unwrap()
         .iter()
-        .filter(|case| case["language"] == selected)
+        .filter(|case| {
+            case["language"] == selected && case["path"].as_str().unwrap().starts_with("archive.")
+        })
     {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
@@ -64,5 +66,103 @@ fn native_language_search_uses_saved_source_and_reuses_unchanged_files() {
         );
         run(root, &["index"]);
         assert!(!run(root, &["search", "restore café archives", "--limit", "5"]).contains(path));
+    }
+}
+
+#[test]
+#[ignore = "loads the cached q8 model for the v1 fallback-format retrieval check"]
+fn fallback_formats_are_searchable_with_exact_saved_evidence() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let paths = [
+        "archive.swift",
+        "archive.fish",
+        "archive.tf",
+        "archive.proto",
+        "archive.graphql",
+        "archive.gql",
+        "archive.mod",
+        "archive.xml",
+        "archive.json",
+        "archive.sql",
+        "archive.bru",
+        "archive.scss",
+        "archive.less",
+        "archive.zon",
+        "archive.zsh",
+        "archive.lhs",
+        "Dockerfile.dev",
+        "Jenkinsfile.prod",
+        "GNUmakefile",
+        "Vagrantfile",
+        "Gemfile",
+        "Rakefile",
+        "Brewfile",
+        "Procfile",
+        "guide.mdx",
+    ];
+    let labels = [
+        "apricot",
+        "birch",
+        "cobalt",
+        "dahlia",
+        "emerald",
+        "fennel",
+        "ginger",
+        "hazel",
+        "indigo",
+        "juniper",
+        "kiwi",
+        "lavender",
+        "magnolia",
+        "nectarine",
+        "orchid",
+        "paprika",
+        "quartz",
+        "rosemary",
+        "sapphire",
+        "tamarind",
+        "umber",
+        "violet",
+        "willow",
+        "xenon",
+        "zinnia",
+    ];
+    for (index, path) in paths.iter().enumerate() {
+        fs::write(
+            root.join(path),
+            format!(
+                "# {} archive\r\n\r\nRestore {} café archive manifests.\r\n",
+                labels[index], labels[index]
+            ),
+        )
+        .unwrap();
+    }
+    fs::write(root.join("unrelated.rs"), "fn draw_triangle() {}\n").unwrap();
+    run(root, &["init"]);
+    run(root, &["index"]);
+    for (index, path) in paths.iter().enumerate() {
+        let direct = run(root, &["inspect", path, "--source-chunks"]);
+        assert_eq!(
+            direct,
+            run(root, &["inspect", path, "--source-chunks", "--stored"])
+        );
+        let result = run(
+            root,
+            &[
+                "search",
+                &format!("restore {} archive", labels[index]),
+                "--limit",
+                "5",
+            ],
+        );
+        assert!(result.contains(path), "{path}: {result}");
+        let previews: Value = serde_json::from_str(&direct).unwrap();
+        let source = fs::read_to_string(root.join(path)).unwrap();
+        for preview in previews.as_array().unwrap() {
+            let start = preview["span"]["start"].as_u64().unwrap() as usize;
+            let end = preview["span"]["end"].as_u64().unwrap() as usize;
+            assert_eq!(preview["text"], &source[start..end]);
+        }
     }
 }

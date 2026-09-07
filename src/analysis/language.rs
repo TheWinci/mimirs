@@ -66,11 +66,23 @@ pub fn for_path(path: &str) -> &'static Language {
 }
 
 fn select<'a>(path: &str, registered: &'a [Language]) -> &'a Language {
+    if super::formats::named_text(path) {
+        return &super::text::LANGUAGE;
+    }
     let extension = Path::new(path).extension().and_then(|ext| ext.to_str());
     registered
         .iter()
         .find(|language| extension.is_some_and(|ext| language.extensions.contains(&ext)))
         .unwrap_or(&super::text::LANGUAGE)
+}
+
+/// Fresh discovery defaults follow delivered native extensions and explicit text formats.
+pub fn default_includes() -> Vec<String> {
+    REGISTERED
+        .iter()
+        .flat_map(|language| language.extensions.iter().map(|ext| format!("**/*.{ext}")))
+        .chain(super::formats::includes())
+        .collect()
 }
 
 /// Extension mappings are part of compatibility: registering a formerly text
@@ -86,8 +98,9 @@ fn identity(registered: &[Language]) -> String {
         .map(|language| (language.extensions, language.identity))
         .collect();
     format!(
-        "analyzers-1:{}",
-        serde_json::to_string(&entries).expect("string metadata")
+        "analyzers-2:{}",
+        serde_json::to_string(&(entries, super::formats::BASENAMES, super::formats::PREFIXES))
+            .expect("string metadata")
     )
 }
 

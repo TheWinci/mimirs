@@ -3,6 +3,7 @@ use tree_sitter::Node;
 
 use crate::source::SourceFile;
 
+pub(crate) mod formats;
 mod go;
 mod javascript;
 pub mod language;

@@ -53,12 +53,11 @@ mimirs index
 mimirs search 'valid_username check for trailing newline' --limit 5
 ```
 
-Run these commands from the project root. Fresh config includes Rust `.rs`,
-Python `.py` and `.pyi`, TypeScript `.ts`, `.mts`, `.cts`, and `.tsx`,
-JavaScript `.js`, `.mjs`, `.cjs`, and `.jsx`, Go `.go`, Java `.java`, and C `.c`/`.h` files. This includes
-`.d.ts` declarations. `node_modules` and common Python environment directories `.venv`,
-`venv`, and `__pycache__` are excluded. Customize `include` and `exclude` in
-`.mimirs/config.toml` for your project.
+Run these commands from the project root. Fresh config includes the
+[languages and formats supported by v1 and TS v2](docs/languages.md), with
+native grammars for 24 languages plus Markdown sections and explicit text
+fallback. Common dependency, environment and build directories are excluded.
+Customize `include` and `exclude` in `.mimirs/config.toml` for your project.
 `init` preserves an existing config. The first model use can download files;
 indexing and search then use the local cache.
 
@@ -78,8 +77,8 @@ does not require rebuilding unchanged files. Each active worker needs its own
 model session; sessions are created only as files need more workers and reused.
 Search embeds its single query with one worker.
 
-Native tree-sitter grammars identify retrieval chunks for Rust, Python,
-TypeScript, JavaScript, JSX, TSX, Go, Java, C, C++, and C#. The grammars ship in the binary and
+Native tree-sitter grammars identify retrieval chunks for the
+[languages listed here](docs/languages.md#native-syntax). They ship in the binary and
 need no language servers or language runtimes. Written declarations, attached
 comments, decorators, imports, and incomplete source remain searchable. Retrieval
 follows TS v2's chunk boundaries, including collapsed import groups and overloads.
@@ -89,7 +88,7 @@ Top-level retrieval chunks form source windows targeting 4,000 UTF-16 units.
 Large chunks split at child or source-line boundaries. A long physical line may
 exceed that target. Markdown headings form nested sections; included unsupported
 text uses paragraph chunks and receives no inferred syntax facts. Supported
-Markdown section parsing covers `.md` and `.markdown`.
+Markdown section parsing covers `.md`, `.markdown` and `.mdx`.
 
 Each document adds `File: path` context. MiniLM inputs split into 256-token
 windows with a 32-token overlap, repeating the path context. The document vector
@@ -232,88 +231,5 @@ covers dialects, fallback upgrades, mixed-language indexing, and visible answers
 The [Go retrieval check](benchmarks/retrieval/go/README.md) records declaration
 groups, receiver methods, fallback upgrades and mixed-language search results.
 
-To enable Java in an existing project, add `"**/*.java"` to `include` in
-`.mimirs/config.toml` and run `mimirs index`. Existing configuration rules are
-preserved. Java uses the native 0.23.5 grammar, with declaration owners, leading
-documentation, signatures and parse diagnostics. It does not resolve classpaths.
-
-C uses the native 0.24.1 grammar. Add `"**/*.c"` and `"**/*.h"` to an existing
-config to enable it. Headers use C by default. Names follow pointer, array and
-function declarators; preprocessor branches remain source-backed chunks.
-
-C++ uses the native 0.23.4 grammar for `.cpp`, `.cc`, `.cxx`, `.hpp`, `.hh`
-and `.hxx`. Fresh configs include these extensions. Add matching `"**/*.ext"`
-patterns to existing configs and reindex. Templates retain one owner; qualified
-methods and declaration names remain tied to their written source.
-
-C# uses the native 0.23.1 grammar for `.cs`. Fresh configs include it; existing
-projects can add `"**/*.cs"` and reindex. File-scoped namespaces own their
-remaining source, and property, event, operator and lambda names are retained.
-
-Ruby uses the native 0.23.1 grammar for `.rb`, included by fresh configs. Add
-`"**/*.rb"` to existing configs and reindex. Modules, singleton methods and
-classes, constant assignments and assigned lambdas retain their source names.
-
-PHP uses the native 0.24.2 grammar for `.php`, including PHP tags and embedded
-text. Fresh configs include it; existing projects can add `"**/*.php"` and
-reindex. Namespace boundaries, promoted properties and assigned functions keep
-source ownership. Property names omit their leading dollar sign.
-
-Scala uses the native 0.24.0 grammar for `.scala` and `.sc`. Existing projects
-can add `"**/*.scala"` and `"**/*.sc"` and reindex. Class parameters become fields
-only for `val`/`var`, case classes or enum cases. Given and extension definitions
-retain computed names; package clauses own the remaining file.
-
-HTML uses the native 0.23.2 grammar for `.html` and `.htm`. Existing projects
-can add `"**/*.html"` and `"**/*.htm"` and reindex. Element names, nested ranges,
-comments, and inline script/style source remain searchable. Embedded languages
-are retained as HTML source rather than separately parsed.
-
-CSS uses the native 0.25.0 grammar for `.css`. Existing projects can add
-`"**/*.css"` and reindex. Selectors, keyframes, media queries and other at-rules
-retain names and nested ranges. SCSS and Less use explicit text fallback.
-
-Kotlin uses the native Kotlin NG 1.1.0 grammar for `.kt` and `.kts`. Existing
-projects can add `"**/*.kt"` and `"**/*.kts"` and reindex. Data/value classes,
-interfaces, enum and annotation classes retain distinct kinds. Constructor
-fields, companion objects, properties and methods retain their owners.
-
-Lua uses the native 0.4.1 grammar for `.lua`. Existing projects can add
-`"**/*.lua"` and reindex. Method syntax, assigned functions, table function fields
-and multiple assignment names remain distinct source declarations.
-
-Zig uses the native 1.1.2 grammar for `.zig`. Existing projects can add
-`"**/*.zig"` and reindex. Structs, enums, error sets, container methods,
-compile-time blocks and named tests retain their source identities.
-
-Elixir uses the native 0.3.5 grammar for `.ex` and `.exs`. Existing projects can
-add `"**/*.ex"` and `"**/*.exs"` and reindex. Definition keywords distinguish
-modules, protocols, implementations, structs, types, callbacks and imports.
-
-Bash uses the native 0.25.1 grammar for `.sh` and `.bash`. Existing projects
-can add `"**/*.sh"` and `"**/*.bash"` and reindex. Functions, persistent variables,
-readonly declarations and sourced files become chunks. Command-local environment
-assignments stay inside command source instead of becoming separate owners.
-
-TOML uses the native TOML NG 0.7.0 grammar for `.toml`. Existing projects can
-add `"**/*.toml"` and reindex. Tables, table arrays, quoted and dotted keys retain
-their names and source ranges. Configuration values remain exact source.
-
-YAML uses the native 0.7.1 grammar for `.yaml` and `.yml`. Existing projects
-can add `"**/*.yaml"` and `"**/*.yml"` and reindex. Document sections, nested keys,
-flow mappings, sequences and directives retain their written source structure.
-
-Haskell uses the native 0.23.1 grammar for `.hs`. Existing projects can add
-`"**/*.hs"` and reindex. Module headers, type signatures, bindings, data types,
-classes and instances retain names. Haddock comments attach as documentation.
-Literate `.lhs` files use explicit text fallback.
-
-OCaml uses native 0.24.2 grammars for `.ml` implementations and `.mli` interfaces.
-Existing projects can add `"**/*.ml"` and `"**/*.mli"` and reindex. Value bindings,
-patterns, modules, classes and interface specifications retain declared names.
-The interface parser and query cache are separate from implementation parsing.
-
-Dart uses the native Dart Orchard 0.6.0 grammar for `.dart`. Existing projects can add
-`"**/*.dart"` and reindex. Constructors, named extensions, fields, local functions
-and directives retain names. Function and method chunks include their bodies
-even when the grammar represents the body as a sibling of the signature.
+See [language support](docs/languages.md) for the complete extension list, grammar
+versions, fallback behavior and instructions for existing projects.

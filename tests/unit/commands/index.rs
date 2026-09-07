@@ -68,6 +68,64 @@ fn backend() -> TestBackend {
 }
 
 #[test]
+fn the_language_union_shares_reuse_replacement_and_failed_cleanup() {
+    let dir = project(&[]);
+    fs::write(
+        dir.path().join(".mimirs/config.toml"),
+        Config::default().to_toml().unwrap(),
+    )
+    .unwrap();
+    let inputs: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../benchmarks/versions/port/languages/inputs.json"
+    ))
+    .unwrap();
+    let mut paths = Vec::new();
+    for case in inputs.as_array().unwrap() {
+        let path = case["path"].as_str().unwrap();
+        fs::write(dir.path().join(path), case["source"].as_str().unwrap()).unwrap();
+        paths.push(path.to_owned());
+    }
+    for ext in crate::analysis::formats::EXTENSIONS {
+        let path = format!("archive.{ext}");
+        fs::write(
+            dir.path().join(&path),
+            "Restore café archives.\r\n\r\nUse the manifest.\r\n",
+        )
+        .unwrap();
+        paths.push(path);
+    }
+    run(&dir, backend(), false).0.unwrap();
+    for path in &paths {
+        let direct = crate::analysis::extract(source::read(dir.path(), path).unwrap()).unwrap();
+        assert_eq!(
+            storage::analysis::load(&connection(&dir), path)
+                .unwrap()
+                .unwrap(),
+            direct
+        );
+    }
+    let model = backend();
+    let calls = model.calls.clone();
+    run(&dir, model, false).0.unwrap();
+    assert!(calls.borrow().batches.is_empty());
+    for path in &paths {
+        fs::write(dir.path().join(path), "replacement_source").unwrap();
+        let mut model = backend();
+        model.fail_on = Some(format!("File: {path}\nreplacement_source"));
+        assert!(run(&dir, model, false).0.is_err(), "{path}");
+        let db = connection(&dir);
+        assert!(
+            storage::analysis::load(&db, path).unwrap().is_none(),
+            "{path}"
+        );
+        assert_eq!(db.query_row("SELECT count(*) FROM retrieval_documents d JOIN files f ON f.id=d.file_id WHERE f.path=?1", [path], |r| r.get::<_, i64>(0)).unwrap(), 0);
+        fs::remove_file(dir.path().join(path)).unwrap();
+    }
+    run(&dir, backend(), false).0.unwrap();
+    assert!(files(&dir).is_empty());
+}
+
+#[test]
 fn worker_config_reaches_backend_and_does_not_invalidate_existing_documents() {
     let dir = project(&[("a.rs", "fn a() {}")]);
     let available = std::thread::available_parallelism().map_or(1, usize::from);

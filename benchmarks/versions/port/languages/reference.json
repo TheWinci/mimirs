@@ -1242,6 +1242,1335 @@
           "end": 120
         }
       ]
+    },
+    {
+      "language": "java",
+      "extensions": [
+        "java"
+      ],
+      "path": "Store.java",
+      "source": "/** Recover archives. */\nclass Store {\n  String recover(String path) { return path; }\n  class Nested { void recover() {} }\n}\n",
+      "chunks": [
+        {
+          "kind": "class",
+          "name": "Store",
+          "parent": null,
+          "start": 0,
+          "end": 125
+        },
+        {
+          "kind": "comment",
+          "name": null,
+          "parent": 0,
+          "start": 0,
+          "end": 25
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 0,
+          "start": 25,
+          "end": 39
+        },
+        {
+          "kind": "method",
+          "name": "recover",
+          "parent": 0,
+          "start": 39,
+          "end": 86
+        },
+        {
+          "kind": "class",
+          "name": "Nested",
+          "parent": 0,
+          "start": 86,
+          "end": 123
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 4,
+          "start": 86,
+          "end": 103
+        },
+        {
+          "kind": "method",
+          "name": "recover",
+          "parent": 4,
+          "start": 103,
+          "end": 123
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 0,
+          "start": 123,
+          "end": 125
+        }
+      ]
+    },
+    {
+      "language": "c",
+      "extensions": [
+        "h"
+      ],
+      "path": "bindings.h",
+      "source": "#ifndef ARCHIVE_H\n#define ARCHIVE_H\ntypedef int (*Callback)(int);\nint recover(int count);\nint (*callback)(int);\nconst int first = 1, second = 2;\nstruct Archive { int count, size; };\n#endif\n",
+      "chunks": [
+        {
+          "kind": "conditional",
+          "name": "!defined(ARCHIVE_H)",
+          "parent": null,
+          "start": 0,
+          "end": 189
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 0,
+          "start": 0,
+          "end": 18
+        },
+        {
+          "kind": "macro",
+          "name": "ARCHIVE_H",
+          "parent": 0,
+          "start": 18,
+          "end": 36
+        },
+        {
+          "kind": "type",
+          "name": "Callback",
+          "parent": 0,
+          "start": 36,
+          "end": 66
+        },
+        {
+          "kind": "function",
+          "name": "recover",
+          "parent": 0,
+          "start": 66,
+          "end": 90
+        },
+        {
+          "kind": "variable",
+          "name": "callback",
+          "parent": 0,
+          "start": 90,
+          "end": 112
+        },
+        {
+          "kind": "constant",
+          "name": "first, second",
+          "parent": 0,
+          "start": 112,
+          "end": 145
+        },
+        {
+          "kind": "struct",
+          "name": "Archive",
+          "parent": 0,
+          "start": 145,
+          "end": 182
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 7,
+          "start": 145,
+          "end": 162
+        },
+        {
+          "kind": "field",
+          "name": "count, size",
+          "parent": 7,
+          "start": 162,
+          "end": 182
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 0,
+          "start": 182,
+          "end": 189
+        }
+      ]
+    },
+    {
+      "language": "csharp",
+      "extensions": [
+        "cs"
+      ],
+      "path": "Store.cs",
+      "source": "namespace Archive;\nclass Store {\n int count, size;\n public int this[int index] => index;\n public static Store operator +(Store a, Store b) => a;\n public static implicit operator int(Store a) => 1;\n void Recover() { System.Func<int,int> callback = x => x; }\n}\n",
+      "chunks": [
+        {
+          "kind": "module",
+          "name": "Archive",
+          "parent": null,
+          "start": 0,
+          "end": 259
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 0,
+          "start": 0,
+          "end": 19
+        },
+        {
+          "kind": "class",
+          "name": "Store",
+          "parent": 0,
+          "start": 19,
+          "end": 259
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 2,
+          "start": 19,
+          "end": 33
+        },
+        {
+          "kind": "field",
+          "name": "count, size",
+          "parent": 2,
+          "start": 33,
+          "end": 51
+        },
+        {
+          "kind": "property",
+          "name": "this",
+          "parent": 2,
+          "start": 51,
+          "end": 89
+        },
+        {
+          "kind": "method",
+          "name": "operator +",
+          "parent": 2,
+          "start": 89,
+          "end": 145
+        },
+        {
+          "kind": "method",
+          "name": "implicit operator int",
+          "parent": 2,
+          "start": 145,
+          "end": 197
+        },
+        {
+          "kind": "method",
+          "name": "Recover",
+          "parent": 2,
+          "start": 197,
+          "end": 257
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 8,
+          "start": 197,
+          "end": 236
+        },
+        {
+          "kind": "function",
+          "name": "callback",
+          "parent": 8,
+          "start": 236,
+          "end": 257
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 2,
+          "start": 257,
+          "end": 259
+        }
+      ]
+    },
+    {
+      "language": "ruby",
+      "extensions": [
+        "rb"
+      ],
+      "path": "store.rb",
+      "source": "LIMIT = 4\ncallback = ->(path) { path }\nclass Store\n  class << self\n    def recover(path)\n      path\n    end\n  end\nend\n",
+      "chunks": [
+        {
+          "kind": "constant",
+          "name": "LIMIT",
+          "parent": null,
+          "start": 0,
+          "end": 10
+        },
+        {
+          "kind": "function",
+          "name": "callback",
+          "parent": null,
+          "start": 10,
+          "end": 39
+        },
+        {
+          "kind": "class",
+          "name": "Store",
+          "parent": null,
+          "start": 39,
+          "end": 118
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 2,
+          "start": 39,
+          "end": 51
+        },
+        {
+          "kind": "class",
+          "name": "singleton self",
+          "parent": 2,
+          "start": 51,
+          "end": 114
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 4,
+          "start": 51,
+          "end": 67
+        },
+        {
+          "kind": "method",
+          "name": "recover",
+          "parent": 4,
+          "start": 67,
+          "end": 108
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 4,
+          "start": 108,
+          "end": 114
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 2,
+          "start": 114,
+          "end": 118
+        }
+      ]
+    },
+    {
+      "language": "scala",
+      "extensions": [
+        "scala"
+      ],
+      "path": "Store.scala",
+      "source": "package archive\nclass Store(hidden: Int, val count: Int) { def recover(path: String): String = path }\ncase class Entry(value: Int)\n",
+      "chunks": [
+        {
+          "kind": "package",
+          "name": "archive",
+          "parent": null,
+          "start": 0,
+          "end": 131
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 0,
+          "start": 0,
+          "end": 16
+        },
+        {
+          "kind": "class",
+          "name": "Store",
+          "parent": 0,
+          "start": 16,
+          "end": 102
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 2,
+          "start": 16,
+          "end": 41
+        },
+        {
+          "kind": "field",
+          "name": "count",
+          "parent": 2,
+          "start": 41,
+          "end": 55
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 2,
+          "start": 55,
+          "end": 59
+        },
+        {
+          "kind": "method",
+          "name": "recover",
+          "parent": 2,
+          "start": 59,
+          "end": 102
+        },
+        {
+          "kind": "class",
+          "name": "Entry",
+          "parent": 0,
+          "start": 102,
+          "end": 131
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 7,
+          "start": 102,
+          "end": 119
+        },
+        {
+          "kind": "field",
+          "name": "value",
+          "parent": 7,
+          "start": 119,
+          "end": 131
+        }
+      ]
+    },
+    {
+      "language": "html",
+      "extensions": [
+        "htm"
+      ],
+      "path": "page.htm",
+      "source": "<main><input type=\"text\"><p>Recover archives</p><script>function recover() {}</script></main>\n",
+      "chunks": [
+        {
+          "kind": "element",
+          "name": "main",
+          "parent": null,
+          "start": 0,
+          "end": 94
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 0,
+          "start": 0,
+          "end": 6
+        },
+        {
+          "kind": "element",
+          "name": "input",
+          "parent": 0,
+          "start": 6,
+          "end": 25
+        },
+        {
+          "kind": "element",
+          "name": "p",
+          "parent": 0,
+          "start": 25,
+          "end": 48
+        },
+        {
+          "kind": "element",
+          "name": "script",
+          "parent": 0,
+          "start": 48,
+          "end": 94
+        }
+      ]
+    },
+    {
+      "language": "css",
+      "extensions": [
+        "css"
+      ],
+      "path": "store.css",
+      "source": "@supports (display: grid) { .archive { display: grid; } }\n@layer archives;\n@keyframes recover { from { opacity: 0; } to { opacity: 1; } }\n",
+      "chunks": [
+        {
+          "kind": "rule",
+          "name": "@supports (display: grid)",
+          "parent": null,
+          "start": 0,
+          "end": 58
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 0,
+          "start": 0,
+          "end": 28
+        },
+        {
+          "kind": "selector",
+          "name": ".archive",
+          "parent": 0,
+          "start": 28,
+          "end": 58
+        },
+        {
+          "kind": "rule",
+          "name": "@layer archives",
+          "parent": null,
+          "start": 58,
+          "end": 75
+        },
+        {
+          "kind": "rule",
+          "name": "recover",
+          "parent": null,
+          "start": 75,
+          "end": 138
+        }
+      ]
+    },
+    {
+      "language": "kotlin",
+      "extensions": [
+        "kts"
+      ],
+      "path": "Store.kts",
+      "source": "package archive\ndata class Entry(val count: Int)\nclass Store(hidden: Int, val count: Int) {\n companion object {\n  fun recover(): Int { return 1 }\n }\n val size = 4\n}\ninterface Reader {\n fun read(): Int\n}\n",
+      "chunks": [
+        {
+          "kind": "package",
+          "name": "archive",
+          "parent": null,
+          "start": 0,
+          "end": 203
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 0,
+          "start": 0,
+          "end": 16
+        },
+        {
+          "kind": "record",
+          "name": "Entry",
+          "parent": 0,
+          "start": 16,
+          "end": 49
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 2,
+          "start": 16,
+          "end": 33
+        },
+        {
+          "kind": "field",
+          "name": "count",
+          "parent": 2,
+          "start": 33,
+          "end": 49
+        },
+        {
+          "kind": "class",
+          "name": "Store",
+          "parent": 0,
+          "start": 49,
+          "end": 165
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 5,
+          "start": 49,
+          "end": 74
+        },
+        {
+          "kind": "field",
+          "name": "count",
+          "parent": 5,
+          "start": 74,
+          "end": 92
+        },
+        {
+          "kind": "class",
+          "name": "(companion)",
+          "parent": 5,
+          "start": 92,
+          "end": 149
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 8,
+          "start": 92,
+          "end": 112
+        },
+        {
+          "kind": "method",
+          "name": "recover",
+          "parent": 8,
+          "start": 112,
+          "end": 146
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 8,
+          "start": 146,
+          "end": 149
+        },
+        {
+          "kind": "field",
+          "name": "size",
+          "parent": 5,
+          "start": 149,
+          "end": 163
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 5,
+          "start": 163,
+          "end": 165
+        },
+        {
+          "kind": "interface",
+          "name": "Reader",
+          "parent": 0,
+          "start": 165,
+          "end": 203
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 14,
+          "start": 165,
+          "end": 184
+        },
+        {
+          "kind": "method",
+          "name": "read",
+          "parent": 14,
+          "start": 184,
+          "end": 201
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 14,
+          "start": 201,
+          "end": 203
+        }
+      ]
+    },
+    {
+      "language": "lua",
+      "extensions": [
+        "lua"
+      ],
+      "path": "store.lua",
+      "source": "local count, size = 1, 2\nlocal recover = function(path) return path end\nlocal store = { restore = function(path) return path end }\nfunction store:read(path) return path end\n",
+      "chunks": [
+        {
+          "kind": "variable",
+          "name": "count, size",
+          "parent": null,
+          "start": 0,
+          "end": 25
+        },
+        {
+          "kind": "function",
+          "name": "recover",
+          "parent": null,
+          "start": 25,
+          "end": 72
+        },
+        {
+          "kind": "variable",
+          "name": "store",
+          "parent": null,
+          "start": 72,
+          "end": 131
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 2,
+          "start": 72,
+          "end": 88
+        },
+        {
+          "kind": "function",
+          "name": "restore",
+          "parent": 2,
+          "start": 88,
+          "end": 131
+        },
+        {
+          "kind": "method",
+          "name": "store:read",
+          "parent": null,
+          "start": 131,
+          "end": 173
+        }
+      ]
+    },
+    {
+      "language": "zig",
+      "extensions": [
+        "zig"
+      ],
+      "path": "store.zig",
+      "source": "const State = enum { ready, failed };\nconst Errors = error { Missing, Corrupt };\nconst Store = struct { count: usize, fn recover() void {} };\ntest \"recover archive\" {}\ncomptime {}\n",
+      "chunks": [
+        {
+          "kind": "enum",
+          "name": "State",
+          "parent": null,
+          "start": 0,
+          "end": 38
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 0,
+          "start": 0,
+          "end": 21
+        },
+        {
+          "kind": "constant",
+          "name": "ready",
+          "parent": 0,
+          "start": 21,
+          "end": 26
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 0,
+          "start": 26,
+          "end": 28
+        },
+        {
+          "kind": "constant",
+          "name": "failed",
+          "parent": 0,
+          "start": 28,
+          "end": 38
+        },
+        {
+          "kind": "type",
+          "name": "Errors",
+          "parent": null,
+          "start": 38,
+          "end": 81
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 5,
+          "start": 38,
+          "end": 61
+        },
+        {
+          "kind": "constant",
+          "name": "Missing",
+          "parent": 5,
+          "start": 61,
+          "end": 68
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 5,
+          "start": 68,
+          "end": 70
+        },
+        {
+          "kind": "constant",
+          "name": "Corrupt",
+          "parent": 5,
+          "start": 70,
+          "end": 81
+        },
+        {
+          "kind": "struct",
+          "name": "Store",
+          "parent": null,
+          "start": 81,
+          "end": 142
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 10,
+          "start": 81,
+          "end": 104
+        },
+        {
+          "kind": "field",
+          "name": "count",
+          "parent": 10,
+          "start": 104,
+          "end": 116
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 10,
+          "start": 116,
+          "end": 118
+        },
+        {
+          "kind": "method",
+          "name": "recover",
+          "parent": 10,
+          "start": 118,
+          "end": 142
+        },
+        {
+          "kind": "function",
+          "name": "recover archive",
+          "parent": null,
+          "start": 142,
+          "end": 168
+        },
+        {
+          "kind": "initializer",
+          "name": "comptime",
+          "parent": null,
+          "start": 168,
+          "end": 180
+        }
+      ]
+    },
+    {
+      "language": "elixir",
+      "extensions": [
+        "exs"
+      ],
+      "path": "store.exs",
+      "source": "defprotocol Recover do\n def recover(path)\nend\ndefmodule Archive.Store do\n defstruct [:count]\n @callback restore(String.t()) :: String.t()\nend\ndefimpl Recover, for: Archive.Store do\n def recover(path), do: path\nend\n",
+      "chunks": [
+        {
+          "kind": "trait",
+          "name": "Recover",
+          "parent": null,
+          "start": 0,
+          "end": 46
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 0,
+          "start": 0,
+          "end": 23
+        },
+        {
+          "kind": "function",
+          "name": "recover",
+          "parent": 0,
+          "start": 23,
+          "end": 42
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 0,
+          "start": 42,
+          "end": 46
+        },
+        {
+          "kind": "module",
+          "name": "Archive.Store",
+          "parent": null,
+          "start": 46,
+          "end": 142
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 4,
+          "start": 46,
+          "end": 73
+        },
+        {
+          "kind": "struct",
+          "name": "Store",
+          "parent": 4,
+          "start": 73,
+          "end": 93
+        },
+        {
+          "kind": "method",
+          "name": "restore",
+          "parent": 4,
+          "start": 93,
+          "end": 138
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 4,
+          "start": 138,
+          "end": 142
+        },
+        {
+          "kind": "impl",
+          "name": "Recover for Archive.Store",
+          "parent": null,
+          "start": 142,
+          "end": 214
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 9,
+          "start": 142,
+          "end": 181
+        },
+        {
+          "kind": "function",
+          "name": "recover",
+          "parent": 9,
+          "start": 181,
+          "end": 210
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 9,
+          "start": 210,
+          "end": 214
+        }
+      ]
+    },
+    {
+      "language": "bash",
+      "extensions": [
+        "bash"
+      ],
+      "path": "store.bash",
+      "source": "source ./config.sh\nreadonly LIMIT=4\ndeclare -rx CACHE=1\nTEMP=2 echo ready\nrecover() { printf '%s' \"$1\"; }\n",
+      "chunks": [
+        {
+          "kind": "import",
+          "name": null,
+          "parent": null,
+          "start": 0,
+          "end": 19
+        },
+        {
+          "kind": "constant",
+          "name": "LIMIT",
+          "parent": null,
+          "start": 19,
+          "end": 36
+        },
+        {
+          "kind": "constant",
+          "name": "CACHE",
+          "parent": null,
+          "start": 36,
+          "end": 56
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": null,
+          "start": 56,
+          "end": 74
+        },
+        {
+          "kind": "function",
+          "name": "recover",
+          "parent": null,
+          "start": 74,
+          "end": 106
+        }
+      ]
+    },
+    {
+      "language": "toml",
+      "extensions": [
+        "toml"
+      ],
+      "path": "store.toml",
+      "source": "[archive.primary]\n\"cache path\" = \"manifest\"\nlimits.count = 4\n[[archive.stores]]\nname = \"backup\"\n",
+      "chunks": [
+        {
+          "kind": "section",
+          "name": "archive.primary",
+          "parent": null,
+          "start": 0,
+          "end": 61
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 0,
+          "start": 0,
+          "end": 18
+        },
+        {
+          "kind": "property",
+          "name": "\"cache path\"",
+          "parent": 0,
+          "start": 18,
+          "end": 44
+        },
+        {
+          "kind": "property",
+          "name": "limits.count",
+          "parent": 0,
+          "start": 44,
+          "end": 61
+        },
+        {
+          "kind": "section",
+          "name": "archive.stores",
+          "parent": null,
+          "start": 61,
+          "end": 96
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 4,
+          "start": 61,
+          "end": 80
+        },
+        {
+          "kind": "property",
+          "name": "name",
+          "parent": 4,
+          "start": 80,
+          "end": 96
+        }
+      ]
+    },
+    {
+      "language": "yaml",
+      "extensions": [
+        "yml"
+      ],
+      "path": "store.yml",
+      "source": "---\nprimary:\n  name: first\n  options: {count: 4, enabled: true}\n---\nsecondary:\n  name: second\n  stores:\n    - name: backup\n",
+      "chunks": [
+        {
+          "kind": "section",
+          "name": null,
+          "parent": null,
+          "start": 0,
+          "end": 64
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 0,
+          "start": 0,
+          "end": 4
+        },
+        {
+          "kind": "property",
+          "name": "primary",
+          "parent": 0,
+          "start": 4,
+          "end": 64
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 2,
+          "start": 4,
+          "end": 13
+        },
+        {
+          "kind": "property",
+          "name": "name",
+          "parent": 2,
+          "start": 13,
+          "end": 27
+        },
+        {
+          "kind": "property",
+          "name": "options",
+          "parent": 2,
+          "start": 27,
+          "end": 64
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 5,
+          "start": 27,
+          "end": 39
+        },
+        {
+          "kind": "property",
+          "name": "count",
+          "parent": 5,
+          "start": 39,
+          "end": 47
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 5,
+          "start": 47,
+          "end": 49
+        },
+        {
+          "kind": "property",
+          "name": "enabled",
+          "parent": 5,
+          "start": 49,
+          "end": 64
+        },
+        {
+          "kind": "section",
+          "name": null,
+          "parent": null,
+          "start": 64,
+          "end": 123
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 10,
+          "start": 64,
+          "end": 68
+        },
+        {
+          "kind": "property",
+          "name": "secondary",
+          "parent": 10,
+          "start": 68,
+          "end": 123
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 12,
+          "start": 68,
+          "end": 79
+        },
+        {
+          "kind": "property",
+          "name": "name",
+          "parent": 12,
+          "start": 79,
+          "end": 94
+        },
+        {
+          "kind": "property",
+          "name": "stores",
+          "parent": 12,
+          "start": 94,
+          "end": 123
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 15,
+          "start": 94,
+          "end": 104
+        },
+        {
+          "kind": "section",
+          "name": null,
+          "parent": 15,
+          "start": 104,
+          "end": 123
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 17,
+          "start": 104,
+          "end": 110
+        },
+        {
+          "kind": "property",
+          "name": "name",
+          "parent": 17,
+          "start": 110,
+          "end": 123
+        }
+      ]
+    },
+    {
+      "language": "haskell",
+      "extensions": [
+        "hs"
+      ],
+      "path": "Store.hs",
+      "source": "module Store where\n-- | Restore archive contents.\nrecover :: String -> String\nrecover path = path\nclass Restore a where\n  restore :: a -> a\ninstance Restore Int where\n  restore x = x\n",
+      "chunks": [
+        {
+          "kind": "module",
+          "name": "Store",
+          "parent": null,
+          "start": 0,
+          "end": 19
+        },
+        {
+          "kind": "type",
+          "name": "recover",
+          "parent": null,
+          "start": 19,
+          "end": 78
+        },
+        {
+          "kind": "comment",
+          "name": null,
+          "parent": 1,
+          "start": 19,
+          "end": 50
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 1,
+          "start": 50,
+          "end": 78
+        },
+        {
+          "kind": "function",
+          "name": "recover",
+          "parent": null,
+          "start": 78,
+          "end": 98
+        },
+        {
+          "kind": "class",
+          "name": "Restore",
+          "parent": null,
+          "start": 98,
+          "end": 140
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 5,
+          "start": 98,
+          "end": 120
+        },
+        {
+          "kind": "type",
+          "name": "restore",
+          "parent": 5,
+          "start": 120,
+          "end": 140
+        },
+        {
+          "kind": "impl",
+          "name": "Restore Int",
+          "parent": null,
+          "start": 140,
+          "end": 183
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 8,
+          "start": 140,
+          "end": 167
+        },
+        {
+          "kind": "function",
+          "name": "restore",
+          "parent": 8,
+          "start": 167,
+          "end": 183
+        }
+      ]
+    },
+    {
+      "language": "dart",
+      "extensions": [
+        "dart"
+      ],
+      "path": "store.dart",
+      "source": "class Store {\n final int count;\n Store(this.count);\n Store.empty() : count = 0;\n String recover(String path) { return path; }\n}\nextension Restore on String { String restore() { return this; } }\n",
+      "chunks": [
+        {
+          "kind": "class",
+          "name": "Store",
+          "parent": null,
+          "start": 0,
+          "end": 128
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 0,
+          "start": 0,
+          "end": 14
+        },
+        {
+          "kind": "field",
+          "name": "count",
+          "parent": 0,
+          "start": 14,
+          "end": 32
+        },
+        {
+          "kind": "method",
+          "name": "Store",
+          "parent": 0,
+          "start": 32,
+          "end": 52
+        },
+        {
+          "kind": "method",
+          "name": "Store.empty",
+          "parent": 0,
+          "start": 52,
+          "end": 80
+        },
+        {
+          "kind": "method",
+          "name": "recover",
+          "parent": 0,
+          "start": 80,
+          "end": 126
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 0,
+          "start": 126,
+          "end": 128
+        },
+        {
+          "kind": "class",
+          "name": "Restore",
+          "parent": null,
+          "start": 128,
+          "end": 194
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 7,
+          "start": 128,
+          "end": 158
+        },
+        {
+          "kind": "method",
+          "name": "restore",
+          "parent": 7,
+          "start": 158,
+          "end": 194
+        }
+      ]
     }
   ]
 }

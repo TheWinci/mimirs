@@ -81,6 +81,7 @@ fn default_include_selects_delivered_languages() {
     assert_eq!(
         walk.paths,
         [
+            "a.txt",
             "api.d.ts",
             "app.js",
             "app.py",
@@ -93,6 +94,43 @@ fn default_include_selects_delivered_languages() {
             "stubs/app.pyi",
             "view.tsx"
         ]
+    );
+}
+
+#[test]
+fn default_discovery_covers_the_v1_v2_union_and_keeps_exclusions() {
+    let dir = tree(&[]);
+    let inputs: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../benchmarks/versions/port/languages/inputs.json"
+    ))
+    .unwrap();
+    let mut expected = std::collections::BTreeSet::new();
+    for case in inputs.as_array().unwrap() {
+        for ext in case["extensions"].as_array().unwrap() {
+            expected.insert(format!("file.{}", ext.as_str().unwrap()));
+        }
+    }
+    for ext in crate::analysis::formats::EXTENSIONS {
+        expected.insert(format!("file.{ext}"));
+    }
+    for name in crate::analysis::formats::BASENAMES
+        .iter()
+        .chain(crate::analysis::formats::PREFIXES)
+    {
+        expected.insert(name.to_string());
+    }
+    for name in ["Dockerfile.dev", "dockerfile.test", "Jenkinsfile.prod"] {
+        expected.insert(name.into());
+    }
+    for path in &expected {
+        fs::write(dir.path().join(path), "source").unwrap();
+    }
+    fs::create_dir_all(dir.path().join("node_modules")).unwrap();
+    fs::write(dir.path().join("node_modules/ignored.java"), "source").unwrap();
+    fs::write(dir.path().join("unknown.binary"), "source").unwrap();
+    assert_eq!(
+        walk(dir.path(), &Config::default()).unwrap().paths,
+        expected.into_iter().collect::<Vec<_>>()
     );
 }
 

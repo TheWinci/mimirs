@@ -7,7 +7,7 @@ use super::{Analysis, LineIndex, Scope};
 use crate::source::SourceFile;
 
 pub(super) const LANGUAGE: Language = Language {
-    identity: "text/default/parser-none/grammar-none/extractor-1",
+    identity: "text/default/parser-none/grammar-none/extractor-2",
     extensions: &[],
     extract,
     is_native: false,

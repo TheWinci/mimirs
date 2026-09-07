@@ -171,5 +171,133 @@
     ],
     "path": "archive.mli",
     "source": "(** Restore café archives. *)\nmodule Archive : sig\n  type store = { count : int }\n  val recover : string -> string\nend\n"
+  },
+  {
+    "language": "java",
+    "extensions": [
+      "java"
+    ],
+    "path": "Store.java",
+    "source": "/** Recover archives. */\nclass Store {\n  String recover(String path) { return path; }\n  class Nested { void recover() {} }\n}\n"
+  },
+  {
+    "language": "c",
+    "extensions": [
+      "h"
+    ],
+    "path": "bindings.h",
+    "source": "#ifndef ARCHIVE_H\n#define ARCHIVE_H\ntypedef int (*Callback)(int);\nint recover(int count);\nint (*callback)(int);\nconst int first = 1, second = 2;\nstruct Archive { int count, size; };\n#endif\n"
+  },
+  {
+    "language": "csharp",
+    "extensions": [
+      "cs"
+    ],
+    "path": "Store.cs",
+    "source": "namespace Archive;\nclass Store {\n int count, size;\n public int this[int index] => index;\n public static Store operator +(Store a, Store b) => a;\n public static implicit operator int(Store a) => 1;\n void Recover() { System.Func<int,int> callback = x => x; }\n}\n"
+  },
+  {
+    "language": "ruby",
+    "extensions": [
+      "rb"
+    ],
+    "path": "store.rb",
+    "source": "LIMIT = 4\ncallback = ->(path) { path }\nclass Store\n  class << self\n    def recover(path)\n      path\n    end\n  end\nend\n"
+  },
+  {
+    "language": "scala",
+    "extensions": [
+      "scala"
+    ],
+    "path": "Store.scala",
+    "source": "package archive\nclass Store(hidden: Int, val count: Int) { def recover(path: String): String = path }\ncase class Entry(value: Int)\n"
+  },
+  {
+    "language": "html",
+    "extensions": [
+      "htm"
+    ],
+    "path": "page.htm",
+    "source": "<main><input type=\"text\"><p>Recover archives</p><script>function recover() {}</script></main>\n"
+  },
+  {
+    "language": "css",
+    "extensions": [
+      "css"
+    ],
+    "path": "store.css",
+    "source": "@supports (display: grid) { .archive { display: grid; } }\n@layer archives;\n@keyframes recover { from { opacity: 0; } to { opacity: 1; } }\n"
+  },
+  {
+    "language": "kotlin",
+    "extensions": [
+      "kts"
+    ],
+    "path": "Store.kts",
+    "source": "package archive\ndata class Entry(val count: Int)\nclass Store(hidden: Int, val count: Int) {\n companion object {\n  fun recover(): Int { return 1 }\n }\n val size = 4\n}\ninterface Reader {\n fun read(): Int\n}\n"
+  },
+  {
+    "language": "lua",
+    "extensions": [
+      "lua"
+    ],
+    "path": "store.lua",
+    "source": "local count, size = 1, 2\nlocal recover = function(path) return path end\nlocal store = { restore = function(path) return path end }\nfunction store:read(path) return path end\n"
+  },
+  {
+    "language": "zig",
+    "extensions": [
+      "zig"
+    ],
+    "path": "store.zig",
+    "source": "const State = enum { ready, failed };\nconst Errors = error { Missing, Corrupt };\nconst Store = struct { count: usize, fn recover() void {} };\ntest \"recover archive\" {}\ncomptime {}\n"
+  },
+  {
+    "language": "elixir",
+    "extensions": [
+      "exs"
+    ],
+    "path": "store.exs",
+    "source": "defprotocol Recover do\n def recover(path)\nend\ndefmodule Archive.Store do\n defstruct [:count]\n @callback restore(String.t()) :: String.t()\nend\ndefimpl Recover, for: Archive.Store do\n def recover(path), do: path\nend\n"
+  },
+  {
+    "language": "bash",
+    "extensions": [
+      "bash"
+    ],
+    "path": "store.bash",
+    "source": "source ./config.sh\nreadonly LIMIT=4\ndeclare -rx CACHE=1\nTEMP=2 echo ready\nrecover() { printf '%s' \"$1\"; }\n"
+  },
+  {
+    "language": "toml",
+    "extensions": [
+      "toml"
+    ],
+    "path": "store.toml",
+    "source": "[archive.primary]\n\"cache path\" = \"manifest\"\nlimits.count = 4\n[[archive.stores]]\nname = \"backup\"\n"
+  },
+  {
+    "language": "yaml",
+    "extensions": [
+      "yml"
+    ],
+    "path": "store.yml",
+    "source": "---\nprimary:\n  name: first\n  options: {count: 4, enabled: true}\n---\nsecondary:\n  name: second\n  stores:\n    - name: backup\n"
+  },
+  {
+    "language": "haskell",
+    "extensions": [
+      "hs"
+    ],
+    "path": "Store.hs",
+    "source": "module Store where\n-- | Restore archive contents.\nrecover :: String -> String\nrecover path = path\nclass Restore a where\n  restore :: a -> a\ninstance Restore Int where\n  restore x = x\n"
+  },
+  {
+    "language": "dart",
+    "extensions": [
+      "dart"
+    ],
+    "path": "store.dart",
+    "source": "class Store {\n final int count;\n Store(this.count);\n Store.empty() : count = 0;\n String recover(String path) { return path; }\n}\nextension Restore on String { String restore() { return this; } }\n"
   }
 ]

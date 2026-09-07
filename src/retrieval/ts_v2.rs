@@ -1085,7 +1085,7 @@ fn flatten(tree: Vec<TreeChunk>, source: &str, owners: &[Owner]) -> Vec<Chunk> {
 }
 
 pub fn text_chunks(source: &str, path: &str) -> Vec<Chunk> {
-    if path.ends_with(".md") || path.ends_with(".markdown") {
+    if path.ends_with(".md") || path.ends_with(".markdown") || path.ends_with(".mdx") {
         return flatten(markdown::chunks(source), source, &[]);
     }
     let mut tree = Vec::new();

@@ -276,3 +276,7 @@ pub mod hybrid;
 #[cfg(test)]
 #[path = "../benchmarks/versions/port-source.rs"]
 mod port_source;
+
+#[cfg(test)]
+#[path = "../benchmarks/versions/port-language-reuse.rs"]
+mod port_language_reuse;
