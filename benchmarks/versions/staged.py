@@ -23,7 +23,10 @@ def main():
     parser.add_argument('--root', type=Path, required=True)
     parser.add_argument('--reference-root', type=Path, required=True)
     parser.add_argument('--binary', type=Path, required=True)
+    parser.add_argument('--workers', type=int, default=3)
     args = parser.parse_args()
+    if args.workers < 1:
+        parser.error('--workers must be positive')
     root, reference = args.root.resolve(), args.reference_root.resolve()
     root.mkdir(parents=True, exist_ok=False)
     (root / 'corpora').symlink_to(reference / 'corpora')
@@ -32,12 +35,14 @@ def main():
     shutil.copy2(args.binary, binary)
     baseline = module('port-baseline')
     report = {'binarySha256': hashlib.sha256(binary.read_bytes()).hexdigest(),
-              'workers': 3, 'corpora': {}}
+              'workers': args.workers, 'corpora': {}}
     for corpus in ('mimirs', 'excalidraw', 'django'):
         manifest = baseline.verify_manifest(root, corpus)
         project = root / 'projects' / corpus
         shutil.copytree(root / 'corpora' / corpus, project)
         config(project, 'rust')
+        settings = project / '.mimirs/config.toml'
+        settings.write_text(settings.read_text().replace('embedding_workers = 3\n', f'embedding_workers = {args.workers}\n'))
         output = root / 'results' / corpus
         edits = edit_files(manifest, json.loads((HERE / 'queries' / f'{corpus}.json').read_text()))
         entry = report['corpora'][corpus] = {'manifestSha256': manifest['manifest_sha256'],
@@ -56,6 +61,7 @@ def main():
             timing = measure([str(binary), 'index', '--profile', str(profile_path)], project, output / stage)
             profile = json.loads(profile_path.read_text())
             assert profile['complete'] and not profile['counters'].get('files_skipped', 0)
+            assert profile['counters']['embedding_worker_limit'] == args.workers
             assert not profile['counters'].get('model_assets_fetched', 0)
             if stage == 'unchanged':
                 assert profile['counters']['files_reused'] == len(manifest['manifest'])
