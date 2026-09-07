@@ -10,7 +10,9 @@ use std::{
 use tree_sitter::{Node, Query, QueryCursor, StreamingIterator};
 
 mod declarators;
+mod kinds;
 mod markdown;
+use kinds::node_kind;
 mod windows;
 pub use windows::project;
 
@@ -87,6 +89,7 @@ pub struct Chunk {
 }
 
 pub(crate) struct Entity {
+    pub node_type: String,
     pub kind: String,
     pub name: Option<String>,
     pub node_start: usize,
@@ -132,6 +135,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
     static TSX: OnceLock<Result<Query, String>> = OnceLock::new();
     static GO: OnceLock<Result<Query, String>> = OnceLock::new();
     static C: OnceLock<Result<Query, String>> = OnceLock::new();
+    static CPP: OnceLock<Result<Query, String>> = OnceLock::new();
     static JAVA: OnceLock<Result<Query, String>> = OnceLock::new();
     let (slot, text) = match language {
         "rust" => (&RUST, include_str!("ts_v2/queries/rust.scm")),
@@ -141,6 +145,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
         "tsx" => (&TSX, include_str!("ts_v2/queries/typescript.scm")),
         "go" => (&GO, include_str!("ts_v2/queries/go.scm")),
         "c" => (&C, include_str!("ts_v2/queries/c.scm")),
+        "cpp" => (&CPP, include_str!("ts_v2/queries/cpp.scm")),
         "java" => (&JAVA, include_str!("ts_v2/queries/java.scm")),
         _ => anyhow::bail!("unsupported retrieval grammar {language}"),
     };
@@ -181,6 +186,13 @@ pub(crate) fn declarations(
             continue;
         };
         let node = item.node;
+        if language == "cpp"
+            && node.parent().is_some_and(|p| {
+                p.kind() == "template_declaration" && declarators::template(p) == Some(node)
+            })
+        {
+            continue;
+        }
         if !seen.insert(node.start_byte()) {
             continue;
         }
@@ -227,12 +239,28 @@ pub(crate) fn declarations(
             kind = "initializer".into();
         }
         if language == "c" && node.kind() == "declaration" {
-            kind = declarators::kind(node, source).into();
+            kind = declarators::kind(node, source, false).into();
+        }
+        if language == "cpp" {
+            match node.kind() {
+                "declaration" | "field_declaration" => {
+                    kind = declarators::kind(node, source, true).into()
+                }
+                "template_declaration" => kind = declarators::template_kind(node).into(),
+                "function_definition" if declarators::qualified_method(node, source) => {
+                    kind = "method".into()
+                }
+                _ => {}
+            }
+            if node.kind() == "declaration" && contains(Some(node), "lambda_expression") {
+                kind = "function".into();
+            }
         }
         let name = declared_name(node, source, language)
             .or(captured)
             .or_else(|| special("default_export").then(|| "default".into()));
         flat.push(Entity {
+            node_type: node.kind().into(),
             kind,
             name,
             node_start: node.start_byte(),
@@ -291,7 +319,7 @@ fn contains(node: Option<Node<'_>>, kind: &str) -> bool {
 }
 
 fn declared_name(node: Node<'_>, source: &str, language: &str) -> Option<String> {
-    if language == "c" {
+    if matches!(language, "c" | "cpp") {
         return declarators::declared_name(node, source);
     }
     if language == "rust" && node.kind() == "impl_item" {
@@ -352,72 +380,6 @@ fn declared_name(node: Node<'_>, source: &str, language: &str) -> Option<String>
         _ => return None,
     }
     (!names.is_empty()).then(|| names.join(", "))
-}
-
-fn node_kind(kind: &str) -> &str {
-    match kind {
-        "function_declaration"
-        | "function_signature"
-        | "function_expression"
-        | "generator_function_declaration"
-        | "arrow_function"
-        | "function_definition"
-        | "decorated_definition"
-        | "function_item" => "function",
-        "class_declaration" | "abstract_class_declaration" | "class_definition" | "class" => {
-            "class"
-        }
-        "method_definition"
-        | "method_signature"
-        | "abstract_method_signature"
-        | "function_signature_item"
-        | "method_declaration"
-        | "method_elem" => "method",
-        "interface_declaration" => "interface",
-        "type_alias_declaration" | "type_item" | "type_declaration" | "type_spec" => "type",
-        "enum_declaration" | "enum_item" => "enum",
-        "import_statement"
-        | "import_from_statement"
-        | "use_declaration"
-        | "extern_crate_declaration"
-        | "import_declaration" => "import",
-        "export_statement" => "export",
-        "internal_module" | "mod_item" => "module",
-        "variable_declarator"
-        | "lexical_declaration"
-        | "expression_statement"
-        | "static_item"
-        | "let_declaration"
-        | "var_declaration"
-        | "var_spec"
-        | "short_var_declaration" => "variable",
-        "field_definition" | "public_field_definition" | "field_declaration" => "field",
-        "property_signature" => "property",
-        "struct_item" | "union_item" => "struct",
-        "trait_item" => "trait",
-        "impl_item" => "impl",
-        "const_item" | "enum_variant" | "const_declaration" | "const_spec" => "constant",
-        "macro_definition" => "macro",
-        "package_clause" | "package_declaration" => "package",
-        "module_declaration" => "module",
-        "record_declaration" => "record",
-        "annotation_type_declaration" => "annotation_type",
-        "constructor_declaration"
-        | "compact_constructor_declaration"
-        | "annotation_type_element_declaration" => "method",
-        "static_initializer" => "initializer",
-        "enum_constant" => "constant",
-        "formal_parameter" => "field",
-        "preproc_include" => "import",
-        "preproc_def" | "preproc_function_def" => "macro",
-        "preproc_ifdef" | "preproc_if" | "preproc_elif" | "preproc_else" => "conditional",
-        "preproc_call" => "directive",
-        "struct_specifier" | "union_specifier" => "struct",
-        "enum_specifier" => "enum",
-        "type_definition" => "type",
-        "enumerator" => "constant",
-        _ => "block",
-    }
 }
 
 fn nest(flat: Vec<Entity>) -> Vec<Entity> {
@@ -497,6 +459,25 @@ fn decorator(line: &str, language: &str) -> bool {
     }
 }
 
+pub(crate) fn classified_kind<'a>(
+    language: &str,
+    _node_type: &str,
+    kind: &'a str,
+    parent: Option<&str>,
+) -> &'a str {
+    if kind == "function"
+        && ((language == "python" && parent == Some("class"))
+            || (language == "rust" && matches!(parent, Some("impl" | "trait")))
+            || (language == "cpp" && matches!(parent, Some("class" | "struct"))))
+    {
+        return "method";
+    }
+    if language == "python" && parent == Some("class") && kind == "variable" {
+        return "field";
+    }
+    kind
+}
+
 struct Parent<'a> {
     floor: Option<usize>,
     end: usize,
@@ -515,16 +496,8 @@ fn adjust(
     for i in 0..entities.len() {
         let next_row = entities.get(i + 1).map(|e| e.start_row);
         let entity = &mut entities[i];
-        if (language == "python" && parent.kind == Some("class"))
-            || (language == "rust" && matches!(parent.kind, Some("impl" | "trait")))
-        {
-            if entity.kind == "function" {
-                entity.kind = "method".into();
-            }
-            if language == "python" && entity.kind == "variable" {
-                entity.kind = "field".into();
-            }
-        }
+        entity.kind =
+            classified_kind(language, &entity.node_type, &entity.kind, parent.kind).into();
         let mut attached = entity.start_row;
         let mut cursor = entity.start_row;
         while cursor > 0 && previous.is_none_or(|p| cursor - 1 > p) {

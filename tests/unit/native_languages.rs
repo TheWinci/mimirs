@@ -144,6 +144,40 @@ fn c_names_follow_declarators_without_confusing_function_pointers() {
 }
 
 #[test]
+fn cpp_templates_qualified_methods_and_header_aliases_keep_names() {
+    let source = "template <class T> class Store { public: T recover(T value); };\ntemplate <class T> T Store<T>::recover(T value) { return value; }\nclass Other { public: int count; int recover(); };\nint Other::recover() { return 1; }\nint (*callback)(int);\n";
+    for ext in ["cpp", "cc", "cxx", "hpp", "hh", "hxx"] {
+        let result = analyze(&format!("store.{ext}"), source);
+        assert!(
+            result
+                .entities
+                .iter()
+                .any(|e| e.name.as_deref() == Some("Store") && e.kind == "class")
+        );
+        assert!(
+            result
+                .entities
+                .iter()
+                .any(|e| e.name.as_deref() == Some("Other::recover") && e.kind == "method")
+        );
+        assert!(
+            result
+                .entities
+                .iter()
+                .any(|e| e.name.as_deref() == Some("callback") && e.kind == "variable")
+        );
+        assert_eq!(
+            result
+                .entities
+                .iter()
+                .filter(|e| e.name.as_deref() == Some("Store"))
+                .count(),
+            1
+        );
+    }
+}
+
+#[test]
 fn native_snapshots_round_trip_replace_rollback_and_delete() {
     for case in fixture_cases() {
         let path = case["path"].as_str().unwrap();

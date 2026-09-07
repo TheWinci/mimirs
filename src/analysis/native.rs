@@ -23,6 +23,15 @@ pub(super) const C: Language = Language {
     chunking: super::language::Chunking::Paragraphs,
 };
 
+pub(super) const CPP: Language = Language {
+    identity: "cpp/default/tree-sitter-0.27.0/tree-sitter-cpp-0.23.4/extractor-1",
+    extensions: &["cpp", "cc", "cxx", "hpp", "hh", "hxx"],
+    extract: |source| extract(source, tree_sitter_cpp::LANGUAGE.into(), "cpp"),
+    is_native: true,
+    #[cfg(test)]
+    chunking: super::language::Chunking::Paragraphs,
+};
+
 fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analysis> {
     let mut parser = Parser::new();
     parser
@@ -62,7 +71,13 @@ fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analy
         let id = analysis.entities.len();
         let span = lines.span(declaration.node_start, declaration.node_end);
         analysis.entities.push(Entity {
-            kind: declaration.kind.clone(),
+            kind: ts_v2::classified_kind(
+                language,
+                &declaration.node_type,
+                &declaration.kind,
+                parent.map(|id| analysis.entities[id].kind.as_str()),
+            )
+            .into(),
             name: declaration.name.clone(),
             span: span.clone(),
             parent,

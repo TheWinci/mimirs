@@ -26,6 +26,12 @@ impl Default for Config {
             embedding_workers: None,
             generated: Vec::new(),
             include: [
+                "**/*.cpp",
+                "**/*.cc",
+                "**/*.cxx",
+                "**/*.hpp",
+                "**/*.hh",
+                "**/*.hxx",
                 "**/*.c",
                 "**/*.h",
                 "**/*.rs",

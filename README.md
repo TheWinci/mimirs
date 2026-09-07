@@ -79,7 +79,7 @@ model session; sessions are created only as files need more workers and reused.
 Search embeds its single query with one worker.
 
 Native tree-sitter grammars identify retrieval chunks for Rust, Python,
-TypeScript, JavaScript, JSX, TSX, Go, Java, and C. The grammars ship in the binary and
+TypeScript, JavaScript, JSX, TSX, Go, Java, C, and C++. The grammars ship in the binary and
 need no language servers or language runtimes. Written declarations, attached
 comments, decorators, imports, and incomplete source remain searchable. Retrieval
 follows TS v2's chunk boundaries, including collapsed import groups and overloads.
@@ -240,3 +240,8 @@ documentation, signatures and parse diagnostics. It does not resolve classpaths.
 C uses the native 0.24.1 grammar. Add `"**/*.c"` and `"**/*.h"` to an existing
 config to enable it. Headers use C by default. Names follow pointer, array and
 function declarators; preprocessor branches remain source-backed chunks.
+
+C++ uses the native 0.23.4 grammar for `.cpp`, `.cc`, `.cxx`, `.hpp`, `.hh`
+and `.hxx`. Fresh configs include these extensions. Add matching `"**/*.ext"`
+patterns to existing configs and reindex. Templates retain one owner; qualified
+methods and declaration names remain tied to their written source.
