@@ -2,6 +2,47 @@
 use super::text;
 use tree_sitter::Node;
 
+pub(super) fn ocaml(node: Node<'_>, source: &str) -> Option<String> {
+    fn bindings<'a>(node: Node<'_>, source: &'a str, names: &mut Vec<&'a str>) {
+        if node.kind() == "value_name" {
+            names.push(text(node, source));
+        } else {
+            for child in node.named_children(&mut node.walk()) {
+                bindings(child, source, names);
+            }
+        }
+    }
+    if node.kind() != "value_definition" {
+        return None;
+    }
+    let mut names = Vec::new();
+    for pattern in node
+        .named_children(&mut node.walk())
+        .filter(|n| n.kind() == "let_binding")
+        .filter_map(|n| n.child_by_field_name("pattern"))
+    {
+        bindings(pattern, source, &mut names);
+    }
+    (!names.is_empty()).then(|| names.join(", "))
+}
+
+pub(super) fn ocaml_kind(node: Node<'_>) -> &'static str {
+    if node
+        .named_children(&mut node.walk())
+        .filter(|n| n.kind() == "let_binding")
+        .any(|n| {
+            n.named_children(&mut n.walk())
+                .any(|c| c.kind() == "parameter")
+                || n.child_by_field_name("body")
+                    .is_some_and(|n| n.kind() == "fun_expression")
+        })
+    {
+        "function"
+    } else {
+        "variable"
+    }
+}
+
 pub(super) fn bash_kind(node: Node<'_>, source: &str) -> &'static str {
     if let Some(parent) = node.parent().filter(|n| n.kind() == "declaration_command") {
         let words: Vec<_> = text(parent, source).split_whitespace().collect();

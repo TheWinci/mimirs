@@ -152,6 +152,8 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
     static TOML: OnceLock<Result<Query, String>> = OnceLock::new();
     static YAML: OnceLock<Result<Query, String>> = OnceLock::new();
     static HASKELL: OnceLock<Result<Query, String>> = OnceLock::new();
+    static OCAML_INTERFACE: OnceLock<Result<Query, String>> = OnceLock::new();
+    static OCAML: OnceLock<Result<Query, String>> = OnceLock::new();
     static JAVA: OnceLock<Result<Query, String>> = OnceLock::new();
     let (slot, text) = match language {
         "rust" => (&RUST, include_str!("ts_v2/queries/rust.scm")),
@@ -176,6 +178,8 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
         "toml" => (&TOML, include_str!("ts_v2/queries/toml.scm")),
         "yaml" => (&YAML, include_str!("ts_v2/queries/yaml.scm")),
         "haskell" => (&HASKELL, include_str!("ts_v2/queries/haskell.scm")),
+        "ocaml_interface" => (&OCAML_INTERFACE, include_str!("ts_v2/queries/ocaml.scm")),
+        "ocaml" => (&OCAML, include_str!("ts_v2/queries/ocaml.scm")),
         "java" => (&JAVA, include_str!("ts_v2/queries/java.scm")),
         _ => anyhow::bail!("unsupported retrieval grammar {language}"),
     };
@@ -202,6 +206,11 @@ pub(crate) fn declarations(
     language: &str,
 ) -> Result<Vec<Entity>> {
     let query = query(language, grammar)?;
+    let language = if language == "ocaml_interface" {
+        "ocaml"
+    } else {
+        language
+    };
     let mut cursor = QueryCursor::new();
     let mut matches = cursor.matches(query, root, source.as_bytes());
     let names = query.capture_names();
@@ -441,6 +450,9 @@ pub(crate) fn declarations(
         } else {
             captured
         };
+        if language == "ocaml" && node.kind() == "value_definition" {
+            kind = names::ocaml_kind(node).into();
+        }
         let name = declared_name(node, source, language)
             .or(captured)
             .or_else(|| special("default_export").then(|| "default".into()));
@@ -540,6 +552,9 @@ fn contains(node: Option<Node<'_>>, kind: &str) -> bool {
 }
 
 fn declared_name(node: Node<'_>, source: &str, language: &str) -> Option<String> {
+    if language == "ocaml" {
+        return names::ocaml(node, source);
+    }
     if language == "zig" {
         if node.kind() == "test_declaration" {
             return Some(

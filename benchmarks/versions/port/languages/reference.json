@@ -1190,6 +1190,58 @@
           "end": 148
         }
       ]
+    },
+    {
+      "language": "ocaml",
+      "extensions": [
+        "mli"
+      ],
+      "path": "archive.mli",
+      "source": "(** Restore café archives. *)\nmodule Archive : sig\n  type store = { count : int }\n  val recover : string -> string\nend\n",
+      "chunks": [
+        {
+          "kind": "module",
+          "name": "Archive",
+          "parent": null,
+          "start": 0,
+          "end": 120
+        },
+        {
+          "kind": "comment",
+          "name": null,
+          "parent": 0,
+          "start": 0,
+          "end": 31
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 0,
+          "start": 31,
+          "end": 52
+        },
+        {
+          "kind": "type",
+          "name": "store",
+          "parent": 0,
+          "start": 52,
+          "end": 83
+        },
+        {
+          "kind": "function",
+          "name": "recover",
+          "parent": 0,
+          "start": 83,
+          "end": 116
+        },
+        {
+          "kind": "block",
+          "name": null,
+          "parent": 0,
+          "start": 116,
+          "end": 120
+        }
+      ]
     }
   ]
 }

@@ -158,6 +158,30 @@ pub(super) const HASKELL: Language = Language {
     chunking: super::language::Chunking::Paragraphs,
 };
 
+pub(super) const OCAML: Language = Language {
+    identity: "ocaml/default/tree-sitter-0.27.0/tree-sitter-ocaml-0.24.2/extractor-1",
+    extensions: &["ml"],
+    extract: |source| extract(source, tree_sitter_ocaml::LANGUAGE_OCAML.into(), "ocaml"),
+    is_native: true,
+    #[cfg(test)]
+    chunking: super::language::Chunking::Paragraphs,
+};
+
+pub(super) const OCAML_INTERFACE: Language = Language {
+    identity: "ocaml/interface/tree-sitter-0.27.0/ocaml-0.24.2/extractor-1",
+    extensions: &["mli"],
+    extract: |source| {
+        extract(
+            source,
+            tree_sitter_ocaml::LANGUAGE_OCAML_INTERFACE.into(),
+            "ocaml_interface",
+        )
+    },
+    is_native: true,
+    #[cfg(test)]
+    chunking: super::language::Chunking::Paragraphs,
+};
+
 fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analysis> {
     let mut parser = Parser::new();
     parser

@@ -70,5 +70,7 @@ tree-sitter-yaml = "=0.7.1"
 
 tree-sitter-haskell = "=0.23.1"
 
+tree-sitter-ocaml = "=0.24.2"
+
 [dev-dependencies]
 tempfile = "3.27.0"

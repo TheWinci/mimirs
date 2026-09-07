@@ -307,3 +307,8 @@ Haskell uses the native 0.23.1 grammar for `.hs`. Existing projects can add
 `"**/*.hs"` and reindex. Module headers, type signatures, bindings, data types,
 classes and instances retain names. Haddock comments attach as documentation.
 Literate `.lhs` files use explicit text fallback.
+
+OCaml uses native 0.24.2 grammars for `.ml` implementations and `.mli` interfaces.
+Existing projects can add `"**/*.ml"` and `"**/*.mli"` and reindex. Value bindings,
+patterns, modules, classes and interface specifications retain declared names.
+The interface parser and query cache are separate from implementation parsing.

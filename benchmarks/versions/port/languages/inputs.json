@@ -163,5 +163,13 @@
     ],
     "path": "archive.dart",
     "source": "library archive;\n/// Restore café archives.\nclass Store {\n  final int count;\n  Store(this.count);\n  String recover(String path) { return path; }\n}\n"
+  },
+  {
+    "language": "ocaml",
+    "extensions": [
+      "mli"
+    ],
+    "path": "archive.mli",
+    "source": "(** Restore café archives. *)\nmodule Archive : sig\n  type store = { count : int }\n  val recover : string -> string\nend\n"
   }
 ]

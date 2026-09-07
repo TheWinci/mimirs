@@ -549,6 +549,43 @@ fn haskell_haddock_signatures_and_instances_remain_distinct() {
 }
 
 #[test]
+fn ocaml_interfaces_bindings_and_functions_use_the_selected_grammar() {
+    assert_ne!(
+        crate::analysis::language::for_path("store.ml").identity,
+        crate::analysis::language::for_path("store.mli").identity
+    );
+    let implementation = analyze(
+        "store.ml",
+        "let count, size = 1, 2\nlet recover path = path\nlet restore = fun path -> path\n",
+    );
+    for (name, kind) in [
+        ("count, size", "variable"),
+        ("recover", "function"),
+        ("restore", "function"),
+    ] {
+        assert!(
+            implementation
+                .entities
+                .iter()
+                .any(|e| e.name.as_deref() == Some(name) && e.kind == kind),
+            "{name}: {:?}",
+            implementation.entities
+        );
+    }
+    let interface = analyze(
+        "store.mli",
+        "(** Restore archives. *)\nval recover : string -> string\nmodule type Store = sig val count : int end\n",
+    );
+    assert!(interface.diagnostics.is_empty());
+    assert!(
+        interface
+            .entities
+            .iter()
+            .any(|e| e.name.as_deref() == Some("recover") && e.kind == "function")
+    );
+}
+
+#[test]
 fn native_snapshots_round_trip_replace_rollback_and_delete() {
     for case in fixture_cases() {
         let path = case["path"].as_str().unwrap();
