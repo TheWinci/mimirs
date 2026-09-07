@@ -77,6 +77,15 @@ pub(super) const HTML: Language = Language {
     chunking: super::language::Chunking::Paragraphs,
 };
 
+pub(super) const CSS: Language = Language {
+    identity: "css/default/tree-sitter-0.27.0/tree-sitter-css-0.25.0/extractor-1",
+    extensions: &["css"],
+    extract: |source| extract(source, tree_sitter_css::LANGUAGE.into(), "css"),
+    is_native: true,
+    #[cfg(test)]
+    chunking: super::language::Chunking::Paragraphs,
+};
+
 fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analysis> {
     let mut parser = Parser::new();
     parser
@@ -141,6 +150,10 @@ fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analy
             let start = declaration.node_start;
             let end = node
                 .child_by_field_name("body")
+                .or_else(|| {
+                    node.named_children(&mut node.walk())
+                        .find(|n| matches!(n.kind(), "block" | "declaration_list"))
+                })
                 .map_or(declaration.syntax_end, |body| body.start_byte())
                 .min(declaration.node_end);
             let end = start + analysis.source.text[start..end].trim_end().len();

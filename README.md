@@ -268,3 +268,7 @@ HTML uses the native 0.23.2 grammar for `.html` and `.htm`. Existing projects
 can add `"**/*.html"` and `"**/*.htm"` and reindex. Element names, nested ranges,
 comments, and inline script/style source remain searchable. Embedded languages
 are retained as HTML source rather than separately parsed.
+
+CSS uses the native 0.25.0 grammar for `.css`. Existing projects can add
+`"**/*.css"` and reindex. Selectors, keyframes, media queries and other at-rules
+retain names and nested ranges. SCSS and Less use explicit text fallback.

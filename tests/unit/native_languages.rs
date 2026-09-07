@@ -309,6 +309,29 @@ fn html_void_tags_do_not_swallow_the_following_elements() {
 }
 
 #[test]
+fn css_at_rule_names_include_conditions_and_nested_selectors() {
+    let result = analyze(
+        "store.css",
+        "@supports (display: grid) { .archive { display: grid; } }\n@layer archives;\n@keyframes recover { from { opacity: 0; } to { opacity: 1; } }\n",
+    );
+    for (name, kind) in [
+        ("@supports (display: grid)", "rule"),
+        (".archive", "selector"),
+        ("@layer archives", "rule"),
+        ("recover", "rule"),
+    ] {
+        assert!(
+            result
+                .entities
+                .iter()
+                .any(|e| e.name.as_deref() == Some(name) && e.kind == kind),
+            "{name}: {:?}",
+            result.entities
+        );
+    }
+}
+
+#[test]
 fn native_snapshots_round_trip_replace_rollback_and_delete() {
     for case in fixture_cases() {
         let path = case["path"].as_str().unwrap();

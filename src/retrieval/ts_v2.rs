@@ -143,6 +143,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
     static PHP: OnceLock<Result<Query, String>> = OnceLock::new();
     static SCALA: OnceLock<Result<Query, String>> = OnceLock::new();
     static HTML: OnceLock<Result<Query, String>> = OnceLock::new();
+    static CSS: OnceLock<Result<Query, String>> = OnceLock::new();
     static JAVA: OnceLock<Result<Query, String>> = OnceLock::new();
     let (slot, text) = match language {
         "rust" => (&RUST, include_str!("ts_v2/queries/rust.scm")),
@@ -158,6 +159,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
         "php" => (&PHP, include_str!("ts_v2/queries/php.scm")),
         "scala" => (&SCALA, include_str!("ts_v2/queries/scala.scm")),
         "html" => (&HTML, include_str!("ts_v2/queries/html.scm")),
+        "css" => (&CSS, include_str!("ts_v2/queries/css.scm")),
         "java" => (&JAVA, include_str!("ts_v2/queries/java.scm")),
         _ => anyhow::bail!("unsupported retrieval grammar {language}"),
     };
@@ -409,6 +411,22 @@ fn contains(node: Option<Node<'_>>, kind: &str) -> bool {
 }
 
 fn declared_name(node: Node<'_>, source: &str, language: &str) -> Option<String> {
+    if language == "css"
+        && matches!(
+            node.kind(),
+            "media_statement" | "supports_statement" | "scope_statement" | "at_rule"
+        )
+    {
+        let end = node
+            .named_children(&mut node.walk())
+            .find(|n| n.kind() == "block")
+            .map_or(node.end_byte(), |n| n.start_byte());
+        let name = source[node.start_byte()..end]
+            .trim()
+            .trim_end_matches(';')
+            .trim();
+        return (!name.is_empty()).then(|| name.to_owned());
+    }
     if language == "scala" {
         return names::scala(node, source);
     }
