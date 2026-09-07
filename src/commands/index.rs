@@ -7,7 +7,9 @@ use anyhow::{Context, ensure};
 
 use crate::{config::Config, embedding, source, storage};
 
+mod admission;
 mod channel;
+mod parallel;
 mod pipeline;
 mod progress;
 mod walk;
@@ -172,7 +174,7 @@ fn index_with_mode(
     let cancel = channel::Cancel::default();
     let _cancel_on_exit = cancel.guard();
     let (paths, total): (
-        Box<dyn Iterator<Item = anyhow::Result<walk::stream::Event>>>,
+        Box<dyn Iterator<Item = anyhow::Result<walk::stream::Event>> + Send>,
         _,
     ) = if streaming {
         (
@@ -225,19 +227,33 @@ fn index_with_mode(
     })?;
 
     let mut summary = Summary::default();
-    let successful = pipeline::run(
-        root,
-        paths,
-        total,
-        &mut database.connection,
-        &mut embedder,
-        &document_policy,
-        progress,
-        profile,
-        &mut summary,
-        read,
-        extract,
-    )?;
+    let successful = if let Some(worker) = streaming.then(|| embedder.take_worker()).flatten() {
+        parallel::run(
+            root,
+            paths,
+            worker,
+            workers,
+            &mut database.connection,
+            &document_policy,
+            progress,
+            profile,
+            &mut summary,
+        )?
+    } else {
+        pipeline::run(
+            root,
+            paths,
+            total,
+            &mut database.connection,
+            &mut embedder,
+            &document_policy,
+            progress,
+            profile,
+            &mut summary,
+            read,
+            extract,
+        )?
+    };
     profile.measure("reconciliation", || {
         storage::reconcile(
             &mut database.connection,

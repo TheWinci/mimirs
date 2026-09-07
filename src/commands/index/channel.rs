@@ -5,7 +5,7 @@ use std::sync::{Arc, Condvar, Mutex, Weak};
 
 use crate::profiling::{Activity, Profiler};
 
-trait Close: Send + Sync {
+pub(super) trait Close: Send + Sync {
     fn close(&self);
 }
 
@@ -19,6 +19,13 @@ struct Registry {
 }
 
 impl Cancel {
+    pub fn register(&self, queue: Arc<dyn Close>) {
+        let mut registry = self.0.lock().unwrap();
+        if registry.cancelled {
+            queue.close();
+        }
+        registry.queues.push(Arc::downgrade(&queue));
+    }
     pub fn cancel(&self) {
         let queues = {
             let mut state = self.0.lock().unwrap();
@@ -103,12 +110,7 @@ pub(super) fn bounded<T: Send + 'static>(
         profile: profile.clone(),
         name,
     });
-    let erased: Arc<dyn Close> = shared.clone();
-    let mut registry = cancel.0.lock().unwrap();
-    if registry.cancelled {
-        shared.close();
-    }
-    registry.queues.push(Arc::downgrade(&erased));
+    cancel.register(shared.clone());
     (Sender(shared.clone()), Receiver(shared))
 }
 

@@ -1337,6 +1337,13 @@ struct AsyncBackend {
 }
 
 impl Backend for AsyncBackend {
+    fn take_worker(&mut self) -> Option<Box<dyn Backend + Send>> {
+        let pool = embedding::pool::Pool::new(vec![()], |_, _| unreachable!()).unwrap();
+        Some(Box::new(Self {
+            pool: std::mem::replace(&mut self.pool, pool),
+            limit: self.limit,
+        }))
+    }
     fn pending_files(&self) -> usize {
         self.limit
     }
@@ -1543,5 +1550,218 @@ fn streamed_index_reads_source_before_discovery_finishes() {
     assert_eq!(
         profile.finish(None).unwrap().counters["files_discovered"],
         200
+    );
+}
+
+fn run_parallel_test(
+    root: &Path,
+    factory: impl FnOnce() -> anyhow::Result<Embedder>,
+    _: &mut dyn Write,
+    stderr: &mut dyn Write,
+    terminal: bool,
+    elapsed: &dyn Fn() -> Duration,
+    profile: &Profiler,
+) -> anyhow::Result<()> {
+    let mut progress = Progress::new(root, stderr, terminal, elapsed).with_profile(profile.clone());
+    index_with_mode(
+        root,
+        factory,
+        &mut progress,
+        source::read,
+        crate::analysis::extract,
+        profile,
+        true,
+    )?;
+    Ok(())
+}
+#[test]
+fn parallel_stages_overlap_and_commit_in_source_order() {
+    use std::sync::{Arc, Mutex, mpsc};
+    use std::time::Duration;
+    let dir = project(&[
+        ("a.rs", "first"),
+        ("b.rs", "second"),
+        ("c.rs", "third"),
+        ("d.rs", "fourth"),
+    ]);
+    let (started, receive) = mpsc::channel();
+    let (release, released) = mpsc::channel();
+    let released = Arc::new(Mutex::new(released));
+    let pool = embedding::pool::Pool::new(vec![(); 3], move |_, text| {
+        if !text.contains("fourth") {
+            started.send(()).unwrap();
+            released
+                .lock()
+                .unwrap()
+                .recv_timeout(Duration::from_secs(5))??;
+        }
+        Ok(fake_vector(text))
+    })
+    .unwrap();
+    let controller = std::thread::spawn(move || {
+        let ready = (0..3).all(|_| receive.recv_timeout(Duration::from_secs(5)).is_ok());
+        for _ in 0..3 {
+            let _ = release.send(if ready {
+                Ok(())
+            } else {
+                Err(anyhow::anyhow!("files did not overlap"))
+            });
+        }
+        ready
+    });
+    let profile = Profiler::enabled();
+    run_parallel_test(
+        dir.path(),
+        || Ok(Embedder::new(AsyncBackend { pool, limit: 3 })),
+        &mut Vec::new(),
+        &mut Vec::new(),
+        false,
+        &|| Duration::ZERO,
+        &profile,
+    )
+    .unwrap();
+    assert!(controller.join().unwrap());
+    let report = serde_json::to_value(profile.finish(None).unwrap()).unwrap();
+    assert!(
+        report["counters"]["index_queue_peak_files"]
+            .as_u64()
+            .unwrap()
+            <= 6
+    );
+    assert_eq!(report["counters"]["embedding_calls"], 4);
+    assert_eq!(
+        report["files"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|f| f["path"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        ["a.rs", "b.rs", "c.rs", "d.rs"]
+    );
+    let db = connection(&dir);
+    let paths = db
+        .prepare("SELECT path FROM files ORDER BY id")
+        .unwrap()
+        .query_map([], |r| r.get::<_, String>(0))
+        .unwrap()
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .unwrap();
+    assert_eq!(paths, ["a.rs", "b.rs", "c.rs", "d.rs"]);
+    for path in paths {
+        let direct = crate::analysis::extract(source::read(dir.path(), &path).unwrap()).unwrap();
+        assert_eq!(
+            storage::analysis::load(&db, &path).unwrap().unwrap(),
+            direct
+        );
+    }
+    assert!(report["phases_seconds"]["embedding_wait"].is_number());
+    assert!(!report["phases_seconds"]["embedding"].is_number());
+    let phases: f64 = report["phases_seconds"]
+        .as_object()
+        .unwrap()
+        .values()
+        .map(|v| v.as_f64().unwrap())
+        .sum();
+    assert!(phases > 0.0);
+}
+
+#[test]
+fn parallel_failure_preserves_earlier_commits_and_later_snapshots() {
+    use std::sync::{Arc, Condvar, Mutex};
+    let dir = project(&[
+        ("a.rs", "old a"),
+        ("b.rs", "old b"),
+        ("c.rs", "old c"),
+        ("stale.rs", "stale"),
+    ]);
+    run(&dir, backend(), false).0.unwrap();
+    for path in ["a", "b", "c"] {
+        fs::write(dir.path().join(format!("{path}.rs")), format!("new {path}")).unwrap();
+    }
+    fs::remove_file(dir.path().join("stale.rs")).unwrap();
+    let failed = Arc::new((Mutex::new(false), Condvar::new()));
+    let pool = embedding::pool::Pool::new(vec![(); 3], move |_, text| {
+        if text.ends_with("new a") {
+            let (lock, changed) = &*failed;
+            let (_guard, timed) = changed
+                .wait_timeout_while(lock.lock().unwrap(), Duration::from_secs(5), |failed| {
+                    !*failed
+                })
+                .unwrap();
+            anyhow::ensure!(!timed.timed_out(), "later file did not start");
+        } else if text.ends_with("new b") {
+            *failed.0.lock().unwrap() = true;
+            failed.1.notify_all();
+            anyhow::bail!("inference failed before earlier file finished");
+        }
+        Ok(fake_vector(text))
+    })
+    .unwrap();
+    let profile = Profiler::enabled();
+    let result = run_parallel_test(
+        dir.path(),
+        || Ok(Embedder::new(AsyncBackend { pool, limit: 3 })),
+        &mut Vec::new(),
+        &mut Vec::new(),
+        false,
+        &|| Duration::ZERO,
+        &profile,
+    );
+    assert!(format!("{:#}", result.unwrap_err()).contains("cannot embed source file b.rs"));
+    assert_eq!(
+        files(&dir),
+        [
+            ("a.rs".into(), "new a".into()),
+            ("c.rs".into(), "old c".into()),
+            ("stale.rs".into(), "stale".into())
+        ]
+    );
+    let report = profile.finish(Some("expected failure".into())).unwrap();
+    assert_eq!(report.counters["files_indexed"], 1);
+    assert!(report.counters["embedding_calls"] >= 2);
+}
+
+#[test]
+fn parallel_workers_publish_the_read_snapshot_after_disk_changes() {
+    let dir = project(&[("a.rs", "old snapshot"), ("empty.rs", "")]);
+    let path = dir.path().join("a.rs");
+    let pool = embedding::pool::Pool::new(vec![()], move |_, text| {
+        // Inference starts after the parser handed off its immutable source.
+        fs::write(&path, "new disk generation")?;
+        Ok(fake_vector(text))
+    })
+    .unwrap();
+    run_parallel_test(
+        dir.path(),
+        || Ok(Embedder::new(AsyncBackend { pool, limit: 2 })),
+        &mut Vec::new(),
+        &mut Vec::new(),
+        false,
+        &|| Duration::ZERO,
+        &Profiler::default(),
+    )
+    .unwrap();
+    assert_eq!(
+        files(&dir),
+        [
+            ("a.rs".into(), "old snapshot".into()),
+            ("empty.rs".into(), "".into())
+        ]
+    );
+    assert_eq!(
+        fs::read_to_string(dir.path().join("a.rs")).unwrap(),
+        "new disk generation"
+    );
+    let db = connection(&dir);
+    let policy: String = db
+        .query_row(
+            "SELECT value FROM index_metadata WHERE key='document_policy'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert!(
+        !storage::processing::reusable(&db, &source::read(dir.path(), "a.rs").unwrap(), &policy)
+            .unwrap()
     );
 }

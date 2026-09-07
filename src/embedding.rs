@@ -26,6 +26,11 @@ mod task;
 pub use task::SourceTask;
 
 pub trait Backend {
+    /// Move production model ownership to the window worker. Local test backends
+    /// can retain their synchronous contract by leaving this unsupported.
+    fn take_worker(&mut self) -> Option<Box<dyn Backend + Send>> {
+        None
+    }
     /// Synchronous test/custom backends retain the original one-file contract.
     fn pending_files(&self) -> usize {
         1
@@ -76,7 +81,27 @@ pub struct Embedder {
     profile: Profiler,
 }
 
+pub struct Worker {
+    backend: Box<dyn Backend + Send>,
+    profile: Profiler,
+}
+
+impl Worker {
+    pub fn into_embedder(self) -> Embedder {
+        Embedder {
+            backend: self.backend,
+            profile: self.profile,
+        }
+    }
+}
+
 impl Embedder {
+    pub fn take_worker(&mut self) -> Option<Worker> {
+        self.backend.take_worker().map(|backend| Worker {
+            backend,
+            profile: self.profile.clone(),
+        })
+    }
     pub fn with_workers(mut self, workers: usize) -> Self {
         self.backend.set_workers(workers.max(1));
         self
@@ -332,6 +357,10 @@ impl OnnxBackend {
 }
 
 impl Backend for OnnxBackend {
+    fn take_worker(&mut self) -> Option<Box<dyn Backend + Send>> {
+        let empty = Self::new(self.cache_dir.clone());
+        Some(Box::new(std::mem::replace(self, empty)))
+    }
     fn pending_files(&self) -> usize {
         self.workers.saturating_mul(2).max(1)
     }

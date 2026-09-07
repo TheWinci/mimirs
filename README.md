@@ -72,14 +72,17 @@ embedding_workers = 3
 Each worker uses one inference thread. Larger values are clamped to available
 CPUs; zero and non-integer values are invalid. Remove the entry to restore the
 automatic default. This controls inference concurrency, not a hard CPU percentage.
-The coordinator can prepare and save files while inference runs. Each worker
+A reader/parser worker and a window preparation worker run alongside inference.
+Each owns its data and SQLite connections stay on their owning threads. Each worker
 owns a model session, and its thread and session persist across files. The pool
 starts when a file needs embeddings. Changing the worker setting does not
 require rebuilding unchanged files. Search embeds its query with one worker.
 
 Indexing allows at most twice the worker count in-flight files. Read-ahead pauses
-when their estimated input/vector payload reaches 32 MiB; one additional large
-file can exceed that threshold. This is a queue limit, not a total memory cap.
+when reservations for active files reach a 32 MiB target. Each file reserves
+64 times its source and path bytes plus 64 KiB for expanded analysis, windows,
+and results. The reservation follows the file through all stages. An oversized
+file runs alone. These conservative estimates are not a total memory cap.
 Files commit in discovery order. On failure, earlier commits remain, the failed
 replacement is invalidated, and later queued results are discarded. In-flight
 model calls finish before indexing returns. The scheduling change preserves

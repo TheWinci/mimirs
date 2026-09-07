@@ -81,6 +81,16 @@ pub fn open_read_only(path: &Path) -> anyhow::Result<Connection> {
     read().with_context(|| format!("cannot read database {}", path.display()))
 }
 
+/// The coordinator already validated this database before starting workers.
+/// Each reader gets its own connection; it cannot mutate the index.
+pub(crate) fn index_reader(path: &Path) -> anyhow::Result<Connection> {
+    register_vec()?;
+    Ok(Connection::open_with_flags(
+        path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )?)
+}
+
 /// Validate without stamping. Return whether this index already has a model.
 pub fn validate_model(connection: &Connection) -> anyhow::Result<bool> {
     let stored_model = metadata(connection, "embedding_model")?;
