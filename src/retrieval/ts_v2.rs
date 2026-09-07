@@ -85,11 +85,11 @@ pub struct Chunk {
     pub owner: Option<usize>,
 }
 
-struct Entity {
-    kind: String,
-    name: Option<String>,
-    node_start: usize,
-    node_end: usize,
+pub(crate) struct Entity {
+    pub kind: String,
+    pub name: Option<String>,
+    pub node_start: usize,
+    pub node_end: usize,
     start_row: usize,
     start: usize,
     end: usize,
@@ -130,6 +130,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
     static TS: OnceLock<Result<Query, String>> = OnceLock::new();
     static TSX: OnceLock<Result<Query, String>> = OnceLock::new();
     static GO: OnceLock<Result<Query, String>> = OnceLock::new();
+    static JAVA: OnceLock<Result<Query, String>> = OnceLock::new();
     let (slot, text) = match language {
         "rust" => (&RUST, include_str!("ts_v2/queries/rust.scm")),
         "python" => (&PYTHON, include_str!("ts_v2/queries/python.scm")),
@@ -137,6 +138,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
         "typescript" => (&TS, include_str!("ts_v2/queries/typescript.scm")),
         "tsx" => (&TSX, include_str!("ts_v2/queries/typescript.scm")),
         "go" => (&GO, include_str!("ts_v2/queries/go.scm")),
+        "java" => (&JAVA, include_str!("ts_v2/queries/java.scm")),
         _ => anyhow::bail!("unsupported retrieval grammar {language}"),
     };
     slot.get_or_init(|| Query::new(grammar, text).map_err(|e| e.to_string()))
@@ -151,6 +153,16 @@ pub fn from_tree(
     language: &str,
     owners: &[Owner],
 ) -> Result<Vec<Chunk>> {
+    let flat = declarations(source, root, grammar, language)?;
+    Ok(build_chunks(source, root, language, owners, flat))
+}
+
+pub(crate) fn declarations(
+    source: &str,
+    root: Node<'_>,
+    grammar: &tree_sitter::Language,
+    language: &str,
+) -> Result<Vec<Entity>> {
     let query = query(language, grammar)?;
     let mut cursor = QueryCursor::new();
     let mut matches = cursor.matches(query, root, source.as_bytes());
@@ -180,9 +192,12 @@ pub fn from_tree(
             kind = "comment".into();
         }
         if node.kind() == "variable_declarator"
-            && node
-                .child_by_field_name("value")
-                .is_some_and(|n| matches!(n.kind(), "arrow_function" | "function_expression"))
+            && node.child_by_field_name("value").is_some_and(|n| {
+                matches!(
+                    n.kind(),
+                    "arrow_function" | "function_expression" | "lambda_expression"
+                )
+            })
         {
             kind = "function".into();
         }
@@ -205,6 +220,9 @@ pub fn from_tree(
             }
             .into();
         }
+        if language == "java" && node.kind() == "block" {
+            kind = "initializer".into();
+        }
         let name = declared_name(node, source, language)
             .or(captured)
             .or_else(|| special("default_export").then(|| "default".into()));
@@ -221,6 +239,16 @@ pub fn from_tree(
         });
     }
     flat.sort_by_key(|e| (e.node_start, std::cmp::Reverse(e.node_end)));
+    Ok(flat)
+}
+
+pub(crate) fn build_chunks(
+    source: &str,
+    root: Node<'_>,
+    language: &str,
+    owners: &[Owner],
+    flat: Vec<Entity>,
+) -> Vec<Chunk> {
     let mut entities = nest(flat);
     let comments = comments(root, source, language);
     let starts = line_starts(source);
@@ -238,7 +266,7 @@ pub fn from_tree(
     );
     entities = collapse(entities, source);
     let tree = emit_level(source, &starts, &comments.spans, &entities, 0, source.len());
-    Ok(flatten(tree, source, owners))
+    flatten(tree, source, owners)
 }
 
 fn text<'a>(node: Node<'_>, source: &'a str) -> &'a str {
@@ -263,6 +291,15 @@ fn declared_name(node: Node<'_>, source: &str, language: &str) -> Option<String>
             || ty.to_owned(),
             |tr| format!("{} for {ty}", text(tr, source)),
         ));
+    }
+    if language == "java" && node.kind() == "field_declaration" {
+        let names: Vec<_> = node
+            .named_children(&mut node.walk())
+            .filter(|n| n.kind() == "variable_declarator")
+            .filter_map(|n| n.child_by_field_name("name"))
+            .map(|n| text(n, source))
+            .collect();
+        return (!names.is_empty()).then(|| names.join(", "));
     }
     if language != "go" {
         return None;
@@ -352,7 +389,16 @@ fn node_kind(kind: &str) -> &str {
         "impl_item" => "impl",
         "const_item" | "enum_variant" | "const_declaration" | "const_spec" => "constant",
         "macro_definition" => "macro",
-        "package_clause" => "package",
+        "package_clause" | "package_declaration" => "package",
+        "module_declaration" => "module",
+        "record_declaration" => "record",
+        "annotation_type_declaration" => "annotation_type",
+        "constructor_declaration"
+        | "compact_constructor_declaration"
+        | "annotation_type_element_declaration" => "method",
+        "static_initializer" => "initializer",
+        "enum_constant" => "constant",
+        "formal_parameter" => "field",
         _ => "block",
     }
 }

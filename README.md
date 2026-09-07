@@ -55,7 +55,7 @@ mimirs search 'valid_username check for trailing newline' --limit 5
 
 Run these commands from the project root. Fresh config includes Rust `.rs`,
 Python `.py` and `.pyi`, TypeScript `.ts`, `.mts`, `.cts`, and `.tsx`,
-JavaScript `.js`, `.mjs`, `.cjs`, and `.jsx`, and Go `.go` files. This includes
+JavaScript `.js`, `.mjs`, `.cjs`, and `.jsx`, Go `.go`, and Java `.java` files. This includes
 `.d.ts` declarations. `node_modules` and common Python environment directories `.venv`,
 `venv`, and `__pycache__` are excluded. Customize `include` and `exclude` in
 `.mimirs/config.toml` for your project.
@@ -79,7 +79,7 @@ model session; sessions are created only as files need more workers and reused.
 Search embeds its single query with one worker.
 
 Native tree-sitter grammars identify retrieval chunks for Rust, Python,
-TypeScript, JavaScript, JSX, TSX, and Go. The grammars ship in the binary and
+TypeScript, JavaScript, JSX, TSX, Go, and Java. The grammars ship in the binary and
 need no language servers or language runtimes. Written declarations, attached
 comments, decorators, imports, and incomplete source remain searchable. Retrieval
 follows TS v2's chunk boundaries, including collapsed import groups and overloads.
@@ -231,3 +231,8 @@ covers dialects, fallback upgrades, mixed-language indexing, and visible answers
 
 The [Go retrieval check](benchmarks/retrieval/go/README.md) records declaration
 groups, receiver methods, fallback upgrades and mixed-language search results.
+
+To enable Java in an existing project, add `"**/*.java"` to `include` in
+`.mimirs/config.toml` and run `mimirs index`. Existing configuration rules are
+preserved. Java uses the native 0.23.5 grammar, with declaration owners, leading
+documentation, signatures and parse diagnostics. It does not resolve classpaths.

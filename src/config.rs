@@ -26,8 +26,19 @@ impl Default for Config {
             embedding_workers: None,
             generated: Vec::new(),
             include: [
-                "**/*.rs", "**/*.py", "**/*.pyi", "**/*.ts", "**/*.mts", "**/*.cts", "**/*.tsx",
-                "**/*.js", "**/*.mjs", "**/*.cjs", "**/*.jsx", "**/*.go",
+                "**/*.rs",
+                "**/*.py",
+                "**/*.pyi",
+                "**/*.ts",
+                "**/*.mts",
+                "**/*.cts",
+                "**/*.tsx",
+                "**/*.js",
+                "**/*.mjs",
+                "**/*.cjs",
+                "**/*.jsx",
+                "**/*.go",
+                "**/*.java",
             ]
             .map(String::from)
             .to_vec(),

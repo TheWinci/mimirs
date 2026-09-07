@@ -1,0 +1,152 @@
+//! Native declarations and retrieval share one parse and one entity query.
+use anyhow::{Context, Result};
+use tree_sitter::{Language as Grammar, Parser};
+
+use super::{Analysis, Diagnostic, Entity, Fact, LineIndex, Scope, Span, language::Language};
+use crate::{retrieval::ts_v2, source::SourceFile};
+
+pub(super) const JAVA: Language = Language {
+    identity: "java/default/tree-sitter-0.27.0/java-0.23.5/extractor-1",
+    extensions: &["java"],
+    extract: |source| extract(source, tree_sitter_java::LANGUAGE.into(), "java"),
+    is_native: true,
+    #[cfg(test)]
+    chunking: super::language::Chunking::Paragraphs,
+};
+
+fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analysis> {
+    let mut parser = Parser::new();
+    parser
+        .set_language(&grammar)
+        .with_context(|| format!("cannot initialize {language} parser"))?;
+    let tree = parser
+        .parse(&source.text, None)
+        .context("native parser returned no tree")?;
+    let root = tree.root_node();
+    let declarations = ts_v2::declarations(&source.text, root, &grammar, language)?;
+    let lines = LineIndex::new(&source.text);
+    let mut analysis = Analysis {
+        source_chunks: Vec::new(),
+        scopes: vec![Scope {
+            kind: "file".into(),
+            span: lines.span(0, source.text.len()),
+            parent: None,
+            owner: None,
+        }],
+        source,
+        entities: Vec::new(),
+        facts: Vec::new(),
+        diagnostics: Vec::new(),
+    };
+    let mut ancestors = Vec::<usize>::new();
+    for declaration in &declarations {
+        if declaration.kind == "comment" || declaration.node_start == declaration.node_end {
+            continue;
+        }
+        while ancestors.last().is_some_and(|&id| {
+            let parent = &analysis.entities[id].span;
+            parent.end < declaration.node_end || parent.end <= declaration.node_start
+        }) {
+            ancestors.pop();
+        }
+        let parent = ancestors.last().copied();
+        let id = analysis.entities.len();
+        let span = lines.span(declaration.node_start, declaration.node_end);
+        analysis.entities.push(Entity {
+            kind: declaration.kind.clone(),
+            name: declaration.name.clone(),
+            span: span.clone(),
+            parent,
+        });
+        let scope = analysis.scopes.len();
+        analysis.scopes.push(Scope {
+            kind: "item".into(),
+            span,
+            parent: Some(parent.map_or(0, |id| id + 1)),
+            owner: Some(id),
+        });
+        ancestors.push(id);
+        if let Some(node) =
+            root.descendant_for_byte_range(declaration.node_start, declaration.node_end)
+        {
+            let start = declaration.node_start;
+            let end = node
+                .child_by_field_name("body")
+                .map_or(declaration.node_end, |body| body.start_byte());
+            let end = start + analysis.source.text[start..end].trim_end().len();
+            if end > start {
+                analysis
+                    .facts
+                    .push(fact("signature", lines.span(start, end), id, scope));
+            }
+            let mut first = node;
+            while let Some(doc) = first
+                .prev_named_sibling()
+                .filter(|n| n.kind().contains("comment"))
+            {
+                let gap = &analysis.source.text[doc.end_byte()..first.start_byte()];
+                let line_start = analysis.source.text[..doc.start_byte()]
+                    .rfind('\n')
+                    .map_or(0, |i| i + 1);
+                if !gap.trim().is_empty()
+                    || gap.bytes().filter(|b| *b == b'\n').count() > 1
+                    || !analysis.source.text[line_start..doc.start_byte()]
+                        .trim()
+                        .is_empty()
+                {
+                    break;
+                }
+                // Leading documentation belongs to the surrounding scope.
+                analysis.facts.push(fact(
+                    "doc",
+                    Span::of(doc, &analysis.source.text),
+                    id,
+                    parent.map_or(0, |id| id + 1),
+                ));
+                first = doc;
+            }
+        }
+    }
+    let mut stack = vec![root];
+    while let Some(node) = stack.pop() {
+        if node.is_error() || node.is_missing() {
+            analysis.diagnostics.push(Diagnostic {
+                kind: if node.is_missing() {
+                    format!("missing {}", node.kind())
+                } else {
+                    "ERROR".into()
+                },
+                span: Span::of(node, &analysis.source.text),
+                column: node.start_position().column + 1,
+            });
+        }
+        stack.extend(node.children(&mut node.walk()));
+    }
+    analysis
+        .diagnostics
+        .sort_by_key(|d| (d.span.start, d.span.end));
+    analysis.facts.sort_by_key(|f| (f.span.start, f.span.end));
+    analysis.source_chunks = ts_v2::build_chunks(
+        &analysis.source.text,
+        root,
+        language,
+        &analysis.entities,
+        declarations,
+    );
+    Ok(analysis)
+}
+
+fn fact(kind: &str, span: Span, owner: usize, scope: usize) -> Fact {
+    Fact {
+        kind: kind.into(),
+        span,
+        owner: Some(owner),
+        scope,
+        evidence: Vec::new(),
+        related: None,
+    }
+}
+
+#[cfg(test)]
+#[path = "../../tests/unit/native_languages.rs"]
+mod tests;

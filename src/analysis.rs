@@ -6,6 +6,7 @@ use crate::source::SourceFile;
 mod go;
 mod javascript;
 pub mod language;
+mod native;
 mod python;
 mod rust;
 mod text;

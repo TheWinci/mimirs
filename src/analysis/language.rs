@@ -39,6 +39,7 @@ const REGISTERED: &[Language] = &[
     super::javascript::TYPESCRIPT,
     super::javascript::TSX,
     super::go::LANGUAGE,
+    super::native::JAVA,
 ];
 
 pub fn for_path(path: &str) -> &'static Language {

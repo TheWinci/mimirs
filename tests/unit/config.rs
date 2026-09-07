@@ -73,13 +73,7 @@ fn from_toml_accepts_an_absent_exclude() {
 fn from_toml_accepts_the_default() {
     let config = Config::from_toml(&Config::default().to_toml().unwrap()).unwrap();
 
-    assert_eq!(
-        config.include,
-        [
-            "**/*.rs", "**/*.py", "**/*.pyi", "**/*.ts", "**/*.mts", "**/*.cts", "**/*.tsx",
-            "**/*.js", "**/*.mjs", "**/*.cjs", "**/*.jsx", "**/*.go"
-        ]
-    );
+    assert_eq!(config.include, Config::default().include);
 }
 
 #[test]
