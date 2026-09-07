@@ -256,7 +256,8 @@ needs a stage-specific explanation, including numerical ties. Matching aggregate
 recall cannot excuse a different algorithm. Preserve the original query labels
 and corrections. File recall does not score answer correctness.
 
-Use Mimirs, Excalidraw, and Django during development. Kubernetes remains deferred.
+Use Mimirs, Excalidraw, and Django during development. Run Kubernetes last,
+after the retrieval port and language expansion.
 The q8 baseline is saved separately from the historical float32 results so the
 earlier comparison remains reproducible. Single-run baseline timings are
 descriptive, not statistically established speedups.
@@ -316,7 +317,9 @@ The [adoption report](adoption/ADOPTION.md) verifies every source-window vector
 and all 262 top-20 rankings on Mimirs, Excalidraw, and Django. Its JSON contains
 per-query differences from the original Rust q8 baseline, resource measurements,
 and exact-source audits. All TS rank comparisons match and all 27,295 vectors
-meet the original tolerance. Kubernetes remains deferred.
+meet the original tolerance. The later
+[four-corpus verification](kubernetes/FOUR-CORPUS.md) includes Kubernetes after
+language expansion and confirms the final binary on all 382 original queries.
 
 Public indexing now constructs TS source windows and embeds their path-aware
 token windows. Public search uses the completed lexical/semantic union, ranking

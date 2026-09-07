@@ -3,8 +3,10 @@
 The later [TS v2 retrieval reference](port/CONTRACT.md) captures the active
 implementation and controlled fixtures for the Rust port. Its
 [q8 baseline](port/baseline/BASELINE.md) reuses the TS results and records the
-three development corpora separately. The original results below remain the
-historical float32 Rust comparison. Kubernetes is deferred during port development.
+three development corpora separately. The completed
+[four-corpus verification](port/kubernetes/FOUR-CORPUS.md) includes the final
+Kubernetes checkpoint after language expansion. The original results below
+remain the historical float32 Rust comparison.
 
 Compare published npm Mimirs 1.8.0, archived TypeScript v2 at
 `122674c8bfbbc3549390743f51396c5f0e4e3537`, and Rust at `35dd0d3`.
