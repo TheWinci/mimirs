@@ -258,3 +258,8 @@ PHP uses the native 0.24.2 grammar for `.php`, including PHP tags and embedded
 text. Fresh configs include it; existing projects can add `"**/*.php"` and
 reindex. Namespace boundaries, promoted properties and assigned functions keep
 source ownership. Property names omit their leading dollar sign.
+
+Scala uses the native 0.24.0 grammar for `.scala` and `.sc`. Existing projects
+can add `"**/*.scala"` and `"**/*.sc"` and reindex. Class parameters become fields
+only for `val`/`var`, case classes or enum cases. Given and extension definitions
+retain computed names; package clauses own the remaining file.

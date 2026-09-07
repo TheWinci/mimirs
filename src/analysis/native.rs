@@ -59,6 +59,15 @@ pub(super) const PHP: Language = Language {
     chunking: super::language::Chunking::Paragraphs,
 };
 
+pub(super) const SCALA: Language = Language {
+    identity: "scala/default/tree-sitter-0.27.0/tree-sitter-scala-0.24.0/extractor-1",
+    extensions: &["scala", "sc"],
+    extract: |source| extract(source, tree_sitter_scala::LANGUAGE.into(), "scala"),
+    is_native: true,
+    #[cfg(test)]
+    chunking: super::language::Chunking::Paragraphs,
+};
+
 fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analysis> {
     let mut parser = Parser::new();
     parser

@@ -141,6 +141,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
     static CSHARP: OnceLock<Result<Query, String>> = OnceLock::new();
     static RUBY: OnceLock<Result<Query, String>> = OnceLock::new();
     static PHP: OnceLock<Result<Query, String>> = OnceLock::new();
+    static SCALA: OnceLock<Result<Query, String>> = OnceLock::new();
     static JAVA: OnceLock<Result<Query, String>> = OnceLock::new();
     let (slot, text) = match language {
         "rust" => (&RUST, include_str!("ts_v2/queries/rust.scm")),
@@ -154,6 +155,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
         "csharp" => (&CSHARP, include_str!("ts_v2/queries/csharp.scm")),
         "ruby" => (&RUBY, include_str!("ts_v2/queries/ruby.scm")),
         "php" => (&PHP, include_str!("ts_v2/queries/php.scm")),
+        "scala" => (&SCALA, include_str!("ts_v2/queries/scala.scm")),
         "java" => (&JAVA, include_str!("ts_v2/queries/java.scm")),
         _ => anyhow::bail!("unsupported retrieval grammar {language}"),
     };
@@ -198,6 +200,12 @@ pub(crate) fn declarations(
             && node.parent().is_some_and(|p| {
                 p.kind() == "template_declaration" && declarators::template(p) == Some(node)
             })
+        {
+            continue;
+        }
+        if language == "scala"
+            && node.kind() == "class_parameter"
+            && !names::scala_parameter_is_field(node, source)
         {
             continue;
         }
@@ -297,6 +305,12 @@ pub(crate) fn declarations(
                 n
             }
         });
+        if language == "scala"
+            && matches!(node.kind(), "val_definition" | "var_definition")
+            && contains(node.child_by_field_name("value"), "lambda_expression")
+        {
+            kind = "function".into();
+        }
         let name = declared_name(node, source, language)
             .or(captured)
             .or_else(|| special("default_export").then(|| "default".into()));
@@ -314,6 +328,12 @@ pub(crate) fn declarations(
                 .named_children(&mut root.walk())
                 .find(|n| n.kind() == "namespace_definition" && n.start_byte() > node.start_byte())
                 .map_or(root.end_byte(), |n| n.start_byte());
+        }
+        if language == "scala"
+            && node.kind() == "package_clause"
+            && node.child_by_field_name("body").is_none()
+        {
+            node_end = root.end_byte();
         }
         flat.push(Entity {
             node_type: node.kind().into(),
@@ -376,6 +396,9 @@ fn contains(node: Option<Node<'_>>, kind: &str) -> bool {
 }
 
 fn declared_name(node: Node<'_>, source: &str, language: &str) -> Option<String> {
+    if language == "scala" {
+        return names::scala(node, source);
+    }
     if language == "php" {
         return names::php(node, source);
     }
@@ -538,7 +561,7 @@ fn decorator(line: &str, language: &str) -> bool {
 
 pub(crate) fn classified_kind<'a>(
     language: &str,
-    _node_type: &str,
+    node_type: &str,
     kind: &'a str,
     parent: Option<&str>,
 ) -> &'a str {
@@ -551,6 +574,21 @@ pub(crate) fn classified_kind<'a>(
     }
     if language == "python" && parent == Some("class") && kind == "variable" {
         return "field";
+    }
+    if language == "scala" {
+        if matches!(parent, Some("class" | "trait" | "enum" | "given" | "impl"))
+            && kind == "function"
+            && matches!(node_type, "function_definition" | "function_declaration")
+        {
+            return "method";
+        }
+        if matches!(
+            parent,
+            Some("class" | "trait" | "enum" | "given" | "impl" | "module")
+        ) && kind == "variable"
+        {
+            return "field";
+        }
     }
     kind
 }

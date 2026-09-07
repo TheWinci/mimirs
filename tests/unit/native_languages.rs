@@ -257,6 +257,34 @@ fn php_namespaces_end_before_the_next_namespace_and_strip_property_sigils() {
 }
 
 #[test]
+fn scala_constructor_parameters_and_methods_have_honest_owners() {
+    let result = analyze(
+        "Store.scala",
+        "package archive\nclass Store(hidden: Int, val count: Int) { def recover(path: String): String = path }\ncase class Entry(value: Int)\n",
+    );
+    assert!(
+        !result
+            .entities
+            .iter()
+            .any(|e| e.name.as_deref() == Some("hidden"))
+    );
+    for (name, kind) in [
+        ("count", "field"),
+        ("value", "field"),
+        ("recover", "method"),
+    ] {
+        assert!(
+            result
+                .entities
+                .iter()
+                .any(|e| e.name.as_deref() == Some(name) && e.kind == kind),
+            "{name}: {:?}",
+            result.entities
+        );
+    }
+}
+
+#[test]
 fn native_snapshots_round_trip_replace_rollback_and_delete() {
     for case in fixture_cases() {
         let path = case["path"].as_str().unwrap();

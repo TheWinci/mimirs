@@ -2,6 +2,48 @@
 use super::text;
 use tree_sitter::Node;
 
+pub(super) fn word(source: &str, target: &str) -> bool {
+    source
+        .split(|c: char| !c.is_alphanumeric() && c != '_')
+        .any(|s| s == target)
+}
+
+pub(super) fn scala_parameter_is_field(node: Node<'_>, source: &str) -> bool {
+    if word(text(node, source), "val") || word(text(node, source), "var") {
+        return true;
+    }
+    node.parent().and_then(|p| p.parent()).is_some_and(|p| {
+        p.kind() == "full_enum_case"
+            || (p.kind() == "class_definition"
+                && p.children(&mut p.walk()).any(|n| n.kind() == "case"))
+    })
+}
+
+pub(super) fn scala(node: Node<'_>, source: &str) -> Option<String> {
+    match node.kind() {
+        "given_definition" => Some(
+            node.child_by_field_name("name")
+                .or_else(|| node.child_by_field_name("return_type"))
+                .map_or("(anonymous given)", |n| text(n, source))
+                .into(),
+        ),
+        "extension_definition" => {
+            let ty = node
+                .child_by_field_name("parameters")
+                .and_then(|p| {
+                    p.named_children(&mut p.walk())
+                        .find(|n| n.kind() == "parameter")
+                })
+                .and_then(|n| n.child_by_field_name("type"));
+            Some(ty.map_or_else(
+                || "extensions".into(),
+                |n| format!("{} extensions", text(n, source)),
+            ))
+        }
+        _ => None,
+    }
+}
+
 pub(super) fn php(node: Node<'_>, source: &str) -> Option<String> {
     match node.kind() {
         "namespace_definition" => Some(
