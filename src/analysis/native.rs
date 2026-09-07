@@ -122,6 +122,15 @@ pub(super) const ELIXIR: Language = Language {
     chunking: super::language::Chunking::Paragraphs,
 };
 
+pub(super) const BASH: Language = Language {
+    identity: "bash/default/tree-sitter-0.27.0/tree-sitter-bash-0.25.1/extractor-1",
+    extensions: &["sh", "bash"],
+    extract: |source| extract(source, tree_sitter_bash::LANGUAGE.into(), "bash"),
+    is_native: true,
+    #[cfg(test)]
+    chunking: super::language::Chunking::Paragraphs,
+};
+
 fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analysis> {
     let mut parser = Parser::new();
     parser

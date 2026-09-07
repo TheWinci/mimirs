@@ -148,6 +148,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
     static LUA: OnceLock<Result<Query, String>> = OnceLock::new();
     static ZIG: OnceLock<Result<Query, String>> = OnceLock::new();
     static ELIXIR: OnceLock<Result<Query, String>> = OnceLock::new();
+    static BASH: OnceLock<Result<Query, String>> = OnceLock::new();
     static JAVA: OnceLock<Result<Query, String>> = OnceLock::new();
     let (slot, text) = match language {
         "rust" => (&RUST, include_str!("ts_v2/queries/rust.scm")),
@@ -168,6 +169,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
         "lua" => (&LUA, include_str!("ts_v2/queries/lua.scm")),
         "zig" => (&ZIG, include_str!("ts_v2/queries/zig.scm")),
         "elixir" => (&ELIXIR, include_str!("ts_v2/queries/elixir.scm")),
+        "bash" => (&BASH, include_str!("ts_v2/queries/bash.scm")),
         "java" => (&JAVA, include_str!("ts_v2/queries/java.scm")),
         _ => anyhow::bail!("unsupported retrieval grammar {language}"),
     };
@@ -225,6 +227,12 @@ pub(crate) fn declarations(
             && node.kind() == "class_parameter"
             && !names::word(text(node, source), "val")
             && !names::word(text(node, source), "var")
+        {
+            continue;
+        }
+        if language == "bash"
+            && node.kind() == "variable_assignment"
+            && node.parent().is_some_and(|n| n.kind() == "command")
         {
             continue;
         }
@@ -403,6 +411,14 @@ pub(crate) fn declarations(
         } else {
             captured
         };
+        if language == "bash" {
+            if node.kind() == "variable_assignment" {
+                kind = names::bash_kind(node, source).into();
+            }
+            if matches!(context, Some("source" | ".")) {
+                kind = "import".into();
+            }
+        }
         let name = declared_name(node, source, language)
             .or(captured)
             .or_else(|| special("default_export").then(|| "default".into()));

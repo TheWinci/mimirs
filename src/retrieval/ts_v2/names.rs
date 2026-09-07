@@ -2,6 +2,23 @@
 use super::text;
 use tree_sitter::Node;
 
+pub(super) fn bash_kind(node: Node<'_>, source: &str) -> &'static str {
+    if let Some(parent) = node.parent().filter(|n| n.kind() == "declaration_command") {
+        let words: Vec<_> = text(parent, source).split_whitespace().collect();
+        if words.first() == Some(&"readonly")
+            || (matches!(words.first(), Some(&"declare" | &"local" | &"typeset"))
+                && words.iter().any(|s| {
+                    s.strip_prefix('-').is_some_and(|flags| {
+                        flags.bytes().all(|b| b.is_ascii_alphabetic()) && flags.contains('r')
+                    })
+                }))
+        {
+            return "constant";
+        }
+    }
+    "variable"
+}
+
 pub(super) fn elixir(
     node: Node<'_>,
     source: &str,

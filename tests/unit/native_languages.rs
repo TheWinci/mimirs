@@ -436,6 +436,35 @@ fn elixir_definition_keywords_distinguish_protocols_structs_and_implementations(
 }
 
 #[test]
+fn bash_environment_bindings_are_not_persistent_declarations() {
+    let result = analyze(
+        "store.bash",
+        "source ./config.sh\nreadonly LIMIT=4\ndeclare -rx CACHE=1\nTEMP=2 echo ready\nrecover() { printf '%s' \"$1\"; }\n",
+    );
+    assert!(
+        !result
+            .entities
+            .iter()
+            .any(|e| e.name.as_deref() == Some("TEMP"))
+    );
+    for (name, kind) in [
+        ("LIMIT", "constant"),
+        ("CACHE", "constant"),
+        ("recover", "function"),
+    ] {
+        assert!(
+            result
+                .entities
+                .iter()
+                .any(|e| e.name.as_deref() == Some(name) && e.kind == kind),
+            "{name}: {:?}",
+            result.entities
+        );
+    }
+    assert!(result.entities.iter().any(|e| e.kind == "import"));
+}
+
+#[test]
 fn native_snapshots_round_trip_replace_rollback_and_delete() {
     for case in fixture_cases() {
         let path = case["path"].as_str().unwrap();

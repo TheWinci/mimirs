@@ -289,3 +289,8 @@ compile-time blocks and named tests retain their source identities.
 Elixir uses the native 0.3.5 grammar for `.ex` and `.exs`. Existing projects can
 add `"**/*.ex"` and `"**/*.exs"` and reindex. Definition keywords distinguish
 modules, protocols, implementations, structs, types, callbacks and imports.
+
+Bash uses the native 0.25.1 grammar for `.sh` and `.bash`. Existing projects
+can add `"**/*.sh"` and `"**/*.bash"` and reindex. Functions, persistent variables,
+readonly declarations and sourced files become chunks. Command-local environment
+assignments stay inside command source instead of becoming separate owners.
