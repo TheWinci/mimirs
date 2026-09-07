@@ -363,6 +363,29 @@ fn kotlin_distinguishes_class_kinds_parameters_and_companions() {
 }
 
 #[test]
+fn lua_assignments_methods_and_function_fields_keep_written_names() {
+    let result = analyze(
+        "store.lua",
+        "local count, size = 1, 2\nlocal recover = function(path) return path end\nlocal store = { restore = function(path) return path end }\nfunction store:read(path) return path end\n",
+    );
+    for (name, kind) in [
+        ("count, size", "variable"),
+        ("recover", "function"),
+        ("restore", "function"),
+        ("store:read", "method"),
+    ] {
+        assert!(
+            result
+                .entities
+                .iter()
+                .any(|e| e.name.as_deref() == Some(name) && e.kind == kind),
+            "{name}: {:?}",
+            result.entities
+        );
+    }
+}
+
+#[test]
 fn native_snapshots_round_trip_replace_rollback_and_delete() {
     for case in fixture_cases() {
         let path = case["path"].as_str().unwrap();

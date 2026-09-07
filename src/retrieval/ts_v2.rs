@@ -145,6 +145,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
     static HTML: OnceLock<Result<Query, String>> = OnceLock::new();
     static CSS: OnceLock<Result<Query, String>> = OnceLock::new();
     static KOTLIN: OnceLock<Result<Query, String>> = OnceLock::new();
+    static LUA: OnceLock<Result<Query, String>> = OnceLock::new();
     static JAVA: OnceLock<Result<Query, String>> = OnceLock::new();
     let (slot, text) = match language {
         "rust" => (&RUST, include_str!("ts_v2/queries/rust.scm")),
@@ -162,6 +163,7 @@ fn query(language: &str, grammar: &tree_sitter::Language) -> Result<&'static Que
         "html" => (&HTML, include_str!("ts_v2/queries/html.scm")),
         "css" => (&CSS, include_str!("ts_v2/queries/css.scm")),
         "kotlin" => (&KOTLIN, include_str!("ts_v2/queries/kotlin.scm")),
+        "lua" => (&LUA, include_str!("ts_v2/queries/lua.scm")),
         "java" => (&JAVA, include_str!("ts_v2/queries/java.scm")),
         _ => anyhow::bail!("unsupported retrieval grammar {language}"),
     };
@@ -337,6 +339,26 @@ pub(crate) fn declarations(
                 .into();
             }
         }
+        if language == "lua" {
+            if node.kind() == "function_declaration" {
+                kind = if node
+                    .child_by_field_name("name")
+                    .is_some_and(|n| n.kind() == "method_index_expression")
+                {
+                    "method"
+                } else {
+                    "function"
+                }
+                .into();
+            }
+            if matches!(
+                node.kind(),
+                "variable_declaration" | "assignment_statement" | "field"
+            ) && names::lua_function(node)
+            {
+                kind = "function".into();
+            }
+        }
         let name = declared_name(node, source, language)
             .or(captured)
             .or_else(|| special("default_export").then(|| "default".into()));
@@ -436,6 +458,9 @@ fn contains(node: Option<Node<'_>>, kind: &str) -> bool {
 }
 
 fn declared_name(node: Node<'_>, source: &str, language: &str) -> Option<String> {
+    if language == "lua" {
+        return names::lua(node, source);
+    }
     if language == "kotlin" {
         if node.kind() == "companion_object" {
             return Some(

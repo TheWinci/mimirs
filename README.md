@@ -277,3 +277,7 @@ Kotlin uses the native Kotlin NG 1.1.0 grammar for `.kt` and `.kts`. Existing
 projects can add `"**/*.kt"` and `"**/*.kts"` and reindex. Data/value classes,
 interfaces, enum and annotation classes retain distinct kinds. Constructor
 fields, companion objects, properties and methods retain their owners.
+
+Lua uses the native 0.4.1 grammar for `.lua`. Existing projects can add
+`"**/*.lua"` and reindex. Method syntax, assigned functions, table function fields
+and multiple assignment names remain distinct source declarations.

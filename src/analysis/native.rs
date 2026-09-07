@@ -95,6 +95,15 @@ pub(super) const KOTLIN: Language = Language {
     chunking: super::language::Chunking::Paragraphs,
 };
 
+pub(super) const LUA: Language = Language {
+    identity: "lua/default/tree-sitter-0.27.0/tree-sitter-lua-0.4.1/extractor-1",
+    extensions: &["lua"],
+    extract: |source| extract(source, tree_sitter_lua::LANGUAGE.into(), "lua"),
+    is_native: true,
+    #[cfg(test)]
+    chunking: super::language::Chunking::Paragraphs,
+};
+
 fn extract(source: SourceFile, grammar: Grammar, language: &str) -> Result<Analysis> {
     let mut parser = Parser::new();
     parser

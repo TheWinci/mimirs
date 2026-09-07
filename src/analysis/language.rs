@@ -40,6 +40,7 @@ const REGISTERED: &[Language] = &[
     super::javascript::TSX,
     super::go::LANGUAGE,
     super::native::JAVA,
+    super::native::LUA,
     super::native::KOTLIN,
     super::native::CSS,
     super::native::HTML,

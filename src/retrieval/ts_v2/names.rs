@@ -2,6 +2,58 @@
 use super::text;
 use tree_sitter::Node;
 
+fn lua_assignment(node: Node<'_>) -> Option<Node<'_>> {
+    if node.kind() == "variable_declaration" {
+        node.named_children(&mut node.walk())
+            .find(|n| n.kind() == "assignment_statement")
+    } else {
+        Some(node)
+    }
+}
+
+pub(super) fn unquote(value: &str) -> &str {
+    if value.len() >= 2
+        && ((value.starts_with('"') && value.ends_with('"'))
+            || (value.starts_with('\'') && value.ends_with('\'')))
+    {
+        &value[1..value.len() - 1]
+    } else {
+        value
+    }
+}
+
+pub(super) fn lua(node: Node<'_>, source: &str) -> Option<String> {
+    if node.kind() == "field" {
+        return node
+            .child_by_field_name("name")
+            .map(|n| unquote(text(n, source)).into());
+    }
+    let assignment = lua_assignment(node).unwrap_or(node);
+    let variables = assignment
+        .named_children(&mut assignment.walk())
+        .find(|n| n.kind() == "variable_list")?;
+    let names: Vec<_> = variables
+        .named_children(&mut variables.walk())
+        .map(|n| text(n, source))
+        .collect();
+    (!names.is_empty()).then(|| names.join(", "))
+}
+
+pub(super) fn lua_function(node: Node<'_>) -> bool {
+    if node.kind() == "field" {
+        return node
+            .child_by_field_name("value")
+            .is_some_and(|n| n.kind() == "function_definition");
+    }
+    lua_assignment(node)
+        .and_then(|n| {
+            n.named_children(&mut n.walk())
+                .find(|n| n.kind() == "expression_list")
+        })
+        .and_then(|n| n.named_child(0))
+        .is_some_and(|n| n.kind() == "function_definition")
+}
+
 pub(super) fn word(source: &str, target: &str) -> bool {
     source
         .split(|c: char| !c.is_alphanumeric() && c != '_')
