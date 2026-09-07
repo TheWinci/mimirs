@@ -138,6 +138,21 @@ impl Profiler {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn queue_peak(&self, name: &str) -> usize {
+        self.0
+            .as_ref()
+            .and_then(|state| {
+                state
+                    .lock()
+                    .unwrap()
+                    .stages
+                    .get(name)
+                    .map(|s| s.peak_queued_items)
+            })
+            .unwrap_or(0)
+    }
+
     pub fn stage_queue(&self, name: &'static str, items: usize, bytes: usize) {
         if let Some(state) = &self.0 {
             let mut state = state.lock().unwrap();

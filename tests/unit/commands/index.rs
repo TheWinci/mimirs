@@ -1811,3 +1811,183 @@ fn parallel_writer_failure_cancels_pending_work_at_the_failed_path() {
         ]
     );
 }
+
+#[test]
+fn interrupted_parallel_discovery_never_reconciles_unseen_files() {
+    let dir = project(&[("a.rs", "old"), ("stale.rs", "retained")]);
+    run(&dir, backend(), false).0.unwrap();
+    fs::write(dir.path().join("a.rs"), "new").unwrap();
+    fs::remove_file(dir.path().join("stale.rs")).unwrap();
+    let _lock = lock::acquire(dir.path()).unwrap();
+    let mut db = connection(&dir);
+    let policy: String = db
+        .query_row(
+            "SELECT value FROM index_metadata WHERE key='document_policy'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    let pool = embedding::pool::Pool::new(vec![(); 3], |_, text| Ok(fake_vector(text))).unwrap();
+    let worker = Embedder::new(AsyncBackend { pool, limit: 6 })
+        .take_worker()
+        .unwrap();
+    let events = vec![
+        Ok(walk::stream::Event::Path {
+            path: "a.rs".into(),
+            ordinal: 0,
+        }),
+        Err(anyhow::anyhow!("interrupted discovery")),
+    ];
+    let mut output = Vec::new();
+    let mut progress = Progress::new(dir.path(), &mut output, false, &|| Duration::ZERO);
+    let result = parallel::run(
+        dir.path(),
+        Box::new(events.into_iter()),
+        worker,
+        3,
+        &mut db,
+        &policy,
+        &mut progress,
+        &Profiler::default(),
+        &mut Summary::default(),
+    );
+    assert!(format!("{:#}", result.unwrap_err()).contains("interrupted discovery"));
+    assert_eq!(
+        files(&dir),
+        [
+            ("a.rs".into(), "new".into()),
+            ("stale.rs".into(), "retained".into())
+        ]
+    );
+}
+
+struct FailedWindowPlanner {
+    inner: Option<Box<dyn Backend + Send>>,
+}
+impl Backend for FailedWindowPlanner {
+    fn take_worker(&mut self) -> Option<Box<dyn Backend + Send>> {
+        Some(Box::new(Self {
+            inner: self.inner.take(),
+        }))
+    }
+    fn tokenizer(&mut self) -> anyhow::Result<tokenizers::Tokenizer> {
+        self.inner.as_mut().unwrap().tokenizer()
+    }
+    fn submit_source(
+        &mut self,
+        texts: &[String],
+        profile: &Profiler,
+    ) -> anyhow::Result<Option<embedding::SourceTask>> {
+        anyhow::ensure!(
+            !texts.iter().any(|t| t.contains("new b")),
+            "window preparation failed"
+        );
+        self.inner.as_mut().unwrap().submit_source(texts, profile)
+    }
+    fn embed(&mut self, _: &[String]) -> anyhow::Result<Vec<Vec<f32>>> {
+        unreachable!()
+    }
+}
+
+#[test]
+fn window_preparation_failure_preserves_order_and_cleans_staging() {
+    let dir = project(&[("a.rs", "old a"), ("b.rs", "old b"), ("c.rs", "old c")]);
+    run(&dir, backend(), false).0.unwrap();
+    for path in ["a", "b", "c"] {
+        fs::write(dir.path().join(format!("{path}.rs")), format!("new {path}")).unwrap();
+    }
+    let pool = embedding::pool::Pool::new(vec![(); 3], |_, text| Ok(fake_vector(text))).unwrap();
+    let backend = FailedWindowPlanner {
+        inner: Some(Box::new(AsyncBackend { pool, limit: 6 })),
+    };
+    let result = run_parallel_test(
+        dir.path(),
+        || Ok(Embedder::new(backend)),
+        &mut Vec::new(),
+        &mut Vec::new(),
+        false,
+        &|| Duration::ZERO,
+        &Profiler::default(),
+    );
+    assert!(format!("{:#}", result.unwrap_err()).contains("window preparation failed"));
+    assert_eq!(
+        files(&dir),
+        [
+            ("a.rs".into(), "new a".into()),
+            ("c.rs".into(), "old c".into())
+        ]
+    );
+    let db = rusqlite::Connection::open(dir.path().join(".mimirs/staging.db")).unwrap();
+    assert_eq!(
+        db.query_row("SELECT count(*) FROM work", [], |r| r.get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+}
+
+#[test]
+fn full_writer_queue_cancels_without_deadlock() {
+    struct ClosedWriter {
+        profile: Profiler,
+        filled: bool,
+    }
+    impl Write for ClosedWriter {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            if String::from_utf8_lossy(bytes).contains("documents: 00.rs") {
+                let start = Instant::now();
+                while self.profile.queue_peak("writer") < 6
+                    && start.elapsed() < Duration::from_secs(5)
+                {
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+                self.filled = self.profile.queue_peak("writer") == 6;
+                return Err(io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    "writer output closed",
+                ));
+            }
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+    let dir = project(&[]);
+    for i in 0..30 {
+        fs::write(dir.path().join(format!("{i:02}.rs")), "old snapshot").unwrap();
+    }
+    run(&dir, backend(), false).0.unwrap();
+    for i in 0..30 {
+        fs::write(dir.path().join(format!("{i:02}.rs")), "new snapshot").unwrap();
+    }
+    let profile = Profiler::enabled();
+    let mut output = ClosedWriter {
+        profile: profile.clone(),
+        filled: false,
+    };
+    let pool = embedding::pool::Pool::new(vec![(); 3], |_, text| Ok(fake_vector(text))).unwrap();
+    let result = run_parallel_test(
+        dir.path(),
+        || Ok(Embedder::new(AsyncBackend { pool, limit: 6 })),
+        &mut Vec::new(),
+        &mut output,
+        false,
+        &|| Duration::ZERO,
+        &profile,
+    );
+    assert!(format!("{:#}", result.unwrap_err()).contains("writer output closed"));
+    assert!(
+        output.filled,
+        "writer queue did not fill while its consumer was blocked"
+    );
+    let saved = files(&dir);
+    assert_eq!(saved[0], ("00.rs".into(), "new snapshot".into()));
+    assert!(saved[1..].iter().all(|(_, text)| text == "old snapshot"));
+    assert!(
+        profile
+            .finish(Some("expected failure".into()))
+            .unwrap()
+            .counters["index_queue_peak_files"]
+            <= 6
+    );
+}

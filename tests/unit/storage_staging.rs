@@ -263,3 +263,118 @@ fn failed_publication_rolls_back_the_entire_replacement() {
         replacement
     );
 }
+
+#[test]
+fn interruption_at_each_stage_keeps_old_search_and_snapshot_results() {
+    for stop in 1..=4 {
+        let dir = tempfile::tempdir().unwrap();
+        let (old, old_documents, _, old_vectors, policy) = fixture();
+        let live_path = dir.path().join("index.db");
+        let mut live = super::super::open(&live_path).unwrap().connection;
+        super::super::documents::publish(
+            &mut live,
+            &old,
+            super::super::documents::Batch {
+                documents: &old_documents,
+                vectors: &old_vectors,
+                policy: &policy,
+            },
+        )
+        .unwrap();
+        let next = crate::analysis::extract(crate::source::SourceFile {
+            path: "a.rs".into(),
+            text: "pub fn unpublished() {}\n".into(),
+        })
+        .unwrap();
+        let documents = crate::retrieval::ts_v2::documents(&next).unwrap();
+        let plan = WindowPlan {
+            inputs: Arc::new(documents.iter().map(|d| d.text.clone()).collect()),
+            documents: Arc::new((0..documents.len()).map(|i| vec![i]).collect()),
+        };
+        let vectors = vec![vec![0.25; DIMENSION]; documents.len()];
+        let hash = super::super::processing::source_hash(&next.source.text);
+        let key = Key {
+            ordinal: 0,
+            path: "a.rs",
+            source_hash: &hash,
+            policy: &policy,
+        };
+        let path = dir.path().join("staging.db");
+        let mut store = Store::open(&path, &Profiler::default()).unwrap();
+        for stage in [
+            Stage::Discovered,
+            Stage::Source(&next),
+            Stage::Windows(&documents, &plan),
+            Stage::Vectors(&vectors),
+        ]
+        .into_iter()
+        .take(stop)
+        {
+            store.record(&key, stage).unwrap();
+        }
+        drop(store);
+        let reader = super::super::open_read_only(&live_path).unwrap();
+        assert_eq!(
+            super::super::analysis::load(&reader, "a.rs")
+                .unwrap()
+                .unwrap(),
+            old
+        );
+        assert!(
+            super::super::lexical::candidates(&reader, "unpublished", 20)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            !super::super::lexical::candidates(&reader, "saved", 20)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(super::super::processing::reusable(&reader, &old.source, &policy).unwrap());
+        assert!(!super::super::processing::reusable(&reader, &next.source, &policy).unwrap());
+        let store = Store::open(&path, &Profiler::default()).unwrap();
+        assert_eq!(
+            store
+                .connection
+                .query_row("SELECT count(*) FROM work", [], |r| r.get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+        store.finish().unwrap();
+    }
+}
+
+#[test]
+fn stage_write_failure_never_commits_a_completion_record() {
+    let dir = tempfile::tempdir().unwrap();
+    let (analysis, documents, plan, vectors, policy) = fixture();
+    let hash = super::super::processing::source_hash(&analysis.source.text);
+    let key = Key {
+        ordinal: 0,
+        path: "a.rs",
+        source_hash: &hash,
+        policy: &policy,
+    };
+    let mut store = Store::open(&dir.path().join("staging.db"), &Profiler::default()).unwrap();
+    store.record(&key, Stage::Discovered).unwrap();
+    store.connection.execute_batch("CREATE TRIGGER fail_stage AFTER INSERT ON source_stages BEGIN SELECT RAISE(ABORT, 'stage write failed'); END;").unwrap();
+    assert!(store.record(&key, Stage::Source(&analysis)).is_err());
+    store
+        .connection
+        .execute_batch("DROP TRIGGER fail_stage")
+        .unwrap();
+    assert_eq!(
+        store
+            .connection
+            .query_row("SELECT count(*) FROM source_stages", [], |r| r
+                .get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+    assert!(
+        store
+            .validate_complete(&key, &analysis, &documents, &plan, &vectors)
+            .is_err()
+    );
+    store.finish().unwrap();
+}

@@ -117,6 +117,11 @@ impl Store {
 
     pub fn record(&mut self, key: &Key<'_>, stage: Stage<'_>) -> Result<()> {
         let _work = self.profile.scope("staging_save");
+        super::policy::validate(key.policy)?;
+        ensure!(
+            key.source_hash.len() == 64 && key.source_hash.bytes().all(|b| b.is_ascii_hexdigit()),
+            "invalid staging source hash"
+        );
         let (table, count, payload) = stage.encode(key)?;
         let digest = Sha256::digest(&payload).to_vec();
         let tx = self.connection.transaction()?;
