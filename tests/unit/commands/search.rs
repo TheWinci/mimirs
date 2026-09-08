@@ -168,14 +168,7 @@ fn invalid_arguments_fail_before_database_access_even_with_an_empty_index() {
 #[test]
 fn bad_databases_fail_before_embedding_and_remain_unchanged() {
     for case in [
-        "missing",
-        "old",
-        "newer",
-        "unknown",
-        "foreign",
-        "damaged",
-        "schema",
-        "foreign_key",
+        "missing", "old", "newer", "unknown", "foreign", "damaged", "schema",
     ] {
         let (dir, connection) = project();
         let path = dir.path().join(".mimirs/index.db");
@@ -185,15 +178,15 @@ fn bad_databases_fail_before_embedding_and_remain_unchanged() {
             "newer" => "newer than supported",
             "unknown" => "unknown database schema version",
             "foreign" | "schema" => "unknown or damaged database schema",
-            "foreign_key" => "broken foreign keys",
             _ => "not a database",
         };
         match case {
             "newer" => connection.pragma_update(None, "user_version", 99).unwrap(),
             "unknown" => connection.pragma_update(None, "user_version", 0).unwrap(),
-            "schema" => connection.execute_batch("DROP TABLE index_metadata").unwrap(),
-            "foreign_key" => connection.execute_batch("PRAGMA foreign_keys = OFF; INSERT INTO source_snapshots VALUES (99, 'old', '')").unwrap(),
-            _ => {},
+            "schema" => connection
+                .execute_batch("DROP TABLE index_metadata")
+                .unwrap(),
+            _ => {}
         }
         drop(connection);
         if ["missing", "old", "foreign", "damaged"].contains(&case) {
@@ -221,6 +214,64 @@ fn bad_databases_fail_before_embedding_and_remain_unchanged() {
         assert!(error.contains("index.db"));
         assert!(output.is_empty());
         assert_eq!(fs::read(&path).ok(), before, "{case}");
+    }
+}
+
+#[test]
+fn unrelated_content_damage_is_deferred_to_the_index_audit() {
+    for mutation in [
+        "PRAGMA foreign_keys = OFF; INSERT INTO source_snapshots VALUES (99, 'old', '')",
+        "UPDATE retrieval_processing SET policy = 'different' WHERE file_id = (SELECT id FROM files WHERE path = 'blank.rs')",
+    ] {
+        let (dir, mut connection) = project();
+        save(
+            &mut connection,
+            "a.rs",
+            "fn recoverArchive() {}\n",
+            &[vector(1.0, 0.0)],
+        );
+        save(&mut connection, "blank.rs", "", &[]);
+        connection.execute_batch(mutation).unwrap();
+        assert!(storage::audit(&connection).is_err(), "{mutation}");
+        drop(connection);
+        let path = dir.path().join(".mimirs/index.db");
+        let before = fs::read(&path).unwrap();
+        let (result, output) = execute(dir.path(), "recoverArchive", 1, || {
+            Ok(Embedder::new(fixed()))
+        });
+        result.unwrap();
+        assert!(output.contains("location: a.rs:1"));
+        assert_eq!(fs::read(&path).unwrap(), before);
+    }
+}
+
+#[test]
+fn damaged_returned_evidence_still_fails_without_output_or_writes() {
+    for mutation in [
+        "UPDATE retrieval_processing SET policy = 'different'",
+        "UPDATE retrieval_processing SET document_count = document_count + 1",
+        "UPDATE retrieval_documents SET policy = 'different'",
+        "UPDATE retrieval_documents SET text = 'tampered'",
+        "UPDATE retrieval_documents SET evidence = '[]'",
+        "PRAGMA foreign_keys = OFF; DELETE FROM source_snapshots",
+    ] {
+        let (dir, mut connection) = project();
+        save(
+            &mut connection,
+            "a.rs",
+            "fn recoverArchive() {}\n",
+            &[vector(1.0, 0.0)],
+        );
+        connection.execute_batch(mutation).unwrap();
+        drop(connection);
+        let path = dir.path().join(".mimirs/index.db");
+        let before = fs::read(&path).unwrap();
+        let (result, output) = execute(dir.path(), "recoverArchive", 1, || {
+            Ok(Embedder::new(fixed()))
+        });
+        assert!(result.is_err(), "{mutation}");
+        assert!(output.is_empty(), "{mutation}");
+        assert_eq!(fs::read(&path).unwrap(), before);
     }
 }
 

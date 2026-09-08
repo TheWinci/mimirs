@@ -1,0 +1,207 @@
+diff --git a/src/commands/index.rs b/src/commands/index.rs
+index 3c0471d5..924c175c 100644
+--- a/src/commands/index.rs
++++ b/src/commands/index.rs
+@@ -268,6 +268,7 @@ fn index_with_mode(
+             &successful.iter().map(String::as_str).collect::<Vec<_>>(),
+         )
+     })?;
++    profile.measure("database_audit", || storage::audit(&database.connection))?;
+     Ok(summary)
+ }
+ 
+diff --git a/src/commands/search.rs b/src/commands/search.rs
+index f032e13a..0cea3fec 100644
+--- a/src/commands/search.rs
++++ b/src/commands/search.rs
+@@ -35,7 +35,7 @@ fn run_at(
+     // Metadata, candidates, and every citation share one saved-source snapshot.
+     let transaction = connection.transaction()?;
+     storage::validate_model(&transaction)?;
+-    let policy = storage::policy::read(&transaction)?;
++    let policy = storage::policy::read_for_search(&transaction)?;
+     let results = if storage::has_content(&transaction)? {
+         let config = crate::config::Config::load(root)?;
+         let mut embedder = make_embedder()?;
+diff --git a/src/storage.rs b/src/storage.rs
+index 875f008d..a83c7f5c 100644
+--- a/src/storage.rs
++++ b/src/storage.rs
+@@ -63,6 +63,8 @@ pub fn open(path: &Path) -> anyhow::Result<OpenedDatabase> {
+     open_at(path).with_context(|| format!("cannot open database {}", path.display()))
+ }
+ 
++/// Check compatibility on reads. Full-index audits belong to indexing; loaded
++/// source and documents are validated separately before returning evidence.
+ pub fn open_read_only(path: &Path) -> anyhow::Result<Connection> {
+     let read = || -> anyhow::Result<Connection> {
+         register_vec()?;
+@@ -143,6 +145,7 @@ fn open_at(path: &Path) -> anyhow::Result<OpenedDatabase> {
+         // Inspect without allowing SQLite to modify an unrecognized database.
+         let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+         let found = validate_version(&connection)?;
++        validate_contents(&connection)?;
+         connection.close().map_err(|(_, error)| error)?;
+         if found == SCHEMA_VERSION {
+             OpenOutcome::Reused
+@@ -208,6 +211,10 @@ fn validate_schema(connection: &Connection, schema: &str) -> anyhow::Result<()>
+         schema_objects(connection)? == schema_objects(&reference)?,
+         "unknown or damaged database schema"
+     );
++    Ok(())
++}
++
++fn validate_contents(connection: &Connection) -> anyhow::Result<()> {
+     let integrity: String = connection.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
+     ensure!(integrity == "ok", "damaged database: {integrity}");
+     let mut foreign_keys = connection.prepare("PRAGMA foreign_key_check")?;
+@@ -218,6 +225,14 @@ fn validate_schema(connection: &Connection, schema: &str) -> anyhow::Result<()>
+     Ok(())
+ }
+ 
++/// Audit the complete published index once indexing has finished.
++pub fn audit(connection: &Connection) -> anyhow::Result<()> {
++    validate_contents(connection)?;
++    validate_model(connection)?;
++    policy::read(connection)?;
++    Ok(())
++}
++
+ // Include indexes and vec0's shadow tables so partial or foreign schemas fail
+ // recognition. Ignore formatting, but retain every SQL token and object name.
+ fn schema_objects(connection: &Connection) -> anyhow::Result<Vec<(String, String, String)>> {
+diff --git a/src/storage/policy.rs b/src/storage/policy.rs
+index 07d66edb..e499996b 100644
+--- a/src/storage/policy.rs
++++ b/src/storage/policy.rs
+@@ -40,7 +40,9 @@ pub(super) fn validate(policy: &str) -> Result<()> {
+     Ok(())
+ }
+ 
+-pub fn read(connection: &Connection) -> Result<Option<String>> {
++/// Read compatible metadata without scanning unrelated files. Search validates
++/// each returned file's processing policy and documents when loading evidence.
++pub fn read_for_search(connection: &Connection) -> Result<Option<String>> {
+     let policy = super::metadata(connection, "document_policy")?;
+     let populated: bool = connection.query_row(
+         "SELECT EXISTS(SELECT 1 FROM files) OR EXISTS(SELECT 1 FROM document_embeddings)",
+@@ -52,6 +54,14 @@ pub fn read(connection: &Connection) -> Result<Option<String>> {
+         return Ok(None);
+     };
+     validate(&value)?;
++    Ok(Some(value))
++}
++
++/// Audit policy and coverage across the complete index.
++pub fn read(connection: &Connection) -> Result<Option<String>> {
++    let Some(value) = read_for_search(connection)? else {
++        return Ok(None);
++    };
+     let mixed: bool = connection.query_row("SELECT EXISTS(SELECT 1 FROM retrieval_processing WHERE policy != ?1) OR EXISTS(SELECT 1 FROM retrieval_documents WHERE policy != ?1)", [&value], |r| r.get(0))?;
+     ensure!(!mixed, "mixed document policies; run mimirs index");
+     let incomplete: bool = connection.query_row("SELECT
+diff --git a/tests/unit/commands/search.rs b/tests/unit/commands/search.rs
+index 944542d3..b4d8cd1b 100644
+--- a/tests/unit/commands/search.rs
++++ b/tests/unit/commands/search.rs
+@@ -168,14 +168,7 @@ fn invalid_arguments_fail_before_database_access_even_with_an_empty_index() {
+ #[test]
+ fn bad_databases_fail_before_embedding_and_remain_unchanged() {
+     for case in [
+-        "missing",
+-        "old",
+-        "newer",
+-        "unknown",
+-        "foreign",
+-        "damaged",
+-        "schema",
+-        "foreign_key",
++        "missing", "old", "newer", "unknown", "foreign", "damaged", "schema",
+     ] {
+         let (dir, connection) = project();
+         let path = dir.path().join(".mimirs/index.db");
+@@ -185,15 +178,15 @@ fn bad_databases_fail_before_embedding_and_remain_unchanged() {
+             "newer" => "newer than supported",
+             "unknown" => "unknown database schema version",
+             "foreign" | "schema" => "unknown or damaged database schema",
+-            "foreign_key" => "broken foreign keys",
+             _ => "not a database",
+         };
+         match case {
+             "newer" => connection.pragma_update(None, "user_version", 99).unwrap(),
+             "unknown" => connection.pragma_update(None, "user_version", 0).unwrap(),
+-            "schema" => connection.execute_batch("DROP TABLE index_metadata").unwrap(),
+-            "foreign_key" => connection.execute_batch("PRAGMA foreign_keys = OFF; INSERT INTO source_snapshots VALUES (99, 'old', '')").unwrap(),
+-            _ => {},
++            "schema" => connection
++                .execute_batch("DROP TABLE index_metadata")
++                .unwrap(),
++            _ => {}
+         }
+         drop(connection);
+         if ["missing", "old", "foreign", "damaged"].contains(&case) {
+@@ -224,6 +217,64 @@ fn bad_databases_fail_before_embedding_and_remain_unchanged() {
+     }
+ }
+ 
++#[test]
++fn unrelated_content_damage_is_deferred_to_the_index_audit() {
++    for mutation in [
++        "PRAGMA foreign_keys = OFF; INSERT INTO source_snapshots VALUES (99, 'old', '')",
++        "UPDATE retrieval_processing SET policy = 'different' WHERE file_id = (SELECT id FROM files WHERE path = 'blank.rs')",
++    ] {
++        let (dir, mut connection) = project();
++        save(
++            &mut connection,
++            "a.rs",
++            "fn recoverArchive() {}\n",
++            &[vector(1.0, 0.0)],
++        );
++        save(&mut connection, "blank.rs", "", &[]);
++        connection.execute_batch(mutation).unwrap();
++        assert!(storage::audit(&connection).is_err(), "{mutation}");
++        drop(connection);
++        let path = dir.path().join(".mimirs/index.db");
++        let before = fs::read(&path).unwrap();
++        let (result, output) = execute(dir.path(), "recoverArchive", 1, || {
++            Ok(Embedder::new(fixed()))
++        });
++        result.unwrap();
++        assert!(output.contains("location: a.rs:1"));
++        assert_eq!(fs::read(&path).unwrap(), before);
++    }
++}
++
++#[test]
++fn damaged_returned_evidence_still_fails_without_output_or_writes() {
++    for mutation in [
++        "UPDATE retrieval_processing SET policy = 'different'",
++        "UPDATE retrieval_processing SET document_count = document_count + 1",
++        "UPDATE retrieval_documents SET policy = 'different'",
++        "UPDATE retrieval_documents SET text = 'tampered'",
++        "UPDATE retrieval_documents SET evidence = '[]'",
++        "PRAGMA foreign_keys = OFF; DELETE FROM source_snapshots",
++    ] {
++        let (dir, mut connection) = project();
++        save(
++            &mut connection,
++            "a.rs",
++            "fn recoverArchive() {}\n",
++            &[vector(1.0, 0.0)],
++        );
++        connection.execute_batch(mutation).unwrap();
++        drop(connection);
++        let path = dir.path().join(".mimirs/index.db");
++        let before = fs::read(&path).unwrap();
++        let (result, output) = execute(dir.path(), "recoverArchive", 1, || {
++            Ok(Embedder::new(fixed()))
++        });
++        assert!(result.is_err(), "{mutation}");
++        assert!(output.is_empty(), "{mutation}");
++        assert_eq!(fs::read(&path).unwrap(), before);
++    }
++}
++
+ #[test]
+ fn bad_model_metadata_fails_before_empty_check_or_embedding() {
+     for populated in [false, true] {

@@ -63,6 +63,8 @@ pub fn open(path: &Path) -> anyhow::Result<OpenedDatabase> {
     open_at(path).with_context(|| format!("cannot open database {}", path.display()))
 }
 
+/// Check compatibility on reads. Full-index audits belong to indexing; loaded
+/// source and documents are validated separately before returning evidence.
 pub fn open_read_only(path: &Path) -> anyhow::Result<Connection> {
     let read = || -> anyhow::Result<Connection> {
         register_vec()?;
@@ -143,6 +145,7 @@ fn open_at(path: &Path) -> anyhow::Result<OpenedDatabase> {
         // Inspect without allowing SQLite to modify an unrecognized database.
         let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
         let found = validate_version(&connection)?;
+        validate_contents(&connection)?;
         connection.close().map_err(|(_, error)| error)?;
         if found == SCHEMA_VERSION {
             OpenOutcome::Reused
@@ -208,6 +211,10 @@ fn validate_schema(connection: &Connection, schema: &str) -> anyhow::Result<()> 
         schema_objects(connection)? == schema_objects(&reference)?,
         "unknown or damaged database schema"
     );
+    Ok(())
+}
+
+fn validate_contents(connection: &Connection) -> anyhow::Result<()> {
     let integrity: String = connection.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
     ensure!(integrity == "ok", "damaged database: {integrity}");
     let mut foreign_keys = connection.prepare("PRAGMA foreign_key_check")?;
@@ -215,6 +222,14 @@ fn validate_schema(connection: &Connection, schema: &str) -> anyhow::Result<()> 
         foreign_keys.query([])?.next()?.is_none(),
         "damaged database: broken foreign keys"
     );
+    Ok(())
+}
+
+/// Audit the complete published index once indexing has finished.
+pub fn audit(connection: &Connection) -> anyhow::Result<()> {
+    validate_contents(connection)?;
+    validate_model(connection)?;
+    policy::read(connection)?;
     Ok(())
 }
 

@@ -268,6 +268,7 @@ fn index_with_mode(
             &successful.iter().map(String::as_str).collect::<Vec<_>>(),
         )
     })?;
+    profile.measure("database_audit", || storage::audit(&database.connection))?;
     Ok(summary)
 }
 

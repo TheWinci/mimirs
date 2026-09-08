@@ -40,7 +40,9 @@ pub(super) fn validate(policy: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn read(connection: &Connection) -> Result<Option<String>> {
+/// Read compatible metadata without scanning unrelated files. Search validates
+/// each returned file's processing policy and documents when loading evidence.
+pub fn read_for_search(connection: &Connection) -> Result<Option<String>> {
     let policy = super::metadata(connection, "document_policy")?;
     let populated: bool = connection.query_row(
         "SELECT EXISTS(SELECT 1 FROM files) OR EXISTS(SELECT 1 FROM document_embeddings)",
@@ -52,6 +54,14 @@ pub fn read(connection: &Connection) -> Result<Option<String>> {
         return Ok(None);
     };
     validate(&value)?;
+    Ok(Some(value))
+}
+
+/// Audit policy and coverage across the complete index.
+pub fn read(connection: &Connection) -> Result<Option<String>> {
+    let Some(value) = read_for_search(connection)? else {
+        return Ok(None);
+    };
     let mixed: bool = connection.query_row("SELECT EXISTS(SELECT 1 FROM retrieval_processing WHERE policy != ?1) OR EXISTS(SELECT 1 FROM retrieval_documents WHERE policy != ?1)", [&value], |r| r.get(0))?;
     ensure!(!mixed, "mixed document policies; run mimirs index");
     let incomplete: bool = connection.query_row("SELECT

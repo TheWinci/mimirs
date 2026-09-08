@@ -35,7 +35,7 @@ fn run_at(
     // Metadata, candidates, and every citation share one saved-source snapshot.
     let transaction = connection.transaction()?;
     storage::validate_model(&transaction)?;
-    let policy = storage::policy::read(&transaction)?;
+    let policy = storage::policy::read_for_search(&transaction)?;
     let results = if storage::has_content(&transaction)? {
         let config = crate::config::Config::load(root)?;
         let mut embedder = make_embedder()?;
