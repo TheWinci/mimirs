@@ -91,6 +91,11 @@ pub(crate) struct Pool {
 
 impl Pool {
     #[cfg(test)]
+    pub(crate) fn worker_count(&self) -> usize {
+        self.threads.len()
+    }
+
+    #[cfg(test)]
     pub(crate) fn new<W: Send + 'static>(
         workers: Vec<W>,
         operation: impl Fn(&mut W, &str) -> Result<Vec<f32>> + Send + Sync + 'static,

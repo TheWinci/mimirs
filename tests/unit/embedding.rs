@@ -253,8 +253,12 @@ fn real_workers_match_serial_vectors_and_load_sessions_only_when_needed() {
     tokenizers::utils::parallelism::set_parallelism(false);
     let mut backend = OnnxBackend::new(model_cache_dir().unwrap());
     backend.set_workers(3);
+    assert!(backend.embed(&[]).unwrap().is_empty());
+    assert!(backend.models.is_empty());
+    assert!(backend.pool.is_none());
     backend.prepare().unwrap();
     assert_eq!(backend.models.len(), 1);
+    assert!(backend.pool.is_none());
     let texts = vec![
         "fn main() {}".to_owned(),
         "Remove expired sessions from persistent storage.".repeat(35),
@@ -262,12 +266,17 @@ fn real_workers_match_serial_vectors_and_load_sessions_only_when_needed() {
         "import os\nprint(os.environ)".to_owned(),
     ];
     let parallel = backend.embed(&texts).unwrap();
-    assert_eq!(backend.models.len(), 3);
+    // Each pool worker owns its session after embedding starts.
+    assert!(backend.models.is_empty());
+    assert_eq!(backend.pool.as_ref().unwrap().worker_count(), 3);
     backend.set_workers(1);
-    assert_eq!(backend.models.len(), 1);
+    assert!(backend.embed(&[]).unwrap().is_empty());
+    assert!(backend.models.is_empty());
+    assert!(backend.pool.is_none());
     let serial = backend.embed(&texts).unwrap();
     assert_eq!(parallel, serial);
-    assert_eq!(backend.models.len(), 1);
+    assert!(backend.models.is_empty());
+    assert_eq!(backend.pool.as_ref().unwrap().worker_count(), 1);
 }
 
 #[test]
