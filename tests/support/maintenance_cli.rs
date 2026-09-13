@@ -21,7 +21,7 @@ fn inspection(f: &Fixture, id: &str, extra: &[&str]) -> std::path::PathBuf {
 }
 fn assessed(f: &Fixture, path: &Path, extra: &[&str]) -> Output {
     let mut args = vec![
-        "review-assessed",
+        "review",
         "--assessment",
         path.to_str().unwrap(),
         "--reviewed",
@@ -308,7 +308,7 @@ fn assessed_review_rejects_stale_checkout_bytes_heads_and_uninspected_support() 
     let other_checkout = f.output(
         "b",
         &[
-            "review-assessed",
+            "review",
             "--assessment",
             old.to_str().unwrap(),
             "--reviewed",

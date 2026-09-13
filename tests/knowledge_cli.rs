@@ -321,6 +321,27 @@ fn heads(view: &Value, id: &str) -> Vec<String> {
         .map(|v| v.as_str().unwrap().to_owned())
         .collect()
 }
+fn review_assessment(
+    fixture: &Fixture,
+    instance: &str,
+    id: &str,
+    paths: &[&str],
+    parents: &[String],
+) -> std::path::PathBuf {
+    let mut args = vec!["maintenance", id];
+    for path in paths {
+        args.extend(["--evidence", path]);
+    }
+    let mut value = fixture.run(instance, &args);
+    // Tests can supply stale or partial heads to verify rejection at the boundary.
+    value["assessment"]["review_heads"] = serde_json::json!(parents);
+    let path = fixture
+        .temp
+        .path()
+        .join(format!("review-{}.json", uuid::Uuid::now_v7()));
+    fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
+    path
+}
 fn review(
     fixture: &Fixture,
     instance: &str,
@@ -329,9 +350,11 @@ fn review(
     parents: &[String],
     promote: bool,
 ) -> Value {
+    let assessment = review_assessment(fixture, instance, id, paths, parents);
     let mut args = vec![
         "review",
-        id,
+        "--assessment",
+        assessment.to_str().unwrap(),
         "--reviewed",
         "--actor",
         "reviewing-agent",
@@ -342,9 +365,6 @@ fn review(
     ];
     for path in paths {
         args.extend(["--evidence", path]);
-    }
-    for parent in parents {
-        args.extend(["--replaces", parent]);
     }
     if promote {
         args.push("--promote");
@@ -629,37 +649,40 @@ fn concurrent_reviews_remain_conflicted_until_explicitly_replaced_together() {
             .contains(&b["review_event"])
     );
     assert_eq!(item(&fixture.run("b", &["orient"]), &id), k);
+    let stale_path = review_assessment(&fixture, "a", &id, &["auth.rs"], &base);
     let stale = fixture.output(
         "a",
         &[
             "review",
-            &id,
+            "--assessment",
+            stale_path.to_str().unwrap(),
             "--reviewed",
-            "--evidence",
-            "auth.rs",
-            "--replaces",
-            &base[0],
             "--actor",
             "test",
         ],
     );
     assert!(!stale.status.success());
-    assert!(String::from_utf8_lossy(&stale.stderr).contains("every current review head"));
+    assert!(String::from_utf8_lossy(&stale.stderr).contains("stale assessment"));
+    let partial_path = review_assessment(
+        &fixture,
+        "a",
+        &id,
+        &["auth.rs"],
+        &[a["review_event"].as_str().unwrap().to_owned()],
+    );
     let partial = fixture.output(
         "a",
         &[
             "review",
-            &id,
+            "--assessment",
+            partial_path.to_str().unwrap(),
             "--reviewed",
-            "--evidence",
-            "auth.rs",
-            "--replaces",
-            a["review_event"].as_str().unwrap(),
             "--actor",
             "test",
         ],
     );
     assert!(!partial.status.success());
+    assert!(String::from_utf8_lossy(&partial.stderr).contains("stale assessment"));
     let resolved = review(
         &fixture,
         "a",
@@ -690,13 +713,17 @@ fn review_requires_explicit_assertion_clean_default_branch_and_committed_support
     let fixture = Fixture::new();
     let id = fixture.learn("a", "reviewed conclusion", "auth.rs");
     let parent = heads(&fixture.run("a", &["orient"]), &id).remove(0);
+    let assessment = review_assessment(
+        &fixture,
+        "a",
+        &id,
+        &["auth.rs"],
+        std::slice::from_ref(&parent),
+    );
     let args = [
         "review",
-        &id,
-        "--evidence",
-        "auth.rs",
-        "--replaces",
-        &parent,
+        "--assessment",
+        assessment.to_str().unwrap(),
         "--actor",
         "test",
     ];
@@ -704,11 +731,27 @@ fn review_requires_explicit_assertion_clean_default_branch_and_committed_support
     let mut args = args.to_vec();
     args.push("--reviewed");
     fs::write(fixture.root("a").join("auth.rs"), "dirty").unwrap();
+    let refreshed = review_assessment(
+        &fixture,
+        "a",
+        &id,
+        &["auth.rs"],
+        std::slice::from_ref(&parent),
+    );
+    fs::copy(refreshed, &assessment).unwrap();
     let dirty = fixture.output("a", &args);
     assert!(!dirty.status.success());
     assert!(String::from_utf8_lossy(&dirty.stderr).contains("clean checkout"));
     git(&fixture.root("a"), &["restore", "auth.rs"]);
     git(&fixture.root("a"), &["checkout", "-b", "feature"]);
+    let refreshed = review_assessment(
+        &fixture,
+        "a",
+        &id,
+        &["auth.rs"],
+        std::slice::from_ref(&parent),
+    );
+    fs::copy(refreshed, &assessment).unwrap();
     let feature = fixture.output("a", &args);
     assert!(!feature.status.success());
     assert!(String::from_utf8_lossy(&feature.stderr).contains("configured default branch"));
@@ -716,16 +759,22 @@ fn review_requires_explicit_assertion_clean_default_branch_and_committed_support
     fs::write(fixture.root("a").join(".gitignore"), "ignored.rs\n").unwrap();
     commit(&fixture.root("a"));
     fs::write(fixture.root("a").join("ignored.rs"), "uncommitted support").unwrap();
+    let ignored_assessment = review_assessment(
+        &fixture,
+        "a",
+        &id,
+        &["ignored.rs"],
+        std::slice::from_ref(&parent),
+    );
     let ignored = fixture.output(
         "a",
         &[
             "review",
-            &id,
-            "--reviewed",
+            "--assessment",
+            ignored_assessment.to_str().unwrap(),
             "--evidence",
             "ignored.rs",
-            "--replaces",
-            &parent,
+            "--reviewed",
             "--actor",
             "test",
         ],
@@ -760,18 +809,32 @@ fn default_branch_policy_is_local_and_does_not_reinterpret_received_history() {
         "trunk"
     );
     let parent = heads(&view, id).remove(0);
+    let inspection = fixture.run(
+        "a",
+        &[
+            "--default-branch",
+            "trunk",
+            "maintenance",
+            id,
+            "--evidence",
+            "auth.rs",
+        ],
+    );
+    assert_eq!(
+        inspection["assessment"]["review_heads"],
+        serde_json::json!([parent])
+    );
+    let assessment = fixture.temp.path().join("trunk-assessment.json");
+    fs::write(&assessment, serde_json::to_vec(&inspection).unwrap()).unwrap();
     let reviewed = fixture.run(
         "a",
         &[
             "--default-branch",
             "trunk",
             "review",
-            id,
+            "--assessment",
+            assessment.to_str().unwrap(),
             "--reviewed",
-            "--evidence",
-            "auth.rs",
-            "--replaces",
-            &parent,
             "--actor",
             "trunk-reviewer",
         ],
@@ -1111,3 +1174,21 @@ mod release_repairs;
 
 #[path = "support/hardening.rs"]
 mod hardening;
+
+#[test]
+fn review_exposes_only_the_assessment_workflow() {
+    let cli = env!("CARGO_BIN_EXE_mimirs");
+    let help = Command::new(cli)
+        .args(["knowledge", "review", "--help"])
+        .output()
+        .unwrap();
+    assert!(help.status.success());
+    let help = String::from_utf8(help.stdout).unwrap();
+    assert!(help.contains("--assessment"));
+    assert!(!help.contains("--replaces"));
+    let removed = Command::new(cli)
+        .args(["knowledge", "review-assessed", "--help"])
+        .output()
+        .unwrap();
+    assert_eq!(removed.status.code(), Some(2));
+}

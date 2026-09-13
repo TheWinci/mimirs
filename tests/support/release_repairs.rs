@@ -317,7 +317,7 @@ fn crlf_commit_identity_preserves_exact_observations_and_historical_bytes() {
     assert_eq!(canonical["text"], raw.replace("\r\n", "\n"));
     assert_eq!(canonical["byte_identity"], "canonical_git_blob");
     let args = [
-        "review-assessed",
+        "review",
         "--assessment",
         assessment.to_str().unwrap(),
         "--reviewed",

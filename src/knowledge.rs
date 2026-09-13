@@ -184,6 +184,7 @@ impl Store {
     }
     /// The caller explicitly asserts that the unchanged statement and complete
     /// supporting set have been reviewed. A stale expected frontier is rejected.
+    #[cfg(test)]
     pub fn review(
         &mut self,
         checkout: &checkout::Checkout,
@@ -200,29 +201,6 @@ impl Store {
         Ok(id)
     }
 
-    pub fn review_with_evidence(
-        &mut self,
-        checkout: &checkout::Checkout,
-        actor: &Actor,
-        request: ReviewRequest<'_>,
-        specs: &[evidence::Spec],
-    ) -> Result<EventId> {
-        let (_, id) = self.journal.append_checked(|events| {
-            let claims = projection::reduce(events)?;
-            let event = review_event_typed(
-                &self.repository,
-                checkout,
-                actor,
-                &claims,
-                request,
-                Some(specs),
-            )?;
-            let id = event.id;
-            Ok((vec![event], id))
-        })?;
-        self.replay()?;
-        Ok(id)
-    }
     pub fn supersede(
         &mut self,
         checkout: &checkout::Checkout,
@@ -340,6 +318,7 @@ fn learning_events_typed(
     Ok((id, events))
 }
 
+#[cfg(test)]
 fn review_event(
     repository: &RepositoryId,
     checkout: &checkout::Checkout,
@@ -380,7 +359,7 @@ fn review_event_typed(
     );
     ensure!(
         !request.replaces.is_empty() && request.replaces == active.ids(),
-        "--replaces must name every current review head from orient, including conflicts; inspect the current state and review again"
+        "review must replace every current review head, including conflicts; inspect with maintenance and review again"
     );
     let fallback = request
         .paths

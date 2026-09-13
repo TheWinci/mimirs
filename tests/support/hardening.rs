@@ -86,7 +86,7 @@ fn safe_git_helpers_and_typed_conversion_blockers_preserve_maintenance() {
         !f.output(
             "a",
             &[
-                "review-assessed",
+                "review",
                 "--assessment",
                 assessment.to_str().unwrap(),
                 "--reviewed",

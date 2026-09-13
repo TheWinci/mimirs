@@ -3,8 +3,7 @@ use crate::knowledge::operations::{Reviewed, Support, Write as KnowledgeWrite};
 use crate::{
     knowledge::assessment as context,
     knowledge::{
-        ReplacementRequest, ReviewRequest, Store, checkout::Checkout, model::*,
-        registry::LocalDirectoryRegistry,
+        ReplacementRequest, Store, checkout::Checkout, model::*, registry::LocalDirectoryRegistry,
     },
 };
 use anyhow::Result;
@@ -103,7 +102,7 @@ enum Action {
     /// List maintenance work or inspect selected evidence without recording a review.
     Maintenance(Box<Maintenance>),
     /// Reaffirm the unchanged statement using a prior maintenance assessment.
-    ReviewAssessed {
+    Review {
         #[arg(long)]
         assessment: PathBuf,
         /// Explicit complete new support set. Omit to retain all inspected active support.
@@ -133,27 +132,6 @@ enum Action {
         rationale: Option<String>,
         #[arg(long, value_enum)]
         kind: Option<KnowledgeKind>,
-        #[arg(long, required = true)]
-        reviewed: bool,
-        #[command(flatten)]
-        provenance: Provenance,
-    },
-    /// Assert that you reviewed this unchanged statement and its complete supporting files.
-    Review {
-        knowledge: uuid::Uuid,
-        /// Complete evidence set after review. Omit files that should be retired.
-        #[arg(long, required_unless_present = "anchor")]
-        evidence: Vec<String>,
-        /// Precise Rust declaration evidence as JSON with path and selector. Repeat for dependencies.
-        #[arg(long, value_parser=evidence::parse)]
-        anchor: Vec<Spec>,
-        /// Every current review head shown by orient. Repeat to resolve a conflict.
-        #[arg(long, required = true)]
-        replaces: Vec<uuid::Uuid>,
-        /// Explicitly promote originally provisional knowledge at this reviewed revision.
-        #[arg(long)]
-        promote: bool,
-        /// Assert that you reviewed the statement and all supplied evidence.
         #[arg(long, required = true)]
         reviewed: bool,
         #[command(flatten)]
@@ -229,7 +207,7 @@ enum Action {
 pub fn run(options: Options) -> Result<()> {
     let operation = match &options.action {
         Action::Learn { .. } => "learn",
-        Action::Review { .. } | Action::ReviewAssessed { .. } => "review",
+        Action::Review { .. } => "review",
         Action::Replace { .. } | Action::Supersede { .. } => "replace",
         Action::Setup { .. } => "setup",
         Action::Publish { .. } => "publish",
@@ -244,7 +222,7 @@ pub fn run(options: Options) -> Result<()> {
     };
     // Read assessed input once, before execution, and use that same reference for the write.
     let reference = match &options.action {
-        Action::ReviewAssessed { assessment, .. } | Action::Replace { assessment, .. } => {
+        Action::Review { assessment, .. } | Action::Replace { assessment, .. } => {
             Some(crate::input::read_reference(assessment))
         }
         _ => None,
@@ -344,7 +322,7 @@ fn run_value(
             )?
         }
 
-        Action::ReviewAssessed {
+        Action::Review {
             assessment: _,
             evidence,
             anchor,
@@ -403,39 +381,6 @@ fn run_value(
                     },
                 },
             )?)?
-        }
-        Action::Review {
-            knowledge,
-            evidence,
-            anchor,
-            replaces,
-            promote,
-            reviewed,
-            provenance,
-        } => {
-            anyhow::ensure!(
-                reviewed,
-                "--reviewed must explicitly assert that you reviewed the unchanged statement and its evidence"
-            );
-            let checkout = Checkout::open(&options.root, &repository)?
-                .with_default_branch(&settings.default_branch)?;
-            let request = ReviewRequest {
-                knowledge: KnowledgeId(knowledge),
-                paths: &evidence,
-                replaces: replaces.into_iter().map(EventId).collect(),
-                promote,
-            };
-            let event = if anchor.is_empty() {
-                store.review(&checkout, &provenance.actor(), request)?
-            } else {
-                store.review_with_evidence(
-                    &checkout,
-                    &provenance.actor(),
-                    request,
-                    &evidence::inputs(&evidence, &anchor)?,
-                )?
-            };
-            serde_json::json!({ "knowledge_id": knowledge, "review_event": event, "promotion_requested": promote })
         }
         Action::Learn {
             statement,

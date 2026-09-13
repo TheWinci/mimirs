@@ -163,7 +163,7 @@ fn configured_two_checkout_exchange_review_dedup_and_override_isolation() {
             "knowledge",
             "--default-branch",
             "main",
-            "review-assessed",
+            "review",
             "--assessment",
             path.to_str().unwrap(),
             "--actor",
@@ -176,7 +176,7 @@ fn configured_two_checkout_exchange_review_dedup_and_override_isolation() {
         "b",
         &[
             "knowledge",
-            "review-assessed",
+            "review",
             "--assessment",
             path.to_str().unwrap(),
             "--actor",

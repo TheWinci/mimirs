@@ -1,6 +1,6 @@
 [package]
 name = "mimirs"
-version = "2.0.0-alpha.2"
+version = "2.0.0-alpha.3"
 edition = "2024"
 description = "Local-first engineering context for coding agents"
 license = "Apache-2.0"

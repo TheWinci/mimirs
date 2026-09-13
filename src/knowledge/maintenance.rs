@@ -144,7 +144,7 @@ impl Store {
         let (_,id)=self.journal.append_checked(|events| {
             let current=maintenance::validate_reference(checkout,events,reference)?;
             let old=&current.claims[&reference.knowledge];
-            ensure!(request.statement.trim()!=old.claim.statement.trim(),"use review-assessed for an unchanged statement");
+            ensure!(request.statement.trim()!=old.claim.statement.trim(),"use review for an unchanged statement");
             ensure!(!current.item.relationship_conflict && current.item.applicable_replacements.is_empty(),
                 "claim already has an applicable replacement or relationship conflict; inspect its successor");
             ensure!(checkout.branch.as_deref()==Some(checkout.default_branch.as_str()) && !checkout.dirty()?,
