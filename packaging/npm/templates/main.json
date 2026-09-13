@@ -1,0 +1,17 @@
+{
+  "name": "mimirs",
+  "version": "0.0.0",
+  "description": "",
+  "license": "Apache-2.0",
+  "repository": { "type": "git", "url": "" },
+  "engines": { "node": ">=18" },
+  "bin": { "mimirs": "launcher.cjs" },
+  "files": ["launcher.cjs", "LICENSE", "README.md"],
+  "optionalDependencies": {},
+  "mimirsPlatforms": {},
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/",
+    "tag": "alpha"
+  }
+}

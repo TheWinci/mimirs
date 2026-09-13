@@ -93,6 +93,9 @@ activity and historical outcomes without running a model or assessing source.
 
 ## Command help and development
 
+Maintainers can [prepare macOS Apple Silicon npm packages](packaging/npm/README.md)
+locally. The packaging command builds and tests tarballs; publishing is manual.
+
 Built-in help covers the supported commands and their options:
 
 ```sh
