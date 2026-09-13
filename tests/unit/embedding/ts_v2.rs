@@ -14,10 +14,8 @@ fn tokenizer() -> Tokenizer {
 #[ignore = "loads cached pinned TS v2 tokenizer without inference"]
 fn final_document_inputs_match_ts_text_and_token_ids() {
     let tokenizer = tokenizer();
-    let reference: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../benchmarks/versions/port/reference.json"
-    ))
-    .unwrap();
+    let reference: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/fixtures/port/reference.json")).unwrap();
     for case in reference["tokenInputs"].as_array().unwrap() {
         let windows = document_inputs(&tokenizer, case["text"].as_str().unwrap()).unwrap();
         let expected = case["windows"].as_array().unwrap();
@@ -51,7 +49,7 @@ fn float32_merge_preserves_normalization_and_duplicate_weight() {
 #[ignore = "runs pinned q8 model against captured TS singleton/averaged documents and long queries"]
 fn real_model_inputs_and_vectors_match_ts_reference() {
     let reference: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../benchmarks/versions/port/model-reference.json"
+        "../../../tests/fixtures/port/model-reference.json"
     ))
     .unwrap();
     let mut model = crate::embedding::production().unwrap().with_workers(2);

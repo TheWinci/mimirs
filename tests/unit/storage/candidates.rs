@@ -1,10 +1,8 @@
 use super::*;
 
 pub(crate) fn fixture() -> (tempfile::TempDir, Connection, serde_json::Value) {
-    let reference: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../benchmarks/versions/port/reference.json"
-    ))
-    .unwrap();
+    let reference: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/fixtures/port/reference.json")).unwrap();
     let dir = tempfile::tempdir().unwrap();
     let db = crate::storage::open(&dir.path().join("index.db"))
         .unwrap()

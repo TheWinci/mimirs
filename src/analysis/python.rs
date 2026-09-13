@@ -125,7 +125,7 @@ fn extract(source: SourceFile) -> Result<Analysis> {
     analysis
         .facts
         .sort_by_key(|fact| (fact.span.start, fact.span.end));
-    analysis.source_chunks = crate::retrieval::ts_v2::from_tree(
+    analysis.source_chunks = crate::analysis::chunks::from_tree(
         &analysis.source.text,
         tree.root_node(),
         &tree_sitter_python::LANGUAGE.into(),

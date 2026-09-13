@@ -1,5 +1,5 @@
 use super::Chunk;
-use crate::retrieval::normalized::Source;
+use crate::source::normalized::Source;
 use anyhow::{Result, ensure};
 
 #[derive(Debug)]

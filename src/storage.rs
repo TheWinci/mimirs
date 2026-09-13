@@ -10,6 +10,7 @@ use crate::embedding::{DIMENSION, MODEL_NAME};
 
 mod reconcile;
 mod search;
+pub(crate) mod writer;
 pub use reconcile::{invalidate, reconcile};
 pub use search::has_content;
 #[cfg(test)]
@@ -275,36 +276,36 @@ fn delete_file_embeddings(transaction: &Transaction<'_>, file_id: i64) -> anyhow
 #[path = "../tests/unit/storage.rs"]
 mod tests;
 
-pub mod analysis;
+pub(crate) mod analysis;
 
-pub mod processing;
+pub(crate) mod processing;
 
-pub mod documents;
+pub(crate) mod documents;
 pub(crate) mod staging;
 
-pub mod policy;
+pub(crate) mod policy;
 
 #[cfg(test)]
 mod document_search;
 
-pub mod lexical;
+pub(crate) mod lexical;
 
-pub mod candidates;
+pub(crate) mod candidates;
 
 #[cfg(test)]
-#[path = "../benchmarks/versions/port-stage.rs"]
+#[path = "../tests/support/probes/port-stage.rs"]
 mod port_stage;
 
-pub mod ranking;
+pub(crate) mod ranking;
 
-pub mod hybrid;
+pub(crate) mod hybrid;
 
 #[cfg(test)]
-#[path = "../benchmarks/versions/port-source.rs"]
+#[path = "../tests/support/probes/port-source.rs"]
 mod port_source;
 
 #[cfg(test)]
-#[path = "../benchmarks/versions/port-language-reuse.rs"]
+#[path = "../tests/support/probes/port-language-reuse.rs"]
 mod port_language_reuse;
 
 /// Releasing unused writer pages after an incremental publication avoids costly

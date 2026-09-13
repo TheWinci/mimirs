@@ -31,7 +31,7 @@ pub fn chunks(analysis: &Analysis) -> Result<Vec<Chunk>> {
 }
 
 fn chunks_with(analysis: &Analysis, chunking: Chunking) -> Result<Vec<Chunk>> {
-    crate::storage::analysis::validate(analysis)?;
+    crate::analysis::validation::validate(analysis)?;
     let lines = LineIndex::new(&analysis.source.text);
     let mut chunks = Vec::new();
     let Chunking::Declarations(rules) = chunking else {

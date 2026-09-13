@@ -1,0 +1,65 @@
+[
+  {
+    "family": "a",
+    "statement": "analysis::extract is the boundary that restores original-source coordinates: language extractors parse normalized text, then the wrapper remaps entity/chunk/fact/evidence/scope/source-fact/diagnostic spans to raw UTF-8 bytes, recomputes raw line and diagnostic column locations, resets the file scope to the entire raw snapshot, and restores Analysis.source.",
+    "rationale": "The filesystem reader, public extraction wrapper, and Rust extractor establish this boundary. Rust parses the SourceFile it receives and constructs tree-sitter byte spans without knowing the original text; only the wrapper retains both versions and remaps every exposed record. Consumers must enter through analysis::extract rather than treating language-extractor offsets as raw source offsets.",
+    "evidence": [
+      "src/source.rs",
+      "src/analysis.rs",
+      "src/analysis/rust.rs"
+    ]
+  },
+  {
+    "family": "a",
+    "statement": "Source reading preserves exact valid UTF-8 bytes and rejects invalid UTF-8. retrieval::normalized::Source removes only an initial three-byte BOM and converts CRLF or lone CR to LF, retaining sparse raw-byte and UTF-16 offset changes with character-boundary checks. Returned analysis line numbers and diagnostic columns are recomputed by the raw LF-only LineIndex, so lone CR permits separate parsed lines but does not increment reported raw line numbers.",
+    "rationale": "The reader, normalization and LineIndex implementations distinguish byte fidelity from parser newline normalization. For BOM/Unicode/CRLF source chunks, the preview preserves raw text. With BOM plus lone-CR Rust source, separate functions can parse while both remain on raw line 1. This behavior does not promise CR-aware display line numbering.",
+    "evidence": [
+      "src/source.rs",
+      "src/retrieval/normalized.rs",
+      "src/analysis.rs"
+    ]
+  },
+  {
+    "family": "a",
+    "statement": "Live inspect loads source through source::read and analysis::extract; source-chunk previews validate Analysis and slice its raw source with raw-byte windows. Retrieval documents use the same window projection but normalize the displayed document text while retaining raw evidence spans. Window sizes are measured in normalized UTF-16 units with a 4000-unit target, not raw byte length.",
+    "rationale": "The inspect loader selects extraction for live reads and stored analysis for --stored. Both preview and documents use windows::project: its units closure converts raw offsets to normalized bytes then UTF-16 units, while Preview.text slices Analysis.source directly and Document.text slices the normalized copy. BOM/CRLF/Unicode source keeps its raw text in previews. The target is a grouping threshold, not a promise that every individual long line is split to 4000 units.",
+    "evidence": [
+      "src/commands/inspect.rs",
+      "src/retrieval/ts_v2.rs",
+      "src/retrieval/ts_v2/windows.rs",
+      "src/storage/analysis.rs"
+    ]
+  },
+  {
+    "family": "b",
+    "statement": "Streaming parallel indexing publishes complete files in discovery ordinal order. An embedding or other changed-file publication failure invalidates that current path and aborts; earlier file commits remain, later existing snapshots remain, and final reconciliation is skipped.",
+    "rationale": "The coordinator checks each file ordinal against completed count, propagates vector errors inside the changed-file publication closure, and calls invalidate on its error. The command only calls reconcile after parallel::run returns successfully. The regression test forces b to fail before a finishes and verifies new a, old c, and the deleted stale file remain while b disappears.",
+    "evidence": [
+      "src/commands/index/parallel.rs",
+      "src/commands/index.rs",
+      "src/storage/reconcile.rs",
+      "tests/unit/commands/index.rs"
+    ]
+  },
+  {
+    "family": "b",
+    "statement": "Index publication is atomic per file, not across the repository: documents::publish deletes and replaces a file's stored analysis, retrieval documents, lexical entries and vectors in one transaction. Durable intermediate stages are separate in .mimirs/staging.db and are validated before searchable publication, then cleaned after success or failure rather than replayed on the next run.",
+    "rationale": "save_inner opens and commits one transaction for each publish call, enclosing analysis::write and document/vector/lexical writes. The parallel coordinator validates complete staged source, windows and vectors first. Staging uses its own FULL-synchronous database and transactions; finish deletes the run on either result, and open deletes abandoned runs, so stage durability does not imply a resumable or searchable repository snapshot.",
+    "evidence": [
+      "src/storage/documents.rs",
+      "src/storage/staging.rs",
+      "src/commands/index/parallel.rs"
+    ]
+  },
+  {
+    "family": "b",
+    "statement": "Hybrid search builds result source blocks and snapshot hashes from stored indexed analysis and document evidence, so it can return a previously indexed file even when the live file is deleted or changed. Parallel indexing publishes the immutable source read by parsing even if disk contents change during embedding.",
+    "rationale": "Snapshots::file loads analysis and documents from its database connection, block calls source_text on analysis.source.text, and result hashes that same stored text. The search regression saves a deleted.rs snapshot without a live source and asserts its source appears. The indexing regression mutates disk during inference, then checks that the old read snapshot was published and reuse rejects the new disk generation.",
+    "evidence": [
+      "src/storage/hybrid.rs",
+      "src/storage/documents.rs",
+      "tests/unit/commands/search.rs",
+      "tests/unit/commands/index.rs"
+    ]
+  }
+]

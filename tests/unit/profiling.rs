@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn disabled_measurements_have_no_report_and_preserve_results() {
     let profile = Profiler::default();
-    let _file = profile.file("a.rs");
+    let _file = profile.file("a.rs", crate::analysis::language::for_path("a.rs").identity);
     profile.count("files_read", 1);
     profile.batch(4);
     assert_eq!(profile.measure("work", || 42), 42);
@@ -13,9 +13,9 @@ fn disabled_measurements_have_no_report_and_preserve_results() {
 
 #[test]
 fn queue_distributions_merge_samples_before_computing_percentiles() {
-    let parent = Profiler::enabled();
+    let parent = Profiler::enabled(crate::embedding::model_identity());
     for values in [vec![0.001, 0.003], vec![0.002, 0.1]] {
-        let child = Profiler::enabled();
+        let child = Profiler::enabled(crate::embedding::model_identity());
         for value in values {
             child
                 .0
@@ -44,9 +44,9 @@ fn queue_distributions_merge_samples_before_computing_percentiles() {
 
 #[test]
 fn nested_phases_count_exclusive_time_and_keep_file_totals() {
-    let profile = Profiler::enabled();
+    let profile = Profiler::enabled(crate::embedding::model_identity());
     {
-        let _file = profile.file("a.py");
+        let _file = profile.file("a.py", crate::analysis::language::for_path("a.py").identity);
         let _outer = profile.scope("outer");
         profile.count("source_bytes", 17);
         profile.measure("inner", || profile.batch(3));
@@ -79,7 +79,7 @@ fn nested_phases_count_exclusive_time_and_keep_file_totals() {
 #[test]
 fn concurrent_scopes_keep_independent_stacks_and_wait_categories() {
     use std::sync::{Barrier, mpsc};
-    let profile = Profiler::enabled();
+    let profile = Profiler::enabled(crate::embedding::model_identity());
     let barrier = Arc::new(Barrier::new(2));
     std::thread::scope(|scope| {
         for name in ["first", "second"] {

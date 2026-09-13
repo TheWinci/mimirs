@@ -14,7 +14,7 @@ fn grammar_loads_for_python_and_stubs() {
             analysis.diagnostics
         );
         assert_eq!(analysis.entities[0].name.as_deref(), Some("café"));
-        crate::storage::analysis::validate(&analysis).unwrap();
+        crate::analysis::validation::validate(&analysis).unwrap();
     }
 }
 
@@ -24,7 +24,7 @@ fn analyze(path: &str, text: &str) -> Analysis {
         text: text.into(),
     })
     .unwrap();
-    crate::storage::analysis::validate(&analysis).unwrap();
+    crate::analysis::validation::validate(&analysis).unwrap();
     analysis
 }
 

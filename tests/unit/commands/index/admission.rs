@@ -5,7 +5,7 @@ use std::time::Duration;
 
 #[test]
 fn oversized_files_run_alone_and_cancellation_wakes_admission() {
-    let profile = Profiler::enabled();
+    let profile = Profiler::enabled(crate::embedding::model_identity());
     let cancel = Cancel::default();
     let admission = Admission::new(6, &profile, &cancel);
     let first = admission.acquire(PAYLOAD_TARGET + 1).unwrap();

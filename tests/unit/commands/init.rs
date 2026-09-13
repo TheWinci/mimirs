@@ -136,3 +136,53 @@ fn init_rebuilds_v1_and_prepares_model_after_preserving_config() {
         "custom configuration"
     );
 }
+
+#[test]
+fn init_respects_writer_during_creation_and_schema_replacement() {
+    let dir = TempDir::new().unwrap();
+    let database = dir.path().join(".mimirs/index.db");
+    let held = crate::storage::writer::acquire(dir.path()).unwrap();
+    assert!(run_at(dir.path(), || panic!("contender must not prepare model")).is_err());
+    assert!(!database.exists());
+    drop(held);
+    run_at(dir.path(), || {
+        crate::storage::writer::acquire(dir.path())?;
+        Ok(())
+    })
+    .unwrap();
+    fs::remove_file(&database).unwrap();
+    let connection = rusqlite::Connection::open(&database).unwrap();
+    connection
+        .execute_batch(include_str!("../../../src/storage/schema_v1.sql"))
+        .unwrap();
+    connection
+        .execute_batch(
+            "PRAGMA user_version=1; INSERT INTO files VALUES (1, 'preserve-until-owned.rs');",
+        )
+        .unwrap();
+    drop(connection);
+    let before = fs::read(&database).unwrap();
+    let held = crate::storage::writer::acquire(dir.path()).unwrap();
+    std::thread::scope(|scope| {
+        scope
+            .spawn(|| {
+                assert!(run_at(dir.path(), || panic!("no model work under contention")).is_err())
+            })
+            .join()
+            .unwrap();
+    });
+    assert_eq!(before, fs::read(&database).unwrap());
+    drop(held);
+    run_at(dir.path(), || {
+        crate::storage::writer::acquire(dir.path())?;
+        Ok(())
+    })
+    .unwrap();
+    let connection = crate::storage::open(&database).unwrap().connection;
+    assert_eq!(
+        connection
+            .query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))
+            .unwrap(),
+        crate::storage::SCHEMA_VERSION
+    );
+}

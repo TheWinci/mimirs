@@ -179,7 +179,7 @@ fn abandoned_stages_are_discarded_while_committed_files_remain_reusable() {
         // Simulate interruption after a durable stage or after live commit but
         // before stage cleanup. Closing SQLite does not erase committed rows.
         drop(store);
-        let profile = Profiler::enabled();
+        let profile = Profiler::enabled(crate::embedding::model_identity());
         let store = Store::open(&path, &profile).unwrap();
         assert_eq!(
             store

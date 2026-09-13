@@ -7,3 +7,8 @@ skills-lock.json
 target/
 
 plans/
+
+# Local research and development records; retained outside the public source set.
+/benchmarks/
+/docs/
+/examples/

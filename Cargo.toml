@@ -1,13 +1,25 @@
 [package]
 name = "mimirs"
-version = "2.0.0-alpha.1"
+version = "2.0.0-alpha.2"
 edition = "2024"
-description = "Local-first RAG and project memory for AI coding agents"
+description = "Local-first engineering context for coding agents"
 license = "Apache-2.0"
 repository = "https://github.com/TheWinci/mimirs"
 keywords = ["rag", "memory", "embeddings", "semantic-search"]
 categories = ["development-tools"]
-exclude = ["skills-lock.json", "logo.png", "/.agents", "/.claude"]
+# Package the implementation, README and self-contained test fixtures.
+# Docs, examples, research, planning and local agent state stay outside the crate.
+include = [
+    "/src/**",
+    "/tests/**",
+    "/README.md",
+    "/LICENSE",
+    "/Cargo.toml",
+    "/Cargo.lock",
+    "!**/.DS_Store",
+    "!**/__pycache__/**",
+    "!**/*.pyc",
+]
 
 [dependencies]
 anyhow = "1.0.104"
@@ -73,6 +85,6 @@ tree-sitter-haskell = "=0.23.1"
 tree-sitter-ocaml = "=0.24.2"
 
 tree-sitter-dart = { package = "tree-sitter-dart-orchard", version = "=0.6.0" }
+uuid = { version = "1.26.1", features = ["v7", "serde"] }
 
-[dev-dependencies]
 tempfile = "3.27.0"

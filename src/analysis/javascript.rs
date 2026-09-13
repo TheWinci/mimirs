@@ -112,7 +112,7 @@ fn extract(source: SourceFile, language: tree_sitter::Language) -> Result<Analys
         );
     }
     analysis.facts.sort_by_key(|f| (f.span.start, f.span.end));
-    analysis.source_chunks = crate::retrieval::ts_v2::from_tree(
+    analysis.source_chunks = crate::analysis::chunks::from_tree(
         &analysis.source.text,
         tree.root_node(),
         &language,

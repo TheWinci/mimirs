@@ -8,7 +8,7 @@ fn analyze(source: &str) -> Analysis {
         text: source.into(),
     })
     .unwrap();
-    crate::storage::analysis::validate(&analysis).unwrap();
+    crate::analysis::validation::validate(&analysis).unwrap();
     analysis
 }
 

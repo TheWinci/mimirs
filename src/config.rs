@@ -5,8 +5,52 @@ use std::path::Path;
 use anyhow::{Context, bail};
 use serde::{Deserialize, Serialize};
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
+#[serde(rename_all = "lowercase")]
+pub enum KnowledgeMode {
+    #[default]
+    Auto,
+    Off,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct ContextConfig {
+    #[serde(default)]
+    pub knowledge: KnowledgeMode,
+}
+impl ContextConfig {
+    fn is_default(&self) -> bool {
+        self.knowledge == KnowledgeMode::Auto
+    }
+}
+
+/// Context preferences work before source initialization. Explicit requests win.
+pub fn knowledge_mode(
+    root: &Path,
+    explicit: Option<KnowledgeMode>,
+) -> anyhow::Result<KnowledgeMode> {
+    if let Some(mode) = explicit {
+        return Ok(mode);
+    }
+    #[derive(Default, Deserialize)]
+    struct Local {
+        #[serde(default)]
+        context: ContextConfig,
+    }
+    match fs::read_to_string(root.join(".mimirs/config.toml")) {
+        Ok(text) => Ok(toml::from_str::<Local>(&text)
+            .context("invalid local context preference")?
+            .context
+            .knowledge),
+        Err(e) if e.kind() == ErrorKind::NotFound => Ok(KnowledgeMode::Auto),
+        Err(e) => Err(e).context("cannot read local context preference"),
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
+    #[serde(default, skip_serializing_if = "ContextConfig::is_default")]
+    pub context: ContextConfig,
     /// Generated-source globs receive TS v2's 0.75 ranking multiplier.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub generated: Vec<String>,
@@ -23,6 +67,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            context: ContextConfig::default(),
             embedding_workers: None,
             generated: Vec::new(),
             include: crate::analysis::language::default_includes(),
@@ -100,8 +145,9 @@ impl Config {
     pub fn to_toml(&self) -> anyhow::Result<String> {
         let mut text = toml::to_string_pretty(self)?;
         if self.embedding_workers.is_none() {
-            text.push_str(
-                "\n# Omit for one-third of available CPUs, minimum one.\n# embedding_workers = 3\n",
+            text.insert_str(
+                0,
+                "# Omit for one-third of available CPUs, minimum one.\n# embedding_workers = 3\n\n",
             );
         }
         Ok(text)
@@ -111,3 +157,12 @@ impl Config {
 #[cfg(test)]
 #[path = "../tests/unit/config.rs"]
 mod tests;
+
+impl Config {
+    pub(crate) fn selection(&self) -> crate::source::walk::Selection<'_> {
+        crate::source::walk::Selection {
+            include: &self.include,
+            exclude: &self.exclude,
+        }
+    }
+}

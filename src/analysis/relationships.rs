@@ -3,7 +3,7 @@ use super::{
     Analysis,
     source_facts::{Binding, ChunkRef, Fact, Kind, Location},
 };
-use crate::retrieval::ts_v2::Chunk;
+use crate::analysis::chunks::Chunk;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 

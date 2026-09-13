@@ -10,6 +10,7 @@ use serde::Serialize;
 pub struct Profiler(Option<Arc<Mutex<State>>>);
 
 struct State {
+    model: String,
     start: Instant,
     stack: HashMap<ThreadId, Vec<Frame>>,
     stages: BTreeMap<&'static str, StageReport>,
@@ -128,8 +129,9 @@ impl Profiler {
         })
     }
 
-    pub fn enabled() -> Self {
+    pub fn enabled(model: String) -> Self {
         Self(Some(Arc::new(Mutex::new(State {
+            model,
             start: Instant::now(),
             stack: HashMap::new(),
             stages: BTreeMap::new(),
@@ -247,13 +249,13 @@ impl Profiler {
         }
     }
 
-    pub fn file(&self, path: &str) -> FileScope {
+    pub fn file(&self, path: &str, language: &str) -> FileScope {
         let start = self.0.as_ref().map(|state| {
             let mut state = state.lock().unwrap();
             assert!(state.current_file.is_none());
             state.current_file = Some(FileReport {
                 path: path.into(),
-                language: crate::analysis::language::for_path(path).identity.into(),
+                language: language.into(),
                 ..FileReport::default()
             });
             Instant::now()
@@ -267,13 +269,13 @@ impl Profiler {
 
     /// File preparation and completion may interleave. Each file keeps its own
     /// coordinator scopes; completed measurements merge into the run report.
-    pub fn fork_file(&self, path: &str) -> (Profiler, FileScope) {
-        let child = if self.0.is_some() {
-            Self::enabled()
+    pub fn fork_file(&self, path: &str, language: &str) -> (Profiler, FileScope) {
+        let child = if let Some(state) = &self.0 {
+            Self::enabled(state.lock().unwrap().model.clone())
         } else {
             Self::default()
         };
-        let mut scope = child.file(path);
+        let mut scope = child.file(path, language);
         scope.parent = Some(self.clone());
         (child, scope)
     }
@@ -332,7 +334,7 @@ impl Profiler {
             counters: std::mem::take(&mut state.counters),
             embedding_batch_sizes: std::mem::take(&mut state.batch_sizes),
             files: std::mem::take(&mut state.files),
-            model: crate::embedding::model_identity(),
+            model: state.model.clone(),
             platform: std::env::consts::OS,
             architecture: std::env::consts::ARCH,
             available_parallelism: std::thread::available_parallelism().ok().map(usize::from),

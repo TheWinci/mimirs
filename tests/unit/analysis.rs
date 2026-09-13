@@ -346,7 +346,7 @@ fn audit_repository_sources() {
                     path.display(),
                     a.diagnostics
                 );
-                crate::storage::analysis::validate(&a)
+                crate::analysis::validation::validate(&a)
                     .unwrap_or_else(|e| panic!("{}: {e:#}", path.display()));
             }
         }
@@ -382,7 +382,7 @@ fn tuple_metadata_and_guard_calls_survive_extraction() {
             .iter()
             .any(|f| f.kind == "call" && &a.source.text[f.span.start..f.span.end] == "pred(v)")
     );
-    crate::storage::analysis::validate(&a).unwrap();
+    crate::analysis::validation::validate(&a).unwrap();
 }
 
 #[test]
@@ -414,7 +414,7 @@ fn parser_and_computed_spans_agree_on_crlf_and_unicode() {
         "\n\n",
     ] {
         let a = analyze(text);
-        crate::storage::analysis::validate(&a).unwrap();
+        crate::analysis::validation::validate(&a).unwrap();
         for fact in &a.facts {
             assert_eq!(
                 fact.span,
@@ -429,7 +429,7 @@ fn recovered_prefixes_keep_valid_owned_records() {
     let text = include_str!("../fixtures/rust/declarations.rs");
     for (end, _) in text.char_indices() {
         let a = analyze(&text[..end]);
-        crate::storage::analysis::validate(&a).unwrap_or_else(|e| panic!("prefix {end}: {e:#}"));
+        crate::analysis::validation::validate(&a).unwrap_or_else(|e| panic!("prefix {end}: {e:#}"));
     }
 }
 
@@ -454,7 +454,7 @@ fn retrieval_examples_have_owned_source_evidence() {
         text: include_str!("../fixtures/retrieval/sessions.rs").into(),
     })
     .unwrap();
-    crate::storage::analysis::validate(&analysis).unwrap();
+    crate::analysis::validation::validate(&analysis).unwrap();
     let cases: serde_json::Value =
         serde_json::from_str(include_str!("../fixtures/retrieval/queries.json")).unwrap();
     for case in cases.as_array().unwrap() {

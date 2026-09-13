@@ -3,7 +3,7 @@ use serde_json::{Value, json};
 
 pub(super) fn cases() -> Vec<Value> {
     serde_json::from_str::<Value>(include_str!(
-        "../../../benchmarks/versions/port/relationships/reference.json"
+        "../../../tests/fixtures/port/relationships/reference.json"
     ))
     .unwrap()["cases"]
         .as_array()
@@ -27,7 +27,7 @@ pub(super) fn analyses(case: &Value) -> Vec<analysis::Analysis> {
                 std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(fixture),
             )
             .unwrap();
-            let normalized = crate::retrieval::normalized::Source::new(&raw);
+            let normalized = crate::source::normalized::Source::new(&raw);
             assert_eq!(normalized.text, file["source"].as_str().unwrap());
             analysis::extract(SourceFile {
                 path: path.into(),
@@ -50,7 +50,7 @@ fn check(suite: &str) {
             .iter()
             .zip(case["files"].as_array().unwrap())
         {
-            crate::storage::analysis::validate(analysis).unwrap();
+            crate::analysis::validation::validate(analysis).unwrap();
             let actual: Vec<_> = analysis
                 .source_chunks
                 .iter()

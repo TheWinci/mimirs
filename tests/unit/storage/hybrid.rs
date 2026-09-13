@@ -192,10 +192,8 @@ fn candidates_from_reference(completed: &serde_json::Value) -> Vec<Candidate> {
 
 #[test]
 fn previews_match_ts_codepoint_and_whitespace_rules() {
-    let reference: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../benchmarks/versions/port/reference.json"
-    ))
-    .unwrap();
+    let reference: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/fixtures/port/reference.json")).unwrap();
     for case in reference["previewCases"].as_array().unwrap() {
         assert_eq!(
             preview(case["text"].as_str().unwrap(), 96),

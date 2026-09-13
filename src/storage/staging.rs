@@ -34,7 +34,7 @@ impl Stage<'_> {
                         && super::processing::source_hash(&analysis.source.text) == key.source_hash,
                     "stale staged source"
                 );
-                super::analysis::validate(analysis)?;
+                crate::analysis::validation::validate(analysis)?;
                 (
                     "source_stages",
                     analysis.source_chunks.len(),

@@ -1,9 +1,10 @@
 use super::*;
+use crate::retrieval::ts_v2;
 use serde_json::{Value, json};
 
 fn fixture_cases() -> Vec<Value> {
     let reference: Value = serde_json::from_str(include_str!(
-        "../../benchmarks/versions/port/languages/reference.json"
+        "../../tests/fixtures/port/languages/reference.json"
     ))
     .unwrap();
     reference["cases"].as_array().unwrap().clone()
@@ -15,7 +16,7 @@ fn analyze(path: &str, source: &str) -> Analysis {
         text: source.into(),
     })
     .unwrap();
-    crate::storage::analysis::validate(&result).unwrap();
+    crate::analysis::validation::validate(&result).unwrap();
     let mut covered = vec![false; source.len()];
     for document in ts_v2::documents(&result).unwrap() {
         for evidence in document.evidence {

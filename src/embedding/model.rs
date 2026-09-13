@@ -119,5 +119,5 @@ fn pool(hidden: &[f32], mask: &[i64]) -> Result<Vec<f32>> {
 }
 
 #[cfg(test)]
-#[path = "../../benchmarks/versions/runtime-probe.rs"]
+#[path = "../../tests/support/probes/runtime-probe.rs"]
 mod runtime_probe;

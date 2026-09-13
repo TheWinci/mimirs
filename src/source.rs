@@ -1,3 +1,6 @@
+pub(crate) mod normalized;
+pub(crate) mod observation;
+pub(crate) mod walk;
 use std::fs;
 use std::path::Path;
 
@@ -25,3 +28,23 @@ pub fn read(root: &Path, path: &str) -> anyhow::Result<SourceFile> {
 #[cfg(test)]
 #[path = "../tests/unit/source.rs"]
 mod tests;
+
+/// Generated files have no source/resolver meaning, even when explicitly included.
+pub(crate) fn operational(path: &Path) -> bool {
+    let text = path.to_string_lossy().replace('\\', "/");
+    let Some(path) = text.strip_prefix(".mimirs/") else {
+        return false;
+    };
+    ["status-owners", "watch", "knowledge/repositories"]
+        .iter()
+        .any(|dir| path == *dir || path.starts_with(&format!("{dir}/")))
+        || ["index.db", "staging.db"]
+            .iter()
+            .any(|name| path == *name || path.starts_with(&format!("{name}-")))
+        || matches!(
+            path,
+            "status" | "status.lock" | "index.lock" | "knowledge/settings.lock"
+        )
+        || path.starts_with(".tmp")
+        || path.starts_with("knowledge/.tmp")
+}

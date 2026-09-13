@@ -1,8 +1,0 @@
-[
-  {"id":"T1","kind":"body","query":"remove browser tokens whose expiration deadline in milliseconds has elapsed","path":"cache.ts","name":"removeExpired","parent":"TokenCache","required_snippets":["entry.expiresAt <= nowMs","this.entries.delete(key)"]},
-  {"id":"T2","kind":"method","query":"restore browser token cache from a JSON file after restarting","path":"cache.ts","name":"restore","parent":"TokenCache","required_snippets":["JSON.parse(readFileSync(path, \"utf8\"))","cache.entries.set"]},
-  {"id":"T3","kind":"documentation","query":"configuration for retrying failed network requests with exponential backoff maximum delay","path":"contracts.d.ts","name":"RetryPolicy","parent":null,"required_snippets":["exponential backoff","maximumDelayMs"]},
-  {"id":"J1","kind":"body","query":"canonical keyboard shortcut trim lowercase sort unique modifiers separated by plus","path":"keyboard.mjs","name":"normalizeShortcut","parent":null,"required_snippets":["part.trim().toLowerCase()","new Set(parts)"]},
-  {"id":"J2","kind":"anonymous","query":"normalize Windows CRLF line endings before hashing content","path":"newlines.cjs","name":null,"parent":null,"entity_kind":"function","required_snippets":["text.replace(/\\r\\n/g, \"\\n\")"]},
-  {"id":"X1","kind":"oversized-component","query":"disable the reconnect button while a network reconnection is in progress","path":"reconnect.tsx","name":"ReconnectPanel","parent":null,"required_snippets":["disabled={props.reconnecting}","props.reconnect"]}
-]

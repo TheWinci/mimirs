@@ -1,12 +1,36 @@
+#[derive(Clone, Copy, clap::ValueEnum)]
+pub enum Output {
+    Full,
+    Compact,
+}
+
 use std::io::{self, Write};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-use crate::{embedding, storage};
+use crate::embedding;
+#[cfg(test)]
+use crate::storage;
+use crate::storage::hybrid::{FileResult, Response};
+#[cfg(test)]
 use anyhow::ensure;
-use storage::hybrid::{FileResult, Response};
 
-pub fn run(query: &str, limit: usize) -> anyhow::Result<()> {
+pub fn run(query: &str, limit: usize, output: Output) -> anyhow::Result<()> {
+    if matches!(output, Output::Compact) {
+        let result = crate::retrieval::query::Retriever::default().retrieve(
+            Path::new("."),
+            query,
+            limit,
+            true,
+            embedding::production,
+        )?;
+        let text = result
+            .compact
+            .unwrap()
+            .render(crate::retrieval::compact::MAX_BYTES, &str::len)?;
+        io::stdout().lock().write_all(text.as_bytes())?;
+        return Ok(());
+    }
     let start = Instant::now();
     run_at(
         Path::new("."),
@@ -26,44 +50,14 @@ fn run_at(
     stdout: &mut dyn Write,
     elapsed: &dyn Fn() -> Duration,
 ) -> anyhow::Result<()> {
-    ensure!(!query.trim().is_empty(), "query must not be blank");
-    ensure!(
-        (1..=100).contains(&limit),
-        "limit must be between 1 and 100"
-    );
-    let mut connection = storage::open_read_only(&root.join(".mimirs/index.db"))?;
-    // Metadata, candidates, and every citation share one saved-source snapshot.
-    let transaction = connection.transaction()?;
-    storage::validate_model(&transaction)?;
-    let policy = storage::policy::read_for_search(&transaction)?;
-    let results = if storage::has_content(&transaction)? {
-        let config = crate::config::Config::load(root)?;
-        let mut embedder = make_embedder()?;
-        let policy = policy
-            .as_deref()
-            .expect("validated populated index has a policy");
-        ensure!(
-            storage::policy::document_policy(&embedder.token_budget()?) == policy,
-            "query tokenizer does not match indexed document policy; run mimirs index"
-        );
-        let vector = embedder.embed_ts_query(query)?;
-        storage::hybrid::search(
-            &transaction,
-            query,
-            Some(&vector),
-            limit,
-            &config.generated,
-            policy,
-        )?
-    } else {
-        Response {
-            source: Vec::new(),
-            docs: Vec::new(),
-            relations: Vec::new(),
-        }
-    };
-    transaction.commit()?;
-    write_results(stdout, &results, elapsed())
+    let result = crate::retrieval::query::Retriever::default().retrieve(
+        root,
+        query,
+        limit,
+        false,
+        make_embedder,
+    )?;
+    write_results(stdout, &result.results, elapsed())
 }
 
 fn write_results(

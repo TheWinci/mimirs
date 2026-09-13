@@ -3,7 +3,7 @@ use anyhow::{Context, Result};
 use tree_sitter::{Language as Grammar, Parser};
 
 use super::{Analysis, Diagnostic, Entity, Fact, LineIndex, Scope, Span, language::Language};
-use crate::{retrieval::ts_v2, source::SourceFile};
+use crate::{analysis::chunks as ts_v2, source::SourceFile};
 
 pub(super) const JAVA: Language = Language {
     identity: "java/default/tree-sitter-0.27.0/java-0.23.5/extractor-3/source-facts-1",

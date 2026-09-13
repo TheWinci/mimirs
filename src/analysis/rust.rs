@@ -74,7 +74,7 @@ fn extract(source: SourceFile) -> Result<Analysis> {
                 break;
             }
             if !cursor.goto_parent() {
-                let source_chunks = crate::retrieval::ts_v2::from_tree(
+                let source_chunks = crate::analysis::chunks::from_tree(
                     &source.text,
                     tree.root_node(),
                     &tree_sitter_rust::LANGUAGE.into(),

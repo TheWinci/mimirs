@@ -8,9 +8,13 @@ use std::{
 };
 
 /// Analyze the selected project files without an index or embedding model.
-pub fn run(json: bool) -> anyhow::Result<()> {
+pub fn run(json: bool, indexed: bool) -> anyhow::Result<()> {
     let root = std::env::current_dir().context("cannot find current directory")?;
-    let result = analyze(&root)?;
+    let result = if indexed {
+        crate::index::graph::read(&root)?
+    } else {
+        analyze(&root)?
+    };
     let output = if json {
         serde_json::to_string_pretty(&result)?
     } else {
@@ -26,7 +30,7 @@ fn analyze(root: &Path) -> anyhow::Result<Relationships> {
     } else {
         Config::default()
     };
-    let sources = super::index::walk::discover(root, &config, |_, _| Ok(()))?;
+    let sources = crate::source::walk::discover(root, &config.selection(), |_, _| Ok(()))?;
     ensure!(
         sources.errors.is_empty(),
         "source discovery failed: {}",
@@ -42,7 +46,7 @@ fn analyze(root: &Path) -> anyhow::Result<Relationships> {
         .collect::<anyhow::Result<Vec<_>>>()?;
     // Asset references need existence, never binary contents. Keep exclusions and gitignore.
     config.include = vec!["**/*".into()];
-    let assets = super::index::walk::discover(root, &config, |_, _| Ok(()))?;
+    let assets = crate::source::walk::discover(root, &config.selection(), |_, _| Ok(()))?;
     ensure!(
         assets.errors.is_empty(),
         "asset discovery failed: {}",

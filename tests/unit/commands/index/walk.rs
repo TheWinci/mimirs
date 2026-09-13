@@ -6,7 +6,7 @@ use tempfile::TempDir;
 use super::*;
 
 fn walk(root: &Path, config: &Config) -> anyhow::Result<Walk> {
-    discover(root, config, |_, _| Ok(()))
+    discover(root, &config.selection(), |_, _| Ok(()))
 }
 
 /// No `.gitignore`, so the walk sees every file.
@@ -101,7 +101,7 @@ fn default_include_selects_delivered_languages() {
 fn default_discovery_covers_the_v1_v2_union_and_keeps_exclusions() {
     let dir = tree(&[]);
     let inputs: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../../benchmarks/versions/port/languages/inputs.json"
+        "../../../../tests/fixtures/port/languages/inputs.json"
     ))
     .unwrap();
     let mut expected = std::collections::BTreeSet::new();
@@ -284,4 +284,50 @@ fn default_target_exclusion_is_rooted_and_custom_rules_stay_explicit() {
     );
     let old = config(&["**/*.rs"], &["**/target/**"]);
     assert!(walk(dir.path(), &old).unwrap().paths.is_empty());
+}
+
+#[test]
+fn operational_outputs_are_excluded_from_both_walks_under_explicit_includes() {
+    let files = [
+        ".mimirs/status",
+        ".mimirs/status.lock",
+        ".mimirs/status-owners/owner",
+        ".mimirs/watch/view.json",
+        ".mimirs/index.db",
+        ".mimirs/index.db-wal",
+        ".mimirs/staging.db-journal",
+        ".mimirs/.tmp-publication",
+        ".mimirs/knowledge/.tmp-settings",
+        ".mimirs/knowledge/repositories/claim/events/event.json",
+    ];
+    let mut entries = files.iter().map(|p| (*p, "generated")).collect::<Vec<_>>();
+    entries.extend([
+        (".mimirs/config.toml", "include=[]"),
+        (".mimirs/knowledge/settings.toml", "version=1"),
+        (".project.toml", "setting=1"),
+    ]);
+    let dir = tree(&entries);
+    let configuration = config(&[".mimirs/**", ".project.toml"], &[]);
+    let expected = vec![
+        ".mimirs/config.toml",
+        ".mimirs/knowledge/settings.toml",
+        ".project.toml",
+    ];
+    let found = discover(dir.path(), &configuration.selection(), |_, _| Ok(())).unwrap();
+    assert_eq!(found.paths, expected);
+    let cancel = crate::channel::Cancel::default();
+    let stream = stream::Stream::start(
+        dir.path(),
+        &configuration.selection(),
+        &crate::profiling::Profiler::default(),
+        &cancel,
+    )
+    .unwrap();
+    let paths = stream
+        .filter_map(|event| match event.unwrap() {
+            stream::Event::Path { path, .. } => Some(path),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(paths, expected);
 }

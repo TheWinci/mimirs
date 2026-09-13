@@ -106,7 +106,7 @@ fn cancelled_queued_files_never_reach_the_model() {
 
 #[test]
 fn worker_metrics_survive_file_completion_and_account_for_cancelled_work() {
-    let profile = Profiler::enabled();
+    let profile = Profiler::enabled(crate::embedding::model_identity());
     let (started, start) = mpsc::channel();
     let (release, released) = mpsc::channel();
     let released = Mutex::new(released);
@@ -133,7 +133,7 @@ fn worker_metrics_survive_file_completion_and_account_for_cancelled_work() {
 
 #[test]
 fn each_window_is_timed_until_dispatch_from_the_same_submission() {
-    let profile = Profiler::enabled();
+    let profile = Profiler::enabled(crate::embedding::model_identity());
     let shared = Shared {
         profile: profile.clone(),
         ..Shared::default()

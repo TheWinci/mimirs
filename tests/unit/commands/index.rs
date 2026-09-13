@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::rc::Rc;
+use std::time::Instant;
 
 use rusqlite::Connection;
 use tempfile::TempDir;
@@ -76,7 +77,7 @@ fn the_language_union_shares_reuse_replacement_and_failed_cleanup() {
     )
     .unwrap();
     let inputs: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../benchmarks/versions/port/languages/inputs.json"
+        "../../../tests/fixtures/port/languages/inputs.json"
     ))
     .unwrap();
     let mut paths = Vec::new();
@@ -1053,7 +1054,7 @@ fn profiling_preserves_index_output_and_tracks_reuse_and_partial_failure() {
     let (plain, stdout, _) = run(&a, backend(), false);
     plain.unwrap();
     for iteration in 0..3 {
-        let profile = Profiler::enabled();
+        let profile = Profiler::enabled(crate::embedding::model_identity());
         let mut output = Vec::new();
         let mut diagnostics = Vec::new();
         let mut model = backend();
@@ -1218,7 +1219,7 @@ fn javascript_dialects_share_storage_reuse_and_failed_replacement() {
 #[test]
 fn failed_profile_retains_measurements_for_committed_and_failed_files() {
     let dir = project(&[("a.rs", "fn a() {}"), ("b.rs", "fn b() {}")]);
-    let profile = Profiler::enabled();
+    let profile = Profiler::enabled(crate::embedding::model_identity());
     let mut model = backend();
     model.fail_on = Some("File: b.rs\nfn b() {}".into());
     let result = run_at_profiled(
@@ -1410,7 +1411,7 @@ fn bounded_pipeline_runs_files_concurrently_and_commits_in_source_order() {
         }
         ready
     });
-    let profile = Profiler::enabled();
+    let profile = Profiler::enabled(crate::embedding::model_identity());
     run_at_profiled(
         dir.path(),
         || Ok(Embedder::new(AsyncBackend { pool, limit: 3 })),
@@ -1493,7 +1494,7 @@ fn out_of_order_failure_preserves_earlier_commits_and_later_snapshots() {
         Ok(fake_vector(text))
     })
     .unwrap();
-    let profile = Profiler::enabled();
+    let profile = Profiler::enabled(crate::embedding::model_identity());
     let result = run_at_profiled(
         dir.path(),
         || Ok(Embedder::new(AsyncBackend { pool, limit: 3 })),
@@ -1522,7 +1523,7 @@ fn streamed_index_reads_source_before_discovery_finishes() {
     for n in 0..200 {
         fs::write(dir.path().join(format!("f{n:03}.rs")), "fn example() {}\n").unwrap();
     }
-    let profile = Profiler::enabled();
+    let profile = Profiler::enabled(crate::embedding::model_identity());
     let mut stderr = Vec::new();
     let mut progress = Progress::new(dir.path(), &mut stderr, false, &|| Duration::ZERO);
     let first = std::cell::Cell::new(true);
@@ -1609,7 +1610,7 @@ fn parallel_stages_overlap_and_commit_in_source_order() {
         }
         ready
     });
-    let profile = Profiler::enabled();
+    let profile = Profiler::enabled(crate::embedding::model_identity());
     run_parallel_test(
         dir.path(),
         || Ok(Embedder::new(AsyncBackend { pool, limit: 3 })),
@@ -1697,7 +1698,7 @@ fn parallel_failure_preserves_earlier_commits_and_later_snapshots() {
         Ok(fake_vector(text))
     })
     .unwrap();
-    let profile = Profiler::enabled();
+    let profile = Profiler::enabled(crate::embedding::model_identity());
     let result = run_parallel_test(
         dir.path(),
         || Ok(Embedder::new(AsyncBackend { pool, limit: 3 })),
@@ -1960,7 +1961,7 @@ fn full_writer_queue_cancels_without_deadlock() {
     for i in 0..30 {
         fs::write(dir.path().join(format!("{i:02}.rs")), "new snapshot").unwrap();
     }
-    let profile = Profiler::enabled();
+    let profile = Profiler::enabled(crate::embedding::model_identity());
     let mut output = ClosedWriter {
         profile: profile.clone(),
         filled: false,
@@ -2009,13 +2010,13 @@ fn writer_cache_release_is_limited_to_incremental_publications() {
         )
         .unwrap();
     };
-    let profile = Profiler::enabled();
+    let profile = Profiler::enabled(crate::embedding::model_identity());
     invoke(&profile);
     let report = profile.finish(None).unwrap();
     assert!(!report.counters.contains_key("writer_cache_releases"));
     fs::write(dir.path().join("a.rs"), "updated a").unwrap();
     fs::write(dir.path().join("c.rs"), "new file").unwrap();
-    let profile = Profiler::enabled();
+    let profile = Profiler::enabled(crate::embedding::model_identity());
     invoke(&profile);
     let report = profile.finish(None).unwrap();
     assert_eq!(report.counters["writer_cache_releases"], 2);
@@ -2029,7 +2030,7 @@ fn writer_cache_release_is_limited_to_incremental_publications() {
             ("c.rs".into(), "new file".into())
         ]
     );
-    let profile = Profiler::enabled();
+    let profile = Profiler::enabled(crate::embedding::model_identity());
     invoke(&profile);
     let report = profile.finish(None).unwrap();
     assert!(!report.counters.contains_key("writer_cache_releases"));

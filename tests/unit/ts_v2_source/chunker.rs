@@ -3,7 +3,7 @@ use serde_json::{Value, json};
 
 fn cases() -> Vec<Value> {
     let reference: Value = serde_json::from_str(include_str!(
-        "../../../benchmarks/versions/port/chunker/reference.json"
+        "../../../tests/fixtures/port/chunker/reference.json"
     ))
     .unwrap();
     reference["cases"].as_array().unwrap().clone()
@@ -16,7 +16,7 @@ fn source(case: &Value) -> String {
         .replace("tests/fixtures/", "tests/fixtures/ts-v2-chunker/");
     let raw = std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(path))
         .unwrap();
-    let normalized = crate::retrieval::normalized::Source::new(&raw);
+    let normalized = crate::source::normalized::Source::new(&raw);
     assert_eq!(normalized.text, case["source"].as_str().unwrap());
     normalized.text
 }
@@ -35,7 +35,7 @@ fn check(language: &str) {
             text: source(&case),
         })
         .unwrap();
-        crate::storage::analysis::validate(&result).unwrap();
+        crate::analysis::validation::validate(&result).unwrap();
         let actual: Vec<_> = result
             .source_chunks
             .iter()
@@ -93,7 +93,7 @@ fn facts(language: &str) {
             text: source(&case),
         })
         .unwrap();
-        crate::storage::analysis::validate(&result).unwrap();
+        crate::analysis::validation::validate(&result).unwrap();
         assert_eq!(json!(result.source_facts), case["facts"], "{path}");
     }
 }
@@ -264,7 +264,7 @@ fn every_language_fact_survives_raw_offsets_and_storage_round_trips() {
         let path = case["path"].as_str().unwrap();
         let text = source(&case);
         let raw = format!("\u{feff}{}", text.replace('\n', "\r\n"));
-        let normalized = crate::retrieval::normalized::Source::new(&raw);
+        let normalized = crate::source::normalized::Source::new(&raw);
         let result = analysis::extract(SourceFile {
             path: path.into(),
             text: raw,

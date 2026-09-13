@@ -1,6 +1,6 @@
 //! Unmodified TS fixtures and goldens, exercised through production dispatch.
 use super::*;
-use crate::{analysis, retrieval::normalized::Source, source::SourceFile};
+use crate::{analysis, source::SourceFile, source::normalized::Source};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::{collections::BTreeSet, path::Path};
@@ -28,7 +28,7 @@ fn cases() -> Vec<Case> {
         cases: Vec<Case>,
     }
     serde_json::from_str::<Reference>(include_str!(
-        "../../../benchmarks/versions/port/source-windows/reference.json"
+        "../../../tests/fixtures/port/source-windows/reference.json"
     ))
     .unwrap()
     .cases
@@ -53,7 +53,7 @@ fn check(case: &Case, raw: &str, render_golden: bool) {
         text: raw.into(),
     })
     .unwrap();
-    crate::storage::analysis::validate(&analysis).unwrap();
+    crate::analysis::validation::validate(&analysis).unwrap();
     let chunks = &analysis.source_chunks;
     let actual: Vec<_> = chunks
         .iter()
@@ -214,7 +214,7 @@ fn every_archived_fixture_and_golden_is_checked_without_changes() {
     let cases = cases();
     assert_eq!(cases.len(), 84);
     let reference: Value = serde_json::from_str(include_str!(
-        "../../../benchmarks/versions/port/source-windows/reference.json"
+        "../../../tests/fixtures/port/source-windows/reference.json"
     ))
     .unwrap();
     for extension in reference["extensions"].as_array().unwrap() {

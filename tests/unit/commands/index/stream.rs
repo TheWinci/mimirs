@@ -1,4 +1,5 @@
 use super::*;
+use crate::config::Config;
 use std::fs;
 
 #[test]
@@ -19,12 +20,12 @@ fn streamed_order_matches_complete_path_sort_across_directory_boundaries() {
         fs::write(path, "text").unwrap();
     }
     let config = Config::default();
-    let expected = crate::commands::index::walk::discover(root.path(), &config, |_, _| Ok(()))
+    let expected = crate::source::walk::discover(root.path(), &config.selection(), |_, _| Ok(()))
         .unwrap()
         .paths;
     let stream = Stream::start(
         root.path(),
-        &config,
+        &config.selection(),
         &Profiler::default(),
         &Cancel::default(),
     )
@@ -57,7 +58,7 @@ fn dropping_a_partially_consumed_stream_joins_a_blocked_walker() {
     let cancel = Cancel::default();
     let mut stream = Stream::start(
         root.path(),
-        &Config::default(),
+        &Config::default().selection(),
         &Profiler::default(),
         &cancel,
     )

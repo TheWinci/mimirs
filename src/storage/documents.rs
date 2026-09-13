@@ -77,7 +77,7 @@ fn save_inner(
 }
 
 pub fn validate(analysis: &Analysis, documents: &[Document]) -> Result<()> {
-    super::analysis::validate(analysis)?;
+    crate::analysis::validation::validate(analysis)?;
     let mut parts = std::collections::HashMap::new();
     let lines = crate::analysis::LineIndex::new(&analysis.source.text);
     for document in documents {

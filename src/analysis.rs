@@ -6,12 +6,13 @@ use crate::source::SourceFile;
 pub(crate) mod formats;
 mod go;
 mod javascript;
-pub mod language;
+pub(crate) mod language;
 mod native;
 mod python;
-pub mod relationships;
+pub(crate) mod relationships;
 mod rust;
-pub mod source_facts;
+pub(crate) mod source_facts;
+pub(crate) mod structure;
 mod text;
 
 #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -138,7 +139,7 @@ impl Diagnostic {
 #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Analysis {
     pub source_facts: Vec<source_facts::Fact>,
-    pub source_chunks: Vec<crate::retrieval::ts_v2::Chunk>,
+    pub source_chunks: Vec<crate::analysis::chunks::Chunk>,
     pub source: SourceFile,
     pub diagnostics: Vec<Diagnostic>,
     pub entities: Vec<Entity>,
@@ -166,7 +167,7 @@ impl Analysis {
 }
 
 pub fn extract(source: SourceFile) -> Result<Analysis> {
-    let normalized = crate::retrieval::normalized::Source::new(&source.text);
+    let normalized = crate::source::normalized::Source::new(&source.text);
     let mut analysis = (language::for_path(&source.path).extract)(SourceFile {
         path: source.path.clone(),
         text: normalized.text.clone(),
@@ -314,3 +315,6 @@ pub fn report(analysis: &Analysis) -> String {
 #[cfg(test)]
 #[path = "../tests/unit/analysis.rs"]
 mod tests;
+
+pub(crate) mod chunks;
+pub(crate) mod validation;

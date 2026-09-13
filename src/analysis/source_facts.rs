@@ -1,7 +1,7 @@
 //! Source facts compatible with the TS language extractors. These are distinct
 //! from Rust's lower-level written-evidence records.
 use super::{LineIndex, Span};
-use crate::retrieval::ts_v2::Chunk;
+use crate::analysis::chunks::Chunk;
 use serde::{Deserialize, Serialize};
 use tree_sitter::Node;
 

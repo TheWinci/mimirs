@@ -1,7 +1,0 @@
-[
-  ["src/embedding.rs"],
-  ["src/storage/processing.rs"],
-  ["src/storage.rs"],
-  ["src/analysis/references.rs"],
-  ["src/storage/reconcile.rs", "src/storage.rs"]
-]

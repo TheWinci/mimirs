@@ -19,7 +19,7 @@ pub fn run(file: &Path, stored: bool, source_chunks: bool) -> anyhow::Result<()>
 
 fn report_at(root: &Path, file: &Path, stored: bool) -> anyhow::Result<String> {
     let analysis = load_at(root, file, stored)?;
-    let projection = crate::retrieval::project(&analysis)?;
+    let projection = crate::analysis::structure::project(&analysis)?;
     let mut report = analysis::report(projection.analysis);
     for relation in &projection.relations {
         report.push_str(&format!(

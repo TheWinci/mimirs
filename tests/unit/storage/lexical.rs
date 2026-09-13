@@ -1,10 +1,7 @@
 use super::*;
 
 fn reference() -> serde_json::Value {
-    serde_json::from_str(include_str!(
-        "../../../benchmarks/versions/port/reference.json"
-    ))
-    .unwrap()
+    serde_json::from_str(include_str!("../../../tests/fixtures/port/reference.json")).unwrap()
 }
 
 #[test]

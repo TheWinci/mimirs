@@ -66,7 +66,7 @@ fn registration_and_mapping_changes_invalidate_identity() {
 #[test]
 fn the_language_union_is_discoverable_with_explicit_fallback_formats() {
     let reference: serde_json::Value = serde_json::from_str(include_str!(
-        "../../benchmarks/versions/port/languages/inputs.json"
+        "../../tests/fixtures/port/languages/inputs.json"
     ))
     .unwrap();
     for case in reference.as_array().unwrap() {
@@ -104,7 +104,7 @@ fn mdx_headings_preserve_jsx_and_raw_source() {
         text: source.into(),
     })
     .unwrap();
-    crate::storage::analysis::validate(&result).unwrap();
+    crate::analysis::validation::validate(&result).unwrap();
     assert!(
         result
             .source_chunks

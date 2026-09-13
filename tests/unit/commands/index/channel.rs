@@ -5,7 +5,7 @@ use std::time::Duration;
 #[test]
 fn cancellation_wakes_full_producers_and_empty_consumers() {
     let cancel = Cancel::default();
-    let profile = Profiler::enabled();
+    let profile = Profiler::enabled(crate::embedding::model_identity());
     let (full_tx, _full_rx) = bounded(1, "full", &profile, &cancel);
     let (_empty_tx, empty_rx) = bounded::<usize>(1, "empty", &profile, &cancel);
     full_tx.send(1, 100).unwrap();
@@ -58,7 +58,7 @@ fn receiver_drop_and_late_channels_observe_cancellation() {
 #[test]
 fn residence_counts_dequeued_items_and_excludes_cancelled_items() {
     let cancel = Cancel::default();
-    let profile = Profiler::enabled();
+    let profile = Profiler::enabled(crate::embedding::model_identity());
     let (tx, rx) = bounded(2, "test", &profile, &cancel);
     tx.send(1, 1).unwrap();
     tx.send(2, 1).unwrap();

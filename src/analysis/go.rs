@@ -103,7 +103,7 @@ fn extract(source: SourceFile) -> Result<Analysis> {
         stack.extend(children.into_iter().rev().map(|child| (child, owner)));
     }
     analysis.facts.sort_by_key(|f| (f.span.start, f.span.end));
-    analysis.source_chunks = crate::retrieval::ts_v2::from_tree(
+    analysis.source_chunks = crate::analysis::chunks::from_tree(
         &analysis.source.text,
         tree.root_node(),
         &tree_sitter_go::LANGUAGE.into(),

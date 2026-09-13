@@ -19,7 +19,7 @@ fn killed_writer_releases_the_os_lock() {
     let mut child = Command::new(std::env::current_exe().unwrap())
         .args([
             "--exact",
-            "commands::index::lock::tests::lock_child",
+            "storage::writer::tests::lock_child",
             "--ignored",
             "--nocapture",
         ])
@@ -52,4 +52,18 @@ fn lock_child() {
     loop {
         std::thread::park();
     }
+}
+
+#[test]
+fn guard_release_does_not_wait_for_a_duplicated_child_descriptor() {
+    let root = tempfile::tempdir().unwrap();
+    let owner = acquire(root.path()).unwrap();
+    // A concurrent fork can temporarily retain the same open-file description.
+    let inherited = owner.0.try_clone().unwrap();
+    drop(owner);
+    let next = acquire(root.path()).unwrap();
+    drop(inherited);
+    assert!(acquire(root.path()).is_err());
+    drop(next);
+    acquire(root.path()).unwrap();
 }

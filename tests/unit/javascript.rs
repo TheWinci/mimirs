@@ -6,7 +6,7 @@ fn analyze(path: &str, text: &str) -> Analysis {
         text: text.into(),
     })
     .unwrap();
-    crate::storage::analysis::validate(&a).unwrap();
+    crate::analysis::validation::validate(&a).unwrap();
     a
 }
 

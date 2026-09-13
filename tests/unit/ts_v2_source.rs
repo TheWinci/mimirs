@@ -33,10 +33,8 @@ fn build(path: &str, source: &str) -> Vec<Chunk> {
 
 #[test]
 fn source_windows_match_ts_reference_before_inference() {
-    let reference: serde_json::Value = serde_json::from_str(include_str!(
-        "../../benchmarks/versions/port/reference.json"
-    ))
-    .unwrap();
+    let reference: serde_json::Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/port/reference.json")).unwrap();
     for case in reference["files"]
         .as_array()
         .unwrap()
@@ -57,7 +55,7 @@ fn source_windows_match_ts_reference_before_inference() {
                 .collect()
         });
         assert_eq!(windows.len(), expected.len(), "{path}");
-        let normalized = crate::retrieval::normalized::Source::new(source);
+        let normalized = crate::source::normalized::Source::new(source);
         for (window, expected) in windows.iter().zip(expected) {
             assert_eq!(
                 &source[window.start..window.end],

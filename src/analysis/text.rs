@@ -20,7 +20,7 @@ fn extract(source: SourceFile) -> Result<Analysis> {
     let lines = LineIndex::new(&source.text);
     let mut analysis = Analysis::new(source, &lines);
     analysis.source_chunks =
-        crate::retrieval::ts_v2::text_chunks(&analysis.source.text, &analysis.source.path);
+        crate::analysis::chunks::text_chunks(&analysis.source.text, &analysis.source.path);
     if std::path::Path::new(&analysis.source.path)
         .extension()
         .and_then(|value| value.to_str())

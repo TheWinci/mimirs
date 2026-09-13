@@ -283,7 +283,7 @@ fn real_workers_match_serial_vectors_and_load_sessions_only_when_needed() {
 #[ignore = "loads the real MiniLM model from the local cache"]
 fn real_worker_costs_cover_calls_and_preserve_unprofiled_vectors() {
     tokenizers::utils::parallelism::set_parallelism(false);
-    let profile = Profiler::enabled();
+    let profile = Profiler::enabled(crate::embedding::model_identity());
     let mut backend = OnnxBackend::new(model_cache_dir().unwrap());
     backend.ensure_models(1).unwrap();
     let texts = vec![

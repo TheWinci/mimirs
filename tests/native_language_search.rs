@@ -19,7 +19,7 @@ fn run(root: &Path, args: &[&str]) -> String {
 #[ignore = "loads the cached q8 model for focused native-language lifecycle checks"]
 fn native_language_search_uses_saved_source_and_reuses_unchanged_files() {
     let reference: Value = serde_json::from_str(include_str!(
-        "../benchmarks/versions/port/languages/reference.json"
+        "../tests/fixtures/port/languages/reference.json"
     ))
     .unwrap();
     let selected = std::env::var("MIMIRS_TEST_LANGUAGE").unwrap_or_else(|_| "java".into());
