@@ -235,6 +235,7 @@ impl Watcher {
         Ok(knowledge::fingerprint(&serde_json::to_vec(&json!({
             "evaluator":knowledge::evidence::current_identity(),"settings":metadata(&knowledge::settings::path(&options.root)),
             "repository":options.repository,"default_branch":options.default_branch,"state":options.state,
+            "local_identity":knowledge::settings::common_identity_path(&options.root)?.map(|p| metadata(&p)),
             "checkout":checkout,"segments":segments,
             "support":self.paths.iter().map(|p|(p,metadata(&options.root.join(p)))).collect::<BTreeMap<_,_>>()
         }))?))

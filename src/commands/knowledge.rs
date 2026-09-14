@@ -94,7 +94,7 @@ struct Maintenance {
 
 #[derive(Subcommand)]
 enum Action {
-    /// Save explicit local knowledge defaults without source-index or model setup.
+    /// Set up local knowledge once. Without --repository, create a Git-local identity shared by linked worktrees. Separate clones need an explicit shared --repository.
     Setup {
         #[arg(long)]
         registry: Option<PathBuf>,
@@ -285,7 +285,9 @@ fn run_value(
         Some(&settings.default_branch),
     )));
     let repository = settings.repository.ok_or_else(|| {
-        anyhow::anyhow!("supply --repository or run mimirs knowledge setup --repository ID")
+        anyhow::anyhow!(
+            "run mimirs knowledge setup once, or supply --repository for a shared identity"
+        )
     })?;
     let state = options
         .state

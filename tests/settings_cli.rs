@@ -148,7 +148,7 @@ fn configured_two_checkout_exchange_review_dedup_and_override_isolation() {
         .unwrap();
     assert!(tracked.status.success());
     assert!(tracked.stdout.is_empty());
-    let context = f.run("b", &["context", "reader bytes"]);
+    let context = f.run("b", &["context", "--output", "json", "reader bytes"]);
     assert_eq!(context["source"]["retrieval"], "failed");
     assert_eq!(
         context["knowledge"]["items"][0]["status"],
@@ -197,7 +197,7 @@ fn configured_two_checkout_exchange_review_dedup_and_override_isolation() {
         1
     );
     assert_eq!(
-        f.run("a", &["context", "reader bytes"])["knowledge"]["items"][0]["status"],
+        f.run("a", &["context", "--output", "json", "reader bytes"])["knowledge"]["items"][0]["status"],
         "Verified"
     );
     let override_dir = f.root("alternate-registry");
@@ -289,7 +289,7 @@ fn missing_invalid_and_unavailable_settings_fail_actionably_without_overwrite() 
         let bad = f.output("a", &["knowledge", "setup", "--repository", "repair"]);
         assert!(!bad.status.success());
         assert_eq!(fs::read_to_string(&path).unwrap(), text);
-        let context = f.run("a", &["context", "reader"]);
+        let context = f.run("a", &["context", "--output", "json", "reader"]);
         assert_eq!(context["knowledge"]["status"], "unavailable");
         assert!(
             context["knowledge"]["error"]
@@ -301,4 +301,80 @@ fn missing_invalid_and_unavailable_settings_fail_actionably_without_overwrite() 
     fs::remove_file(&path).unwrap();
     fs::create_dir(&path).unwrap();
     assert!(!f.output("a", &["knowledge", "orient"]).status.success());
+}
+
+#[test]
+fn local_setup_is_shared_by_worktrees_but_independent_across_clones() {
+    let f = Fixture::new();
+    let metadata = f.root("a").join(".git/mimirs-local-identity.json");
+    assert!(!metadata.exists());
+    let context = f.run("a", &["context", "--output", "json", "reader"]);
+    assert_eq!(context["knowledge"]["status"], "not_configured");
+    assert!(!metadata.exists());
+    assert!(!f.root("a").join(".mimirs/knowledge/repositories").exists());
+    let first = f.run("a", &["knowledge", "setup", "--default-branch", "trunk"]);
+    assert!(first["repository"].as_str().unwrap().starts_with("local/"));
+    let bytes = fs::read(&metadata).unwrap();
+    assert_eq!(
+        f.run("a", &["knowledge", "setup"])["repository"],
+        first["repository"]
+    );
+    assert_eq!(fs::read(&metadata).unwrap(), bytes);
+    assert_ne!(
+        f.run("b", &["knowledge", "setup"])["repository"],
+        first["repository"]
+    );
+    git(
+        &f.root("a"),
+        &[
+            "worktree",
+            "add",
+            "-b",
+            "linked",
+            f.root("linked").to_str().unwrap(),
+        ],
+    );
+    // Read-only orientation discovers the common identity without saving local defaults.
+    let orient = f.output("linked", &["knowledge", "orient"]);
+    assert!(!String::from_utf8_lossy(&orient.stderr).contains("supply --repository"));
+    assert!(
+        !f.root("linked")
+            .join(".mimirs/knowledge/settings.toml")
+            .exists()
+    );
+    assert_eq!(
+        f.run("linked", &["knowledge", "setup"])["repository"],
+        first["repository"]
+    );
+    assert_eq!(fs::read(metadata).unwrap(), bytes);
+}
+
+#[test]
+fn concurrent_local_setup_has_one_identity_and_corrupt_metadata_is_actionable() {
+    let f = Fixture::new();
+    let results = std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..4)
+            .map(|_| scope.spawn(|| f.run("a", &["knowledge", "setup"])))
+            .collect();
+        handles
+            .into_iter()
+            .map(|h| h.join().unwrap()["repository"].clone())
+            .collect::<Vec<_>>()
+    });
+    assert!(results.iter().all(|r| r == &results[0]));
+    fs::remove_file(f.root("a").join(".mimirs/knowledge/settings.toml")).unwrap();
+    let metadata = f.root("a").join(".git/mimirs-local-identity.json");
+    fs::write(&metadata, "corrupt").unwrap();
+    let result = f.output("a", &["knowledge", "setup"]);
+    assert!(!result.status.success());
+    assert!(String::from_utf8_lossy(&result.stderr).contains("repair"));
+    assert_eq!(fs::read(&metadata).unwrap(), b"corrupt");
+    // An explicitly chosen identity remains authoritative over the local fallback.
+    assert_eq!(
+        f.run(
+            "a",
+            &["knowledge", "setup", "--repository", "explicit/shared"]
+        )["repository"],
+        "explicit/shared"
+    );
 }

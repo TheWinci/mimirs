@@ -61,7 +61,7 @@ fn initialize(
     prepare_model()?;
     println!("embedding model ready: {}", embedding::MODEL_NAME);
     println!(
-        "Next: run mimirs index, then mimirs context \"your task\". Use --knowledge off for source-only context."
+        "Next: run mimirs index, then mimirs context \"your task\". Run mimirs knowledge setup once for local knowledge, or use --repository ID to share across clones. Use --knowledge off for source-only context."
     );
 
     Ok(())
