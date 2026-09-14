@@ -252,7 +252,11 @@ fn v1_snapshot_import_retains_history_without_resolution_or_health_claims() {
     assert_eq!(view["version"], 2);
     assert_eq!(view["failures"][0]["reason"], "prior failure");
     assert!(view["failures"][0].get("resolved_at").is_none());
-    assert_eq!(view["components"]["knowledge"]["status"], "unknown");
+    assert_eq!(view["components"]["knowledge"]["status"], "unconfigured");
+    assert_eq!(
+        load(root).unwrap().unwrap().components["knowledge"].status,
+        "unknown"
+    );
     assert_eq!(before, fs::read(path(root)).unwrap());
 }
 #[test]
@@ -276,4 +280,100 @@ fn active_registry_is_bounded_without_replacing_live_owners() {
     for a in &mut activities {
         a.finish("success", None, None, None);
     }
+}
+
+#[test]
+fn legacy_history_migrates_without_changing_legacy_bytes_and_canonical_wins() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().canonicalize().unwrap();
+    let mut activity = Activity::start(&root, "old", "source");
+    activity.finish("success", None, None, None);
+    drop(activity);
+    let legacy = root.join(".mimirs/status");
+    fs::rename(path(&root), &legacy).unwrap();
+    let bytes = fs::read(&legacy).unwrap();
+    assert_eq!(
+        load(&root)
+            .unwrap()
+            .unwrap()
+            .last_success
+            .unwrap()
+            .operation,
+        "old"
+    );
+    update(&root, |s| {
+        s.observe("source", "observed", "new observation", now(), None)
+    })
+    .unwrap();
+    assert_eq!(fs::read(&legacy).unwrap(), bytes);
+    assert!(path(&root).is_file());
+    fs::write(path(&root), "corrupt").unwrap();
+    assert!(load(&root).is_err());
+}
+
+#[test]
+fn migration_defers_for_a_held_legacy_owner_even_with_an_expired_heartbeat() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().canonicalize().unwrap();
+    let mut activity = Activity::start(&root, "old", "source");
+    let mut snapshot = load(&root).unwrap().unwrap();
+    for active in snapshot.activities.values_mut() {
+        active.heartbeat_at = 0;
+    }
+    let legacy = root.join(".mimirs/status");
+    fs::write(&legacy, serde_json::to_vec(&snapshot).unwrap()).unwrap();
+    fs::remove_file(path(&root)).unwrap();
+    let bytes = fs::read(&legacy).unwrap();
+    assert!(
+        update(&root, |_| {})
+            .unwrap_err()
+            .to_string()
+            .contains("deferred")
+    );
+    assert!(!path(&root).exists());
+    assert_eq!(fs::read(&legacy).unwrap(), bytes);
+    assert!(
+        read(&root, now())["diagnostic"]
+            .as_str()
+            .unwrap()
+            .contains("legacy")
+    );
+    activity.finish("success", None, None, None);
+    drop(activity);
+    update(&root, |s| {
+        s.observe("source", "observed", "new observation", now(), None)
+    })
+    .unwrap();
+    assert!(path(&root).exists());
+    assert_eq!(fs::read(&legacy).unwrap(), bytes);
+}
+
+#[test]
+fn customized_ignore_rules_must_cover_canonical_temporary_and_legacy_paths() {
+    let dir = tempfile::tempdir().unwrap();
+    assert!(
+        std::process::Command::new("git")
+            .args(["init", "-q"])
+            .arg(dir.path())
+            .status()
+            .unwrap()
+            .success()
+    );
+    fs::create_dir(dir.path().join(".mimirs")).unwrap();
+    let ignore = dir.path().join(".mimirs/.gitignore");
+    fs::write(&ignore, "status\nstatus.lock\nstatus-owners/\n").unwrap();
+    assert!(
+        directory(dir.path())
+            .unwrap_err()
+            .to_string()
+            .contains("not ignored")
+    );
+    fs::write(
+        &ignore,
+        "status\nstatus.json\nstatus.json.tmp-*\nstatus.lock\nstatus-owners/\n",
+    )
+    .unwrap();
+    let before = fs::read(&ignore).unwrap();
+    directory(dir.path()).unwrap();
+    assert_eq!(fs::read(ignore).unwrap(), before);
 }

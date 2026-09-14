@@ -43,8 +43,10 @@ pub(crate) fn operational(path: &Path) -> bool {
             .any(|name| path == *name || path.starts_with(&format!("{name}-")))
         || matches!(
             path,
-            "status" | "status.lock" | "index.lock" | "knowledge/settings.lock"
+            "status" | "status.json" | "status.lock" | "index.lock" | "knowledge/settings.lock"
         )
+        || path.starts_with("status.json.tmp-")
+        || path.starts_with("status.tmp-")
         || path.starts_with(".tmp")
         || path.starts_with("knowledge/.tmp")
 }

@@ -188,12 +188,15 @@ fn next(component: &str) -> &'static str {
     }
 }
 fn path(root: &Path) -> PathBuf {
-    root.join(".mimirs/status")
+    root.join(".mimirs/status.json")
 }
 fn load(root: &Path) -> Result<Option<Snapshot>> {
     let canonical = root.canonicalize()?;
     let root = canonical.as_path();
-    let path = path(root);
+    let path = match fs::symlink_metadata(path(root)) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => root.join(".mimirs/status"),
+        _ => path(root),
+    };
     let metadata = match fs::symlink_metadata(&path) {
         Ok(m) => m,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -268,6 +271,8 @@ fn directory(root: &Path) -> Result<PathBuf> {
     if fs::read_to_string(&ignore)?.trim() != "*" {
         let paths = [
             ".mimirs/status",
+            ".mimirs/status.json",
+            ".mimirs/status.json.tmp-probe",
             ".mimirs/status.lock",
             ".mimirs/status-owners/",
         ];
@@ -284,7 +289,7 @@ fn directory(root: &Path) -> Result<PathBuf> {
                         .filter(|line| !line.is_empty())
                         .count()
                         == paths.len(),
-                "status paths are not ignored; add status, status.lock and status-owners/ to .mimirs/.gitignore"
+                "status paths are not ignored; add status, status.json, status.json.tmp-*, status.lock and status-owners/ to .mimirs/.gitignore"
             );
         }
     }
@@ -319,6 +324,15 @@ fn update(root: &Path, edit: impl FnOnce(&mut Snapshot)) -> Result<()> {
     ensure!(acquired, "status writer is busy; diagnostic update skipped");
     let result = (|| -> Result<()> {
         let mut snapshot = load(root)?.unwrap_or_else(|| Snapshot::new(root));
+        if !path(root).try_exists()? {
+            ensure!(
+                snapshot
+                    .activities
+                    .values()
+                    .all(|active| view::lease(root, active, now()).0 == "stopped"),
+                "legacy status writer may still own activity; migration to status.json is deferred until it stops; cross-version activity cannot be combined"
+            );
+        }
         let before = serde_json::to_vec(&snapshot)?;
         edit(&mut snapshot);
         if serde_json::to_vec(&snapshot)? == before {
@@ -330,7 +344,9 @@ fn update(root: &Path, edit: impl FnOnce(&mut Snapshot)) -> Result<()> {
             bytes.len() < MAX_BYTES,
             "status snapshot exceeds its bounded capacity"
         );
-        let mut file = tempfile::NamedTempFile::new_in(&directory)?;
+        let mut file = tempfile::Builder::new()
+            .prefix("status.json.tmp-")
+            .tempfile_in(&directory)?;
         file.write_all(&bytes)?;
         file.write_all(b"\n")?;
         // Atomic visibility is required; this disposable snapshot is not a durable journal.
@@ -343,7 +359,7 @@ fn update(root: &Path, edit: impl FnOnce(&mut Snapshot)) -> Result<()> {
 fn warn(result: Result<()>) {
     if let Err(error) = result {
         eprintln!(
-            "status diagnostic: {}; operation outcome is unchanged. See .mimirs/status or mimirs status",
+            "status diagnostic: {}; operation outcome is unchanged. See .mimirs/status.json or mimirs status",
             bounded(&error.to_string(), 384)
         );
     }

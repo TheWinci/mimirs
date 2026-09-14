@@ -54,6 +54,13 @@ pub(crate) fn read(root: &Path, time: u64) -> Value {
     } else {
         "missing"
     });
+    let legacy = !path(&root).exists() && root.join(".mimirs/status").exists();
+    let diagnostic = diagnostic.or_else(|| (legacy && snapshot.activities.values().any(|a| lease(&root, a, time).0 != "stopped")).then(|| "legacy writer may still own activity; migration is deferred and cross-version activity cannot be combined".into()));
+    value["snapshot_path"] = json!(if legacy {
+        ".mimirs/status"
+    } else {
+        ".mimirs/status.json"
+    });
     value["diagnostic"] = json!(diagnostic);
     value["contract"] = json!(
         "Saved operation results are historical. Activity requires a held observation lease and a recent heartbeat. Status does not prove source freshness, index ownership or claim truth."

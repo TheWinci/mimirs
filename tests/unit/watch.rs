@@ -649,7 +649,7 @@ fn status_model_failure_and_retry_use_the_vector_component() {
     assert!(!failed.errors.is_empty());
     let read = || {
         serde_json::from_slice::<serde_json::Value>(
-            &std::fs::read(o.root.join(".mimirs/status")).unwrap(),
+            &std::fs::read(o.root.join(".mimirs/status.json")).unwrap(),
         )
         .unwrap()
     };

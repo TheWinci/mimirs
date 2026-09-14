@@ -85,11 +85,14 @@ fn status_before_setup_after_learning_and_when_unwritable_is_safe() {
             .unwrap()
             .contains("source content must not appear")
     );
-    let before = fs::read(t.path().join(".mimirs/status")).unwrap();
+    let before = fs::read(t.path().join(".mimirs/status.json")).unwrap();
     status(t.path());
-    assert_eq!(before, fs::read(t.path().join(".mimirs/status")).unwrap());
-    fs::remove_file(t.path().join(".mimirs/status")).unwrap();
-    fs::create_dir(t.path().join(".mimirs/status")).unwrap();
+    assert_eq!(
+        before,
+        fs::read(t.path().join(".mimirs/status.json")).unwrap()
+    );
+    fs::remove_file(t.path().join(".mimirs/status.json")).unwrap();
+    fs::create_dir(t.path().join(".mimirs/status.json")).unwrap();
     assert!(learn(t.path())["knowledge_id"].is_string());
     assert_eq!(status(t.path())["snapshot"], "unavailable");
 }
@@ -234,7 +237,7 @@ fn context_targets_keep_a_failures_historical_after_b_and_a_success() {
     fs::write(&journal, "corrupt").unwrap();
     let context = |repo: &str, state: &Path, branch: &str, mode: &str| {
         let out = Command::new(env!("CARGO_BIN_EXE_mimirs"))
-            .args(["context", "evidence", "--root"])
+            .args(["context", "--output", "json", "evidence", "--root"])
             .arg(t.path())
             .args(["--repository", repo, "--state"])
             .arg(state)
@@ -259,17 +262,13 @@ fn context_targets_keep_a_failures_historical_after_b_and_a_success() {
     );
     let view = status(t.path());
     assert_eq!(view["failures"], history);
+    assert_eq!(view["components"]["knowledge"]["status"], "unconfigured");
+    assert!(view["components"]["knowledge"]["target"]["repository"].is_null());
+    let persisted: Value =
+        serde_json::from_slice(&fs::read(t.path().join(".mimirs/status.json")).unwrap()).unwrap();
     assert_eq!(
-        view["components"]["knowledge"]["target"]["repository"],
+        persisted["components"]["knowledge"]["target"]["repository"],
         "test/b"
-    );
-    assert_eq!(
-        view["components"]["knowledge"]["target"]["state"],
-        b.to_str().unwrap()
-    );
-    assert_eq!(
-        view["components"]["knowledge"]["target"]["default_branch"],
-        "other-default"
     );
     fs::write(&journal, &saved).unwrap();
     assert_ne!(
@@ -277,9 +276,72 @@ fn context_targets_keep_a_failures_historical_after_b_and_a_success() {
         "unavailable"
     );
     assert_eq!(status(t.path())["failures"], history);
+    let before: Value =
+        serde_json::from_slice(&fs::read(t.path().join(".mimirs/status.json")).unwrap()).unwrap();
     context("test/a", &a, "main", "off");
+    let after: Value =
+        serde_json::from_slice(&fs::read(t.path().join(".mimirs/status.json")).unwrap()).unwrap();
+    assert_eq!(
+        before["components"]["knowledge"],
+        after["components"]["knowledge"]
+    );
     let view = status(t.path());
-    assert_eq!(view["components"]["knowledge"]["status"], "disabled");
+    assert_eq!(view["components"]["knowledge"]["status"], "unconfigured");
     assert_eq!(view["failures"], history);
     assert_eq!(fs::read(journal).unwrap(), saved);
+}
+
+#[test]
+fn setup_assessment_and_consumption_have_separate_status_states() {
+    let t = project();
+    let run = |args: &[&str]| {
+        let out = Command::new(env!("CARGO_BIN_EXE_mimirs"))
+            .current_dir(t.path())
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        out
+    };
+    assert_eq!(
+        status(t.path())["components"]["relationships"]["status"],
+        "absent"
+    );
+    run(&["knowledge", "setup"]);
+    assert_eq!(
+        status(t.path())["components"]["knowledge"]["status"],
+        "not_yet_assessed"
+    );
+    run(&["context", "--output", "json", "reader"]);
+    assert_eq!(
+        status(t.path())["components"]["knowledge"]["status"],
+        "configured_empty"
+    );
+    fs::write(
+        t.path().join(".mimirs/config.toml"),
+        "[context]\nknowledge='off'\n",
+    )
+    .unwrap();
+    run(&["context", "--output", "json", "reader"]);
+    let view = status(t.path());
+    assert_eq!(
+        view["components"]["knowledge"]["status"],
+        "configured_empty"
+    );
+    assert_eq!(view["components"]["knowledge"]["consumption"], "off");
+    // Cheap status does not parse a graph merely because a file exists.
+    fs::create_dir_all(t.path().join(".mimirs/watch")).unwrap();
+    fs::write(
+        t.path().join(".mimirs/watch/relationships.json"),
+        "not JSON",
+    )
+    .unwrap();
+    assert_eq!(
+        status(t.path())["components"]["relationships"]["status"],
+        "unvalidated"
+    );
 }

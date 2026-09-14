@@ -18,6 +18,7 @@ pub struct Activity {
     last_flush: u64,
     finished: bool,
     warning: Arc<Mutex<Option<String>>>,
+    deferred_warnings: bool,
 }
 fn flush(root: &Path, key: &str, pending: &Pending) -> Result<()> {
     update(root, |snapshot| {
@@ -85,6 +86,7 @@ impl Activity {
             last_flush: now(),
             finished: false,
             warning,
+            deferred_warnings: false,
         };
         let setup = (|| -> Result<()> {
             let directory = directory(&value.root)?.join("status-owners");
@@ -160,6 +162,27 @@ impl Activity {
         }));
         value
     }
+    pub(crate) fn defer_warnings(&mut self) {
+        self.deferred_warnings = true;
+    }
+    pub(crate) fn resume_warnings(&mut self) {
+        self.deferred_warnings = false;
+        if let Some(error) = self.take_warning() {
+            super::warn(Err(anyhow::anyhow!(error)));
+        }
+    }
+    pub(crate) fn take_warning(&self) -> Option<String> {
+        self.warning.lock().unwrap().take()
+    }
+    fn warn(&self, result: Result<()>) {
+        if self.deferred_warnings {
+            if let Err(error) = result {
+                *self.warning.lock().unwrap() = Some(bounded(&error.to_string(), 384));
+            }
+        } else {
+            super::warn(result);
+        }
+    }
     pub fn completion(&mut self, observations: &[(&str, &str, &str)]) {
         self.pending.lock().unwrap().completion = Some(
             observations
@@ -191,20 +214,22 @@ impl Activity {
         self.pending.lock().unwrap().indexed = Some(event);
         self.flush(false);
     }
-    fn flush(&mut self, force: bool) {
+    pub(crate) fn flush(&mut self, force: bool) {
         if self.lease.is_none() {
             return;
         }
         if force || now().saturating_sub(self.last_flush) >= 500 {
-            warn(flush(
+            self.warn(flush(
                 &self.root,
                 &self.key,
                 &self.pending.lock().unwrap().clone(),
             ));
             self.last_flush = now();
         }
-        if let Some(error) = self.warning.lock().unwrap().take() {
-            warn(Err(anyhow::anyhow!(error)));
+        if !self.deferred_warnings
+            && let Some(error) = self.take_warning()
+        {
+            super::warn(Err(anyhow::anyhow!(error)));
         }
     }
     #[allow(clippy::too_many_arguments)]
@@ -246,7 +271,7 @@ impl Activity {
         reason: Option<&str>,
     ) {
         let event = self.event(operation, component, outcome, reason, None, None, None);
-        warn(update(&self.root, |s| {
+        self.warn(update(&self.root, |s| {
             s.record(event);
             s.observe(
                 component,
@@ -266,7 +291,7 @@ impl Activity {
         self.record(operation, &component, "failure", Some(reason));
     }
     pub fn observe(&self, component: &str, status: &str, basis: &str) {
-        warn(update(&self.root, |s| {
+        self.warn(update(&self.root, |s| {
             s.observe(
                 component,
                 status,
@@ -304,7 +329,7 @@ impl Activity {
             preview,
             None,
         );
-        warn(update(&self.root, |s| {
+        self.warn(update(&self.root, |s| {
             let current = s
                 .activities
                 .get(&self.key)

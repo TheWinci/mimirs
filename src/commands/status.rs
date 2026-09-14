@@ -15,23 +15,18 @@ pub struct Options {
 pub(crate) fn read(root: &Path, time: u64) -> serde_json::Value {
     let root = root.canonicalize().unwrap_or_else(|_| root.into());
     let mut value = crate::status::read(&root, time);
-    if value["snapshot"] != "saved" {
-        for component in ["source", "analysis", "vectors_model", "relationships"] {
-            value["components"][component]["status"] = if root.join(".mimirs/index.db").exists() {
-                "unknown"
-            } else {
-                "not_configured"
-            }
-            .into();
+    value["components"]["relationships"] =
+        crate::index::graph::observation(&root, &value["components"]["relationships"]);
+    value["components"]["knowledge"] =
+        crate::knowledge::settings::observation(&root, &value["components"]["knowledge"]);
+    value["components"]["knowledge"]["at"] = time.into();
+    value["components"]["knowledge"]["consumption"] =
+        match crate::config::knowledge_mode(&root, None) {
+            Ok(crate::config::KnowledgeMode::Off) => "off",
+            Ok(crate::config::KnowledgeMode::Auto) => "auto",
+            Err(_) => "unavailable",
         }
-        value["components"]["knowledge"]["status"] =
-            if crate::knowledge::settings::path(&root).exists() {
-                "unknown"
-            } else {
-                "not_configured"
-            }
-            .into();
-    }
+        .into();
     value
 }
 pub fn run(options: Options) -> Result<()> {
@@ -47,10 +42,11 @@ pub fn run(options: Options) -> Result<()> {
         return Ok(());
     }
     println!(
-        "Mimirs: {}\nCheckout: {}\nUpdated: {}\nSnapshot: .mimirs/status ({})",
+        "Mimirs: {}\nCheckout: {}\nUpdated: {}\nSnapshot: {} ({})",
         env!("CARGO_PKG_VERSION"),
         bounded(value["checkout"].as_str().unwrap_or("."), 1024),
         value["updated_utc"].as_str().unwrap(),
+        value["snapshot_path"].as_str().unwrap(),
         value["snapshot"].as_str().unwrap()
     );
     if let Some(error) = value["diagnostic"].as_str() {

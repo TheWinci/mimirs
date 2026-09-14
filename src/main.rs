@@ -31,7 +31,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Read .mimirs/status without loading a model or assessing source.
+    /// Read .mimirs/status.json without loading a model or assessing source.
     Status(commands::status::Options),
     /// Reconcile source, vectors, relationships and mechanical knowledge state.
     Watch(Box<watch::Options>),
