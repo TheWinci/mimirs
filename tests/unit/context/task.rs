@@ -46,6 +46,8 @@ fn knowledge_preference_and_explicit_off_skip_loading_and_reallocate_source() {
 
 fn request(f: &Fixture) -> Request<'_> {
     Request {
+        output: Output::Json,
+        intent: crate::retrieval::navigation::Intent::Auto,
         root: &f.root,
         query: "read bytes",
         knowledge: None,
@@ -343,4 +345,451 @@ fn complete_claims_with_shared_support_fit_without_duplicate_fingerprints() {
             .contains("snapshot")
     );
     assert!(size(&value) <= DEFAULT_BYTES);
+}
+
+#[test]
+fn readable_context_preserves_source_lines_whole_claims_and_budgets() {
+    let mut f = Fixture::new();
+    let statement = "Read bytes without changing offsets.";
+    f.learn(statement, None, &["reader.rs"]);
+    f.index(&[(
+        "reader.rs",
+        "fn read_bytes() {\n    preserve_original();\n}\n",
+    )]);
+    for budget in [1024, 2048, DEFAULT_BYTES] {
+        let mut r = request(&f);
+        r.output = Output::Text;
+        r.max_bytes = budget;
+        let value = execute(&r, &mut Retriever::default(), fixed).unwrap();
+        let text = crate::context::text::render(&value, budget);
+        assert!(text.len() <= budget);
+        if !value["knowledge"]["items"].as_array().unwrap().is_empty() {
+            assert!(text.contains(statement));
+        }
+        if budget == DEFAULT_BYTES {
+            assert!(
+                text.contains("fn read_bytes() {\n    preserve_original();\n}"),
+                "{text}"
+            );
+            assert!(text.contains("reader.rs:"));
+            assert!(!text.contains("navigation_bytes"));
+            assert!(!text.contains("evidence: {"));
+        }
+    }
+}
+
+#[test]
+fn bounded_adjacency_improves_two_distinct_paths_at_the_same_source_limit() {
+    for (primary, neighbor, distractor, query, main, target, noise) in [
+        (
+            "lib.rs",
+            "sink.rs",
+            "guide.rs",
+            "ingest",
+            "mod sink; pub fn ingest() { sink::persist(); }\n",
+            "pub fn persist() {}\n",
+            "// ingest\npub fn ingest_example() {}\n",
+        ),
+        (
+            "app/main.rs",
+            "app/journal.rs",
+            "app/a_guide.rs",
+            "dispatch",
+            "mod journal; pub fn dispatch() { journal::commit(); }\n",
+            "pub fn commit() {}\n",
+            "// dispatch\npub fn dispatch_example() {}\n",
+        ),
+    ] {
+        let f = Fixture::new();
+        fs::remove_file(f.root.join("reader.rs")).unwrap();
+        fs::remove_file(f.root.join("retry.rs")).unwrap();
+        let files = [(primary, main), (neighbor, target), (distractor, noise)];
+        for (path, text) in files {
+            fs::create_dir_all(f.root.join(path).parent().unwrap()).unwrap();
+            fs::write(f.root.join(path), text).unwrap();
+        }
+        f.index(&files);
+        let mut output = Vec::new();
+        let mut progress =
+            crate::index::progress::Progress::new(&f.root, &mut output, false, &|| {
+                std::time::Duration::ZERO
+            });
+        let options = crate::knowledge::observation::Options {
+            root: f.root.clone(),
+            ..Default::default()
+        };
+        let result = crate::processor::Session::default()
+            .process(
+                crate::processor::Request {
+                    root: &f.root,
+                    knowledge: &options,
+                    force: true,
+                },
+                fixed,
+                crate::analysis::extract,
+                &mut progress,
+            )
+            .unwrap();
+        assert!(result.errors.is_empty(), "{:?}", result.errors);
+        let graph = fs::read(f.root.join(".mimirs/watch/relationships.json")).unwrap();
+        let mut r = request(&f);
+        r.query = query;
+        r.source_limit = 2;
+        r.knowledge = Some(crate::config::KnowledgeMode::Off);
+        r.intent = crate::retrieval::navigation::Intent::Task;
+        struct CountQueries(std::sync::Arc<std::sync::atomic::AtomicUsize>);
+        impl crate::embedding::Backend for CountQueries {
+            fn tokenizer(&mut self) -> anyhow::Result<tokenizers::Tokenizer> {
+                Ok(crate::test_support::tokenizer(512))
+            }
+            fn embed(&mut self, texts: &[String]) -> anyhow::Result<Vec<Vec<f32>>> {
+                self.0
+                    .fetch_add(texts.len(), std::sync::atomic::Ordering::Relaxed);
+                Ok(vec![vector(); texts.len()])
+            }
+        }
+        let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let mut retriever = Retriever::default();
+        let task = execute(&r, &mut retriever, || {
+            Ok(crate::embedding::Embedder::new(CountQueries(calls.clone())))
+        })
+        .unwrap();
+        r.intent = crate::retrieval::navigation::Intent::Architecture;
+        let architecture = execute(&r, &mut retriever, unused).unwrap();
+        let paths = |v: &Value| {
+            v["source"]["current"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|f| f["path"].as_str().unwrap().to_owned())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(paths(&task)[0], primary, "{task}");
+        assert!(
+            !paths(&task).contains(&neighbor.to_owned()),
+            "baseline already covers path: {task}"
+        );
+        assert!(
+            paths(&architecture).contains(&primary.to_owned()),
+            "{architecture}"
+        );
+        assert!(
+            paths(&architecture).contains(&neighbor.to_owned()),
+            "{architecture}"
+        );
+        assert_eq!(paths(&task).len(), paths(&architecture).len());
+        assert!(size(&architecture) <= r.max_bytes);
+        assert!(
+            architecture["navigation"]["candidate_nodes"]
+                .as_u64()
+                .unwrap()
+                <= 12
+        );
+        assert!(
+            architecture["navigation"]["candidate_edges"]
+                .as_u64()
+                .unwrap()
+                <= 16
+        );
+        assert_eq!(
+            graph,
+            fs::read(f.root.join(".mimirs/watch/relationships.json")).unwrap()
+        );
+        let saved: Value = serde_json::from_slice(&graph).unwrap();
+        for edge in architecture["navigation"]["edges"].as_array().unwrap() {
+            let group = match edge["kind"].as_str().unwrap() {
+                "call" => "calls",
+                "import" => "imports",
+                "reference" => "reExports",
+                _ => panic!("invented edge kind"),
+            };
+            let matched = saved["relationships"][group]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|fact| {
+                    fact["fromPath"] == edge["from"]["path"]
+                        && fact["toPath"] == edge["to"]["path"]
+                        && if group == "calls" {
+                            fact["fact"]["startLine"] == edge["from"]["lines"][0]
+                                && fact["fact"]["endLine"] == edge["from"]["lines"][1]
+                                && fact["to"]["name"] == edge["to"]["name"]
+                                && fact["to"]["startLine"] == edge["to"]["lines"][0]
+                        } else {
+                            fact["facts"].as_array().unwrap().iter().any(|f| {
+                                f["startLine"] == edge["from"]["lines"][0]
+                                    && f["endLine"] == edge["from"]["lines"][1]
+                            })
+                        }
+                });
+            assert!(matched, "unsupported navigation edge: {edge}");
+        }
+        for operation in architecture["navigation"]["operations"].as_array().unwrap() {
+            let path = operation["path"].as_str().unwrap();
+            let bytes = fs::read(f.root.join(path)).unwrap();
+            assert_eq!(
+                architecture["navigation"]["source_hashes"][path],
+                crate::files::fingerprint(&bytes)
+            );
+            let range = operation["bytes"][0].as_u64().unwrap() as usize
+                ..operation["bytes"][1].as_u64().unwrap() as usize;
+            assert!(
+                std::str::from_utf8(&bytes[range])
+                    .unwrap()
+                    .contains(operation["name"].as_str().unwrap())
+            );
+        }
+        // Diagnostics cannot authorize or reject graph evidence.
+        let status_path = f.root.join(".mimirs/status.json");
+        let mut activity = crate::status::Activity::start(&f.root, "fixture", "relationships");
+        activity.observe(
+            "relationships",
+            "verified_stale",
+            "historical diagnostic only",
+        );
+        activity.finish("success", None, None, None);
+        let historical = fs::read(&status_path).unwrap();
+        for bytes in [None, Some(b"corrupt".to_vec()), Some(historical.clone())] {
+            if let Some(bytes) = bytes {
+                fs::write(&status_path, bytes).unwrap();
+            } else {
+                fs::remove_file(&status_path).unwrap();
+            }
+            let diagnostic_changed = execute(&r, &mut retriever, unused).unwrap();
+            assert_eq!(diagnostic_changed["navigation"], architecture["navigation"]);
+            assert_eq!(paths(&diagnostic_changed), paths(&architecture));
+        }
+        let mut mismatched: Value = serde_json::from_slice(&graph).unwrap();
+        mismatched["source_hashes"][primary] = Value::String("different saved source".into());
+        fs::write(
+            f.root.join(".mimirs/watch/relationships.json"),
+            serde_json::to_vec(&mismatched).unwrap(),
+        )
+        .unwrap();
+        let mismatch = execute(&r, &mut retriever, unused).unwrap();
+        assert_eq!(mismatch["navigation"]["status"], "unavailable");
+        assert_eq!(paths(&mismatch), paths(&task));
+        fs::write(f.root.join(".mimirs/watch/relationships.json"), &graph).unwrap();
+        r.output = Output::Text;
+        let readable = execute(&r, &mut retriever, unused).unwrap();
+        assert_eq!(readable["navigation"], architecture["navigation"]);
+        let text = crate::context::text::render(&readable, DEFAULT_BYTES);
+        assert!(text.contains("[resolved call]"), "{text}");
+        assert!(text.contains(" imports "), "{text}");
+        for line in text.lines().filter(|s| s.contains(" -> ")) {
+            assert!(line.ends_with("[resolved call]"), "{line}");
+        }
+        r.output = Output::Json;
+        fs::write(f.root.join(primary), "pub fn changed() {}\n").unwrap();
+        let changed = execute(&r, &mut retriever, unused).unwrap();
+        assert_eq!(changed["navigation"]["status"], "unavailable");
+        assert_eq!(paths(&changed), paths(&task));
+        fs::remove_file(f.root.join(".mimirs/watch/relationships.json")).unwrap();
+        let missing = execute(&r, &mut retriever, unused).unwrap();
+        assert_eq!(missing["navigation"]["status"], "unavailable");
+        assert_eq!(paths(&missing), paths(&task));
+        assert_eq!(
+            calls.load(std::sync::atomic::Ordering::Relaxed),
+            9,
+            "one embedding per query, none per neighbor"
+        );
+    }
+}
+
+#[test]
+fn architecture_intent_is_explicit_or_a_small_deterministic_rule() {
+    use crate::retrieval::navigation::Intent;
+    assert!(Intent::Auto.architecture("index lifecycle and stages"));
+    assert!(!Intent::Auto.architecture("find retry_count"));
+    assert!(!Intent::Task.architecture("architecture flow"));
+    assert!(Intent::Architecture.architecture("ingest"));
+}
+
+#[test]
+fn adjacency_caps_cycles_and_reports_unresolved_dispatch_deterministically() {
+    let f = Fixture::new();
+    fs::remove_file(f.root.join("reader.rs")).unwrap();
+    fs::remove_file(f.root.join("retry.rs")).unwrap();
+    let mut main = String::new();
+    let mut files = Vec::new();
+    for n in 0..20 {
+        main.push_str(&format!("mod child{n:02};\n"));
+        files.push((
+            format!("child{n:02}.rs"),
+            "pub fn run() { crate::dispatch(); }\n".to_owned(),
+        ));
+    }
+    main.push_str("pub fn dispatch() {\n");
+    for n in 0..20 {
+        main.push_str(&format!("child{n:02}::run();\n"));
+    }
+    main.push_str("unknown_callback();\n}\n");
+    files.push(("lib.rs".into(), main));
+    for (path, text) in &files {
+        fs::write(f.root.join(path), text).unwrap();
+    }
+    f.index(
+        &files
+            .iter()
+            .map(|(p, t)| (p.as_str(), t.as_str()))
+            .collect::<Vec<_>>(),
+    );
+    let mut output = Vec::new();
+    let mut progress = crate::index::progress::Progress::new(&f.root, &mut output, false, &|| {
+        std::time::Duration::ZERO
+    });
+    let options = crate::knowledge::observation::Options {
+        root: f.root.clone(),
+        ..Default::default()
+    };
+    let result = crate::processor::Session::default()
+        .process(
+            crate::processor::Request {
+                root: &f.root,
+                knowledge: &options,
+                force: true,
+            },
+            fixed,
+            crate::analysis::extract,
+            &mut progress,
+        )
+        .unwrap();
+    assert!(result.errors.is_empty(), "{:?}", result.errors);
+    let mut r = request(&f);
+    r.query = "dispatch lib flow";
+    r.source_limit = 3;
+    r.knowledge = Some(crate::config::KnowledgeMode::Off);
+    let mut retriever = Retriever::default();
+    let first = execute(&r, &mut retriever, fixed).unwrap();
+    let second = execute(&r, &mut retriever, unused).unwrap();
+    assert_eq!(first, second);
+    let nav = &first["navigation"];
+    assert!(nav["candidate_nodes"].as_u64().unwrap() <= 12, "{first}");
+    assert!(nav["candidate_edges"].as_u64().unwrap() <= 16);
+    assert!(nav["omitted_edges"].as_u64().unwrap() > 0, "{first}");
+    assert!(nav["unresolved_calls"].as_u64().unwrap() > 0);
+    assert!(size(&first) <= DEFAULT_BYTES);
+}
+
+#[test]
+fn architecture_fallback_retains_source_without_rejected_graph_citations() {
+    use crate::retrieval::navigation::Intent;
+    for mixed_generation in [false, true] {
+        let f = Fixture::new();
+        fs::remove_file(f.root.join("reader.rs")).unwrap();
+        fs::remove_file(f.root.join("retry.rs")).unwrap();
+        let files = [
+            ("lib.rs", "mod sink; pub fn ingest() { sink::persist(); }\n"),
+            ("guide.rs", "// ingest\npub fn ingest_example() {}\n"),
+            ("sink.rs", "pub fn persist() { unknown_callback(); }\n"),
+        ];
+        for (path, text) in files {
+            fs::write(f.root.join(path), text).unwrap();
+        }
+        f.index(&files);
+        let mut output = Vec::new();
+        let mut progress =
+            crate::index::progress::Progress::new(&f.root, &mut output, false, &|| {
+                std::time::Duration::ZERO
+            });
+        let options = crate::knowledge::observation::Options {
+            root: f.root.clone(),
+            ..Default::default()
+        };
+        let published = crate::processor::Session::default()
+            .process(
+                crate::processor::Request {
+                    root: &f.root,
+                    knowledge: &options,
+                    force: true,
+                },
+                fixed,
+                crate::analysis::extract,
+                &mut progress,
+            )
+            .unwrap();
+        assert!(published.errors.is_empty(), "{published:?}");
+        let graph_path = f.root.join(".mimirs/watch/relationships.json");
+        let graph = fs::read(&graph_path).unwrap();
+        let mut r = request(&f);
+        r.query = "ingest";
+        r.source_limit = 3;
+        r.knowledge = Some(crate::config::KnowledgeMode::Off);
+        r.intent = Intent::Task;
+        let mut retriever = Retriever::default();
+        let ranked = execute(&r, &mut retriever, fixed).unwrap();
+        let paths = |v: &Value| {
+            v["source"]["current"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|f| f["path"].as_str().unwrap().to_owned())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(paths(&ranked), ["lib.rs", "guide.rs", "sink.rs"]);
+        r.intent = Intent::Architecture;
+        let before = execute(&r, &mut retriever, unused).unwrap();
+        assert!(
+            before["navigation"]["edges"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|edge| edge["kind"] == "call" && edge["to"]["path"] == "sink.rs")
+        );
+        assert!(before["navigation"]["unresolved_calls"].as_u64().unwrap() > 0);
+        let replacement = "// new source generation\npub fn write_record() {}\n";
+        if mixed_generation {
+            // Refresh actual indexed source/documents while retaining the prior graph.
+            // This models mixed generations, not concurrent publication.
+            fs::write(f.root.join("sink.rs"), replacement).unwrap();
+            f.index(&[("sink.rs", replacement)]);
+            assert_eq!(fs::read(&graph_path).unwrap(), graph);
+        } else {
+            let mut mismatched: Value = serde_json::from_slice(&graph).unwrap();
+            mismatched["source_hashes"]["sink.rs"] =
+                Value::String("different source binding".into());
+            fs::write(&graph_path, serde_json::to_vec(&mismatched).unwrap()).unwrap();
+        }
+        let result = execute(&r, &mut retriever, unused).unwrap();
+        assert_eq!(paths(&result), paths(&ranked), "{result}");
+        assert!(size(&result) <= r.max_bytes);
+        for file in result["source"]["current"].as_array().unwrap() {
+            assert_eq!(file["comparison"], "Unchanged");
+        }
+        let nav = &result["navigation"];
+        assert_eq!(nav["status"], "indexed_unvalidated");
+        assert_eq!(nav["selection"][2]["path"], "sink.rs");
+        assert_eq!(nav["selection"][2]["reason"], "ranked source fallback");
+        assert!(nav["edges"].as_array().unwrap().is_empty(), "{nav}");
+        assert!(nav["operations"].as_array().unwrap().is_empty(), "{nav}");
+        assert_eq!(nav["unresolved_calls"], 0);
+        assert!(nav["source_hashes"].get("sink.rs").is_none());
+        assert!(nav["omitted_edges"].as_u64().unwrap() >= 2);
+        assert!(!nav["gaps"].as_array().unwrap().iter().any(|gap| {
+            let text = gap.as_str().unwrap();
+            text.starts_with("sink.rs:") && text.contains("unresolved call")
+        }));
+        for path in ["lib.rs", "guide.rs"] {
+            assert_eq!(
+                nav["source_hashes"][path],
+                crate::files::fingerprint(&fs::read(f.root.join(path)).unwrap())
+            );
+        }
+        let expected_source = if mixed_generation {
+            replacement
+        } else {
+            files[2].1
+        };
+        assert!(
+            result["source"]["text"]
+                .as_str()
+                .unwrap()
+                .contains(expected_source)
+        );
+        r.output = Output::Text;
+        let readable = execute(&r, &mut retriever, unused).unwrap();
+        assert_eq!(readable["navigation"], *nav);
+        let text = crate::context::text::render(&readable, r.max_bytes);
+        assert!(!text.contains("[resolved call]"));
+    }
 }

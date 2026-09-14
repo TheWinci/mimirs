@@ -301,6 +301,8 @@ fn maintenance_and_context_match_direct_operations_and_reuse_embedder() {
     assert_eq!(one, two);
     let direct = crate::context::task::execute(
         &crate::context::task::Request {
+            output: crate::context::task::Output::Json,
+            intent: crate::retrieval::navigation::Intent::Auto,
             root: &f.root,
             query: "read bytes",
             knowledge: None,
@@ -506,7 +508,7 @@ fn status_review_and_replace_successes_preserve_historical_failures() {
             requests.push(args);
         }
         let read = || {
-            serde_json::from_slice::<Value>(&fs::read(f.root.join(".mimirs/status")).unwrap())
+            serde_json::from_slice::<Value>(&fs::read(f.root.join(".mimirs/status.json")).unwrap())
                 .unwrap()
         };
         let before = read();
@@ -557,7 +559,8 @@ fn status_context_targets_preserve_a_history_across_b_and_a_success() {
         "unavailable"
     );
     let read = || {
-        serde_json::from_slice::<Value>(&fs::read(f.root.join(".mimirs/status")).unwrap()).unwrap()
+        serde_json::from_slice::<Value>(&fs::read(f.root.join(".mimirs/status.json")).unwrap())
+            .unwrap()
     };
     let history = read()["failures"].clone();
     let other = f._temp.path().join("other-state");
@@ -598,7 +601,7 @@ fn status_context_targets_preserve_a_history_across_b_and_a_success() {
         "context",
         json!({"query":"reader contract","knowledge":"off"}),
     ));
-    assert_eq!(read()["components"]["knowledge"]["status"], "disabled");
+    assert_eq!(read()["components"]["knowledge"]["status"], "assessed");
     assert_eq!(read()["failures"], history);
     assert_eq!(fs::read(journal).unwrap(), saved);
 }

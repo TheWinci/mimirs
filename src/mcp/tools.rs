@@ -35,7 +35,7 @@ pub fn list() -> Value {
             "Recommended task entry point: bounded indexed source and relevant existing knowledge. Reading does not learn or review; learning and maintenance are explicit tools.",
             true,
             object(
-                json!({"query":{"type":"string","minLength":1,"description":"Distilled query, at most 4096 UTF-8 bytes"},"limit":{"type":"integer","minimum":1,"maximum":100,"default":5},"knowledge_limit":{"type":"integer","minimum":1,"maximum":20,"default":5},"knowledge":{"type":"string","enum":["auto","off"],"description":"Override local context preference. Default auto consumes relevant existing knowledge; off skips knowledge loading and assessment."},"max_bytes":budget}),
+                json!({"query":{"type":"string","minLength":1,"description":"Distilled query, at most 4096 UTF-8 bytes"},"limit":{"type":"integer","minimum":1,"maximum":100,"default":5},"knowledge_limit":{"type":"integer","minimum":1,"maximum":20,"default":5},"knowledge":{"type":"string","enum":["auto","off"],"description":"Override local context preference. Default auto consumes relevant existing knowledge; off skips knowledge loading and assessment."},"intent":{"type":"string","enum":["auto","task","architecture"],"default":"auto"},"max_bytes":budget}),
                 &["query"],
             ),
         ),
@@ -92,6 +92,8 @@ pub fn list() -> Value {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ContextArgs {
+    #[serde(default)]
+    intent: crate::retrieval::navigation::Intent,
     knowledge: Option<crate::config::KnowledgeMode>,
     query: String,
     #[serde(default = "five")]
@@ -266,6 +268,8 @@ fn call_inner(
         );
         return task::execute(
             &task::Request {
+                output: task::Output::Json,
+                intent: args.intent,
                 root: &options.root,
                 query: &args.query,
                 knowledge: args.knowledge,

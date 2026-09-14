@@ -132,6 +132,9 @@ outside the checkout, and pass it with `--assessment` to `review` or
 support. A stale assessment requires a fresh inspection. Use `--promote` explicitly
 when making provisional knowledge portable.
 
+CLI context defaults to readable text, including redirected output. Use `--output json`
+for machine consumers; MCP keeps its structured JSON response.
+
 Use `mimirs context "your task" --knowledge off` to skip knowledge loading and
 assessment for a request.
 
@@ -158,6 +161,16 @@ mimirs knowledge setup --repository example/project --registry /path/to/registry
 Checkouts must use the same logical repository identity; exchange Git history
 separately. `mimirs status` reads local
 activity and historical outcomes without running a model or assessing source.
+
+CLI context defaults to readable text in terminals and redirected output. Use
+`mimirs context "your task" --output json` for machine consumers. MCP continues to
+return its structured JSON response.
+
+Architecture context uses one-hop saved relationships within the existing source
+limit and byte budget. `--intent task` keeps ranked retrieval; `--intent architecture`
+enables expansion. Auto enables it for the words architecture, lifecycle, pipeline,
+stages, flow or ownership. Lookup considers at most 12 nodes and 16 edges, loads no
+additional embedding per neighbor, and reports missing or unvalidated evidence.
 
 ## Command help and development
 

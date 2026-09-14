@@ -15,7 +15,16 @@ use std::{
 pub const DEFAULT_BYTES: usize = 16_000;
 const CONTRACT: &str = "Source excerpts cite indexed bytes; never apply their spans to changed working files. Knowledge status compares declared evidence, not semantic truth or unlisted dependencies. Reads do not record reviews. Use knowledge maintenance ID for complete support and changes.";
 
+#[derive(Clone, Copy, Default, clap::ValueEnum)]
+pub enum Output {
+    #[default]
+    Text,
+    Json,
+}
+
 pub struct Request<'a> {
+    pub output: Output,
+    pub intent: crate::retrieval::navigation::Intent,
     pub root: &'a Path,
     pub query: &'a str,
     pub knowledge: Option<crate::config::KnowledgeMode>,
@@ -86,7 +95,7 @@ fn knowledge(
     ));
     let Some(repository) = settings.repository else {
         return Ok(query::Selection {
-            summary: json!({"status":"not_configured","reason":"supply --repository for recorded knowledge","items":[]}),
+            summary: json!({"status":"not_configured","reason":"run mimirs knowledge setup once for local knowledge","items":[]}),
             items: vec![],
         });
     };
@@ -139,14 +148,18 @@ pub fn execute(
     };
     let mut paths = BTreeSet::new();
     let mut prepared: Option<Prepared> = None;
-    let source = match retriever.retrieve(
+    let mut navigation = None;
+    let source = match retriever.retrieve_with_intent(
         request.root,
         request.query,
         request.source_limit,
         true,
         make_embedder,
+        request.intent,
+        &mut |path| live.get(path).metadata.sha256.clone(),
     ) {
         Ok(retrieved) => {
+            navigation = retrieved.navigation;
             paths.extend(
                 retrieved
                     .results
@@ -190,6 +203,24 @@ pub fn execute(
     });
     let mut value = json!({"version":1,"contract":CONTRACT,"max_bytes":request.max_bytes,
         "live_files_read":live.files.len(),"source":source,"knowledge":selection.summary});
+    if request.intent.architecture(request.query) {
+        value["navigation"] = navigation.unwrap_or_else(|| json!({"status":"unavailable","gaps":["source retrieval unavailable; no adjacency established"]}));
+        for field in ["edges", "operations"] {
+            while size(&value["navigation"]) > request.max_bytes / 3
+                && value["navigation"][field]
+                    .as_array()
+                    .is_some_and(|items| !items.is_empty())
+            {
+                value["navigation"][field].as_array_mut().unwrap().pop();
+                let omitted = format!("omitted_{field}");
+                value["navigation"][&omitted] =
+                    (value["navigation"][&omitted].as_u64().unwrap_or(0) + 1).into();
+            }
+        }
+        if size(&value["navigation"]) > request.max_bytes / 3 {
+            value["navigation"] = json!({"status":"budget_exceeded","gaps":["navigation omitted to preserve source and whole claims within the response budget"]});
+        }
+    }
     // Drop an entire overflowing source section, never individual navigation paths.
     if size(&value) > request.max_bytes {
         let mut without_source = value.clone();
@@ -221,7 +252,10 @@ pub fn execute(
     if let Some(source) = &prepared {
         loop {
             let remaining = request.max_bytes - size(&value);
-            match source.render(remaining, &escaped) {
+            match match request.output {
+                Output::Json => source.render(remaining, &escaped),
+                Output::Text => source.render_readable(remaining, &escaped),
+            } {
                 Ok(text) => {
                     value["source"]["text"] = json!(text);
                     break;
@@ -252,14 +286,23 @@ pub fn execute(
         None,
         source["error"].as_str(),
     );
-    crate::status::observation(
-        request.root,
-        "context-knowledge",
-        "knowledge",
-        selection.summary["status"].as_str().unwrap_or("unknown"),
-        target,
-        selection.summary["error"].as_str(),
-    );
+    let state = match selection.summary["status"].as_str() {
+        Some("disabled") => None,
+        Some("empty") => Some("configured_empty"),
+        Some("ok" | "no_match") => Some("assessed"),
+        Some("not_configured") => Some("unconfigured"),
+        _ => Some("unavailable"),
+    };
+    if let Some(state) = state {
+        crate::status::observation(
+            request.root,
+            "context-knowledge",
+            "knowledge",
+            state,
+            target,
+            selection.summary["error"].as_str(),
+        );
+    }
     Ok(value)
 }
 

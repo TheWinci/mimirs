@@ -1,5 +1,6 @@
 //! Search representations and citations derived from source analysis.
 pub(crate) mod compact;
+pub(crate) mod navigation;
 pub(crate) mod query;
 use crate::analysis::Span;
 pub use crate::analysis::structure::Record;

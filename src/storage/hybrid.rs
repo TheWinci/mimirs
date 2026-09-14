@@ -209,3 +209,31 @@ pub fn preview(text: &str, limit: usize) -> String {
 #[cfg(test)]
 #[path = "../../tests/unit/storage/hybrid.rs"]
 mod tests;
+
+/// Hydrate one saved adjacent source location without running retrieval or a model.
+pub(crate) fn at_path(
+    db: &Connection,
+    path: &str,
+    offset: usize,
+    policy: &str,
+) -> Result<FileResult> {
+    let mut snapshots = Snapshots {
+        db,
+        policy,
+        files: HashMap::new(),
+    };
+    let windows = snapshots.windows(path)?;
+    let candidate = windows
+        .iter()
+        .find(|c| c.start <= offset && offset < c.end)
+        .or_else(|| windows.first())
+        .context("adjacent source has no retrieval documents")?
+        .clone();
+    snapshots.result(Hit {
+        representative: candidate.clone(),
+        score: 0.0,
+        semantic_score: 0.0,
+        lexical_score: 0.0,
+        windows: vec![candidate],
+    })
+}

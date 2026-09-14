@@ -12,7 +12,7 @@ fn context_cli_off_overrides_preferences_without_knowledge_setup() {
     .unwrap();
     let run = |extra: &[&str]| {
         let output = Command::new(env!("CARGO_BIN_EXE_mimirs"))
-            .args(["context", "task", "--root"])
+            .args(["context", "--output", "json", "task", "--root"])
             .arg(temp.path())
             .args(extra)
             .output()
@@ -102,6 +102,8 @@ fn context_cli_returns_knowledge_on_source_failure_and_preserves_journal() {
     let output = Command::new(binary)
         .args([
             "context",
+            "--output",
+            "json",
             "read bytes",
             "--repository",
             "test/context",
@@ -133,9 +135,30 @@ fn context_cli_returns_knowledge_on_source_failure_and_preserves_journal() {
     assert!(help.contains("--output"));
     assert!(help.contains("full, compact"));
     let tiny = Command::new(binary)
-        .args(["context", "read", "--max-bytes", "100"])
+        .args(["context", "--output", "json", "read", "--max-bytes", "100"])
         .output()
         .unwrap();
     assert!(!tiny.status.success());
     assert!(tiny.stdout.is_empty());
+}
+
+#[test]
+fn context_defaults_to_readable_text_and_explicit_json_stays_available() {
+    let temp = tempfile::tempdir().unwrap();
+    for args in [
+        vec!["context", "reader"],
+        vec!["context", "reader", "--output", "text"],
+    ] {
+        let out = Command::new(env!("CARGO_BIN_EXE_mimirs"))
+            .current_dir(temp.path())
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        let text = String::from_utf8(out.stdout).unwrap();
+        assert!(text.starts_with("Knowledge: not_configured\n"), "{text}");
+        assert!(text.contains("Source: unavailable"));
+        assert!(text.len() <= 16_000);
+        assert!(!text.contains('\x1b'));
+    }
 }

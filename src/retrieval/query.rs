@@ -10,6 +10,7 @@ pub struct Retriever {
     embedder: Option<embedding::Embedder>,
 }
 pub struct Retrieved {
+    pub navigation: Option<serde_json::Value>,
     pub results: Response,
     pub compact: Option<Prepared>,
 }
@@ -22,6 +23,27 @@ impl Retriever {
         compact: bool,
         make_embedder: impl FnOnce() -> Result<embedding::Embedder>,
     ) -> Result<Retrieved> {
+        self.retrieve_with_intent(
+            root,
+            query,
+            limit,
+            compact,
+            make_embedder,
+            super::navigation::Intent::Task,
+            &mut |_| None,
+        )
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub fn retrieve_with_intent(
+        &mut self,
+        root: &Path,
+        query: &str,
+        limit: usize,
+        compact: bool,
+        make_embedder: impl FnOnce() -> Result<embedding::Embedder>,
+        intent: super::navigation::Intent,
+        observe: &mut impl FnMut(&str) -> Option<String>,
+    ) -> Result<Retrieved> {
         ensure!(!query.trim().is_empty(), "query must not be blank");
         ensure!(
             (1..=100).contains(&limit),
@@ -32,7 +54,7 @@ impl Retriever {
         let transaction = connection.transaction()?;
         storage::validate_model(&transaction)?;
         let policy = storage::policy::read_for_search(&transaction)?;
-        let results = if storage::has_content(&transaction)? {
+        let mut results = if storage::has_content(&transaction)? {
             let config = crate::config::Config::load(root)?;
             if self.embedder.is_none() {
                 self.embedder = Some(make_embedder()?);
@@ -61,12 +83,27 @@ impl Retriever {
                 relations: Vec::new(),
             }
         };
+        let navigation = intent.architecture(query).then(|| {
+            super::navigation::expand(
+                root,
+                &transaction,
+                &mut results,
+                query,
+                limit,
+                policy.as_deref(),
+                observe,
+            )
+        });
         let compact = if compact {
             Some(Prepared::new(&transaction, &results)?)
         } else {
             None
         };
         transaction.commit()?;
-        Ok(Retrieved { results, compact })
+        Ok(Retrieved {
+            results,
+            compact,
+            navigation,
+        })
     }
 }

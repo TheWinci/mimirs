@@ -8,6 +8,12 @@ use std::{
 
 #[derive(Args)]
 pub struct Options {
+    /// Auto expands architecture/lifecycle queries through saved relationships.
+    #[arg(long, value_enum, default_value_t = crate::retrieval::navigation::Intent::Auto)]
+    intent: crate::retrieval::navigation::Intent,
+    /// Readable text by default, including when redirected.
+    #[arg(long, value_enum, default_value_t = task::Output::Text)]
+    output: task::Output,
     /// Caller-distilled task query; preserves the source retrieval query verbatim.
     query: String,
     /// Consume existing knowledge by default; off bypasses all knowledge reads.
@@ -26,13 +32,15 @@ pub struct Options {
     limit: usize,
     #[arg(long, default_value_t = query::DEFAULT_LIMIT)]
     knowledge_limit: usize,
-    /// Complete JSON response including UTF-8, escaping and newline.
+    /// Maximum response bytes, including UTF-8 wrappers and final newline.
     #[arg(long, default_value_t = task::DEFAULT_BYTES)]
     max_bytes: usize,
 }
 pub fn run(options: Options) -> Result<()> {
     let value = task::execute(
         &task::Request {
+            output: options.output,
+            intent: options.intent,
             root: &options.root,
             query: &options.query,
             knowledge: options.knowledge,
@@ -47,7 +55,14 @@ pub fn run(options: Options) -> Result<()> {
         embedding::production,
     )?;
     let mut stdout = io::stdout().lock();
-    serde_json::to_writer(&mut stdout, &value)?;
-    writeln!(stdout)?;
+    match options.output {
+        task::Output::Json => {
+            serde_json::to_writer(&mut stdout, &value)?;
+            writeln!(stdout)?;
+        }
+        task::Output::Text => {
+            stdout.write_all(crate::context::text::render(&value, options.max_bytes).as_bytes())?
+        }
+    }
     Ok(())
 }

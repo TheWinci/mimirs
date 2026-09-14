@@ -121,6 +121,8 @@ fn unreadable_evidence_isolated_across_overviews_detail_and_task_context() {
     let output = Command::new(env!("CARGO_BIN_EXE_mimirs"))
         .args([
             "context",
+            "--output",
+            "json",
             "contract",
             "--repository",
             "test/identity",
