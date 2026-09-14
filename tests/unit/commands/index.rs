@@ -269,9 +269,9 @@ fn batches_update_only_terminal_progress() {
                 .collect::<Vec<_>>(),
             [1024, 1]
         );
-        assert_eq!(stderr.contains("100% (1024/1025 documents)"), terminal);
+        assert_eq!(stderr.contains("99% (1024/1025 documents)"), terminal);
         assert_eq!(stderr.contains("\x1b["), terminal);
-        assert!(stderr.contains("index_progress: 100% (1/1 files)"));
+        assert!(stderr.contains("files_completed: 100% (1/1 files)"));
         if terminal {
             assert!(stderr.ends_with("\x1b[6F\x1b[J"));
         }
@@ -356,7 +356,7 @@ fn walk_errors_are_listed_after_discovery_and_do_not_block_cleanup() {
     assert!(stdout.contains("skipped: 0 files\nwalk_errors: 1\n"));
     let error = stderr.find("walk_error:").unwrap();
     assert!(error > stderr.rfind("phase: walking").unwrap());
-    assert!(error < stderr.find("phase: indexing").unwrap());
+    assert!(error < stderr.find("phase: reused").unwrap());
     assert!(stderr[error..].contains("locked"));
     assert!(stderr[error..].contains("Permission denied"));
     assert_eq!(files(&dir), [("a.rs".into(), "keep".into())]);
@@ -551,7 +551,7 @@ fn a_file_removed_after_discovery_is_a_read_skip() {
         )
     );
     assert!(stderr.contains("cannot read source file a.rs"));
-    assert!(stderr.contains("index_progress: 100% (1/1 files)"));
+    assert!(stderr.contains("files_completed: 100% (1/1 files)"));
     assert_eq!(counts(&dir), [0, 0, 0, 0, 3]);
 }
 
@@ -1518,7 +1518,7 @@ fn out_of_order_failure_preserves_earlier_commits_and_later_snapshots() {
     assert!(report.counters["embedding_calls"] >= 2);
 }
 #[test]
-fn streamed_index_reads_source_before_discovery_finishes() {
+fn streamed_index_processes_events_without_waiting_for_a_total() {
     let dir = project(&[]);
     for n in 0..200 {
         fs::write(dir.path().join(format!("f{n:03}.rs")), "fn example() {}\n").unwrap();
@@ -1533,7 +1533,8 @@ fn streamed_index_reads_source_before_discovery_finishes() {
         &mut progress,
         |root, path| {
             if first.replace(false) {
-                assert!(profile.counter("files_discovered") < 200);
+                // Unbounded discovery may finish before the first source read.
+                assert!(profile.counter("files_discovered") >= 1);
             }
             source::read(root, path)
         },
@@ -1927,21 +1928,21 @@ fn window_preparation_failure_preserves_order_and_cleans_staging() {
 }
 
 #[test]
-fn full_writer_queue_cancels_without_deadlock() {
+fn unbounded_writer_queue_grows_and_cancels_without_deadlock() {
     struct ClosedWriter {
         profile: Profiler,
         filled: bool,
     }
     impl Write for ClosedWriter {
         fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-            if String::from_utf8_lossy(bytes).contains("documents: 00.rs") {
+            if String::from_utf8_lossy(bytes).contains("phase: published\nfile: 00.rs") {
                 let start = Instant::now();
-                while self.profile.queue_peak("writer") < 6
+                while self.profile.queue_peak("writer") <= 6
                     && start.elapsed() < Duration::from_secs(5)
                 {
                     std::thread::sleep(Duration::from_millis(5));
                 }
-                self.filled = self.profile.queue_peak("writer") == 6;
+                self.filled = self.profile.queue_peak("writer") > 6;
                 return Err(io::Error::new(
                     io::ErrorKind::BrokenPipe,
                     "writer output closed",
@@ -1989,7 +1990,7 @@ fn full_writer_queue_cancels_without_deadlock() {
             .finish(Some("expected failure".into()))
             .unwrap()
             .counters["index_queue_peak_files"]
-            <= 6
+            >= 1
     );
 }
 
@@ -2035,4 +2036,1066 @@ fn writer_cache_release_is_limited_to_incremental_publications() {
     let report = profile.finish(None).unwrap();
     assert!(!report.counters.contains_key("writer_cache_releases"));
     assert_eq!(report.counters["files_reused"], 3);
+}
+
+#[test]
+fn complete_processor_reuses_the_production_parallel_session_and_relationships() {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+    let dir = project(&[
+        ("start.rs", "pub fn start() {}\n"),
+        ("finish.rs", "pub fn finish() {}\n"),
+    ]);
+    let root = dir.path().canonicalize().unwrap();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let counted = calls.clone();
+    let pool = embedding::pool::Pool::new(vec![(); 2], move |_, text| {
+        counted.fetch_add(1, Ordering::Relaxed);
+        Ok(fake_vector(text))
+    })
+    .unwrap();
+    let profile = Profiler::enabled(embedding::model_identity());
+    let mut log = Vec::new();
+    let mut progress =
+        Progress::new(&root, &mut log, false, &|| Duration::ZERO).with_profile(profile.clone());
+    let knowledge = crate::knowledge::observation::Options {
+        root: root.clone(),
+        ..Default::default()
+    };
+    let request = || crate::processor::Request {
+        root: &root,
+        knowledge: &knowledge,
+        force: false,
+    };
+    let mut session = crate::processor::Session::default();
+    let first = session
+        .process(
+            request(),
+            || Ok(Embedder::new(AsyncBackend { pool, limit: 2 })),
+            crate::analysis::extract,
+            &mut progress,
+        )
+        .unwrap();
+    assert!(first.errors.is_empty(), "{:?}", first.errors);
+    assert_eq!(first.indexed, 2);
+    assert!(first.graph_published);
+    assert!(crate::index::graph::read(&root).is_ok());
+    let before = calls.load(Ordering::Relaxed);
+    let unused = || anyhow::bail!("warm model was discarded");
+    let idle = session
+        .process(
+            request(),
+            unused,
+            |_| panic!("idle extraction"),
+            &mut progress,
+        )
+        .unwrap();
+    assert_eq!(idle.selected_source_reads, 0);
+    assert_eq!(idle.embedded_documents, 0);
+    assert_eq!(calls.load(Ordering::Relaxed), before);
+    fs::write(root.join("start.rs"), "pub fn changed() {}\n").unwrap();
+    assert_eq!(
+        crate::commands::status::read(&root, crate::status::now())["components"]["relationships"]["status"],
+        "unvalidated"
+    );
+    assert!(crate::index::graph::read(&root).is_err());
+    assert_eq!(
+        crate::commands::status::read(&root, crate::status::now())["components"]["relationships"]["status"],
+        "verified_stale"
+    );
+    let changed = session
+        .process(request(), unused, crate::analysis::extract, &mut progress)
+        .unwrap();
+    assert!(changed.errors.is_empty(), "{:?}", changed.errors);
+    assert_eq!(changed.indexed, 1);
+    assert!(calls.load(Ordering::Relaxed) > before);
+    assert!(profile.counter("staging_transactions") > 0);
+    assert!(crate::index::graph::read(&root).is_ok());
+}
+
+#[test]
+fn complete_processor_recovers_valid_stages_without_parsing_or_embedding() {
+    let dir = project(&[("recover.rs", "pub fn recovered() {}\n")]);
+    let root = dir.path().canonicalize().unwrap();
+    let analysis = crate::analysis::extract(source::read(&root, "recover.rs").unwrap()).unwrap();
+    let documents = crate::retrieval::ts_v2::documents(&analysis).unwrap();
+    let vectors: Vec<_> = documents.iter().map(|d| fake_vector(&d.text)).collect();
+    let plan = crate::embedding::WindowPlan {
+        inputs: std::sync::Arc::new(documents.iter().map(|d| d.text.clone()).collect()),
+        documents: std::sync::Arc::new((0..documents.len()).map(|i| vec![i]).collect()),
+    };
+    let budget =
+        crate::retrieval::split::TokenBudget::new(crate::test_support::tokenizer(512)).unwrap();
+    let policy = storage::policy::document_policy(&budget);
+    let hash = storage::processing::source_hash(&analysis.source.text);
+    let key = storage::staging::Key {
+        ordinal: 7,
+        path: "recover.rs",
+        source_hash: &hash,
+        policy: &policy,
+    };
+    let mut stage = storage::staging::Store::open_for(
+        &root.join(".mimirs/staging.db"),
+        &Profiler::default(),
+        true,
+    )
+    .unwrap();
+    for payload in [
+        storage::staging::Stage::Discovered,
+        storage::staging::Stage::Source(&analysis),
+        storage::staging::Stage::Windows(&documents, &plan),
+        storage::staging::Stage::Vectors(&vectors),
+    ] {
+        stage.record(&key, payload).unwrap();
+    }
+    drop(stage); // Committed stages from an interrupted process.
+    // Current discovery may reach the writer before the parser checks recovery.
+    let mut newer = storage::staging::Store::open_for(
+        &root.join(".mimirs/staging.db"),
+        &Profiler::default(),
+        true,
+    )
+    .unwrap();
+    newer
+        .record(&key, storage::staging::Stage::Discovered)
+        .unwrap();
+    assert!(storage::staging::recover(&root, "recover.rs", &hash, &policy).is_some());
+    drop(newer);
+    let pool = embedding::pool::Pool::new(vec![()], |_, _| {
+        anyhow::bail!("recovered vectors embedded again")
+    })
+    .unwrap();
+    let mut log = Vec::new();
+    let mut progress = Progress::new(&root, &mut log, false, &|| Duration::ZERO);
+    let options = crate::knowledge::observation::Options {
+        root: root.clone(),
+        ..Default::default()
+    };
+    let result = crate::processor::Session::default()
+        .process(
+            crate::processor::Request {
+                root: &root,
+                knowledge: &options,
+                force: true,
+            },
+            || Ok(Embedder::new(AsyncBackend { pool, limit: 1 })),
+            |_| panic!("recovered source parsed again"),
+            &mut progress,
+        )
+        .unwrap();
+    assert!(result.errors.is_empty(), "{:?}", result.errors);
+    assert_eq!(result.recovered, 1);
+    assert_eq!(result.analyzed, 0);
+    assert_eq!(result.embedded_documents, 0);
+    assert_eq!(result.indexed, 1);
+    assert!(crate::index::graph::read(&root).is_ok());
+    assert!(storage::staging::recover(&root, "recover.rs", &hash, &policy).is_none());
+}
+
+#[test]
+fn production_parallel_progress_reports_documents_empty_and_reused_in_both_outputs() {
+    for terminal in [false, true] {
+        let dir = project(&[
+            ("a.rs", "pub fn alpha() {}\npub fn beta() {}\n"),
+            ("empty.rs", ""),
+        ]);
+        let profile = Profiler::enabled(crate::embedding::model_identity());
+        let mut output = Vec::new();
+        let pool =
+            embedding::pool::Pool::new(vec![(); 2], |_, text| Ok(fake_vector(text))).unwrap();
+        run_parallel_test(
+            dir.path(),
+            || Ok(Embedder::new(AsyncBackend { pool, limit: 2 })),
+            &mut Vec::new(),
+            &mut output,
+            terminal,
+            &|| Duration::ZERO,
+            &profile,
+        )
+        .unwrap();
+        let text = String::from_utf8(output).unwrap();
+        let count: i64 = connection(&dir)
+            .query_row("SELECT count(*) FROM retrieval_documents", [], |r| r.get(0))
+            .unwrap();
+        assert!(count > 0);
+        assert!(
+            text.contains(&format!("100% ({count}/{count} documents)")),
+            "{text}"
+        );
+        assert!(
+            text.contains("phase: empty\nfile: empty.rs\nfile_progress: 0/0 documents (no work)"),
+            "{text}"
+        );
+        assert!(!text.contains("100% (0/0"));
+        assert!(!text.contains("documents: a.rs"));
+        assert!(text.contains("source_processing: complete"));
+        assert_eq!(text.contains("phase: processing"), terminal);
+        assert_eq!(text.contains('\x1b'), terminal);
+        let mut reused = Vec::new();
+        let pool = embedding::pool::Pool::new(vec![()], |_, _| {
+            anyhow::bail!("reused embeddings recomputed")
+        })
+        .unwrap();
+        run_parallel_test(
+            dir.path(),
+            || Ok(Embedder::new(AsyncBackend { pool, limit: 2 })),
+            &mut Vec::new(),
+            &mut reused,
+            terminal,
+            &|| Duration::ZERO,
+            &Profiler::default(),
+        )
+        .unwrap();
+        let text = String::from_utf8(reused).unwrap();
+        assert!(
+            text.contains("phase: reused\nfile: a.rs\nfile_progress: not applicable"),
+            "{text}"
+        );
+    }
+}
+
+#[test]
+fn complete_processor_preserves_source_success_when_relationship_publication_fails() {
+    use crate::processor::{Outcome, Request, Session};
+    let dir = project(&[("start.rs", "pub fn start() {}\n")]);
+    let root = dir.path().canonicalize().unwrap();
+    let graph = root.join(".mimirs/watch/relationships.json");
+    fs::create_dir_all(&graph).unwrap();
+    let options = crate::knowledge::observation::Options {
+        root: root.clone(),
+        ..Default::default()
+    };
+    let mut log = Vec::new();
+    let mut progress = Progress::new(&root, &mut log, false, &|| Duration::ZERO)
+        .with_status(crate::status::Activity::start(&root, "index", "source"));
+    let pool = embedding::pool::Pool::new(vec![()], |_, text| Ok(fake_vector(text))).unwrap();
+    let mut session = Session::default();
+    let request = || Request {
+        root: &root,
+        knowledge: &options,
+        force: false,
+    };
+    let result = session
+        .process(
+            request(),
+            || Ok(Embedder::new(AsyncBackend { pool, limit: 1 })),
+            crate::analysis::extract,
+            &mut progress,
+        )
+        .unwrap();
+    assert!(!result.errors.is_empty());
+    assert_eq!(result.indexed, 1);
+    for name in ["source", "analysis", "retrieval", "embeddings", "storage"] {
+        assert!(
+            matches!(result.components[name], Outcome::Complete { .. }),
+            "{name}: {result:?}"
+        );
+    }
+    assert!(matches!(
+        result.components["relationships"],
+        Outcome::Incomplete { .. }
+    ));
+    let state: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join(".mimirs/watch/state.json")).unwrap()).unwrap();
+    assert_eq!(state["source"], "current");
+    let db = storage::open(&root.join(".mimirs/index.db"))
+        .unwrap()
+        .connection;
+    assert_eq!(
+        crate::index::update::indexed_paths(&db).unwrap(),
+        ["start.rs"]
+    );
+    storage::audit(&db).unwrap();
+    drop(db);
+    fs::remove_dir(&graph).unwrap();
+    let retry = session
+        .process(
+            request(),
+            || anyhow::bail!("warm model lost"),
+            crate::analysis::extract,
+            &mut progress,
+        )
+        .unwrap();
+    assert!(retry.errors.is_empty(), "{retry:?}");
+    assert!(retry.graph_published);
+    assert_eq!(retry.embedded_documents, 0);
+    assert_eq!(retry.indexed, 0);
+    let snapshot: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join(".mimirs/status.json")).unwrap()).unwrap();
+    let activities = snapshot["activities"].as_object().unwrap();
+    assert_eq!(activities.len(), 1);
+    for activity in activities.values() {
+        assert_eq!(activity["operation"], "index");
+        assert_ne!(activity["phase"], "watching");
+    }
+    assert!(!snapshot.to_string().contains("watch-source"));
+    assert!(!snapshot.to_string().contains("watch-knowledge"));
+}
+
+#[test]
+fn complete_processor_model_failure_leaves_unstarted_phases_not_run() {
+    use crate::processor::{Outcome, Request, Session};
+    let dir = project(&[("start.rs", "pub fn start() {}\n")]);
+    let root = dir.path().canonicalize().unwrap();
+    let options = crate::knowledge::observation::Options {
+        root: root.clone(),
+        ..Default::default()
+    };
+    let mut log = Vec::new();
+    let mut progress = Progress::new(&root, &mut log, false, &|| Duration::ZERO);
+    let result = Session::default()
+        .process(
+            Request {
+                root: &root,
+                knowledge: &options,
+                force: true,
+            },
+            || anyhow::bail!("model unavailable"),
+            |_| panic!("analysis before model preparation"),
+            &mut progress,
+        )
+        .unwrap();
+    assert!(matches!(
+        result.components["source"],
+        Outcome::Complete { items: Some(1) }
+    ));
+    assert!(matches!(
+        result.components["embeddings"],
+        Outcome::Incomplete { completed: 0, .. }
+    ));
+    for name in ["analysis", "retrieval", "storage", "relationships"] {
+        assert!(
+            matches!(result.components[name], Outcome::NotRun),
+            "{name}: {result:?}"
+        );
+    }
+    assert_eq!(result.indexed, 0);
+    let db = storage::open(&root.join(".mimirs/index.db"))
+        .unwrap()
+        .connection;
+    assert!(crate::index::update::indexed_paths(&db).unwrap().is_empty());
+}
+
+#[test]
+fn complete_processor_publishes_diagnostic_source_and_later_files_then_reuses_them() {
+    use crate::processor::{Outcome, Request, Session};
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+    let malformed = "pub fn intact() {}\npub fn editing( {\n";
+    let valid = "pub fn unrelated() {}\n";
+    let dir = project(&[("a.rs", malformed), ("b.rs", valid)]);
+    let root = dir.path().canonicalize().unwrap();
+    let options = crate::knowledge::observation::Options {
+        root: root.clone(),
+        ..Default::default()
+    };
+    let calls = Arc::new(AtomicUsize::new(0));
+    let counted = calls.clone();
+    let pool = embedding::pool::Pool::new(vec![(); 2], move |_, text| {
+        counted.fetch_add(1, Ordering::Relaxed);
+        Ok(fake_vector(text))
+    })
+    .unwrap();
+    let mut log = Vec::new();
+    let mut progress = Progress::new(&root, &mut log, false, &|| Duration::ZERO);
+    let request = || Request {
+        root: &root,
+        knowledge: &options,
+        force: false,
+    };
+    let mut session = Session::default();
+    let first = session
+        .process(
+            request(),
+            || Ok(Embedder::new(AsyncBackend { pool, limit: 2 })),
+            crate::analysis::extract,
+            &mut progress,
+        )
+        .unwrap();
+    assert_eq!(first.indexed, 2, "{first:?}");
+    for name in ["source", "analysis", "retrieval", "embeddings", "storage"] {
+        assert!(
+            matches!(first.components[name], Outcome::Complete { .. }),
+            "{name}: {first:?}"
+        );
+    }
+    assert!(matches!(
+        first.components["relationships"],
+        Outcome::Incomplete { .. }
+    ));
+    assert!(first.errors.is_empty());
+    assert!(first.warnings.parser_diagnostics > 0);
+    assert!(!first.graph_published);
+    assert!(!root.join(".mimirs/watch/relationships.json").exists());
+    let state: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join(".mimirs/watch/state.json")).unwrap()).unwrap();
+    assert_eq!(state["source"], "current");
+    let db = storage::open(&root.join(".mimirs/index.db"))
+        .unwrap()
+        .connection;
+    assert_eq!(
+        crate::index::update::indexed_paths(&db).unwrap(),
+        ["a.rs", "b.rs"]
+    );
+    let policy = storage::policy::read(&db).unwrap().unwrap();
+    for (path, text) in [("a.rs", malformed), ("b.rs", valid)] {
+        let saved = storage::analysis::load(&db, path).unwrap().unwrap();
+        assert_eq!(saved.source.text, text);
+        assert_eq!(!saved.diagnostics.is_empty(), path == "a.rs");
+        assert!(
+            !storage::documents::load(&db, path, &policy)
+                .unwrap()
+                .is_empty()
+        );
+    }
+    storage::audit(&db).unwrap();
+    drop(db);
+    let before = calls.load(Ordering::Relaxed);
+    assert!(before > 0);
+    let retry = session
+        .process(
+            request(),
+            || anyhow::bail!("warm model lost"),
+            crate::analysis::extract,
+            &mut progress,
+        )
+        .unwrap();
+    assert_eq!(retry.unchanged, 2);
+    assert_eq!(retry.indexed, 0);
+    assert_eq!(retry.analyzed, 0);
+    assert_eq!(retry.embedded_documents, 0);
+    assert_eq!(calls.load(Ordering::Relaxed), before);
+    for name in ["analysis", "retrieval", "embeddings", "storage"] {
+        assert!(
+            matches!(retry.components[name], Outcome::Unchanged),
+            "{retry:?}"
+        );
+    }
+    assert!(matches!(
+        retry.components["relationships"],
+        Outcome::Incomplete { .. }
+    ));
+    fs::write(
+        root.join("a.rs"),
+        "pub fn intact() {}\npub fn editing() {}\n",
+    )
+    .unwrap();
+    let repaired = session
+        .process(
+            request(),
+            || anyhow::bail!("warm model lost"),
+            crate::analysis::extract,
+            &mut progress,
+        )
+        .unwrap();
+    assert!(repaired.errors.is_empty(), "{repaired:?}");
+    assert_eq!(repaired.indexed, 1);
+    assert_eq!(repaired.unchanged, 1);
+    assert!(repaired.graph_published);
+    assert!(crate::index::graph::read(&root).is_ok());
+    drop(progress);
+    assert!(!String::from_utf8(log).unwrap().contains("syntax: a.rs:"));
+}
+
+#[test]
+fn best_effort_command_keeps_later_source_and_bounds_warnings_in_both_outputs() {
+    for terminal in [false, true] {
+        let malformed: String = (0..40)
+            .map(|n| format!("pub fn editing_{n}() {{ let = ; }}\n"))
+            .collect();
+        let dir = project(&[("a.rs", &malformed), ("z.rs", "pub fn later() {}\n")]);
+        fs::write(dir.path().join("middle.css"), [0xff, 0xfe]).unwrap();
+        let root = dir.path().canonicalize().unwrap();
+        let pool =
+            embedding::pool::Pool::new(vec![(); 2], |_, text| Ok(fake_vector(text))).unwrap();
+        let mut log = Vec::new();
+        let mut output = Vec::new();
+        let mut progress = Progress::new(&root, &mut log, terminal, &|| Duration::from_millis(1250))
+            .with_status(crate::status::Activity::start(&root, "index", "source"));
+        let report = crate::commands::index::execute(
+            &root,
+            || Ok(Embedder::new(AsyncBackend { pool, limit: 2 })),
+            &mut progress,
+            &mut output,
+        )
+        .unwrap();
+        assert_eq!(report.indexed, 2);
+        assert_eq!(report.warnings.unsupported_encoding_files, 1);
+        assert!(report.warnings.parser_diagnostics >= 40);
+        assert!(report.errors.is_empty());
+        assert!(matches!(
+            report.components["relationships"],
+            crate::processor::Outcome::Incomplete { .. }
+        ));
+        drop(progress);
+        let text = String::from_utf8(output).unwrap();
+        assert!(text.contains("result: complete with warnings"), "{text}");
+        assert!(text.ends_with("time: 1.25 seconds\n"), "{text}");
+        assert!(text.contains("skipped: 1 unsupported-encoding files"));
+        assert!(text.contains("relationships: incomplete"));
+        assert!(text.contains(crate::index::diagnostics::PATH));
+        assert!(!text.contains("processing: {"));
+        assert!(text.len() < 1000);
+        assert!(!String::from_utf8_lossy(&log).contains("syntax:"));
+        if terminal {
+            for frame in String::from_utf8_lossy(&log).split("\x1b[?7l").skip(1) {
+                assert!(frame.split("\x1b[?7h").next().unwrap().lines().count() <= 6);
+            }
+        }
+        if !terminal {
+            assert!(String::from_utf8_lossy(&log).contains("indexing: 3 selected files"));
+            assert!(log.len() < 100);
+        }
+        let db = storage::open_read_only(&root.join(".mimirs/index.db")).unwrap();
+        assert_eq!(
+            crate::index::update::indexed_paths(&db).unwrap(),
+            ["a.rs", "z.rs"]
+        );
+        assert_eq!(
+            storage::analysis::load(&db, "a.rs")
+                .unwrap()
+                .unwrap()
+                .source
+                .text,
+            malformed
+        );
+        storage::audit(&db).unwrap();
+        let status: serde_json::Value =
+            serde_json::from_slice(&fs::read(root.join(".mimirs/status.json")).unwrap()).unwrap();
+        assert_eq!(status["last_success"]["operation"], "index");
+        assert_eq!(
+            status["components"]["relationships"]["status"],
+            "incomplete"
+        );
+        assert_eq!(status["components"]["source"]["status"], "partial");
+        let details_path = root.join(crate::index::diagnostics::PATH);
+        let details: serde_json::Value =
+            serde_json::from_slice(&fs::read(&details_path).unwrap()).unwrap();
+        assert_eq!(
+            details["counts"]["parser_diagnostics"],
+            report.warnings.parser_diagnostics
+        );
+        assert_eq!(details["coverage"], "observed_selection");
+        assert!(
+            details["entries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|e| e["path"] == "middle.css" && e["kind"] == "unsupported_encoding")
+        );
+        let (scan, _) = crate::index::scan::Scan::capture(&root, true, None).unwrap();
+        assert!(!scan.files.contains_key(crate::index::diagnostics::PATH));
+        let mut capped = crate::index::diagnostics::Counts::default();
+        crate::index::diagnostics::publish_with_limit(&root, &db, &scan, &[], 3, &mut capped)
+            .unwrap();
+        assert_eq!(
+            capped.parser_diagnostics,
+            report.warnings.parser_diagnostics
+        );
+        assert_eq!(capped.omitted_details, capped.parser_diagnostics + 1 - 3);
+        let details: serde_json::Value =
+            serde_json::from_slice(&fs::read(details_path).unwrap()).unwrap();
+        assert_eq!(details["entries"].as_array().unwrap().len(), 3);
+        assert_eq!(details["counts"]["omitted_details"], capped.omitted_details);
+    }
+}
+
+#[test]
+fn best_effort_command_keeps_true_failures_actionable() {
+    let dir = project(&[("a.rs", "pub fn first() {}\n")]);
+    let root = dir.path().canonicalize().unwrap();
+    let mut log = Vec::new();
+    let mut output = Vec::new();
+    let mut progress = Progress::new(&root, &mut log, false, &|| Duration::ZERO);
+    let result = crate::commands::index::execute(
+        &root,
+        || anyhow::bail!("injected model failure"),
+        &mut progress,
+        &mut output,
+    );
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("injected model failure")
+    );
+    let text = String::from_utf8(output).unwrap();
+    assert!(text.contains("result: failed"), "{text}");
+    assert!(text.contains("injected model failure"));
+    assert!(!text.contains("processing: {"));
+    let db = storage::open_read_only(&root.join(".mimirs/index.db")).unwrap();
+    assert!(crate::index::update::indexed_paths(&db).unwrap().is_empty());
+}
+
+#[test]
+fn best_effort_keeps_permission_and_diagnostic_persistence_failures_fatal() {
+    for blocked_details in [false, true] {
+        let dir = project(&[
+            ("a.rs", "pub fn first() {}\n"),
+            ("middle.rs", "pub fn middle() {}\n"),
+            ("z.rs", "pub fn last() {}\n"),
+        ]);
+        let root = dir.path().canonicalize().unwrap();
+        if blocked_details {
+            fs::create_dir_all(root.join(crate::index::diagnostics::PATH)).unwrap();
+        } else {
+            fs::set_permissions(root.join("middle.rs"), fs::Permissions::from_mode(0o000)).unwrap();
+        }
+        let pool = embedding::pool::Pool::new(vec![()], |_, text| Ok(fake_vector(text))).unwrap();
+        let mut log = Vec::new();
+        let mut output = Vec::new();
+        let mut progress = Progress::new(&root, &mut log, false, &|| Duration::ZERO);
+        let error = crate::commands::index::execute(
+            &root,
+            || Ok(Embedder::new(AsyncBackend { pool, limit: 1 })),
+            &mut progress,
+            &mut output,
+        )
+        .unwrap_err();
+        let text = String::from_utf8(output).unwrap();
+        assert!(text.contains("result: failed"), "{text}");
+        let db = storage::open_read_only(&root.join(".mimirs/index.db")).unwrap();
+        let paths = crate::index::update::indexed_paths(&db).unwrap();
+        assert!(paths.contains(&"a.rs".into()) && paths.contains(&"z.rs".into()));
+        storage::audit(&db).unwrap();
+        if blocked_details {
+            assert!(
+                error
+                    .to_string()
+                    .contains("cannot save processing diagnostics")
+            );
+            assert!(crate::index::graph::read(&root).is_ok());
+        } else {
+            assert!(error.to_string().contains("middle.rs"));
+            assert!(text.contains("read failures: 1 files"));
+            assert!(!paths.contains(&"middle.rs".into()));
+            let details: serde_json::Value = serde_json::from_slice(
+                &fs::read(root.join(crate::index::diagnostics::PATH)).unwrap(),
+            )
+            .unwrap();
+            assert_eq!(details["counts"]["unsupported_encoding_files"], 0);
+            assert_eq!(details["counts"]["read_failures"], 1);
+            assert_eq!(details["coverage"], "incomplete_processing");
+            fs::set_permissions(root.join("middle.rs"), fs::Permissions::from_mode(0o644)).unwrap();
+        }
+    }
+}
+
+#[test]
+fn best_effort_graph_retirement_failure_does_not_hide_source_success() {
+    let dir = project(&[
+        ("a.rs", "pub fn editing() { let = ; }\n"),
+        ("z.rs", "pub fn later() {}\n"),
+    ]);
+    let root = dir.path().canonicalize().unwrap();
+    fs::create_dir_all(root.join(".mimirs/watch/relationships.json")).unwrap();
+    let options = crate::knowledge::observation::Options {
+        root: root.clone(),
+        ..Default::default()
+    };
+    let mut log = Vec::new();
+    let mut progress = Progress::new(&root, &mut log, false, &|| Duration::ZERO);
+    let pool = embedding::pool::Pool::new(vec![()], |_, text| Ok(fake_vector(text))).unwrap();
+    let result = crate::processor::Session::default()
+        .process(
+            crate::processor::Request {
+                root: &root,
+                knowledge: &options,
+                force: true,
+            },
+            || Ok(Embedder::new(AsyncBackend { pool, limit: 1 })),
+            crate::analysis::extract,
+            &mut progress,
+        )
+        .unwrap();
+    assert_eq!(result.indexed, 2);
+    assert_eq!(result.errors.len(), 1, "{result:?}");
+    assert!(result.errors[0].contains("cannot retire relationship cache"));
+    assert!(result.warnings.parser_diagnostics > 0);
+    assert!(matches!(
+        result.components["storage"],
+        crate::processor::Outcome::Complete { .. }
+    ));
+    let db = storage::open_read_only(&root.join(".mimirs/index.db")).unwrap();
+    assert_eq!(
+        crate::index::update::indexed_paths(&db).unwrap(),
+        ["a.rs", "z.rs"]
+    );
+}
+
+#[derive(Clone, Default)]
+struct LiveCapture(std::sync::Arc<(std::sync::Mutex<Vec<u8>>, std::sync::Condvar)>);
+impl std::io::Write for LiveCapture {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.0.0.lock().unwrap().extend_from_slice(bytes);
+        self.0.1.notify_all();
+        Ok(bytes.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+impl LiveCapture {
+    fn text(&self) -> String {
+        String::from_utf8(self.0.0.lock().unwrap().clone()).unwrap()
+    }
+    fn wait_elapsed(&self, phase: &str, seconds: f64) {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let mut bytes = self.0.0.lock().unwrap();
+        loop {
+            let text = String::from_utf8_lossy(&bytes);
+            let ready = text.split("\x1b[?7l").any(|frame| {
+                frame.contains(&format!("phase: {phase}\n"))
+                    && frame.lines().any(|line| {
+                        line.strip_prefix("elapsed_time: ")
+                            .and_then(|s| s.split_whitespace().next())
+                            .and_then(|s| s.parse::<f64>().ok())
+                            .is_some_and(|n| n >= seconds)
+                    })
+            });
+            if ready {
+                return;
+            }
+            let left = deadline.saturating_duration_since(Instant::now());
+            assert!(
+                !left.is_zero(),
+                "no heartbeat for {phase} at {seconds}: {text}"
+            );
+            bytes = self.0.1.wait_timeout(bytes, left).unwrap().0;
+        }
+    }
+}
+
+#[test]
+fn live_progress_production_keeps_updating_after_32_events_and_during_model_wait() {
+    let dir = project(&[]);
+    for n in 0..40 {
+        fs::write(
+            dir.path().join(format!("f{n:02}.rs")),
+            format!("pub fn item_{n}() {{}}\n"),
+        )
+        .unwrap();
+    }
+    let root = dir.path().canonicalize().unwrap();
+    let capture = LiveCapture::default();
+    let mut writer = capture.clone();
+    let start = Instant::now();
+    let pool = embedding::pool::Pool::new(vec![()], |_, text| Ok(fake_vector(text))).unwrap();
+    let mut output = Vec::new();
+    let report =
+        crate::index::progress::live(&root, &mut writer, true, &|| start.elapsed(), |progress| {
+            crate::commands::index::execute(
+                &root,
+                || {
+                    let before = capture.text();
+                    let frame = before.rsplit("\x1b[?7l").next().unwrap();
+                    assert!(frame.contains("phase: preparing model\n"));
+                    assert!(!frame.contains("file_progress:"));
+                    assert!(before.matches("\x1b[?7l").count() > 32);
+                    capture.wait_elapsed("preparing model", start.elapsed().as_secs_f64() + 0.9);
+                    Ok(Embedder::new(AsyncBackend { pool, limit: 1 }))
+                },
+                progress,
+                &mut output,
+            )
+        })
+        .unwrap();
+    assert_eq!(report.indexed, 40);
+    let text = capture.text();
+    assert!(text.matches("\x1b[?7l").count() > 100);
+    assert!(text.contains("file: f39.rs"));
+    assert!(text.contains("phase: finalizing\n"));
+    assert!(text.contains("40/40 files"));
+    let elapsed: Vec<f64> = text
+        .lines()
+        .filter_map(|line| line.strip_prefix("elapsed_time: "))
+        .map(|value| value.split_whitespace().next().unwrap().parse().unwrap())
+        .collect();
+    assert!(elapsed.windows(2).all(|pair| pair[0] <= pair[1]));
+    assert!(text.ends_with("\x1b[?7h"));
+    assert!(
+        String::from_utf8(output)
+            .unwrap()
+            .contains("result: complete")
+    );
+    let finished = capture.text();
+    std::thread::sleep(Duration::from_millis(1100));
+    assert_eq!(capture.text(), finished, "post-completion redraw");
+}
+
+#[test]
+fn live_progress_silence_preserves_counts_without_status_writes_and_stops_on_error() {
+    let dir = project(&[]);
+    let path = dir.path().join(".mimirs/status.json");
+    fs::write(&path, "unchanged diagnostic snapshot").unwrap();
+    let modified = fs::metadata(&path).unwrap().modified().unwrap();
+    let capture = LiveCapture::default();
+    let mut writer = capture.clone();
+    let start = Instant::now();
+    let result: anyhow::Result<()> = crate::index::progress::live(
+        dir.path(),
+        &mut writer,
+        true,
+        &|| start.elapsed(),
+        |progress| {
+            progress.concise();
+            progress.file(
+                "waiting.rs",
+                crate::index::progress::Work::Known { done: 2, total: 9 },
+                (7, 12),
+                crate::index::progress::FileOutcome::Processing,
+            )?;
+            capture.wait_elapsed("processing", 0.9);
+            let text = capture.text();
+            assert!(text.matches("file_progress: 22% (2/9 documents)").count() >= 2);
+            assert!(text.matches("files_completed: 58% (7/12 files)").count() >= 2);
+            assert_eq!(fs::read(&path).unwrap(), b"unchanged diagnostic snapshot");
+            assert_eq!(fs::metadata(&path).unwrap().modified().unwrap(), modified);
+            progress.phase("finalizing", "source", None)?;
+            let text = capture.text();
+            let latest = text.rsplit("\x1b[?7l").next().unwrap();
+            assert!(latest.contains("phase: finalizing\nfile: -\n"));
+            assert!(!latest.contains("file_progress:"));
+            anyhow::bail!("injected cancellation")
+        },
+    );
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("injected cancellation")
+    );
+    let finished = capture.text();
+    std::thread::sleep(Duration::from_millis(1100));
+    assert_eq!(capture.text(), finished);
+    assert!(finished.ends_with("\x1b[?7h"));
+}
+
+#[test]
+fn live_progress_redirected_waits_do_not_produce_timer_output() {
+    let dir = project(&[]);
+    let mut output = Vec::new();
+    let start = Instant::now();
+    crate::index::progress::live(
+        dir.path(),
+        &mut output,
+        false,
+        &|| start.elapsed(),
+        |progress| {
+            progress.concise();
+            progress.walking("-", 40)?;
+            for done in 0..40 {
+                progress.file(
+                    "a.rs",
+                    crate::index::progress::Work::Known { done, total: 40 },
+                    (0, 1),
+                    crate::index::progress::FileOutcome::Processing,
+                )?;
+            }
+            progress.phase("preparing model", "vectors_model", None)?;
+            std::thread::sleep(Duration::from_millis(1100));
+            Ok(())
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        String::from_utf8(output).unwrap(),
+        "indexing: 40 selected files\n"
+    );
+}
+
+struct LiveFailure {
+    capture: LiveCapture,
+    fail: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    failed: std::sync::Arc<(std::sync::Mutex<bool>, std::sync::Condvar)>,
+    processing_until_failure: Option<usize>,
+}
+impl std::io::Write for LiveFailure {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        use std::sync::atomic::Ordering;
+        if String::from_utf8_lossy(bytes).contains("phase: processing\n")
+            && let Some(left) = &mut self.processing_until_failure
+        {
+            *left -= 1;
+            if *left == 0 {
+                self.fail.store(true, Ordering::SeqCst);
+            }
+        }
+        if self.fail.load(Ordering::SeqCst) && bytes != b"\x1b[?7h" {
+            *self.failed.0.lock().unwrap() = true;
+            self.failed.1.notify_all();
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::BrokenPipe,
+                "injected terminal failure",
+            ));
+        }
+        std::io::Write::write(&mut self.capture, bytes)
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn live_progress_timer_failure_propagates_and_restores_terminal_without_waiting_for_next_tick() {
+    use std::sync::{
+        Arc, Condvar, Mutex,
+        atomic::{AtomicBool, Ordering},
+    };
+    let capture = LiveCapture::default();
+    let fail = Arc::new(AtomicBool::new(false));
+    let failed = Arc::new((Mutex::new(false), Condvar::new()));
+    let mut writer = LiveFailure {
+        capture: capture.clone(),
+        fail: fail.clone(),
+        failed: failed.clone(),
+        processing_until_failure: None,
+    };
+    let start = Instant::now();
+    let mut work_done = None;
+    let result = crate::index::progress::live(
+        Path::new("root"),
+        &mut writer,
+        true,
+        &|| start.elapsed(),
+        |progress| {
+            progress.phase("preparing model", "vectors_model", None)?;
+            fail.store(true, Ordering::SeqCst);
+            let (seen, timed) = failed
+                .1
+                .wait_timeout_while(failed.0.lock().unwrap(), Duration::from_secs(5), |seen| {
+                    !*seen
+                })
+                .unwrap();
+            assert!(
+                *seen && !timed.timed_out(),
+                "timer never attempted a redraw"
+            );
+            work_done = Some(Instant::now());
+            Ok(())
+        },
+    );
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("injected terminal failure")
+    );
+    assert!(work_done.unwrap().elapsed() < Duration::from_secs(1));
+    assert!(capture.text().ends_with("\x1b[?7h"));
+    let finished = capture.text();
+    std::thread::sleep(Duration::from_millis(1100));
+    assert_eq!(capture.text(), finished);
+}
+
+#[test]
+fn live_progress_output_failure_cancels_production_workers_and_releases_writer() {
+    use std::sync::{Arc, Condvar, Mutex, atomic::AtomicBool};
+    let dir = project(&[]);
+    for n in 0..40 {
+        fs::write(
+            dir.path().join(format!("f{n:02}.rs")),
+            format!("pub fn item_{n}() {{}}\n"),
+        )
+        .unwrap();
+    }
+    let root = dir.path().canonicalize().unwrap();
+    let capture = LiveCapture::default();
+    let mut writer = LiveFailure {
+        capture: capture.clone(),
+        fail: Arc::new(AtomicBool::new(false)),
+        failed: Arc::new((Mutex::new(false), Condvar::new())),
+        processing_until_failure: Some(10),
+    };
+    let pool = embedding::pool::Pool::new(vec![(); 2], |_, text| Ok(fake_vector(text))).unwrap();
+    let start = Instant::now();
+    let result =
+        crate::index::progress::live(&root, &mut writer, true, &|| start.elapsed(), |progress| {
+            crate::commands::index::execute(
+                &root,
+                || Ok(Embedder::new(AsyncBackend { pool, limit: 2 })),
+                progress,
+                &mut Vec::new(),
+            )
+        });
+    assert!(result.is_err());
+    let _writer = crate::storage::writer::acquire(&root).unwrap();
+    let db = storage::open_read_only(&root.join(".mimirs/index.db")).unwrap();
+    storage::audit(&db).unwrap();
+    assert!(!root.join(".mimirs/watch/relationships.json").exists());
+    assert!(capture.text().ends_with("\x1b[?7h"));
+}
+
+#[test]
+fn live_progress_unwind_stops_the_scoped_timer() {
+    let capture = LiveCapture::default();
+    let mut output = capture.clone();
+    let start = Instant::now();
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let _: anyhow::Result<()> = crate::index::progress::live(
+            Path::new("root"),
+            &mut output,
+            true,
+            &|| start.elapsed(),
+            |progress| {
+                progress.phase("discovering source", "source", None)?;
+                panic!("injected processing panic");
+            },
+        );
+    }));
+    assert!(result.is_err());
+    assert!(start.elapsed() < Duration::from_secs(1));
+    assert!(capture.text().ends_with("\x1b[?7h"));
+}
+
+#[test]
+fn live_progress_status_diagnostics_share_the_terminal_and_survive_redraw() {
+    let dir = project(&[]);
+    let mut activity = crate::status::Activity::start(dir.path(), "index", "source");
+    activity.defer_warnings();
+    let capture = LiveCapture::default();
+    let mut writer = capture.clone();
+    crate::index::progress::live(
+        dir.path(),
+        &mut writer,
+        true,
+        &|| Duration::ZERO,
+        |progress| {
+            progress.status = Some(activity);
+            progress.phase("preparing model", "source", None)?;
+            fs::write(
+                dir.path().join(".mimirs/status.json"),
+                b"invalid status JSON",
+            )?;
+            progress
+                .status
+                .as_ref()
+                .unwrap()
+                .observe("source", "observed", "fixture");
+            assert!(!capture.text().contains("status diagnostic:"));
+            progress.phase("finalizing", "source", None)?;
+            let text = capture.text();
+            let diagnostic = text.find("status diagnostic:").unwrap();
+            let frame = text.rfind("\x1b[?7l").unwrap();
+            assert!(diagnostic < frame);
+            assert!(
+                !text[diagnostic..frame].contains("\x1b[J"),
+                "diagnostic was erased"
+            );
+            assert!(text[frame..].contains("phase: finalizing"));
+            progress
+                .status
+                .as_mut()
+                .unwrap()
+                .finish("success", None, None, None);
+            progress.clear()?;
+            Ok(())
+        },
+    )
+    .unwrap();
+    assert!(capture.text().ends_with("\x1b[?7h"));
 }

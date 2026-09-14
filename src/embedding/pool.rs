@@ -1,10 +1,10 @@
-//! Persistent singleton-inference workers. The indexing coordinator bounds the
-//! number and retained bytes of submitted files; workers never access SQLite.
-use std::collections::VecDeque;
+//! Persistent blocking inference workers consume Tokio unbounded messages.
+//! Worker count limits simultaneous model calls; queued work has no fixed limit.
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::JoinHandle;
 use std::time::Instant;
+use tokio::sync::mpsc;
 
 use crate::profiling::{Activity, Profiler};
 
@@ -24,6 +24,7 @@ struct Work {
     texts: Arc<Vec<String>>,
     state: Mutex<State>,
     changed: Condvar,
+    ready: tokio::sync::Notify,
 }
 
 pub(crate) struct Job(Arc<Work>);
@@ -36,6 +37,19 @@ impl Job {
     pub(crate) fn ready(&self) -> bool {
         let state = self.0.state.lock().unwrap();
         state.active == 0 && (state.cancelled || state.next == self.0.texts.len())
+    }
+
+    pub(crate) async fn wait_ready(&self) {
+        loop {
+            let notified = self.0.ready.notified();
+            tokio::pin!(notified);
+            // Register before checking state so completion cannot be missed.
+            notified.as_mut().enable();
+            if self.ready() {
+                return;
+            }
+            notified.await;
+        }
     }
 
     pub(crate) fn wait(&mut self) -> Result<Vec<Vec<f32>>> {
@@ -56,6 +70,7 @@ impl Job {
     pub(crate) fn cancel(&self) {
         self.0.state.lock().unwrap().cancelled = true;
         self.0.changed.notify_all();
+        self.0.ready.notify_waiters();
     }
 
     pub(crate) fn calls(&self) -> usize {
@@ -69,18 +84,16 @@ impl Drop for Job {
     }
 }
 
-#[derive(Default)]
 struct Queue {
     stopped: bool,
-    jobs: VecDeque<Arc<Work>>,
+    sender: Option<mpsc::UnboundedSender<(Arc<Work>, usize)>>,
     items: usize,
     bytes: usize,
 }
 
-#[derive(Default)]
 struct Shared {
     queue: Mutex<Queue>,
-    changed: Condvar,
+    receiver: Mutex<mpsc::UnboundedReceiver<(Arc<Work>, usize)>>,
     profile: Profiler,
 }
 
@@ -109,10 +122,17 @@ impl Pool {
         operation: impl Fn(&mut W, &str) -> Result<Vec<f32>> + Send + Sync + 'static,
     ) -> Result<Self> {
         ensure!(!workers.is_empty(), "embedding needs at least one worker");
+        let (sender, receiver) = mpsc::unbounded_channel();
         let mut pool = Self {
             shared: Arc::new(Shared {
                 profile,
-                ..Shared::default()
+                queue: Mutex::new(Queue {
+                    stopped: false,
+                    sender: Some(sender),
+                    items: 0,
+                    bytes: 0,
+                }),
+                receiver: Mutex::new(receiver),
             }),
             threads: Vec::new(),
         };
@@ -145,6 +165,7 @@ impl Pool {
                                 }
                             }
                             job.changed.notify_all();
+                            job.ready.notify_waiters();
                         }
                     })
                     .context("cannot start embedding worker")?,
@@ -167,6 +188,7 @@ impl Pool {
                 vectors: vec![None; count],
             }),
             changed: Condvar::new(),
+            ready: tokio::sync::Notify::new(),
         };
         let mut queue = self.shared.queue.lock().unwrap();
         work.queued = self.shared.profile.queue_start();
@@ -178,51 +200,56 @@ impl Pool {
                 .iter()
                 .map(|s| s.len() + crate::embedding::DIMENSION * 4)
                 .sum::<usize>();
-            queue.jobs.push_back(job.clone());
+            for ordinal in 0..count {
+                queue
+                    .sender
+                    .as_ref()
+                    .unwrap()
+                    .send((job.clone(), ordinal))
+                    .unwrap_or_else(|_| unreachable!("inference receiver closed"));
+            }
             self.shared
                 .profile
                 .stage_queue("inference", queue.items, queue.bytes);
             drop(queue);
-            self.shared.changed.notify_all();
         }
         Job(job)
     }
 }
 
 fn next(shared: &Shared) -> Option<(Arc<Work>, usize)> {
-    let mut queue = shared.queue.lock().unwrap();
     loop {
+        let item = {
+            let mut receiver = shared.receiver.lock().unwrap();
+            match receiver.try_recv() {
+                Ok(item) => Some(item),
+                Err(mpsc::error::TryRecvError::Disconnected) => None,
+                Err(mpsc::error::TryRecvError::Empty) => {
+                    let _idle = shared.profile.stage("inference", Activity::Input);
+                    receiver.blocking_recv()
+                }
+            }
+        };
+        let (job, ordinal) = item?;
+        let mut queue = shared.queue.lock().unwrap();
+        queue.items -= 1;
+        queue.bytes -= job.texts[ordinal].len() + crate::embedding::DIMENSION * 4;
+        let mut state = job.state.lock().unwrap();
         if queue.stopped {
-            return None;
+            state.cancelled = true;
         }
-        if let Some(job) = queue.jobs.front().cloned() {
-            let mut state = job.state.lock().unwrap();
-            if state.cancelled {
-                queue.items -= job.texts.len() - state.next;
-                queue.bytes -= job.texts[state.next..]
-                    .iter()
-                    .map(|s| s.len() + crate::embedding::DIMENSION * 4)
-                    .sum::<usize>();
-                queue.jobs.pop_front();
-                job.changed.notify_all();
-                continue;
-            }
-            let ordinal = state.next;
-            queue.items -= 1;
-            queue.bytes -= job.texts[ordinal].len() + crate::embedding::DIMENSION * 4;
-            state.next += 1;
-            state.active += 1;
-            state.calls += 1;
-            if state.next == job.texts.len() {
-                queue.jobs.pop_front();
-            }
-            drop(state);
-            shared.profile.queue_end("inference", job.queued);
-            return Some((job, ordinal));
+        drop(queue);
+        if state.cancelled {
+            job.changed.notify_all();
+            job.ready.notify_waiters();
+            continue;
         }
-        let idle = shared.profile.stage("inference", Activity::Input);
-        queue = shared.changed.wait(queue).unwrap();
-        drop(idle);
+        state.next += 1;
+        state.active += 1;
+        state.calls += 1;
+        drop(state);
+        shared.profile.queue_end("inference", job.queued);
+        return Some((job, ordinal));
     }
 }
 
@@ -231,12 +258,8 @@ impl Drop for Pool {
         {
             let mut queue = self.shared.queue.lock().unwrap();
             queue.stopped = true;
-            for job in queue.jobs.drain(..) {
-                job.state.lock().unwrap().cancelled = true;
-                job.changed.notify_all();
-            }
+            queue.sender.take();
         }
-        self.shared.changed.notify_all();
         for thread in self.threads.drain(..) {
             // In-flight inference finishes before the model sessions are dropped.
             let _ = thread.join();

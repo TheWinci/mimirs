@@ -28,6 +28,7 @@ pub struct Reads {
 
 #[derive(Default)]
 pub struct Watcher {
+    pub assessed_items: Option<usize>,
     pub target: Option<crate::status::Target>,
     metadata: Option<String>,
     paths: Vec<String>,
@@ -255,6 +256,7 @@ impl Watcher {
             return Ok((false, false));
         }
         self.metadata = None;
+        self.assessed_items = None;
         let input = Input::capture(options, reads, &mut self.target)?;
         self.paths = input.observations.keys().cloned().collect();
         self.journal = input.journal.clone();
@@ -282,6 +284,7 @@ impl Watcher {
         )?;
         self.cache = crate::files::stamp(&cache_path).ok();
         self.metadata = Some(after);
+        self.assessed_items = input.checkout.as_ref().map(|_| input.claims.len());
         Ok((assessed, published))
     }
 }

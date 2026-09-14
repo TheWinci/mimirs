@@ -10,21 +10,21 @@ files_found: 1
 elapsed_time: 1.23 seconds
 <ESC>[?7h<ESC>[5F<ESC>[Jwalk_error: locked: Permission denied
 <ESC>[?7lindexing: root
-phase: indexing
+phase: processing
 file: a.rs
-file_progress: 0% (0/0 documents)
-index_progress: 0% (0/1 files)
+file_progress: unknown (documents)
+files_completed: 0% (0/1 files)
 elapsed_time: 2.47 seconds
 <ESC>[?7h<ESC>[6F<ESC>[J<ESC>[?7lindexing: root
-phase: indexing
+phase: processing
 file: a.rs
-file_progress: 100% (256/257 documents)
-index_progress: 0% (0/1 files)
+file_progress: 99% (256/257 documents)
+files_completed: 0% (0/1 files)
 elapsed_time: 3.70 seconds
 <ESC>[?7h<ESC>[6F<ESC>[J<ESC>[?7lindexing: root
-phase: indexing
+phase: published
 file: a.rs
 file_progress: 100% (257/257 documents)
-index_progress: 100% (1/1 files)
+files_completed: 100% (1/1 files)
 elapsed_time: 4.94 seconds
 <ESC>[?7h<ESC>[6F<ESC>[J

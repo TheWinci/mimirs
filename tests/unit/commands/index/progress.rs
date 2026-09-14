@@ -42,8 +42,13 @@ fn control_characters_in_paths_and_errors_are_printed_as_text() {
 
 #[test]
 fn percentages_round_and_zero_totals_distinguish_started_from_finished() {
-    assert_eq!(percent((1, 3), false), 33);
-    assert_eq!(percent((2, 3), false), 67);
-    assert_eq!(percent((0, 0), false), 0);
-    assert_eq!(percent((0, 0), true), 100);
+    assert_eq!(percent((1, 3)), 33);
+    assert_eq!(percent((2, 3)), 67);
+    assert_eq!(percent((0, 0)), 0);
+    assert_eq!(Work::Unknown.label("documents"), "unknown (documents)");
+    assert_eq!(Work::NotApplicable.label("documents"), "not applicable");
+    assert_eq!(
+        Work::Known { done: 0, total: 0 }.label("documents"),
+        "0/0 documents (no work)"
+    );
 }

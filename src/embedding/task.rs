@@ -108,6 +108,12 @@ impl SourceTask {
         }
     }
 
+    pub(crate) async fn wait_ready(&self) {
+        if let Task::Pending { job, .. } = &self.inner {
+            job.wait_ready().await;
+        }
+    }
+
     pub fn finish(
         mut self,
         profile: &Profiler,

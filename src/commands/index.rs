@@ -19,15 +19,22 @@ pub fn run(report_path: Option<&Path>, cache_dir: Option<PathBuf>) -> anyhow::Re
     let start = Instant::now();
     let stderr = io::stderr();
     let terminal = stderr.is_terminal();
-    let result = crate::index::run_at_profiled(
-        Path::new("."),
-        || embedding::production_profiled(cache_dir, profile.clone()),
-        &mut io::stdout().lock(),
-        &mut stderr.lock(),
-        terminal,
-        &|| start.elapsed(),
-        &profile,
-    );
+    let result = (|| -> anyhow::Result<()> {
+        let root = Path::new(".").canonicalize()?;
+        let elapsed = || start.elapsed();
+        let mut output = stderr;
+        crate::index::progress::live(&root, &mut output, terminal, &elapsed, |progress| {
+            progress.profile = profile.clone();
+            progress.status = Some(crate::status::Activity::start(&root, "index", "source"));
+            execute(
+                &root,
+                || embedding::production_profiled(cache_dir, profile.clone()),
+                progress,
+                &mut io::stdout().lock(),
+            )
+            .map(|_| ())
+        })
+    })();
     if let Some(path) = report_path {
         let report = profile
             .finish(result.as_ref().err().map(|e| format!("{e:#}")))
@@ -45,4 +52,49 @@ pub fn run(report_path: Option<&Path>, cache_dir: Option<PathBuf>) -> anyhow::Re
         return result.and(saved);
     }
     result
+}
+
+/// The production command path also accepts deterministic workers in regression tests.
+pub(crate) fn execute(
+    root: &Path,
+    make: impl FnOnce() -> anyhow::Result<embedding::Embedder>,
+    progress: &mut crate::index::progress::Progress<'_>,
+    output: &mut dyn Write,
+) -> anyhow::Result<crate::processor::ProcessingResult> {
+    let result = crate::processor::Session::default().process(
+        crate::processor::Request {
+            root,
+            knowledge: &crate::knowledge::observation::Options {
+                root: root.to_path_buf(),
+                ..Default::default()
+            },
+            force: true,
+        },
+        make,
+        crate::analysis::extract,
+        progress,
+    );
+    if let Some(status) = &mut progress.status {
+        status.completion(&[]);
+        match &result {
+            Ok(report) if !report.errors.is_empty() => status.finish(
+                "incomplete",
+                report.errors.first().map(String::as_str),
+                None,
+                None,
+            ),
+            _ => status.result(&result),
+        }
+    }
+    progress.clear()?;
+    let report = result?;
+    report.write_summary(output)?;
+    writeln!(output, "time: {:.2} seconds", progress.elapsed().as_secs_f64())?;
+    if !report.errors.is_empty() {
+        anyhow::bail!(
+            "processing failed: {}",
+            crate::files::preview(&report.errors[0], 500)
+        );
+    }
+    Ok(report)
 }

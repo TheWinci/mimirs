@@ -4,14 +4,13 @@ use crate::index::graph;
 use crate::index::update::indexed_paths;
 use crate::knowledge::observation as knowledge;
 
-use crate::files::cache::{load, persist, remove};
+use crate::files::cache::load;
 use crate::{
     analysis,
     embedding::{self, Embedder},
 };
 use anyhow::{Result, ensure};
 use clap::Args;
-use serde::Serialize;
 use serde_json::{Value, json};
 use std::{
     path::PathBuf,
@@ -42,26 +41,10 @@ pub struct Options {
     pub state: Option<PathBuf>,
 }
 
-#[derive(Default, Debug, Serialize)]
-pub struct Cycle {
-    selected_source_reads: usize,
-    knowledge_support_reads: usize,
-    knowledge_journal_replays: usize,
-    analyzed: usize,
-    embedded_documents: usize,
-    indexed: usize,
-    invalidated: usize,
-    graph_rebuilt: bool,
-    graph_published: bool,
-    knowledge_assessed: bool,
-    knowledge_published: bool,
-    state_published: bool,
-    errors: Vec<String>,
-}
+use crate::processor::ProcessingResult as Cycle;
 #[derive(Default)]
 struct Engine {
-    source: crate::index::update::Update,
-    knowledge: knowledge::Watcher,
+    session: crate::processor::Session,
     status: Option<crate::status::Activity>,
 }
 impl Engine {
@@ -72,93 +55,38 @@ impl Engine {
         make: impl FnOnce() -> Result<Embedder>,
         extract: impl Fn(crate::source::SourceFile) -> Result<analysis::Analysis>,
     ) -> Result<Cycle> {
-        let root = &options.root;
-        // Ownership still covers observation, invalidation and both publications.
-        let _lock = crate::storage::writer::acquire(root)?;
-        let source = self.source.run(
-            crate::index::update::Options {
-                root,
-                force,
-                settle: (options.debounce_ms > 0 && !options.once)
-                    .then(|| Duration::from_millis(options.debounce_ms)),
-            },
-            make,
-            extract,
-            &mut self.status,
-        )?;
-        let complete = source.complete;
-        let inputs = source.inputs;
-        let mut report = Cycle {
-            selected_source_reads: source.selected_source_reads,
-            analyzed: source.analyzed,
-            embedded_documents: source.embedded_documents,
-            indexed: source.indexed,
-            invalidated: source.invalidated,
-            graph_rebuilt: source.graph_rebuilt,
-            graph_published: source.graph_published,
-            errors: source.errors,
-            ..Default::default()
-        };
-        let mut reads = knowledge::Reads::default();
-        match self
-            .knowledge
-            .refresh(&options.knowledge(), force, &mut reads)
-        {
-            Ok((assessed, published)) => {
-                report.knowledge_assessed = assessed;
-                report.knowledge_published = published;
-            }
-            Err(error) => {
-                if let Some(status) = &mut self.status {
-                    status.target(self.knowledge.target.clone());
-                    status.record(
-                        "watch-knowledge",
-                        "knowledge",
-                        "failure",
-                        Some(&error.to_string()),
-                    );
-                }
-                remove(root, "knowledge.json")?;
-                report.errors.push(format!("knowledge: {error:#}"));
-            }
-        }
-        report.knowledge_support_reads = reads.support;
-        report.knowledge_journal_replays = reads.journal_replays;
-        report.state_published = persist(
-            root,
-            "state.json",
-            &json!({"version":1,
-            "source":if !complete {"incomplete"} else {"current"},
-            "inputs":inputs, "errors":report.errors}),
-        )?;
-        if let Some(status) = &mut self.status {
-            status.target(None);
-            if complete && (force || report.indexed > 0 || report.invalidated > 0) {
-                status.record("watch-source", "source", "success", None);
-                for component in ["analysis", "vectors_model"] {
-                    status.observe(
-                        component,
-                        "observed",
-                        "watch publication observed; use explicit validation for current freshness",
-                    );
-                }
-            }
-            if report.graph_published {
-                status.observe(
-                    "relationships",
-                    "observed",
-                    "watch graph published at this time; validation remains explicit",
+        let stderr = std::io::stderr();
+        let terminal = std::io::IsTerminal::is_terminal(&stderr);
+        let mut output = stderr;
+        let start = Instant::now();
+        let elapsed = || start.elapsed();
+        let cycle = crate::index::progress::live(
+            &options.root,
+            &mut output,
+            terminal,
+            &elapsed,
+            |progress| {
+                progress.status = self.status.take();
+                let result = self.session.process(
+                    crate::processor::Request {
+                        root: &options.root,
+                        knowledge: &options.knowledge(),
+                        force,
+                    },
+                    make,
+                    extract,
+                    progress,
                 );
-            }
-            if report.knowledge_assessed {
-                status.target(self.knowledge.target.clone());
-                status.record("watch-knowledge", "knowledge", "success", None);
-                status.target(None);
-            }
-            status.progress("watching", "source", Some("."));
+                let cleared = progress.clear();
+                self.status = progress.status.take();
+                cleared?;
+                result
+            },
+        );
+        if let Some(status) = &mut self.status {
+            status.resume_warnings();
         }
-        // Publication can change directory metadata but never belongs to the source selection.
-        Ok(report)
+        cycle
     }
 }
 
@@ -206,6 +134,9 @@ pub fn run(mut options: Options) -> Result<()> {
             full = Instant::now();
         }
         startup = false;
+        if !options.once && options.debounce_ms > 0 {
+            std::thread::sleep(Duration::from_millis(options.debounce_ms));
+        }
         match engine.cycle(&options, force, embedding::production, analysis::extract) {
             Ok(report) => {
                 if options.once
@@ -244,6 +175,9 @@ pub fn run(mut options: Options) -> Result<()> {
                 }
                 eprintln!("watch: {error:#}");
             }
+        }
+        if let Some(status) = &mut engine.status {
+            status.progress("watching", "source", None);
         }
         std::thread::sleep(Duration::from_millis(options.interval_ms));
     }

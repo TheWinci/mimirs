@@ -149,10 +149,10 @@ fn explicit_status_selection_stays_empty_and_relationships_survive_heartbeat() {
             .spawn()
             .unwrap(),
     );
-    let initial = fs::read(root.join(".mimirs/status")).unwrap();
-    wait_for(|| fs::read(root.join(".mimirs/status")).is_ok_and(|v| v != initial));
-    let started = fs::read(root.join(".mimirs/status")).unwrap();
-    wait_for(|| fs::read(root.join(".mimirs/status")).is_ok_and(|v| v != started));
+    let initial = fs::read(root.join(".mimirs/status.json")).unwrap();
+    wait_for(|| fs::read(root.join(".mimirs/status.json")).is_ok_and(|v| v != initial));
+    let started = fs::read(root.join(".mimirs/status.json")).unwrap();
+    wait_for(|| fs::read(root.join(".mimirs/status.json")).is_ok_and(|v| v != started));
     assert!(watch.0.try_wait().unwrap().is_none());
     // Indexed readers themselves take writer ownership, so finish the watcher first.
     drop(watch);

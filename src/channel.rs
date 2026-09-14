@@ -1,10 +1,8 @@
-//! Bounded, cancellable worker channels. Closing a run wakes both producers and
-//! consumers; queued values are dropped outside the channel lock.
-use std::collections::VecDeque;
-use std::sync::{Arc, Condvar, Mutex, Weak};
-use std::time::Instant;
-
+//! Tokio unbounded channels with run cancellation and queue profiling.
 use crate::profiling::{Activity, Profiler};
+use std::sync::{Arc, Mutex, Weak};
+use std::time::Instant;
+use tokio::sync::mpsc;
 
 pub(super) trait Close: Send + Sync {
     fn close(&self);
@@ -58,61 +56,55 @@ impl Drop for Guard {
     }
 }
 
+type Envelope<T> = (T, usize, Option<Instant>);
+
 struct State<T> {
-    values: VecDeque<(T, usize, Option<Instant>)>,
-    bytes: usize,
+    sender: Option<mpsc::UnboundedSender<Envelope<T>>>,
     senders: usize,
-    closed: bool,
+    items: usize,
+    bytes: usize,
+    cancelled: bool,
 }
 
 struct Shared<T> {
     state: Mutex<State<T>>,
-    readable: Condvar,
-    writable: Condvar,
-    capacity: usize,
     profile: Profiler,
     name: &'static str,
 }
 
 impl<T: Send> Close for Shared<T> {
     fn close(&self) {
-        let values = {
-            let mut state = self.state.lock().unwrap();
-            state.closed = true;
-            state.bytes = 0;
-            std::mem::take(&mut state.values)
-        };
-        self.readable.notify_all();
-        self.writable.notify_all();
-        drop(values);
+        let mut state = self.state.lock().unwrap();
+        state.cancelled = true;
+        state.sender.take();
     }
 }
 
 pub(super) struct Sender<T: Send>(Arc<Shared<T>>);
-pub(super) struct Receiver<T: Send>(Arc<Shared<T>>);
+pub(super) struct Receiver<T: Send> {
+    shared: Arc<Shared<T>>,
+    inner: mpsc::UnboundedReceiver<Envelope<T>>,
+}
 
-pub(super) fn bounded<T: Send + 'static>(
-    capacity: usize,
+pub(super) fn unbounded<T: Send + 'static>(
     name: &'static str,
     profile: &Profiler,
     cancel: &Cancel,
 ) -> (Sender<T>, Receiver<T>) {
-    assert!(capacity > 0);
+    let (sender, inner) = mpsc::unbounded_channel();
     let shared = Arc::new(Shared {
         state: Mutex::new(State {
-            values: VecDeque::new(),
-            bytes: 0,
+            sender: Some(sender),
             senders: 1,
-            closed: false,
+            items: 0,
+            bytes: 0,
+            cancelled: false,
         }),
-        readable: Condvar::new(),
-        writable: Condvar::new(),
-        capacity,
         profile: profile.clone(),
         name,
     });
     cancel.register(shared.clone());
-    (Sender(shared.clone()), Receiver(shared))
+    (Sender(shared.clone()), Receiver { shared, inner })
 }
 
 impl<T: Send> Clone for Sender<T> {
@@ -124,53 +116,99 @@ impl<T: Send> Clone for Sender<T> {
 
 impl<T: Send> Sender<T> {
     pub fn send(&self, value: T, bytes: usize) -> Result<(), T> {
+        self.send_at(value, bytes, self.0.profile.queue_start())
+    }
+
+    fn send_at(&self, value: T, bytes: usize, queued: Option<Instant>) -> Result<(), T> {
         let mut state = self.0.state.lock().unwrap();
-        while !state.closed && state.values.len() == self.0.capacity {
-            let _wait = self.0.profile.stage(self.0.name, Activity::Output);
-            state = self.0.writable.wait(state).unwrap();
-        }
-        if state.closed {
+        let Some(sender) = &state.sender else {
             return Err(value);
-        }
+        };
+        sender
+            .send((value, bytes, queued))
+            .map_err(|error| error.0.0)?;
+        state.items += 1;
         state.bytes += bytes;
-        state
-            .values
-            .push_back((value, bytes, self.0.profile.queue_start()));
         self.0
             .profile
-            .stage_queue(self.0.name, state.values.len(), state.bytes);
-        drop(state);
-        self.0.readable.notify_one();
+            .stage_queue(self.0.name, state.items, state.bytes);
         Ok(())
     }
 }
 
 impl<T: Send> Drop for Sender<T> {
     fn drop(&mut self) {
-        self.0.state.lock().unwrap().senders -= 1;
-        self.0.readable.notify_all();
+        let mut state = self.0.state.lock().unwrap();
+        state.senders -= 1;
+        if state.senders == 0 {
+            state.sender.take();
+        }
     }
 }
 
-impl<T: Send> Receiver<T> {
-    pub fn recv(&self) -> Option<T> {
-        let mut state = self.0.state.lock().unwrap();
-        while !state.closed && state.values.is_empty() && state.senders != 0 {
-            let _wait = self.0.profile.stage(self.0.name, Activity::Input);
-            state = self.0.readable.wait(state).unwrap();
+impl<T: Send + 'static> Receiver<T> {
+    pub async fn recv(&mut self) -> Option<T> {
+        let wait = (self.inner.is_empty() && !self.inner.is_closed())
+            .then(|| self.shared.profile.stage(self.shared.name, Activity::Input));
+        // Await even for buffered messages so Tokio's cooperative scheduling
+        // budget applies when a producer keeps the queue continuously nonempty.
+        let value = self.inner.recv().await;
+        drop(wait);
+        match self.received(value) {
+            Ok(value) => value,
+            Err(value) => {
+                let inner = std::mem::replace(&mut self.inner, mpsc::unbounded_channel().1);
+                // Cancelled payloads can wait for in-flight inference on drop.
+                tokio::task::spawn_blocking(move || drop((value, inner)))
+                    .await
+                    .expect("channel cleanup panicked");
+                None
+            }
         }
-        let (value, bytes, queued) = state.values.pop_front()?;
-        self.0.profile.queue_end(self.0.name, queued);
+    }
+
+    pub fn blocking_recv(&mut self) -> Option<T> {
+        let value = match self.inner.try_recv() {
+            Ok(value) => Some(value),
+            Err(mpsc::error::TryRecvError::Disconnected) => None,
+            Err(mpsc::error::TryRecvError::Empty) => {
+                let _wait = self.shared.profile.stage(self.shared.name, Activity::Input);
+                self.inner.blocking_recv()
+            }
+        };
+        match self.received(value) {
+            Ok(value) => value,
+            Err(value) => {
+                drop(value);
+                while let Ok(value) = self.inner.try_recv() {
+                    drop(value);
+                }
+                None
+            }
+        }
+    }
+
+    fn received(&mut self, value: Option<Envelope<T>>) -> Result<Option<T>, Option<Envelope<T>>> {
+        let mut state = self.shared.state.lock().unwrap();
+        if state.cancelled {
+            state.items = 0;
+            state.bytes = 0;
+            return Err(value);
+        }
+        let Some((value, bytes, queued)) = value else {
+            return Ok(None);
+        };
+        state.items -= 1;
         state.bytes -= bytes;
         drop(state);
-        self.0.writable.notify_one();
-        Some(value)
+        self.shared.profile.queue_end(self.shared.name, queued);
+        Ok(Some(value))
     }
 }
 
 impl<T: Send> Drop for Receiver<T> {
     fn drop(&mut self) {
-        self.0.close();
+        self.shared.close();
     }
 }
 

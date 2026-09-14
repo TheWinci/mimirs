@@ -55,6 +55,7 @@ pub(super) fn run(
     summary: &mut Summary,
     read: impl Fn(&Path, &str) -> anyhow::Result<source::SourceFile>,
     extract: impl Fn(source::SourceFile) -> anyhow::Result<Analysis>,
+    verify_current: bool,
 ) -> anyhow::Result<Vec<String>> {
     let mut pending = VecDeque::<Pending>::new();
     let mut bytes = 0usize;
@@ -69,6 +70,7 @@ pub(super) fn run(
                 walk::stream::Event::Error(error) => {
                     progress.issue(None, &error.to_string());
                     progress.diagnostic(&format!("walk_error: {error}"))?;
+                    summary.failures.push(format!("discovery: {error}"));
                     summary.walk_errors += 1;
                     continue;
                 }
@@ -95,6 +97,7 @@ pub(super) fn run(
                     summary,
                     &mut successful,
                     total.unwrap_or(usize::MAX),
+                    verify_current.then_some(root),
                 )?;
             }
             let (file_profile, scope) =
@@ -108,6 +111,7 @@ pub(super) fn run(
                     (completed, total.unwrap_or(usize::MAX)),
                     false,
                 )?;
+                summary.source_reads += 1;
                 let source = match file_profile.measure("source_read", || read(root, path)) {
                     Ok(source) => source,
                     Err(error) => return Ok(Outcome::Skipped(error)),
@@ -121,19 +125,22 @@ pub(super) fn run(
                     return Ok(Outcome::Reused);
                 }
                 Ok(Outcome::Changed((|| {
+                    summary.analyzed += 1;
+                    summary.attempted[0] += 1;
                     let analysis = file_profile
                         .measure("analysis", || extract(source))
                         .with_context(|| format!("cannot analyze source file {path}"))?;
+                    summary.ready[0] += 1;
                     for diagnostic in &analysis.diagnostics {
-                        progress.diagnostic(&format!(
-                            "syntax: {path}:{}:{} {}",
-                            diagnostic.span.line_start, diagnostic.column, diagnostic.kind
-                        ))?;
+                        progress.syntax(path, diagnostic)?;
                     }
                     file_profile.stage_items("parsing", 1);
+                    summary.attempted[1] += 1;
                     let documents = file_profile.measure("chunking_token_budget", || {
                         crate::retrieval::ts_v2::documents(&analysis)
                     })?;
+                    summary.ready[1] += 1;
+                    summary.documents += documents.len();
                     file_profile.count("documents", documents.len());
                     file_profile.stage_items("windows", documents.len());
                     let texts: Vec<_> = file_profile.measure("document_texts", || {
@@ -147,6 +154,7 @@ pub(super) fn run(
                             false,
                         )?;
                     }
+                    summary.attempted[2] += 1;
                     let task = embedder
                         .submit_ts_documents(&texts, &file_profile, |done, document_total| {
                             if progress.is_terminal() {
@@ -201,6 +209,7 @@ pub(super) fn run(
                 summary,
                 &mut successful,
                 total.unwrap_or(usize::MAX),
+                verify_current.then_some(root),
             )?;
         }
         Ok(successful)
@@ -220,6 +229,7 @@ fn finish(
     summary: &mut Summary,
     successful: &mut Vec<String>,
     total: usize,
+    root: Option<&Path>,
 ) -> anyhow::Result<()> {
     let Pending {
         outcome,
@@ -235,15 +245,26 @@ fn finish(
         Outcome::Skipped(error) => {
             progress.issue(Some(path), &error.to_string());
             progress.diagnostic(&format!("skipped: {error:#}"))?;
+            summary.failures.push(format!("{path}: {error:#}"));
             summary.skipped += 1;
             profile.count("files_skipped", 1);
-            progress.indexing(path, (0, 0), (ordinal + 1, total), true)?;
+            progress.file(
+                path,
+                super::progress::Work::NotApplicable,
+                (ordinal + 1, total),
+                super::progress::FileOutcome::Skipped,
+            )?;
         }
         Outcome::Reused => {
             successful.push(path.to_owned());
             summary.unchanged += 1;
             profile.count("files_reused", 1);
-            progress.indexing(path, (0, 0), (ordinal + 1, total), true)?;
+            progress.file(
+                path,
+                super::progress::Work::NotApplicable,
+                (ordinal + 1, total),
+                super::progress::FileOutcome::Reused,
+            )?;
         }
         Outcome::Changed(prepared) => {
             // Delay invalidation until this file reaches the commit position.
@@ -262,6 +283,13 @@ fn finish(
                     Ok(())
                 })
                 .with_context(|| format!("cannot embed source file {path}"))?;
+            summary.ready[2] += 1;
+            summary.embedded_documents += vectors.len();
+            summary.attempted[3] += 1;
+            if let Some(root) = root {
+                summary.source_reads += 1;
+                super::check_publication(root, &analysis)?;
+            }
             profile.measure("storage_save", || {
                 storage::documents::save(
                     connection,
@@ -273,17 +301,25 @@ fn finish(
                     },
                 )
             })?;
-            progress.diagnostic(&format!("documents: {path}: {}", documents.len()))?;
+
             successful.push(path.to_owned());
             summary.indexed += 1;
+            summary.ready[3] += 1;
             progress.published(path);
             profile.count("files_indexed", 1);
             profile.stage_items("database", 1);
-            progress.indexing(
+            progress.file(
                 path,
-                (documents.len(), documents.len()),
+                super::progress::Work::Known {
+                    done: documents.len(),
+                    total: documents.len(),
+                },
                 (ordinal + 1, total),
-                true,
+                if documents.is_empty() {
+                    super::progress::FileOutcome::Empty
+                } else {
+                    super::progress::FileOutcome::Published
+                },
             )?;
         }
     }

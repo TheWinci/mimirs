@@ -34,6 +34,15 @@ mimirs context "streaming indexing failure searchable snapshots retry ownership"
 ```
 
 Initialization prepares the local embedding model and may download its assets.
+Index completes with warnings for non-UTF-8 files and parser diagnostics. Readable
+source remains available; relationship coverage stays incomplete until those
+limitations are resolved. The completion summary lists counts and points to
+`.mimirs/watch/diagnostics.json` for deduplicated paths, locations and reasons.
+That file describes the last processing observation, retains up to 10,000 details,
+and reports omitted details separately from the full counts. Read, inference,
+storage and concurrent-source failures still fail the command. Unchanged warning
+inputs are reused by watch; editing their bytes makes them eligible for processing again.
+
 The default context budget is 16,000 UTF-8 bytes. Results distinguish indexed
 source from current files and recorded claims from their evidence status.
 Knowledge is optional; source retrieval works without it.
@@ -144,6 +153,13 @@ assessment for a request.
 mimirs watch
 mimirs mcp --root /absolute/path/to/project
 ```
+
+The production indexing pipeline uses Tokio async stages and unbounded channels
+for discovery, parsing, window preparation and publication. Blocking filesystem,
+parser and SQLite work yields the async scheduler; dedicated inference workers
+consume an unbounded work channel. Files publish in source order. Worker count
+limits simultaneous inference, but there is no fixed queued-message or retained-file
+limit, so memory use can grow when a downstream stage falls behind.
 
 Watch runs in the foreground and updates source, analysis, vectors, relationships
 and mechanical knowledge assessments. It does not start an LLM or author reviews.

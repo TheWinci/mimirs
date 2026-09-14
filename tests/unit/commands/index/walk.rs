@@ -290,6 +290,9 @@ fn default_target_exclusion_is_rooted_and_custom_rules_stay_explicit() {
 fn operational_outputs_are_excluded_from_both_walks_under_explicit_includes() {
     let files = [
         ".mimirs/status",
+        ".mimirs/status.json",
+        ".mimirs/status.json.tmp-example",
+        ".mimirs/status.tmp-example",
         ".mimirs/status.lock",
         ".mimirs/status-owners/owner",
         ".mimirs/watch/view.json",

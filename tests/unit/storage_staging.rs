@@ -378,3 +378,42 @@ fn stage_write_failure_never_commits_a_completion_record() {
     );
     store.finish().unwrap();
 }
+
+#[test]
+fn recovery_rejects_corrupt_payload_and_mismatched_identity() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join(".mimirs")).unwrap();
+    let (analysis, documents, plan, vectors, policy) = fixture();
+    let hash = super::super::processing::source_hash(&analysis.source.text);
+    let key = Key {
+        ordinal: 0,
+        path: "a.rs",
+        source_hash: &hash,
+        policy: &policy,
+    };
+    let mut store = Store::open_for(
+        &dir.path().join(".mimirs/staging.db"),
+        &Profiler::default(),
+        true,
+    )
+    .unwrap();
+    for stage in [
+        Stage::Discovered,
+        Stage::Source(&analysis),
+        Stage::Windows(&documents, &plan),
+        Stage::Vectors(&vectors),
+    ] {
+        store.record(&key, stage).unwrap();
+    }
+    assert!(recover(dir.path(), "a.rs", &hash, &policy).is_some());
+    assert!(recover(dir.path(), "b.rs", &hash, &policy).is_none());
+    assert!(recover(dir.path(), "a.rs", &"0".repeat(64), &policy).is_none());
+    store
+        .connection
+        .execute(
+            "UPDATE vector_stages SET payload=zeroblob(length(payload))",
+            [],
+        )
+        .unwrap();
+    assert!(recover(dir.path(), "a.rs", &hash, &policy).is_none());
+}

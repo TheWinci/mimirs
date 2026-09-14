@@ -31,7 +31,7 @@ impl Stream {
         cancel: &Cancel,
     ) -> Result<Self> {
         let overrides = selection(root, config)?;
-        let (send, receive) = channel::bounded(64, "paths", profile, cancel);
+        let (send, receive) = channel::unbounded("paths", profile, cancel);
         let root = PathBuf::from(root);
         let profile = profile.clone();
         let cancellation = cancel.clone();
@@ -126,7 +126,7 @@ impl Iterator for Stream {
         if self.ended {
             return None;
         }
-        match self.receive.recv() {
+        match self.receive.blocking_recv() {
             Some(event @ Event::End { .. }) => {
                 self.ended = true;
                 Some(Ok(event))

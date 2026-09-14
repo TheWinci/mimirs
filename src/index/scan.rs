@@ -1,7 +1,7 @@
 use crate::{
     config::Config, files::fingerprint, source::SourceFile, source::observation, source::walk,
 };
-use anyhow::{Context, Result, ensure};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -9,9 +9,17 @@ use std::{
 };
 
 use crate::files::{Stamp, stamp};
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Content {
+    #[default]
+    Text,
+    UnsupportedEncoding,
+}
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct File {
     pub stamp: Option<Stamp>,
+    #[serde(default)]
+    pub content: Content,
     pub hash: Option<String>,
     pub error: Option<String>,
 }
@@ -26,17 +34,44 @@ pub struct Scan {
 }
 impl Scan {
     pub fn capture(root: &Path, force: bool, previous: Option<&Self>) -> Result<(Self, usize)> {
-        let config = Config::load(root)?;
-        let sources = walk::discover(root, &config.selection(), |_, _| Ok(()))?;
+        Self::capture_profiled(
+            root,
+            force,
+            previous,
+            &crate::profiling::Profiler::default(),
+        )
+    }
+    pub fn capture_profiled(
+        root: &Path,
+        force: bool,
+        previous: Option<&Self>,
+        profile: &crate::profiling::Profiler,
+    ) -> Result<(Self, usize)> {
+        Self::capture_progress(root, force, previous, profile, &mut |_, _, _| Ok(()))
+    }
+    pub(crate) fn capture_progress(
+        root: &Path,
+        force: bool,
+        previous: Option<&Self>,
+        profile: &crate::profiling::Profiler,
+        progress: &mut impl FnMut(&str, &str, usize) -> std::io::Result<()>,
+    ) -> Result<(Self, usize)> {
+        let config = profile.measure("config", || Config::load(root))?;
+        let sources = walk::discover(root, &config.selection(), |path, found| {
+            progress("discovering source", path, found)
+        })?;
         let canonical_config = config.to_toml()?;
         let mut asset_config = config;
         asset_config.include = vec!["**/*".into()];
-        let assets = walk::discover(root, &asset_config.selection(), |_, _| Ok(()))?;
+        let assets = walk::discover(root, &asset_config.selection(), |path, found| {
+            progress("discovering resolver inputs", path, found)
+        })?;
         let mut errors = sources.errors;
         errors.extend(assets.errors);
         let mut reads = 0;
         let mut files = BTreeMap::new();
-        for path in sources.paths {
+        for (observed, path) in sources.paths.into_iter().enumerate() {
+            progress("observing source", &path, observed + 1)?;
             let current_stamp = stamp(&root.join(&path)).ok();
             let old = previous.and_then(|s| s.files.get(&path));
             let file = if !force
@@ -50,18 +85,23 @@ impl Scan {
                     Ok(Some(bytes)) => File {
                         stamp: current_stamp,
                         hash: Some(fingerprint(&bytes)),
-                        error: std::str::from_utf8(&bytes)
-                            .err()
-                            .map(|_| "source is not valid UTF-8".into()),
+                        content: if std::str::from_utf8(&bytes).is_ok() {
+                            Content::Text
+                        } else {
+                            Content::UnsupportedEncoding
+                        },
+                        error: None,
                     },
                     Ok(None) => File {
                         stamp: current_stamp,
                         hash: None,
+                        content: Content::Text,
                         error: Some("source disappeared during discovery".into()),
                     },
                     Err(e) => File {
                         stamp: current_stamp,
                         hash: None,
+                        content: Content::Text,
                         error: Some(format!("{e:#}")),
                     },
                 }
@@ -101,7 +141,7 @@ impl Scan {
             &serde_json::to_vec(&(
                 self.files
                     .iter()
-                    .map(|(p, f)| (p, &f.hash, &f.error))
+                    .map(|(p, f)| (p, &f.hash, &f.content, &f.error))
                     .collect::<Vec<_>>(),
                 &self.assets,
                 &self.config,
@@ -111,14 +151,6 @@ impl Scan {
             ))
             .unwrap(),
         )
-    }
-    pub fn source(&self, root: &Path, path: &str) -> Result<SourceFile> {
-        let source = read(root, path)?;
-        ensure!(
-            self.files[path].hash.as_deref() == Some(fingerprint(source.text.as_bytes()).as_str()),
-            "source changed during reconciliation: {path}"
-        );
-        Ok(source)
     }
 }
 

@@ -104,6 +104,8 @@ impl QueueReport {
 pub enum Activity {
     Active,
     Input,
+    // Retain the historical output-wait category for profiler regression tests.
+    #[cfg(test)]
     Output,
 }
 
@@ -400,6 +402,7 @@ impl Drop for StageScope {
             let value = match self.activity {
                 Activity::Active => &mut stage.active_seconds,
                 Activity::Input => &mut stage.input_wait_seconds,
+                #[cfg(test)]
                 Activity::Output => &mut stage.output_wait_seconds,
             };
             *value += start.elapsed().as_secs_f64();

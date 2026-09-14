@@ -1,23 +1,29 @@
 #[cfg(test)]
 use std::io;
+#[cfg(test)]
 use std::io::Write;
 use std::path::Path;
+#[cfg(test)]
 use std::time::Duration;
 
 use crate::profiling::Profiler;
 
-use crate::{config::Config, embedding, source, storage};
+#[cfg(test)]
+use crate::config::Config;
+use crate::{embedding, source, storage};
 
 mod admission;
+pub(crate) mod diagnostics;
 pub(crate) mod graph;
 pub(crate) mod initialize;
 mod scan;
 pub(crate) mod update;
 use crate::channel;
+#[cfg(test)]
 use crate::storage::writer as lock;
 mod parallel;
 mod pipeline;
-mod progress;
+pub(crate) mod progress;
 use crate::source::walk;
 
 use progress::Progress;
@@ -42,6 +48,7 @@ pub(crate) fn run_at(
     )
 }
 
+#[cfg(test)]
 pub(crate) fn run_at_profiled(
     root: &Path,
     make_embedder: impl FnOnce() -> anyhow::Result<embedding::Embedder>,
@@ -74,11 +81,19 @@ pub(crate) fn run_at_profiled(
 }
 
 #[derive(Default)]
-struct Summary {
+pub(crate) struct Summary {
+    ready: [usize; 4],
+    attempted: [usize; 4],
+    documents: usize,
+    source_reads: usize,
+    analyzed: usize,
+    embedded_documents: usize,
+    recovered: usize,
     indexed: usize,
     unchanged: usize,
     skipped: usize,
     walk_errors: usize,
+    failures: Vec<String>,
 }
 
 impl Summary {
@@ -87,6 +102,7 @@ impl Summary {
     }
 }
 
+#[cfg(test)]
 fn index_profiled(
     root: &Path,
     make_embedder: impl FnOnce() -> anyhow::Result<embedding::Embedder>,
@@ -135,6 +151,7 @@ fn index_with_profiled(
 }
 
 #[allow(clippy::too_many_arguments)]
+#[cfg(test)]
 fn index_with_mode(
     root: &Path,
     make_embedder: impl FnOnce() -> anyhow::Result<embedding::Embedder>,
@@ -193,7 +210,7 @@ fn index_with_mode(
     let available = std::thread::available_parallelism().map_or(1, usize::from);
     let workers = config.resolved_embedding_workers(available);
     profile.count("embedding_worker_limit", workers);
-    progress.phase("preparing model", "vectors_model", None);
+    progress.phase("preparing model", "vectors_model", None)?;
     let mut embedder = make_embedder()?
         .with_workers(workers)
         .with_profile(profile.clone());
@@ -234,6 +251,7 @@ fn index_with_mode(
             &mut summary,
             read,
             extract,
+            false,
         )?
     };
     profile.measure("reconciliation", || {
@@ -249,3 +267,17 @@ fn index_with_mode(
 #[cfg(test)]
 #[path = "../tests/unit/commands/index.rs"]
 mod tests;
+
+pub(crate) fn check_publication(
+    root: &Path,
+    analysis: &crate::analysis::Analysis,
+) -> anyhow::Result<()> {
+    // Syntax diagnostics limit relationship completeness, not exact-byte source use.
+    let observed = crate::source::observation::read_bytes(root, &analysis.source.path)?;
+    anyhow::ensure!(
+        observed.as_deref() == Some(analysis.source.text.as_bytes()),
+        "source changed during reconciliation: {}",
+        analysis.source.path
+    );
+    Ok(())
+}

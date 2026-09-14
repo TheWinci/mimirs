@@ -22,6 +22,7 @@ include = [
 ]
 
 [dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "macros"] }
 anyhow = "1.0.104"
 clap = { version = "4.6.6", features = ["derive"] }
 directories = "6.0.0"

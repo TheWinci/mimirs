@@ -19,13 +19,13 @@ fn allowed(from: &str, to: &str) -> bool {
             "analysis" => to == "source",
             "config" => matches!(to, "analysis" | "source"),
             "index" | "knowledge" => matches!(to, "analysis" | "source" | "config" | "status"),
-            "context" => matches!(
+            "context" | "processor" => matches!(
                 to,
                 "index" | "knowledge" | "analysis" | "source" | "config" | "status"
             ),
             "watch" => matches!(
                 to,
-                "index" | "knowledge" | "analysis" | "source" | "config" | "status"
+                "processor" | "index" | "knowledge" | "analysis" | "source" | "config" | "status"
             ),
             _ => false,
         }

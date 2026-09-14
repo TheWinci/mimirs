@@ -78,11 +78,16 @@ pub(crate) struct Store {
     run: String,
     path: PathBuf,
     profile: Profiler,
+    recoverable: bool,
 }
 
 impl Store {
     /// Caller holds the index's OS writer lock, including during cleanup.
+    #[cfg(test)]
     pub fn open(path: &Path, profile: &Profiler) -> Result<Self> {
+        Self::open_for(path, profile, false)
+    }
+    pub fn open_for(path: &Path, profile: &Profiler, recoverable: bool) -> Result<Self> {
         let mut connection = Connection::open(path)?;
         connection.execute_batch(
             "PRAGMA foreign_keys=ON; PRAGMA journal_mode=DELETE; PRAGMA synchronous=FULL;",
@@ -104,7 +109,16 @@ impl Store {
                 .as_nanos()
         );
         let tx = connection.transaction()?;
-        tx.execute("DELETE FROM runs", [])?;
+        if recoverable {
+            tx.execute("DELETE FROM work WHERE discovered=0 OR NOT EXISTS(SELECT 1 FROM source_stages s WHERE s.run=work.run AND s.ordinal=work.ordinal) OR NOT EXISTS(SELECT 1 FROM window_stages s WHERE s.run=work.run AND s.ordinal=work.ordinal) OR NOT EXISTS(SELECT 1 FROM vector_stages s WHERE s.run=work.run AND s.ordinal=work.ordinal)", [])?;
+            tx.execute("DELETE FROM work WHERE rowid NOT IN (SELECT rowid FROM work ORDER BY rowid DESC LIMIT 64)", [])?;
+            tx.execute(
+                "DELETE FROM runs WHERE NOT EXISTS(SELECT 1 FROM work WHERE work.run=runs.id)",
+                [],
+            )?;
+        } else {
+            tx.execute("DELETE FROM runs", [])?;
+        }
         tx.execute("INSERT INTO runs VALUES (?1)", [&run])?;
         tx.commit()?;
         Ok(Self {
@@ -112,6 +126,7 @@ impl Store {
             run,
             path: path.to_owned(),
             profile: profile.clone(),
+            recoverable,
         })
     }
 
@@ -214,16 +229,23 @@ impl Store {
 
     pub fn remove(&mut self, key: &Key<'_>) -> Result<()> {
         self.connection.execute(
-            "DELETE FROM work WHERE run=?1 AND ordinal=?2 AND source_hash=?3 AND policy=?4",
-            params![self.run, key.ordinal as i64, key.source_hash, key.policy],
+            "DELETE FROM work WHERE path=?1 AND source_hash=?2 AND policy=?3",
+            params![key.path, key.source_hash, key.policy],
         )?;
         Ok(())
     }
 
     pub fn finish(self) -> Result<()> {
         let _cleanup = self.profile.scope("staging_cleanup");
-        self.connection
-            .execute("DELETE FROM runs WHERE id=?1", [&self.run])?;
+        if !self.recoverable {
+            self.connection
+                .execute("DELETE FROM runs WHERE id=?1", [&self.run])?;
+        } else {
+            self.connection.execute(
+                "DELETE FROM runs WHERE NOT EXISTS(SELECT 1 FROM work WHERE work.run=runs.id)",
+                [],
+            )?;
+        }
         self.connection.execute_batch("VACUUM")?;
         Ok(())
     }
@@ -232,3 +254,33 @@ impl Store {
 #[cfg(test)]
 #[path = "../../tests/unit/storage_staging.rs"]
 mod tests;
+
+#[derive(Clone)]
+pub(crate) struct Recovered {
+    pub analysis: std::sync::Arc<Analysis>,
+    pub documents: Vec<Document>,
+    pub plan: WindowPlan,
+    pub vectors: Vec<Vec<f32>>,
+}
+/// Corrupt or incomplete disposable stages are a cache miss, never authority.
+pub(crate) fn recover(root: &Path, path: &str, hash: &str, policy: &str) -> Option<Recovered> {
+    (|| -> Result<Recovered> {
+        let connection = Connection::open_with_flags(root.join(".mimirs/staging.db"), rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+        connection.busy_timeout(std::time::Duration::from_secs(5))?;
+        let (run, ordinal): (String, i64) = connection.query_row("SELECT run,ordinal FROM work WHERE path=?1 AND source_hash=?2 AND policy=?3 AND discovered=1 AND EXISTS(SELECT 1 FROM source_stages s WHERE s.run=work.run AND s.ordinal=work.ordinal) AND EXISTS(SELECT 1 FROM window_stages s WHERE s.run=work.run AND s.ordinal=work.ordinal) AND EXISTS(SELECT 1 FROM vector_stages s WHERE s.run=work.run AND s.ordinal=work.ordinal) ORDER BY rowid DESC LIMIT 1", params![path,hash,policy], |r| Ok((r.get(0)?,r.get(1)?)))?;
+        let payload = |table: &str| -> Result<Vec<u8>> {
+            let (bytes, digest): (Vec<u8>,Vec<u8>) = connection.query_row(&format!("SELECT payload,digest FROM {table} WHERE run=?1 AND ordinal=?2 AND source_hash=?3 AND policy=?4"),params![run,ordinal,hash,policy],|r|Ok((r.get(0)?,r.get(1)?)))?;
+            ensure!(Sha256::digest(&bytes).as_slice()==digest, "corrupt staged payload"); Ok(bytes)
+        };
+        let analysis: Analysis=serde_json::from_slice(&payload("source_stages")?)?;
+        ensure!(analysis.source.path==path && super::processing::source_hash(&analysis.source.text)==hash,"stale staged source");
+        let (documents,inputs,mapping): (Vec<Document>,Vec<String>,Vec<Vec<usize>>)=serde_json::from_slice(&payload("window_stages")?)?;
+        let plan=WindowPlan { inputs: std::sync::Arc::new(inputs), documents: std::sync::Arc::new(mapping) };
+        let bytes=payload("vector_stages")?;
+        ensure!(bytes.len()==documents.len()*DIMENSION*4,"incomplete staged vectors");
+        let vectors: Vec<Vec<f32>>=bytes.chunks_exact(DIMENSION*4).map(|v|v.chunks_exact(4).map(|f|f32::from_le_bytes(f.try_into().unwrap())).collect()).collect();
+        let store=Store { connection,run, path: root.join(".mimirs/staging.db"), profile: Profiler::default(),recoverable:true };
+        store.validate_complete(&Key { ordinal:usize::try_from(ordinal)?,path,source_hash:hash,policy },&analysis,&documents,&plan,&vectors)?;
+        Ok(Recovered { analysis: std::sync::Arc::new(analysis),documents,plan,vectors })
+    })().ok()
+}

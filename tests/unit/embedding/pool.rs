@@ -134,9 +134,16 @@ fn worker_metrics_survive_file_completion_and_account_for_cancelled_work() {
 #[test]
 fn each_window_is_timed_until_dispatch_from_the_same_submission() {
     let profile = Profiler::enabled(crate::embedding::model_identity());
+    let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
     let shared = Shared {
         profile: profile.clone(),
-        ..Shared::default()
+        queue: Mutex::new(Queue {
+            stopped: false,
+            sender: Some(sender),
+            items: 0,
+            bytes: 0,
+        }),
+        receiver: Mutex::new(receiver),
     };
     let pool = Pool {
         shared: Arc::new(shared),
@@ -153,4 +160,25 @@ fn each_window_is_timed_until_dispatch_from_the_same_submission() {
     assert_eq!(report.queues["inference"].items, 2);
     assert!(report.queues["inference"].max_seconds > 0.0);
     assert!(report.stages["inference"].active_seconds == 0.0);
+}
+
+#[tokio::test]
+async fn async_completion_yields_to_other_tasks_and_handles_already_finished_jobs() {
+    let (release, released) = std::sync::mpsc::channel();
+    let released = Mutex::new(released);
+    let pool = Pool::new(vec![()], move |_, _| {
+        released
+            .lock()
+            .unwrap()
+            .recv_timeout(std::time::Duration::from_secs(2))?;
+        Ok(vec![1.0])
+    })
+    .unwrap();
+    let mut job = pool.submit(vec!["one".into()]);
+    tokio::join!(job.wait_ready(), async {
+        tokio::task::yield_now().await;
+        release.send(()).unwrap();
+    });
+    job.wait_ready().await;
+    assert_eq!(job.wait().unwrap(), vec![vec![1.0]]);
 }

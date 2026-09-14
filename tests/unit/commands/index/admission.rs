@@ -1,32 +1,22 @@
 use super::super::channel::Cancel;
 use super::*;
-use std::sync::mpsc;
-use std::time::Duration;
 
 #[test]
-fn oversized_files_run_alone_and_cancellation_wakes_admission() {
+fn file_accounting_has_no_capacity_or_payload_limit_and_observes_cancellation() {
     let profile = Profiler::enabled(crate::embedding::model_identity());
     let cancel = Cancel::default();
-    let admission = Admission::new(6, &profile, &cancel);
-    let first = admission.acquire(PAYLOAD_TARGET + 1).unwrap();
-    let (tx, rx) = mpsc::channel();
-    std::thread::scope(|scope| {
-        scope.spawn(|| {
-            let permit = admission.acquire(1);
-            tx.send(permit.is_some()).unwrap();
-        });
-        assert!(rx.recv_timeout(Duration::from_millis(20)).is_err());
-        drop(first);
-        assert!(rx.recv_timeout(Duration::from_secs(2)).unwrap());
-    });
-    let permit = admission.acquire(PAYLOAD_TARGET).unwrap();
-    std::thread::scope(|scope| {
-        scope.spawn(|| assert!(admission.acquire(1).is_none()));
-        cancel.cancel();
-    });
-    drop(permit);
+    let admission = Admission::new(&profile, &cancel);
+    let mut permits: Vec<_> = (0..100)
+        .map(|_| admission.acquire(33 * 1024 * 1024).unwrap())
+        .collect();
+    assert!(permits[0].grow(64 * 1024 * 1024));
     assert_eq!(
         profile.finish(None).unwrap().counters["index_queue_peak_files"],
-        1
+        100
     );
+    drop(permits);
+    assert_eq!(admission.0.state.lock().unwrap().files, 0);
+    assert_eq!(admission.0.state.lock().unwrap().bytes, 0);
+    cancel.cancel();
+    assert!(admission.acquire(1).is_none());
 }

@@ -84,24 +84,22 @@ pub struct Embedder {
 
 pub struct Worker {
     backend: Box<dyn Backend + Send>,
-    profile: Profiler,
 }
 
 impl Worker {
-    pub fn into_embedder(self) -> Embedder {
-        Embedder {
-            backend: self.backend,
-            profile: self.profile,
-        }
+    pub fn submit_ts_documents(
+        &mut self,
+        texts: &[String],
+        profile: &Profiler,
+        progress: impl FnMut(usize, usize) -> anyhow::Result<()>,
+    ) -> anyhow::Result<SourceTask> {
+        submit_documents(self.backend.as_mut(), texts, profile, progress)
     }
 }
 
 impl Embedder {
     pub fn take_worker(&mut self) -> Option<Worker> {
-        self.backend.take_worker().map(|backend| Worker {
-            backend,
-            profile: self.profile.clone(),
-        })
+        self.backend.take_worker().map(|backend| Worker { backend })
     }
     pub fn with_workers(mut self, workers: usize) -> Self {
         self.backend.set_workers(workers.max(1));
@@ -163,21 +161,13 @@ impl Embedder {
         Ok(vectors)
     }
 
+    #[cfg(test)]
     pub fn embed_ts_documents(
         &mut self,
         texts: &[String],
-        mut progress: impl FnMut(usize, usize) -> anyhow::Result<()>,
+        progress: impl FnMut(usize, usize) -> anyhow::Result<()>,
     ) -> anyhow::Result<Vec<Vec<f32>>> {
-        let mut output = Vec::new();
-        for batch in texts.chunks(SOURCE_BATCH_SIZE) {
-            let vectors = self.profile.measure("embedding", || {
-                self.backend.embed_source_profiled(batch, &self.profile)
-            })?;
-            validate(&vectors, batch.len())?;
-            output.extend(vectors);
-            progress(output.len(), texts.len())?;
-        }
-        Ok(output)
+        embed_source_documents(self.backend.as_mut(), texts, &self.profile, progress)
     }
 
     pub fn pending_files(&self) -> usize {
@@ -190,15 +180,7 @@ impl Embedder {
         profile: &Profiler,
         progress: impl FnMut(usize, usize) -> anyhow::Result<()>,
     ) -> anyhow::Result<SourceTask> {
-        if let Some(task) = profile.measure("embedding_prepare", || {
-            self.backend.submit_source(texts, profile)
-        })? {
-            return Ok(task.with_profile(profile.clone()));
-        }
-        let previous = std::mem::replace(&mut self.profile, profile.clone());
-        let result = self.embed_ts_documents(texts, progress);
-        self.profile = previous;
-        Ok(SourceTask::completed(result?))
+        submit_documents(self.backend.as_mut(), texts, profile, progress)
     }
 
     pub fn embed_ts_query(&mut self, query: &str) -> anyhow::Result<Vec<f32>> {
@@ -220,6 +202,40 @@ impl Embedder {
             .pop()
             .context("embedding backend returned no query vector")
     }
+}
+
+fn submit_documents(
+    backend: &mut dyn Backend,
+    texts: &[String],
+    profile: &Profiler,
+    progress: impl FnMut(usize, usize) -> anyhow::Result<()>,
+) -> anyhow::Result<SourceTask> {
+    if let Some(task) = profile.measure("embedding_prepare", || {
+        backend.submit_source(texts, profile)
+    })? {
+        return Ok(task.with_profile(profile.clone()));
+    }
+    Ok(SourceTask::completed(embed_source_documents(
+        backend, texts, profile, progress,
+    )?))
+}
+
+fn embed_source_documents(
+    backend: &mut dyn Backend,
+    texts: &[String],
+    profile: &Profiler,
+    mut progress: impl FnMut(usize, usize) -> anyhow::Result<()>,
+) -> anyhow::Result<Vec<Vec<f32>>> {
+    let mut output = Vec::new();
+    for batch in texts.chunks(SOURCE_BATCH_SIZE) {
+        let vectors = profile.measure("embedding", || {
+            backend.embed_source_profiled(batch, profile)
+        })?;
+        validate(&vectors, batch.len())?;
+        output.extend(vectors);
+        progress(output.len(), texts.len())?;
+    }
+    Ok(output)
 }
 
 fn validate(vectors: &[Vec<f32>], expected_count: usize) -> anyhow::Result<()> {

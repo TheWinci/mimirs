@@ -1,5 +1,5 @@
 //! TS v2 MiniLM input construction and float32 averaging. Model execution stays
-//! in the existing bounded worker pool.
+//! in the inference worker pool.
 use anyhow::{Context, Result, ensure};
 use regex::Regex;
 use std::sync::LazyLock;

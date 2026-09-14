@@ -172,10 +172,25 @@ fn failures_retire_vectors_facts_and_edges_then_recover() {
     let r = step(&mut engine, &o, false);
     assert!(r.errors.is_empty(), "{:?}", r.errors);
     assert!(graph::read(&o.root).is_ok());
-    fs::write(o.root.join("worker.ts"), "export function run( {\n").unwrap();
+    let malformed = "export function run( {\n";
+    fs::write(o.root.join("worker.ts"), malformed).unwrap();
     let r = step(&mut engine, &o, false);
-    assert!(!r.errors.is_empty());
-    assert_absent(&o, "worker.ts");
+    assert!(r.errors.is_empty());
+    assert!(r.warnings.parser_diagnostics > 0);
+    assert_eq!(r.indexed, 1);
+    assert!(matches!(
+        r.components["relationships"],
+        crate::processor::Outcome::Incomplete { .. }
+    ));
+    let db = storage::open_read_only(&o.root.join(".mimirs/index.db")).unwrap();
+    let saved = storage::analysis::load(&db, "worker.ts").unwrap().unwrap();
+    assert_eq!(saved.source.text, malformed);
+    assert!(!saved.diagnostics.is_empty());
+    let policy = storage::policy::read(&db).unwrap().unwrap();
+    assert!(storage::documents::load(&db, "worker.ts", &policy).is_ok());
+    storage::audit(&db).unwrap();
+    drop(db);
+    assert!(graph::read(&o.root).is_err());
     fs::write(o.root.join("worker.ts"), "export function run() {}\n").unwrap();
     assert!(step(&mut engine, &o, false).errors.is_empty());
     fs::rename(o.root.join("worker.ts"), o.root.join("renamed.ts")).unwrap();
@@ -664,4 +679,73 @@ fn status_model_failure_and_retry_use_the_vector_component() {
     assert!(step(&mut engine, &o, true).errors.is_empty());
     assert_eq!(read()["failures"], history);
     assert_eq!(read()["components"]["vectors_model"]["status"], "observed");
+}
+
+#[test]
+fn best_effort_watch_reuses_warnings_and_recovers_when_bytes_change() {
+    let f = Fixture::new();
+    let o = options(&f);
+    fs::write(o.root.join("reader.rs"), "fn read_bytes() { let = ; }\n").unwrap();
+    fs::write(o.root.join("middle.css"), [0xff]).unwrap();
+    let mut engine = Engine::default();
+    let embed = Rc::new(Cell::new(0));
+    let first = engine
+        .cycle(
+            &o,
+            true,
+            || {
+                Ok(Embedder::new(Counted {
+                    prepare: Rc::new(Cell::new(0)),
+                    tokenizer_calls: Rc::new(Cell::new(0)),
+                    embed: embed.clone(),
+                    fail: Rc::new(Cell::new(false)),
+                }))
+            },
+            analysis::extract,
+        )
+        .unwrap();
+    assert!(first.errors.is_empty(), "{first:?}");
+    assert_eq!(first.indexed, 2);
+    assert_eq!(first.warnings.unsupported_encoding_files, 1);
+    assert!(first.warnings.parser_diagnostics > 0);
+    assert!(graph::read(&o.root).is_err());
+    let details_path = o.root.join(crate::index::diagnostics::PATH);
+    let details = fs::read(&details_path).unwrap();
+    let modified = fs::metadata(&details_path).unwrap().modified().unwrap();
+    let before = embed.get();
+    for force in [false, true] {
+        let idle = engine
+            .cycle(&o, force, support::unused, |_| panic!("unchanged analysis"))
+            .unwrap();
+        assert!(idle.errors.is_empty(), "{idle:?}");
+        assert_eq!(
+            idle.warnings.parser_diagnostics,
+            first.warnings.parser_diagnostics
+        );
+        assert_eq!(idle.warnings.unsupported_encoding_files, 1);
+        assert_eq!(idle.indexed, 0);
+        assert_eq!(idle.analyzed, 0);
+        assert_eq!(idle.embedded_documents, 0);
+        assert_eq!(embed.get(), before);
+        assert!(!idle.state_published);
+        assert_eq!(fs::read(&details_path).unwrap(), details);
+        assert_eq!(
+            fs::metadata(&details_path).unwrap().modified().unwrap(),
+            modified
+        );
+    }
+    fs::write(o.root.join("reader.rs"), "fn read_bytes() {}\n").unwrap();
+    fs::write(o.root.join("middle.css"), "body { color: blue; }\n").unwrap();
+    let recovered = engine
+        .cycle(&o, false, support::unused, analysis::extract)
+        .unwrap();
+    assert!(recovered.errors.is_empty(), "{recovered:?}");
+    assert_eq!(recovered.indexed, 2);
+    assert!(!recovered.warnings.any());
+    assert!(recovered.graph_published);
+    assert!(graph::read(&o.root).is_ok());
+    let details: serde_json::Value =
+        serde_json::from_slice(&fs::read(details_path).unwrap()).unwrap();
+    assert!(details["entries"].as_array().unwrap().is_empty());
+    assert!(paths(&o).contains(&"middle.css".into()));
 }

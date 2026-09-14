@@ -14,6 +14,7 @@ mod index;
 mod input;
 mod knowledge;
 mod mcp;
+mod processor;
 mod profiling;
 mod retrieval;
 mod source;
@@ -65,7 +66,7 @@ enum Command {
         json: bool,
     },
 
-    /// Index current directory with config defined in .mimirs folder.
+    /// Index current directory; warnings and paths are saved in .mimirs/watch/diagnostics.json.
     Index {
         /// Write exclusive phase timings and counters to a new JSON file.
         #[arg(long)]
