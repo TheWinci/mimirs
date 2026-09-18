@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 
 mod commands;
 mod config;
+mod files;
 
 /// mimirs CLI
 #[derive(Parser)]
@@ -14,34 +15,31 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Create an initial config for mimirs in .mimirs folder.
-    Init,
+    /// Analyse current mimirs state.
+    Doctor(Box<commands::doctor::Options>),
+
+    /// Create an initial config.toml in .mimirs folder.
+    Init(Box<commands::init::Options>),
 
     /// Index current directory with config defined in .mimirs folder.
-    Index {
-        /// Should watch and update scope defined in the config.
-        #[arg(long)]
-        watch: bool,
-    },
+    Index(Box<commands::index::Options>),
 
-    /// Search query with limit.
-    Search {
-        /// Text that will be used to search the index.
-        query: String,
+    /// Learn something useful to be preserved.
+    Learn(Box<commands::learn::Options>),
 
-        /// Number of top results to return.
-        #[arg(long, default_value_t = 5)]
-        limit: usize,
-    },
+    /// Retrieve context for a distilled query.
+    Context(Box<commands::context::Options>),
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::Init => commands::init::run()?,
-        Command::Index { watch } => commands::index::run(watch)?,
-        Command::Search { query, limit } => commands::search::run(&query, limit)?,
+        Command::Doctor(options) => commands::doctor::run(*options)?,
+        Command::Init(options) => commands::init::run(*options)?,
+        Command::Index(options) => commands::index::run(*options)?,
+        Command::Learn(options) => commands::learn::run(*options)?,
+        Command::Context(options) => commands::context::run(*options)?,
     }
 
     Ok(())
