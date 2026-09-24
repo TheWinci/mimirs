@@ -4,7 +4,7 @@ use clap::Args;
 pub struct Options {}
 
 pub fn run(_options: Options) -> anyhow::Result<()> {
-  println!("learn not implemented yet");
+    println!("learn not implemented yet");
 
-  Ok(())
+    Ok(())
 }
