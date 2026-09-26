@@ -1,8 +1,10 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
+mod chunk;
 mod commands;
 mod config;
+mod discover;
 mod embed;
 mod files;
 

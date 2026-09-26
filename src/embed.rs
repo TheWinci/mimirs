@@ -59,15 +59,12 @@ pub fn download(cache: &Path) -> Result<ModelFiles> {
     Ok(ModelFiles { model, tokenizer })
 }
 
-/// Load the tokenizer with truncation at the model's token limit.
+/// Load the tokenizer without truncation or padding, so it counts every token.
 pub fn load_tokenizer(path: &Path) -> Result<Tokenizer> {
     let mut tokenizer = Tokenizer::from_file(path).map_err(anyhow::Error::msg)?;
     tokenizer.with_padding(None);
     tokenizer
-        .with_truncation(Some(TruncationParams {
-            max_length: MAX_TOKENS,
-            ..Default::default()
-        }))
+        .with_truncation(None)
         .map_err(anyhow::Error::msg)?;
     Ok(tokenizer)
 }
@@ -80,7 +77,13 @@ pub struct Embedder {
 
 impl Embedder {
     pub fn load(files: &ModelFiles) -> Result<Self> {
-        let tokenizer = load_tokenizer(&files.tokenizer)?;
+        let mut tokenizer = load_tokenizer(&files.tokenizer)?;
+        tokenizer
+            .with_truncation(Some(TruncationParams {
+                max_length: MAX_TOKENS,
+                ..Default::default()
+            }))
+            .map_err(anyhow::Error::msg)?;
         let session = Session::builder()?.commit_from_file(&files.model)?;
         Ok(Self { tokenizer, session })
     }
