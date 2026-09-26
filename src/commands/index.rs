@@ -5,12 +5,16 @@ use std::path::Path;
 use anyhow::Context;
 use clap::Args;
 
-use crate::chunk::chunk;
+use crate::chunk::{Chunk, chunk};
 use crate::config::Config;
 use crate::discover::{DiscoveredFile, Discovery, discover};
 use crate::embed::{self, Embedder};
 use crate::files::read::read_text;
 use crate::store::{FileRecord, Store};
+
+/// Windows gathered from several files before embedding them together. Models
+/// wait for the slowest one only at the end of a batch, not after every file.
+const WINDOWS_PER_BATCH: usize = 128;
 
 #[derive(Args)]
 pub struct Options {}
@@ -46,6 +50,20 @@ pub struct Summary {
     unreadable: usize,
 }
 
+/// A file read and chunked, waiting to be embedded and written.
+struct PreparedFile {
+    path: String,
+    size: u64,
+    modified: i64,
+    chunks: Vec<Chunk>,
+}
+
+impl PreparedFile {
+    fn window_count(&self) -> usize {
+        self.chunks.iter().map(|chunk| chunk.windows.len()).sum()
+    }
+}
+
 /// Bring the index in `root/.mimirs/index.db` up to date with the project's files.
 pub fn index_project(root: &Path) -> anyhow::Result<Summary> {
     let config = Config::load(&root.join(".mimirs/config.toml"))?;
@@ -69,6 +87,8 @@ pub fn index_project(root: &Path) -> anyhow::Result<Summary> {
         too_large: discovery.skipped_too_large,
         ..Summary::default()
     };
+    let mut batch: Vec<PreparedFile> = Vec::new();
+    let mut batch_windows = 0;
     for (done, file) in discovery.files.iter().enumerate() {
         if show_progress {
             let line = progress_line(done, total, &file.path.to_string_lossy(), terminal_width);
@@ -96,23 +116,21 @@ pub fn index_project(root: &Path) -> anyhow::Result<Summary> {
             }
         };
 
-        let chunks = chunk(&text, &tokenizer)?;
-        let window_texts: Vec<&str> = chunks
-            .iter()
-            .flat_map(|chunk| chunk.windows.iter().map(|window| chunk.window_text(window)))
-            .collect();
-        let vectors = embedder.embed_all(&window_texts)?;
-        let record = FileRecord {
-            path: &path,
+        let prepared = PreparedFile {
+            path,
             size: file.size,
             modified: file.modified,
+            chunks: chunk(&text, &tokenizer)?,
         };
-        store.write_file(&record, &chunks, &vectors)?;
-
-        summary.files += 1;
-        summary.chunks += chunks.len();
-        summary.windows += vectors.len();
+        batch_windows += prepared.window_count();
+        batch.push(prepared);
+        if batch_windows >= WINDOWS_PER_BATCH {
+            embed_and_write(&batch, &mut embedder, &mut store, &mut summary)?;
+            batch.clear();
+            batch_windows = 0;
+        }
     }
+    embed_and_write(&batch, &mut embedder, &mut store, &mut summary)?;
     clear_progress_line(show_progress);
 
     if walk_found_everything(&discovery) {
@@ -121,6 +139,39 @@ pub fn index_project(root: &Path) -> anyhow::Result<Summary> {
     }
     store.record_finished_run()?;
     Ok(summary)
+}
+
+/// Embed every window of `batch` in one parallel pass, then write each file in
+/// its own transaction.
+fn embed_and_write(
+    batch: &[PreparedFile],
+    embedder: &mut Embedder,
+    store: &mut Store,
+    summary: &mut Summary,
+) -> anyhow::Result<()> {
+    let window_texts: Vec<&str> = batch
+        .iter()
+        .flat_map(|file| &file.chunks)
+        .flat_map(|chunk| chunk.windows.iter().map(|window| chunk.window_text(window)))
+        .collect();
+    let vectors = embedder.embed_all(&window_texts)?;
+
+    let mut remaining_vectors = vectors.as_slice();
+    for file in batch {
+        let (file_vectors, rest) = remaining_vectors.split_at(file.window_count());
+        remaining_vectors = rest;
+        let record = FileRecord {
+            path: &file.path,
+            size: file.size,
+            modified: file.modified,
+        };
+        store.write_file(&record, &file.chunks, file_vectors)?;
+
+        summary.files += 1;
+        summary.chunks += file.chunks.len();
+        summary.windows += file_vectors.len();
+    }
+    Ok(())
 }
 
 /// The path as stored in the index: relative to the root, with `/` separators.
