@@ -7,6 +7,7 @@ mod config;
 mod discover;
 mod embed;
 mod files;
+mod store;
 
 /// mimirs CLI
 #[derive(Parser)]

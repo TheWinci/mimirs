@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::time::UNIX_EPOCH;
 
 use anyhow::Result;
 use globset::{Glob, GlobSet, GlobSetBuilder};
@@ -12,6 +13,9 @@ const MAX_FILE_BYTES: u64 = 50 * 1024 * 1024;
 /// A file the walk found, with its path relative to the project root.
 pub struct DiscoveredFile {
     pub path: PathBuf,
+    pub size: u64,
+    /// Modification time in nanoseconds since the Unix epoch, or 0 when unknown.
+    pub modified: i64,
 }
 
 /// The result of one walk over the project.
@@ -55,19 +59,27 @@ pub fn discover(root: &Path, config: &Config) -> Result<Discovery> {
         if !include.is_match(relative_path) || exclude.is_match(relative_path) {
             continue;
         }
-        let size = match entry.metadata() {
-            Ok(metadata) => metadata.len(),
+        let metadata = match entry.metadata() {
+            Ok(metadata) => metadata,
             Err(error) => {
                 discovery.errors.push(error.to_string());
                 continue;
             }
         };
+        let size = metadata.len();
         if size > MAX_FILE_BYTES {
             discovery.skipped_too_large += 1;
             continue;
         }
+        let modified = metadata
+            .modified()
+            .ok()
+            .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+            .map_or(0, |elapsed| elapsed.as_nanos() as i64);
         discovery.files.push(DiscoveredFile {
             path: relative_path.to_path_buf(),
+            size,
+            modified,
         });
     }
     Ok(discovery)
