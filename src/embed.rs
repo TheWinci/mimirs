@@ -76,7 +76,8 @@ pub struct Embedder {
 }
 
 impl Embedder {
-    pub fn load(files: &ModelFiles) -> Result<Self> {
+    /// Load the model to run on at most `threads` CPU threads.
+    pub fn load(files: &ModelFiles, threads: usize) -> Result<Self> {
         let mut tokenizer = load_tokenizer(&files.tokenizer)?;
         tokenizer
             .with_truncation(Some(TruncationParams {
@@ -84,7 +85,9 @@ impl Embedder {
                 ..Default::default()
             }))
             .map_err(anyhow::Error::msg)?;
-        let session = Session::builder()?.commit_from_file(&files.model)?;
+        let session = Session::builder()?
+            .with_intra_threads(threads)?
+            .commit_from_file(&files.model)?;
         Ok(Self { tokenizer, session })
     }
 
@@ -178,7 +181,7 @@ mod tests {
     #[ignore = "downloads and runs the real model"]
     fn related_sentences_are_closer_than_unrelated_ones() -> Result<()> {
         let files = download(&cache_dir()?)?;
-        let mut embedder = Embedder::load(&files)?;
+        let mut embedder = Embedder::load(&files, 3)?;
         let refresh = embedder.embed("refresh the access token before it expires")?;
         let renew = embedder.embed("renew an expiring authentication token")?;
         let pasta = embedder.embed("boil the pasta for nine minutes")?;

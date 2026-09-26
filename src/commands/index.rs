@@ -52,7 +52,7 @@ pub fn index_project(root: &Path) -> anyhow::Result<Summary> {
     let model_files = embed::cached_files(&embed::cache_dir()?)
         .context("The embedding model is not downloaded; run `mimirs init` first")?;
     let tokenizer = embed::load_tokenizer(&model_files.tokenizer)?;
-    let mut embedder = Embedder::load(&model_files)?;
+    let mut embedder = Embedder::load(&model_files, config.threads)?;
     let mut store = Store::open(&root.join(".mimirs/index.db"))?;
 
     let discovery = discover(root, &config)?;

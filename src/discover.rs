@@ -146,6 +146,7 @@ mod tests {
         let config = Config {
             include: vec!["**/*.rs".into()],
             exclude: vec!["build/**".into()],
+            ..Config::default()
         };
         assert_eq!(discovered_paths(root, &config)?, ["src/build/helper.rs"]);
         Ok(())

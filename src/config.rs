@@ -10,6 +10,14 @@ pub struct Config {
     pub include: Vec<String>,
     /// Glob patterns for the files to skip, applied after `include`.
     pub exclude: Vec<String>,
+    /// CPU threads the embedding model may use. Fewer keeps the machine
+    /// responsive during indexing; more indexes faster.
+    #[serde(default = "default_threads")]
+    pub threads: usize,
+}
+
+fn default_threads() -> usize {
+    3
 }
 
 // The defaults are v1's lists, which its benchmark results were measured with.
@@ -152,6 +160,7 @@ impl Default for Config {
         Self {
             include: DEFAULT_INCLUDE.iter().map(|&glob| glob.into()).collect(),
             exclude: DEFAULT_EXCLUDE.iter().map(|&glob| glob.into()).collect(),
+            threads: default_threads(),
         }
     }
 }
@@ -162,11 +171,38 @@ impl Config {
         let text = std::fs::read_to_string(path).with_context(|| {
             format!("Could not read {}; run `mimirs init` first", path.display())
         })?;
-        Ok(toml::from_str(&text)?)
+        let config: Self = toml::from_str(&text)?;
+        anyhow::ensure!(
+            config.threads > 0,
+            "`threads` in {} must be at least 1",
+            path.display()
+        );
+        Ok(config)
     }
 
     /// Render this config as the text of `.mimirs/config.toml`.
     pub fn to_toml(&self) -> anyhow::Result<String> {
         Ok(toml::to_string_pretty(self)?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_config_without_threads_gets_the_default() -> anyhow::Result<()> {
+        let config: Config = toml::from_str("include = [\"**/*.rs\"]\nexclude = []\n")?;
+        assert_eq!(config.threads, 3);
+        Ok(())
+    }
+
+    #[test]
+    fn zero_threads_is_rejected() -> anyhow::Result<()> {
+        let folder = tempfile::tempdir()?;
+        let path = folder.path().join("config.toml");
+        std::fs::write(&path, "include = []\nexclude = []\nthreads = 0\n")?;
+        assert!(Config::load(&path).is_err());
+        Ok(())
     }
 }
