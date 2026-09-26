@@ -1,6 +1,4 @@
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::thread;
 
 use anyhow::{Context, Result, ensure};
 use hf_hub::api::sync::ApiBuilder;
@@ -71,9 +69,6 @@ pub fn load_tokenizer(path: &Path) -> Result<Tokenizer> {
     Ok(tokenizer)
 }
 
-/// Vectors one worker embedded, each with its text's position in the input.
-type PositionedVectors = Vec<(usize, Vec<f32>)>;
-
 /// Turns texts into vectors with the pinned model.
 pub struct Embedder {
     tokenizer: Tokenizer,
@@ -115,47 +110,25 @@ impl Embedder {
         embed_with(session, &self.tokenizer, text)
     }
 
-    /// Embed many texts, keeping their order. Each model instance runs on its own
-    /// thread and takes the next unclaimed text until none are left.
-    pub fn embed_all(&mut self, texts: &[&str]) -> Result<Vec<Vec<f32>>> {
-        let next_text = AtomicUsize::new(0);
+    /// One handle per model instance, so each can embed on its own thread.
+    pub fn instances(&mut self) -> Vec<ModelInstance<'_>> {
         let tokenizer = &self.tokenizer;
-        let worker_results: Vec<Result<PositionedVectors>> = thread::scope(|scope| {
-            let workers: Vec<_> = self
-                .sessions
-                .iter_mut()
-                .map(|session| {
-                    let next_text = &next_text;
-                    scope.spawn(move || {
-                        let mut embedded = Vec::new();
-                        loop {
-                            let index = next_text.fetch_add(1, Ordering::Relaxed);
-                            let Some(text) = texts.get(index) else {
-                                break;
-                            };
-                            embedded.push((index, embed_with(session, tokenizer, text)?));
-                        }
-                        Ok(embedded)
-                    })
-                })
-                .collect();
-            workers
-                .into_iter()
-                .map(|worker| {
-                    worker
-                        .join()
-                        .unwrap_or_else(|_| Err(anyhow::anyhow!("An embedding thread panicked")))
-                })
-                .collect()
-        });
+        self.sessions
+            .iter_mut()
+            .map(|session| ModelInstance { session, tokenizer })
+            .collect()
+    }
+}
 
-        let mut vectors = vec![Vec::new(); texts.len()];
-        for result in worker_results {
-            for (index, vector) in result? {
-                vectors[index] = vector;
-            }
-        }
-        Ok(vectors)
+/// One copy of the model, borrowed from an `Embedder` to run on one thread.
+pub struct ModelInstance<'a> {
+    session: &'a mut Session,
+    tokenizer: &'a Tokenizer,
+}
+
+impl ModelInstance<'_> {
+    pub fn embed(&mut self, text: &str) -> Result<Vec<f32>> {
+        embed_with(self.session, self.tokenizer, text)
     }
 }
 
@@ -263,20 +236,16 @@ mod tests {
 
     #[test]
     #[ignore = "downloads and runs the real model"]
-    fn parallel_embedding_matches_one_at_a_time_in_order() -> Result<()> {
+    fn every_instance_gives_the_same_vector() -> Result<()> {
         let files = download(&cache_dir()?)?;
         let mut embedder = Embedder::load(&files, 3)?;
-        let texts: Vec<String> = (0..10)
-            .map(|number| format!("function number {number}"))
-            .collect();
-        let text_refs: Vec<&str> = texts.iter().map(String::as_str).collect();
-        let together = embedder.embed_all(&text_refs)?;
-        assert_eq!(together.len(), texts.len());
-        for (text, vector) in texts.iter().zip(&together) {
-            let alone = embedder.embed(text)?;
-            let difference = alone
+        let text = "refresh the access token before it expires";
+        let expected = embedder.embed(text)?;
+        for mut instance in embedder.instances() {
+            let vector = instance.embed(text)?;
+            let difference = expected
                 .iter()
-                .zip(vector)
+                .zip(&vector)
                 .map(|(a, b)| (a - b).abs())
                 .fold(0.0_f32, f32::max);
             assert!(difference < 1e-5);
