@@ -97,12 +97,11 @@ pub fn index_project(root: &Path) -> anyhow::Result<Summary> {
         };
 
         let chunks = chunk(&text, &tokenizer)?;
-        let mut vectors = Vec::new();
-        for chunk in &chunks {
-            for window in &chunk.windows {
-                vectors.push(embedder.embed(chunk.window_text(window))?);
-            }
-        }
+        let window_texts: Vec<&str> = chunks
+            .iter()
+            .flat_map(|chunk| chunk.windows.iter().map(|window| chunk.window_text(window)))
+            .collect();
+        let vectors = embedder.embed_all(&window_texts)?;
         let record = FileRecord {
             path: &path,
             size: file.size,

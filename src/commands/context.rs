@@ -4,7 +4,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::Context;
 use clap::Args;
 
-use crate::config::Config;
 use crate::embed::{self, Embedder};
 use crate::rank::rank;
 use crate::render::render;
@@ -41,8 +40,8 @@ fn answer(root: &Path, query: &str, budget: usize) -> anyhow::Result<String> {
     );
     let model_files = embed::cached_files(&embed::cache_dir()?)
         .context("The embedding model is not downloaded; run `mimirs init` first")?;
-    let config = Config::load(&root.join(".mimirs/config.toml"))?;
-    let mut embedder = Embedder::load(&model_files, config.threads)?;
+    // One query needs one model instance; loading more would only slow startup.
+    let mut embedder = Embedder::load(&model_files, 1)?;
 
     let query_vector = embedder.embed(query)?;
     let hits = store.nearest(&query_vector, NEAREST_WINDOWS)?;

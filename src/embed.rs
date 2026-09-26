@@ -1,4 +1,6 @@
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::thread;
 
 use anyhow::{Context, Result, ensure};
 use hf_hub::api::sync::ApiBuilder;
@@ -69,15 +71,21 @@ pub fn load_tokenizer(path: &Path) -> Result<Tokenizer> {
     Ok(tokenizer)
 }
 
+/// Vectors one worker embedded, each with its text's position in the input.
+type PositionedVectors = Vec<(usize, Vec<f32>)>;
+
 /// Turns texts into vectors with the pinned model.
 pub struct Embedder {
     tokenizer: Tokenizer,
-    session: Session,
+    /// One model instance per thread. A single ~250-token input is too small to
+    /// split well across threads, so instances run side by side instead.
+    sessions: Vec<Session>,
 }
 
 impl Embedder {
-    /// Load the model to run on at most `threads` CPU threads.
-    pub fn load(files: &ModelFiles, threads: usize) -> Result<Self> {
+    /// Load `instances` copies of the model, each running on one CPU thread.
+    pub fn load(files: &ModelFiles, instances: usize) -> Result<Self> {
+        ensure!(instances > 0, "At least one model instance is needed");
         let mut tokenizer = load_tokenizer(&files.tokenizer)?;
         tokenizer
             .with_truncation(Some(TruncationParams {
@@ -85,44 +93,100 @@ impl Embedder {
                 ..Default::default()
             }))
             .map_err(anyhow::Error::msg)?;
-        let session = Session::builder()?
-            .with_intra_threads(threads)?
-            .commit_from_file(&files.model)?;
-        Ok(Self { tokenizer, session })
+        let mut sessions = Vec::with_capacity(instances);
+        for _ in 0..instances {
+            let session = Session::builder()?
+                .with_intra_threads(1)?
+                .commit_from_file(&files.model)?;
+            sessions.push(session);
+        }
+        Ok(Self {
+            tokenizer,
+            sessions,
+        })
     }
 
-    /// Embed one text. One input per call means nothing is padded.
+    /// Embed one text with the first model instance.
     pub fn embed(&mut self, text: &str) -> Result<Vec<f32>> {
-        let encoding = self
-            .tokenizer
-            .encode(text, true)
-            .map_err(anyhow::Error::msg)?;
-        let token_count = encoding.len();
-        let shape = [1, token_count];
-        let ids: Vec<i64> = encoding.get_ids().iter().map(|&id| id as i64).collect();
-        let mask: Vec<i64> = encoding
-            .get_attention_mask()
-            .iter()
-            .map(|&value| value as i64)
-            .collect();
-        let type_ids: Vec<i64> = encoding
-            .get_type_ids()
-            .iter()
-            .map(|&id| id as i64)
-            .collect();
-        let inputs = ort::inputs![
-            "input_ids" => Tensor::from_array((shape, ids))?,
-            "attention_mask" => Tensor::from_array((shape, mask.clone()))?,
-            "token_type_ids" => Tensor::from_array((shape, type_ids))?,
-        ];
-        let outputs = self.session.run(inputs)?;
-        let (_, hidden) = outputs["last_hidden_state"].try_extract_tensor::<f32>()?;
-        ensure!(
-            hidden.len() == token_count * DIMENSION,
-            "Unexpected model output size"
-        );
-        mean_pool_and_normalize(hidden, &mask)
+        let session = self
+            .sessions
+            .first_mut()
+            .context("At least one model instance is needed")?;
+        embed_with(session, &self.tokenizer, text)
     }
+
+    /// Embed many texts, keeping their order. Each model instance runs on its own
+    /// thread and takes the next unclaimed text until none are left.
+    pub fn embed_all(&mut self, texts: &[&str]) -> Result<Vec<Vec<f32>>> {
+        let next_text = AtomicUsize::new(0);
+        let tokenizer = &self.tokenizer;
+        let worker_results: Vec<Result<PositionedVectors>> = thread::scope(|scope| {
+            let workers: Vec<_> = self
+                .sessions
+                .iter_mut()
+                .map(|session| {
+                    let next_text = &next_text;
+                    scope.spawn(move || {
+                        let mut embedded = Vec::new();
+                        loop {
+                            let index = next_text.fetch_add(1, Ordering::Relaxed);
+                            let Some(text) = texts.get(index) else {
+                                break;
+                            };
+                            embedded.push((index, embed_with(session, tokenizer, text)?));
+                        }
+                        Ok(embedded)
+                    })
+                })
+                .collect();
+            workers
+                .into_iter()
+                .map(|worker| {
+                    worker
+                        .join()
+                        .unwrap_or_else(|_| Err(anyhow::anyhow!("An embedding thread panicked")))
+                })
+                .collect()
+        });
+
+        let mut vectors = vec![Vec::new(); texts.len()];
+        for result in worker_results {
+            for (index, vector) in result? {
+                vectors[index] = vector;
+            }
+        }
+        Ok(vectors)
+    }
+}
+
+/// Embed one text with one model instance. One input per call means nothing is padded.
+fn embed_with(session: &mut Session, tokenizer: &Tokenizer, text: &str) -> Result<Vec<f32>> {
+    let encoding = tokenizer.encode(text, true).map_err(anyhow::Error::msg)?;
+    let token_count = encoding.len();
+    let shape = [1, token_count];
+    let ids: Vec<i64> = encoding.get_ids().iter().map(|&id| id as i64).collect();
+    let mask: Vec<i64> = encoding
+        .get_attention_mask()
+        .iter()
+        .map(|&value| value as i64)
+        .collect();
+    let type_ids: Vec<i64> = encoding
+        .get_type_ids()
+        .iter()
+        .map(|&id| id as i64)
+        .collect();
+    let inputs = ort::inputs![
+        "input_ids" => Tensor::from_array((shape, ids))?,
+        "attention_mask" => Tensor::from_array((shape, mask.clone()))?,
+        "token_type_ids" => Tensor::from_array((shape, type_ids))?,
+    ];
+    let outputs = session.run(inputs)?;
+    let (_, hidden) = outputs["last_hidden_state"].try_extract_tensor::<f32>()?;
+    ensure!(
+        hidden.len() == token_count * DIMENSION,
+        "Unexpected model output size"
+    );
+    mean_pool_and_normalize(hidden, &mask)
 }
 
 /// Average the token vectors the attention mask marks as real, then scale to unit length.
@@ -194,6 +258,29 @@ mod tests {
             .sqrt();
         assert!((length - 1.0).abs() < 1e-4);
         assert!(similarity(&refresh, &renew) > similarity(&refresh, &pasta));
+        Ok(())
+    }
+
+    #[test]
+    #[ignore = "downloads and runs the real model"]
+    fn parallel_embedding_matches_one_at_a_time_in_order() -> Result<()> {
+        let files = download(&cache_dir()?)?;
+        let mut embedder = Embedder::load(&files, 3)?;
+        let texts: Vec<String> = (0..10)
+            .map(|number| format!("function number {number}"))
+            .collect();
+        let text_refs: Vec<&str> = texts.iter().map(String::as_str).collect();
+        let together = embedder.embed_all(&text_refs)?;
+        assert_eq!(together.len(), texts.len());
+        for (text, vector) in texts.iter().zip(&together) {
+            let alone = embedder.embed(text)?;
+            let difference = alone
+                .iter()
+                .zip(vector)
+                .map(|(a, b)| (a - b).abs())
+                .fold(0.0_f32, f32::max);
+            assert!(difference < 1e-5);
+        }
         Ok(())
     }
 }

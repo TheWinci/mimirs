@@ -10,8 +10,8 @@ pub struct Config {
     pub include: Vec<String>,
     /// Glob patterns for the files to skip, applied after `include`.
     pub exclude: Vec<String>,
-    /// CPU threads the embedding model may use. Fewer keeps the machine
-    /// responsive during indexing; more indexes faster.
+    /// CPU threads indexing may use for embedding, each running its own copy of
+    /// the model. Fewer keeps the machine responsive; more indexes faster.
     #[serde(default = "default_threads")]
     pub threads: usize,
 }
