@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::io::{IsTerminal, Write};
 use std::path::Path;
 
@@ -6,7 +7,7 @@ use clap::Args;
 
 use crate::chunk::chunk;
 use crate::config::Config;
-use crate::discover::discover;
+use crate::discover::{DiscoveredFile, Discovery, discover};
 use crate::embed::{self, Embedder};
 use crate::files::read::read_text;
 use crate::store::{FileRecord, Store};
@@ -16,20 +17,37 @@ pub struct Options {}
 
 pub fn run(_options: Options) -> anyhow::Result<()> {
     let root = std::env::current_dir()?;
-    index_project(&root)
+    let summary = index_project(&root)?;
+    println!(
+        "{} files indexed: {} chunks, {} windows",
+        summary.files, summary.chunks, summary.windows
+    );
+    println!(
+        "{} unchanged, {} removed",
+        summary.unchanged, summary.removed
+    );
+    println!(
+        "skipped: {} not UTF-8, {} over 50 MB, {} unreadable",
+        summary.not_text, summary.too_large, summary.unreadable
+    );
+    Ok(())
 }
 
+/// What one `index` run did.
 #[derive(Default)]
-struct Summary {
+pub struct Summary {
     files: usize,
+    unchanged: usize,
+    removed: usize,
     chunks: usize,
     windows: usize,
     not_text: usize,
+    too_large: usize,
     unreadable: usize,
 }
 
 /// Bring the index in `root/.mimirs/index.db` up to date with the project's files.
-pub fn index_project(root: &Path) -> anyhow::Result<()> {
+pub fn index_project(root: &Path) -> anyhow::Result<Summary> {
     let config = Config::load(&root.join(".mimirs/config.toml"))?;
     let model_files = embed::cached_files(&embed::cache_dir()?)
         .context("The embedding model is not downloaded; run `mimirs init` first")?;
@@ -42,13 +60,22 @@ pub fn index_project(root: &Path) -> anyhow::Result<()> {
         eprintln!("{error}");
     }
 
+    let known_files = store.file_states()?;
     let show_progress = std::io::stderr().is_terminal();
     let total = discovery.files.len();
-    let mut summary = Summary::default();
+    let mut summary = Summary {
+        too_large: discovery.skipped_too_large,
+        ..Summary::default()
+    };
     for (done, file) in discovery.files.iter().enumerate() {
         if show_progress {
             eprint!("\r\x1b[2K{done}/{total} files · {}", file.path.display());
             std::io::stderr().flush()?;
+        }
+        let path = stored_path(file);
+        if is_unchanged(known_files.get(&path), file) {
+            summary.unchanged += 1;
+            continue;
         }
         let text = match read_text(&root.join(&file.path)) {
             Ok(Some(text)) => text,
@@ -73,7 +100,6 @@ pub fn index_project(root: &Path) -> anyhow::Result<()> {
                 vectors.push(embedder.embed(chunk.window_text(window))?);
             }
         }
-        let path = file.path.to_string_lossy().replace('\\', "/");
         let record = FileRecord {
             path: &path,
             size: file.size,
@@ -86,17 +112,30 @@ pub fn index_project(root: &Path) -> anyhow::Result<()> {
         summary.windows += vectors.len();
     }
     clear_progress_line(show_progress);
-    store.record_finished_run()?;
 
-    println!(
-        "{} files: {} chunks, {} windows",
-        summary.files, summary.chunks, summary.windows
-    );
-    println!(
-        "skipped: {} not UTF-8, {} over 50 MB, {} unreadable",
-        summary.not_text, discovery.skipped_too_large, summary.unreadable
-    );
-    Ok(())
+    if walk_found_everything(&discovery) {
+        let found_paths: HashSet<String> = discovery.files.iter().map(stored_path).collect();
+        summary.removed = store.remove_files_except(&found_paths)?;
+    }
+    store.record_finished_run()?;
+    Ok(summary)
+}
+
+/// The path as stored in the index: relative to the root, with `/` separators.
+fn stored_path(file: &DiscoveredFile) -> String {
+    file.path.to_string_lossy().replace('\\', "/")
+}
+
+/// A file is unchanged when its size and modification time match its record.
+/// An unknown modification time never counts as unchanged.
+fn is_unchanged(known: Option<&(u64, i64)>, file: &DiscoveredFile) -> bool {
+    file.modified != 0 && known == Some(&(file.size, file.modified))
+}
+
+/// Records may only be removed after a walk that saw the whole project. A walk
+/// with errors or no files could otherwise delete the whole index.
+fn walk_found_everything(discovery: &Discovery) -> bool {
+    discovery.errors.is_empty() && !discovery.files.is_empty()
 }
 
 fn clear_progress_line(show_progress: bool) {
@@ -139,6 +178,72 @@ mod tests {
         assert_eq!(count("files")?, 2);
         assert_eq!(count("chunks")?, 2);
         assert_eq!(count("window_vectors")?, count("windows")?);
+        Ok(())
+    }
+
+    fn discovered(size: u64, modified: i64) -> DiscoveredFile {
+        DiscoveredFile {
+            path: "src/a.rs".into(),
+            size,
+            modified,
+        }
+    }
+
+    #[test]
+    fn unchanged_means_same_size_and_modification_time() {
+        let known = (10, 500);
+        assert!(is_unchanged(Some(&known), &discovered(10, 500)));
+        assert!(!is_unchanged(Some(&known), &discovered(11, 500)));
+        assert!(!is_unchanged(Some(&known), &discovered(10, 501)));
+        assert!(!is_unchanged(None, &discovered(10, 500)));
+        assert!(!is_unchanged(Some(&(10, 0)), &discovered(10, 0)));
+    }
+
+    #[test]
+    fn removal_needs_a_complete_walk_that_found_files() {
+        let walk = |files: Vec<DiscoveredFile>, errors: Vec<String>| Discovery {
+            files,
+            skipped_too_large: 0,
+            errors,
+        };
+        assert!(walk_found_everything(&walk(vec![discovered(1, 1)], vec![])));
+        assert!(!walk_found_everything(&walk(vec![], vec![])));
+        assert!(!walk_found_everything(&walk(
+            vec![discovered(1, 1)],
+            vec!["permission denied".into()]
+        )));
+    }
+
+    #[test]
+    #[ignore = "downloads and runs the real model"]
+    fn a_second_run_only_does_work_for_changes() -> anyhow::Result<()> {
+        embed::download(&embed::cache_dir()?)?;
+        let project = tempfile::tempdir()?;
+        let root = project.path();
+        fs::create_dir_all(root.join(".mimirs"))?;
+        fs::write(
+            root.join(".mimirs/config.toml"),
+            Config::default().to_toml()?,
+        )?;
+        fs::create_dir_all(root.join("src"))?;
+        fs::write(root.join("src/a.rs"), "fn a() {}\n")?;
+        fs::write(root.join("src/b.rs"), "fn b() {}\n")?;
+        fs::write(root.join("src/c.rs"), "fn c() {}\n")?;
+        assert_eq!(index_project(root)?.files, 3);
+
+        let second = index_project(root)?;
+        assert_eq!((second.files, second.unchanged, second.removed), (0, 3, 0));
+
+        fs::write(root.join("src/a.rs"), "fn a() { println!(\"edited\"); }\n")?;
+        fs::remove_file(root.join("src/b.rs"))?;
+        let third = index_project(root)?;
+        assert_eq!((third.files, third.unchanged, third.removed), (1, 1, 1));
+
+        let mut config = Config::default();
+        config.exclude.push("src/c.rs".into());
+        fs::write(root.join(".mimirs/config.toml"), config.to_toml()?)?;
+        let fourth = index_project(root)?;
+        assert_eq!((fourth.files, fourth.unchanged, fourth.removed), (0, 1, 1));
         Ok(())
     }
 }

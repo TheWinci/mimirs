@@ -1,3 +1,4 @@
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -181,6 +182,40 @@ impl Store {
         }
         transaction.commit()?;
         Ok(())
+    }
+
+    /// Size and modification time of every indexed file, by path.
+    pub fn file_states(&self) -> Result<HashMap<String, (u64, i64)>> {
+        let mut statement = self
+            .connection
+            .prepare("SELECT path, size, modified FROM files")?;
+        let rows = statement.query_map([], |row| {
+            let size: i64 = row.get(1)?;
+            Ok((row.get(0)?, (size as u64, row.get(2)?)))
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Delete every file whose path is not in `keep`, returning how many were removed.
+    pub fn remove_files_except(&mut self, keep: &HashSet<String>) -> Result<usize> {
+        let stored_paths: Vec<String> = self.file_states()?.into_keys().collect();
+        let transaction = self.connection.transaction()?;
+        let mut removed = 0;
+        for path in stored_paths.iter().filter(|path| !keep.contains(*path)) {
+            // vec0 tables have no cascading deletes, so remove the vectors first.
+            transaction.execute(
+                "DELETE FROM window_vectors WHERE window_id IN (
+                     SELECT windows.id FROM windows
+                     JOIN chunks ON chunks.id = windows.chunk_id
+                     JOIN files ON files.id = chunks.file_id
+                     WHERE files.path = ?1)",
+                [path],
+            )?;
+            transaction.execute("DELETE FROM files WHERE path = ?1", [path])?;
+            removed += 1;
+        }
+        transaction.commit()?;
+        Ok(removed)
     }
 
     /// Record that an `index` run finished now.
@@ -411,6 +446,28 @@ mod tests {
             .err()
             .context("expected an error")?;
         assert!(error.to_string().contains("mimirs index"));
+        Ok(())
+    }
+
+    #[test]
+    fn removes_files_that_are_not_kept() -> Result<()> {
+        let folder = tempfile::tempdir()?;
+        let mut store = Store::open(&folder.path().join("index.db"))?;
+        for path in ["a.rs", "b.rs", "c.rs"] {
+            store.write_file(
+                &record(path),
+                &[chunk_with_windows(1, 1)],
+                &[unit_vector(0)],
+            )?;
+        }
+        let keep: HashSet<String> = ["b.rs".to_string()].into();
+        assert_eq!(store.remove_files_except(&keep)?, 2);
+
+        let states = store.file_states()?;
+        assert_eq!(states.len(), 1);
+        assert_eq!(states["b.rs"], (10, 1));
+        assert_eq!(count(&store, "chunks")?, 1);
+        assert_eq!(count(&store, "window_vectors")?, 1);
         Ok(())
     }
 }
