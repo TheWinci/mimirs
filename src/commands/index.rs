@@ -62,6 +62,8 @@ pub fn index_project(root: &Path) -> anyhow::Result<Summary> {
 
     let known_files = store.file_states()?;
     let show_progress = std::io::stderr().is_terminal();
+    let terminal_width = terminal_size::terminal_size_of(std::io::stderr())
+        .map_or(80, |(width, _)| usize::from(width.0));
     let total = discovery.files.len();
     let mut summary = Summary {
         too_large: discovery.skipped_too_large,
@@ -69,7 +71,8 @@ pub fn index_project(root: &Path) -> anyhow::Result<Summary> {
     };
     for (done, file) in discovery.files.iter().enumerate() {
         if show_progress {
-            eprint!("\r\x1b[2K{done}/{total} files · {}", file.path.display());
+            let line = progress_line(done, total, &file.path.to_string_lossy(), terminal_width);
+            eprint!("\r\x1b[2K{line}");
             std::io::stderr().flush()?;
         }
         let path = stored_path(file);
@@ -138,6 +141,23 @@ fn walk_found_everything(discovery: &Discovery) -> bool {
     discovery.errors.is_empty() && !discovery.files.is_empty()
 }
 
+/// One progress line that fits `width` columns. A line that wraps cannot be
+/// cleared in place, so long paths lose their start instead.
+fn progress_line(done: usize, total: usize, path: &str, width: usize) -> String {
+    let prefix = format!("{done}/{total} files · ");
+    // Stay off the last column, where some terminals wrap early.
+    let room = width.saturating_sub(prefix.chars().count() + 1);
+    let path_length = path.chars().count();
+    if path_length <= room {
+        return format!("{prefix}{path}");
+    }
+    if room < 2 {
+        return prefix.chars().take(width.saturating_sub(1)).collect();
+    }
+    let tail: String = path.chars().skip(path_length - (room - 1)).collect();
+    format!("{prefix}…{tail}")
+}
+
 fn clear_progress_line(show_progress: bool) {
     if show_progress {
         eprint!("\r\x1b[2K");
@@ -179,6 +199,19 @@ mod tests {
         assert_eq!(count("chunks")?, 2);
         assert_eq!(count("window_vectors")?, count("windows")?);
         Ok(())
+    }
+
+    #[test]
+    fn progress_lines_fit_the_terminal_width() {
+        let path = "tests/fixtures_regress/fixtures/non_natural_2.xml";
+        assert_eq!(
+            progress_line(46, 3729, "src/a.rs", 80),
+            "46/3729 files · src/a.rs"
+        );
+        let line = progress_line(46, 3729, path, 40);
+        assert_eq!(line, "46/3729 files · …ures/non_natural_2.xml");
+        assert!(line.chars().count() < 40);
+        assert!(progress_line(46, 3729, path, 10).chars().count() < 10);
     }
 
     fn discovered(size: u64, modified: i64) -> DiscoveredFile {
