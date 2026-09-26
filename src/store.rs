@@ -4,7 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 use rusqlite::auto_extension::{RawAutoExtension, register_auto_extension};
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
 
 use crate::chunk::Chunk;
 use crate::embed::DIMENSION;
@@ -22,6 +22,17 @@ pub struct FileRecord<'a> {
     pub size: u64,
     /// Modification time in nanoseconds since the Unix epoch.
     pub modified: i64,
+}
+
+/// A chunk whose window was among the nearest to a query.
+pub struct Hit {
+    pub path: String,
+    pub chunk_id: i64,
+    pub start_line: usize,
+    pub end_line: usize,
+    pub text: String,
+    /// Cosine similarity between the query and the window, higher is closer.
+    pub score: f32,
 }
 
 /// The project's index in `.mimirs/index.db`.
@@ -49,6 +60,70 @@ impl Store {
             create_schema(&connection)?;
         }
         Ok(Self { connection })
+    }
+
+    /// Open an existing index for queries. Fails with a hint to run `mimirs index`
+    /// when there is no index or it was written by another schema version.
+    pub fn open_existing(path: &Path) -> Result<Self> {
+        register_sqlite_vec()?;
+        anyhow::ensure!(path.exists(), "No index yet; run `mimirs index` first");
+        // Read-write without create: WAL readers need to update the shared-memory file.
+        let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_WRITE)?;
+        let version: i64 = connection.pragma_query_value(None, "user_version", |row| row.get(0))?;
+        anyhow::ensure!(
+            version == SCHEMA_VERSION,
+            "The index format changed; run `mimirs index` to rebuild it"
+        );
+        Ok(Self { connection })
+    }
+
+    pub fn file_count(&self) -> Result<usize> {
+        let count: i64 = self
+            .connection
+            .query_row("SELECT count(*) FROM files", [], |row| row.get(0))?;
+        Ok(count as usize)
+    }
+
+    /// Seconds since the Unix epoch when the last `index` run finished.
+    pub fn last_finished_run(&self) -> Result<Option<i64>> {
+        let finished = self
+            .connection
+            .query_row(
+                "SELECT value FROM meta WHERE key = ?1",
+                [LAST_RUN_KEY],
+                |row| row.get(0),
+            )
+            .optional()?;
+        Ok(finished)
+    }
+
+    /// The chunks of the `limit` windows nearest to `query`, closest first. A chunk
+    /// appears once per matching window.
+    pub fn nearest(&self, query: &[f32], limit: usize) -> Result<Vec<Hit>> {
+        let mut statement = self.connection.prepare(
+            "SELECT files.path, chunks.id, chunks.start_line, chunks.end_line, chunks.text,
+                    window_vectors.distance
+             FROM window_vectors
+             JOIN windows ON windows.id = window_vectors.window_id
+             JOIN chunks ON chunks.id = windows.chunk_id
+             JOIN files ON files.id = chunks.file_id
+             WHERE window_vectors.embedding MATCH ?1 AND k = ?2
+             ORDER BY window_vectors.distance",
+        )?;
+        let rows = statement.query_map(params![vector_bytes(query), limit as i64], |row| {
+            let start_line: i64 = row.get(2)?;
+            let end_line: i64 = row.get(3)?;
+            let distance: f64 = row.get(5)?;
+            Ok(Hit {
+                path: row.get(0)?,
+                chunk_id: row.get(1)?,
+                start_line: start_line as usize,
+                end_line: end_line as usize,
+                text: row.get(4)?,
+                score: (1.0 - distance) as f32,
+            })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
     /// Replace one file's chunks, windows, and vectors in a single transaction.
@@ -295,6 +370,47 @@ mod tests {
             .connection
             .pragma_query_value(None, "user_version", |row| row.get(0))?;
         assert_eq!(version, SCHEMA_VERSION);
+        Ok(())
+    }
+
+    #[test]
+    fn nearest_returns_the_closest_chunks_first() -> Result<()> {
+        let folder = tempfile::tempdir()?;
+        let mut store = Store::open(&folder.path().join("index.db"))?;
+        store.write_file(
+            &record("src/a.rs"),
+            &[chunk_with_windows(1, 1)],
+            &[unit_vector(0)],
+        )?;
+        store.write_file(
+            &record("src/b.rs"),
+            &[chunk_with_windows(7, 1)],
+            &[unit_vector(1)],
+        )?;
+        let hits = store.nearest(&unit_vector(1), 10)?;
+        assert_eq!(hits.len(), 2);
+        assert_eq!((hits[0].path.as_str(), hits[0].start_line), ("src/b.rs", 7));
+        assert!((hits[0].score - 1.0).abs() < 1e-6);
+        assert_eq!(store.file_count()?, 2);
+        Ok(())
+    }
+
+    #[test]
+    fn opening_for_queries_requires_a_matching_index() -> Result<()> {
+        let folder = tempfile::tempdir()?;
+        let path = folder.path().join("index.db");
+        assert!(Store::open_existing(&path).is_err());
+        assert!(!path.exists(), "queries must not create an index");
+
+        let store = Store::open(&path)?;
+        store
+            .connection
+            .pragma_update(None, "user_version", SCHEMA_VERSION + 1)?;
+        drop(store);
+        let error = Store::open_existing(&path)
+            .err()
+            .context("expected an error")?;
+        assert!(error.to_string().contains("mimirs index"));
         Ok(())
     }
 }

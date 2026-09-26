@@ -29,7 +29,7 @@ struct Summary {
 }
 
 /// Bring the index in `root/.mimirs/index.db` up to date with the project's files.
-fn index_project(root: &Path) -> anyhow::Result<()> {
+pub fn index_project(root: &Path) -> anyhow::Result<()> {
     let config = Config::load(&root.join(".mimirs/config.toml"))?;
     let model_files = embed::cached_files(&embed::cache_dir()?)
         .context("The embedding model is not downloaded; run `mimirs init` first")?;

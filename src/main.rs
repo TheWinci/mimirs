@@ -7,6 +7,8 @@ mod config;
 mod discover;
 mod embed;
 mod files;
+mod rank;
+mod render;
 mod store;
 
 /// mimirs CLI
