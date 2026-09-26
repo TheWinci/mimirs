@@ -14,3 +14,8 @@ anyhow = "1.0.104"
 clap = { version = "4.6.6", features = ["derive"] }
 serde = { version = "1.0.229", features = ["derive"] }
 toml = "1.1.4"
+dirs = "6.0.0"
+hf-hub = { version = "0.5.0", default-features = false, features = ["ureq", "rustls-tls"] }
+# Pinned: ONNX Runtime 1.28 changes quantized vectors for identical inputs.
+ort = { version = "=2.0.0-rc.10", default-features = false, features = ["std", "download-binaries"] }
+tokenizers = { version = "0.22.2", default-features = false, features = ["onig"] }
