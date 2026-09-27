@@ -5,14 +5,15 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 use rusqlite::auto_extension::{RawAutoExtension, register_auto_extension};
-use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
+use rusqlite::{Connection, OpenFlags, OptionalExtension, Transaction, params};
 
 use crate::chunk::Chunk;
 use crate::embed::DIMENSION;
+use crate::keywords;
 
 /// Bump whenever the tables, the model, the tokenizer, or the chunking rules
 /// change, so `index` rebuilds instead of mixing old and new data.
-const SCHEMA_VERSION: i64 = 1;
+const SCHEMA_VERSION: i64 = 2;
 
 const LAST_RUN_KEY: &str = "last_index_finished";
 
@@ -142,22 +143,14 @@ impl Store {
         );
 
         let transaction = self.connection.transaction()?;
-        // vec0 tables have no cascading deletes, so remove the vectors first.
-        transaction.execute(
-            "DELETE FROM window_vectors WHERE window_id IN (
-                 SELECT windows.id FROM windows
-                 JOIN chunks ON chunks.id = windows.chunk_id
-                 JOIN files ON files.id = chunks.file_id
-                 WHERE files.path = ?1)",
-            [file.path],
-        )?;
-        transaction.execute("DELETE FROM files WHERE path = ?1", [file.path])?;
+        delete_file(&transaction, file.path)?;
         transaction.execute(
             "INSERT INTO files (path, size, modified) VALUES (?1, ?2, ?3)",
             params![file.path, file.size as i64, file.modified],
         )?;
         let file_id = transaction.last_insert_rowid();
 
+        let path_terms = keywords::terms(file.path).join(" ");
         let mut vectors = vectors.iter();
         for chunk in chunks {
             transaction.execute(
@@ -170,6 +163,10 @@ impl Store {
                 ],
             )?;
             let chunk_id = transaction.last_insert_rowid();
+            transaction.execute(
+                "INSERT INTO chunk_terms (rowid, path, text) VALUES (?1, ?2, ?3)",
+                params![chunk_id, path_terms, keywords::terms(&chunk.text).join(" ")],
+            )?;
             for _window in &chunk.windows {
                 transaction.execute("INSERT INTO windows (chunk_id) VALUES (?1)", [chunk_id])?;
                 let window_id = transaction.last_insert_rowid();
@@ -202,16 +199,7 @@ impl Store {
         let transaction = self.connection.transaction()?;
         let mut removed = 0;
         for path in stored_paths.iter().filter(|path| !keep.contains(*path)) {
-            // vec0 tables have no cascading deletes, so remove the vectors first.
-            transaction.execute(
-                "DELETE FROM window_vectors WHERE window_id IN (
-                     SELECT windows.id FROM windows
-                     JOIN chunks ON chunks.id = windows.chunk_id
-                     JOIN files ON files.id = chunks.file_id
-                     WHERE files.path = ?1)",
-                [path],
-            )?;
-            transaction.execute("DELETE FROM files WHERE path = ?1", [path])?;
+            delete_file(&transaction, path)?;
             removed += 1;
         }
         transaction.commit()?;
@@ -228,6 +216,30 @@ impl Store {
         )?;
         Ok(())
     }
+}
+
+/// Delete a file with its chunks, windows, vectors, and keyword rows.
+fn delete_file(transaction: &Transaction, path: &str) -> Result<()> {
+    // Virtual tables have no cascading deletes, so remove their rows first. A
+    // keyword row left behind would give its terms to a later chunk that reuses
+    // the ID.
+    transaction.execute(
+        "DELETE FROM window_vectors WHERE window_id IN (
+             SELECT windows.id FROM windows
+             JOIN chunks ON chunks.id = windows.chunk_id
+             JOIN files ON files.id = chunks.file_id
+             WHERE files.path = ?1)",
+        [path],
+    )?;
+    transaction.execute(
+        "DELETE FROM chunk_terms WHERE rowid IN (
+             SELECT chunks.id FROM chunks
+             JOIN files ON files.id = chunks.file_id
+             WHERE files.path = ?1)",
+        [path],
+    )?;
+    transaction.execute("DELETE FROM files WHERE path = ?1", [path])?;
+    Ok(())
 }
 
 fn create_schema(connection: &Connection) -> Result<()> {
@@ -254,6 +266,10 @@ fn create_schema(connection: &Connection) -> Result<()> {
          CREATE VIRTUAL TABLE window_vectors USING vec0 (
              window_id INTEGER PRIMARY KEY,
              embedding FLOAT[{DIMENSION}] distance_metric=cosine
+         );
+         -- Contentless: holds only the search index; the text lives in chunks.
+         CREATE VIRTUAL TABLE chunk_terms USING fts5 (
+             path, text, content = '', contentless_delete = 1
          );
          CREATE TABLE meta (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
          PRAGMA user_version = {SCHEMA_VERSION};"
@@ -366,6 +382,7 @@ mod tests {
         assert_eq!(count(&store, "chunks")?, 2);
         assert_eq!(count(&store, "windows")?, 2);
         assert_eq!(count(&store, "window_vectors")?, 2);
+        assert_eq!(count(&store, "chunk_terms")?, 2);
         Ok(())
     }
 
@@ -468,6 +485,36 @@ mod tests {
         assert_eq!(states["b.rs"], (10, 1));
         assert_eq!(count(&store, "chunks")?, 1);
         assert_eq!(count(&store, "window_vectors")?, 1);
+        assert_eq!(count(&store, "chunk_terms")?, 1);
+        Ok(())
+    }
+
+    fn keyword_matches(store: &Store, expression: &str) -> Result<Vec<i64>> {
+        let mut statement = store
+            .connection
+            .prepare("SELECT rowid FROM chunk_terms WHERE chunk_terms MATCH ?1 ORDER BY rowid")?;
+        let rows = statement.query_map([expression], |row| row.get(0))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    #[test]
+    fn keyword_rows_follow_their_chunks() -> Result<()> {
+        let folder = tempfile::tempdir()?;
+        let mut store = Store::open(&folder.path().join("index.db"))?;
+        let mut chunk = chunk_with_windows(1, 1);
+        chunk.text = "fn rrfFuse() {}".into();
+        store.write_file(&record("src/hybrid.rs"), &[chunk], &[unit_vector(0)])?;
+        assert_eq!(keyword_matches(&store, "fuse")?.len(), 1);
+        assert_eq!(keyword_matches(&store, "path: hybrid")?.len(), 1);
+
+        let mut chunk = chunk_with_windows(1, 1);
+        chunk.text = "fn cookPasta() {}".into();
+        store.write_file(&record("src/hybrid.rs"), &[chunk], &[unit_vector(0)])?;
+        assert!(keyword_matches(&store, "fuse")?.is_empty());
+        assert_eq!(keyword_matches(&store, "pasta")?.len(), 1);
+
+        store.remove_files_except(&HashSet::new())?;
+        assert!(keyword_matches(&store, "pasta")?.is_empty());
         Ok(())
     }
 }

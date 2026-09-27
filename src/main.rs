@@ -8,6 +8,7 @@ mod discover;
 mod embed;
 mod files;
 mod indexing;
+mod keywords;
 mod rank;
 mod render;
 mod store;
