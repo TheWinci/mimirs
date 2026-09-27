@@ -10,12 +10,10 @@ use crate::rank::rank;
 use crate::render::render;
 use crate::store::Store;
 
-/// Windows compared with the query; enough to fill a map of 20 files.
+/// Windows compared with the query; enough to fill the default map of 20 files.
 const NEAREST_WINDOWS: usize = 200;
 /// Keyword matches fused with the nearest windows.
 const KEYWORD_CHUNKS: usize = 200;
-/// Files listed in the map.
-const MAP_FILES: usize = 20;
 
 #[derive(Args)]
 pub struct Options {
@@ -25,17 +23,24 @@ pub struct Options {
     /// Most bytes to print.
     #[arg(long, default_value_t = 16_000)]
     pub budget: usize,
+
+    /// Most files to list in the map.
+    #[arg(long, default_value_t = 20)]
+    pub files: usize,
 }
 
 pub fn run(options: Options) -> anyhow::Result<()> {
     let root = std::env::current_dir()?;
-    print!("{}", answer(&root, &options.query, options.budget)?);
+    print!(
+        "{}",
+        answer(&root, &options.query, options.budget, options.files)?
+    );
     Ok(())
 }
 
 /// Search the project's index for `query` and render the file map and excerpts.
 /// Reads only what is committed; it never indexes or waits for an index run.
-fn answer(root: &Path, query: &str, budget: usize) -> anyhow::Result<String> {
+fn answer(root: &Path, query: &str, budget: usize, max_files: usize) -> anyhow::Result<String> {
     let store = Store::open_existing(&root.join(".mimirs/index.db"))?;
     anyhow::ensure!(
         store.file_count()? > 0,
@@ -52,7 +57,7 @@ fn answer(root: &Path, query: &str, budget: usize) -> anyhow::Result<String> {
         Some(expression) => store.keyword_matches(&expression, KEYWORD_CHUNKS)?,
         None => Vec::new(),
     };
-    let files = rank(vector_hits, keyword_hits, MAP_FILES);
+    let files = rank(vector_hits, keyword_hits, max_files);
 
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as i64;
     let index_age = store
@@ -70,7 +75,7 @@ mod tests {
     #[test]
     fn a_project_without_an_index_is_told_to_run_index() -> anyhow::Result<()> {
         let project = tempfile::tempdir()?;
-        let error = answer(project.path(), "anything", 16_000).unwrap_err();
+        let error = answer(project.path(), "anything", 16_000, 20).unwrap_err();
         assert!(error.to_string().contains("mimirs index"));
         Ok(())
     }
@@ -102,7 +107,7 @@ mod tests {
         )?;
         crate::indexing::index_project(root)?;
 
-        let output = answer(root, "renew an expiring login token", 16_000)?;
+        let output = answer(root, "renew an expiring login token", 16_000, 20)?;
         let map = output
             .split("Relevant files\n")
             .nth(1)
