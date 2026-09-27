@@ -2,6 +2,12 @@ use std::collections::HashMap;
 
 use crate::store::Hit;
 
+/// Share of the fused score that comes from the vector list; the keyword list
+/// gives the rest.
+const VECTOR_WEIGHT: f32 = 0.5;
+/// Reciprocal-rank constant: rank 0 counts 1, rank 60 counts half.
+const RANK_CONSTANT: f32 = 60.0;
+
 /// Consecutive lines of one file, made of one chunk or neighbouring chunks.
 pub struct Excerpt {
     pub start_line: usize,
@@ -12,7 +18,7 @@ pub struct Excerpt {
 /// A file in the answer, with its matching code in line order.
 pub struct RankedFile {
     pub path: String,
-    /// The score of the file's best chunk.
+    /// The fused score of the file's best chunk.
     pub score: f32,
     /// Line number and text of the first non-blank line of the best chunk.
     pub summary_line: usize,
@@ -20,21 +26,13 @@ pub struct RankedFile {
     pub excerpts: Vec<Excerpt>,
 }
 
-/// Rank files by their best chunk and keep the `max_files` best.
-pub fn rank(hits: Vec<Hit>, max_files: usize) -> Vec<RankedFile> {
-    // A chunk with several matching windows scores as its best window.
-    let mut best_hits: HashMap<i64, Hit> = HashMap::new();
-    for hit in hits {
-        let is_better = best_hits
-            .get(&hit.chunk_id)
-            .is_none_or(|existing| hit.score > existing.score);
-        if is_better {
-            best_hits.insert(hit.chunk_id, hit);
-        }
-    }
+/// Fuse the nearest windows and the keyword matches by rank, rank files by
+/// their best fused chunk, and keep the `max_files` best.
+pub fn rank(vector_hits: Vec<Hit>, keyword_hits: Vec<Hit>, max_files: usize) -> Vec<RankedFile> {
+    let chunks = fuse(best_window_per_chunk(vector_hits), keyword_hits);
 
     let mut hits_by_file: HashMap<String, Vec<Hit>> = HashMap::new();
-    for hit in best_hits.into_values() {
+    for hit in chunks {
         hits_by_file.entry(hit.path.clone()).or_default().push(hit);
     }
 
@@ -50,6 +48,51 @@ pub fn rank(hits: Vec<Hit>, max_files: usize) -> Vec<RankedFile> {
     });
     files.truncate(max_files);
     files
+}
+
+/// One hit per chunk, scored as its best window, best first.
+fn best_window_per_chunk(hits: Vec<Hit>) -> Vec<Hit> {
+    let mut best_hits: HashMap<i64, Hit> = HashMap::new();
+    for hit in hits {
+        let is_better = best_hits
+            .get(&hit.chunk_id)
+            .is_none_or(|existing| hit.score > existing.score);
+        if is_better {
+            best_hits.insert(hit.chunk_id, hit);
+        }
+    }
+    let mut chunks: Vec<Hit> = best_hits.into_values().collect();
+    chunks.sort_by(|left, right| {
+        right
+            .score
+            .total_cmp(&left.score)
+            .then_with(|| left.chunk_id.cmp(&right.chunk_id))
+    });
+    chunks
+}
+
+/// Reciprocal-rank fusion of two chunk lists, each best first (D2). A chunk's
+/// rank is its position in a list; a list without the chunk adds nothing.
+/// Returns one hit per chunk whose score is the fused score.
+fn fuse(vector_chunks: Vec<Hit>, keyword_chunks: Vec<Hit>) -> Vec<Hit> {
+    let mut fused: HashMap<i64, Hit> = HashMap::new();
+    let lists = [
+        (vector_chunks, VECTOR_WEIGHT),
+        (keyword_chunks, 1.0 - VECTOR_WEIGHT),
+    ];
+    for (chunks, weight) in lists {
+        for (position, mut hit) in chunks.into_iter().enumerate() {
+            let contribution = weight * RANK_CONSTANT / (RANK_CONSTANT + position as f32);
+            match fused.get_mut(&hit.chunk_id) {
+                Some(existing) => existing.score += contribution,
+                None => {
+                    hit.score = contribution;
+                    fused.insert(hit.chunk_id, hit);
+                }
+            }
+        }
+    }
+    fused.into_values().collect()
 }
 
 /// Build a file's entry from its hits; `None` when it has no hits.
@@ -118,11 +161,11 @@ mod tests {
                 hit("b.rs", 3, (1, 5), 0.9),
                 hit("c.rs", 4, (1, 5), 0.1),
             ],
+            Vec::new(),
             2,
         );
         let paths: Vec<&str> = files.iter().map(|file| file.path.as_str()).collect();
         assert_eq!(paths, ["b.rs", "a.rs"]);
-        assert_eq!(files[1].score, 0.6);
         assert_eq!(
             (files[1].summary_line, files[1].summary.as_str()),
             (21, "chunk 2")
@@ -132,11 +175,51 @@ mod tests {
     #[test]
     fn a_chunk_scores_as_its_best_window() {
         let files = rank(
-            vec![hit("a.rs", 1, (1, 5), 0.2), hit("a.rs", 1, (1, 5), 0.7)],
+            vec![
+                hit("a.rs", 1, (1, 5), 0.2),
+                hit("b.rs", 2, (1, 5), 0.5),
+                hit("a.rs", 1, (1, 5), 0.7),
+            ],
+            Vec::new(),
             20,
         );
-        assert_eq!(files[0].score, 0.7);
+        assert_eq!(files[0].path, "a.rs");
         assert_eq!(files[0].excerpts.len(), 1);
+    }
+
+    #[test]
+    fn a_chunk_found_by_both_lists_beats_one_found_by_one() {
+        let files = rank(
+            vec![hit("a.rs", 1, (1, 5), 0.9), hit("b.rs", 2, (1, 5), 0.8)],
+            vec![hit("b.rs", 2, (1, 5), 3.0), hit("c.rs", 3, (1, 5), 2.0)],
+            20,
+        );
+        let paths: Vec<&str> = files.iter().map(|file| file.path.as_str()).collect();
+        assert_eq!(paths, ["b.rs", "a.rs", "c.rs"]);
+    }
+
+    #[test]
+    fn extra_windows_leave_no_gaps_between_vector_ranks() {
+        // Chunk 1 fills the first four window positions; chunk 2 still ranks
+        // second, level with the second keyword match.
+        let files = rank(
+            vec![
+                hit("a.rs", 1, (1, 5), 0.81),
+                hit("a.rs", 1, (1, 5), 0.80),
+                hit("a.rs", 1, (1, 5), 0.79),
+                hit("a.rs", 1, (1, 5), 0.78),
+                hit("b.rs", 2, (1, 5), 0.77),
+            ],
+            vec![hit("c.rs", 3, (1, 5), 5.0), hit("d.rs", 4, (1, 5), 4.0)],
+            20,
+        );
+        let score = |path: &str| {
+            files
+                .iter()
+                .find(|file| file.path == path)
+                .map(|file| file.score)
+        };
+        assert_eq!(score("b.rs"), score("d.rs"));
     }
 
     #[test]
@@ -147,6 +230,7 @@ mod tests {
                 hit("a.rs", 1, (1, 10), 0.5),
                 hit("a.rs", 7, (40, 50), 0.4),
             ],
+            Vec::new(),
             20,
         );
         let ranges: Vec<(usize, usize)> = files[0]

@@ -13,6 +13,28 @@ pub fn terms(text: &str) -> Vec<String> {
     terms
 }
 
+/// An FTS5 query matching chunks that contain any of the query's terms, or
+/// `None` when the query has no terms.
+pub fn match_expression(query: &str) -> Option<String> {
+    let mut distinct_terms: Vec<String> = Vec::new();
+    for term in terms(query) {
+        if !distinct_terms.contains(&term) {
+            distinct_terms.push(term);
+        }
+    }
+    if distinct_terms.is_empty() {
+        return None;
+    }
+    // Quoting keeps words like `not` from being read as operators; terms hold
+    // only letters and digits, so they never contain a quote. FTS5 joins bare
+    // terms with AND, which would leave long questions matching nothing.
+    let quoted: Vec<String> = distinct_terms
+        .iter()
+        .map(|term| format!("\"{term}\""))
+        .collect();
+    Some(quoted.join(" OR "))
+}
+
 /// Cut `getDependsOn` into `get`, `Depends`, `On` and `HTMLParser` into `HTML`,
 /// `Parser`.
 fn split_identifier(word: &str) -> Vec<&str> {
@@ -63,6 +85,20 @@ mod tests {
     #[test]
     fn single_characters_and_punctuation_are_dropped() {
         assert_eq!(terms("let x = a + bc; // X-ray"), ["let", "bc", "ray"]);
+    }
+
+    #[test]
+    fn a_query_matches_any_of_its_distinct_terms() {
+        assert_eq!(
+            match_expression("rrfFuse NOT fuse-ranks").as_deref(),
+            Some("\"rrf\" OR \"fuse\" OR \"not\" OR \"ranks\"")
+        );
+    }
+
+    #[test]
+    fn a_query_without_terms_has_no_expression() {
+        assert_eq!(match_expression(""), None);
+        assert_eq!(match_expression("- : * \" ( )"), None);
     }
 
     #[test]

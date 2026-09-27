@@ -5,12 +5,15 @@ use anyhow::Context;
 use clap::Args;
 
 use crate::embed::{self, Embedder};
+use crate::keywords;
 use crate::rank::rank;
 use crate::render::render;
 use crate::store::Store;
 
 /// Windows compared with the query; enough to fill a map of 20 files.
 const NEAREST_WINDOWS: usize = 200;
+/// Keyword matches fused with the nearest windows.
+const KEYWORD_CHUNKS: usize = 200;
 /// Files listed in the map.
 const MAP_FILES: usize = 20;
 
@@ -44,8 +47,12 @@ fn answer(root: &Path, query: &str, budget: usize) -> anyhow::Result<String> {
     let mut embedder = Embedder::load(&model_files, 1)?;
 
     let query_vector = embedder.embed(query)?;
-    let hits = store.nearest(&query_vector, NEAREST_WINDOWS)?;
-    let files = rank(hits, MAP_FILES);
+    let vector_hits = store.nearest(&query_vector, NEAREST_WINDOWS)?;
+    let keyword_hits = match keywords::match_expression(query) {
+        Some(expression) => store.keyword_matches(&expression, KEYWORD_CHUNKS)?,
+        None => Vec::new(),
+    };
+    let files = rank(vector_hits, keyword_hits, MAP_FILES);
 
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as i64;
     let index_age = store

@@ -26,14 +26,15 @@ pub struct FileRecord<'a> {
     pub modified: i64,
 }
 
-/// A chunk whose window was among the nearest to a query.
+/// A chunk that one search found for a query.
 pub struct Hit {
     pub path: String,
     pub chunk_id: i64,
     pub start_line: usize,
     pub end_line: usize,
     pub text: String,
-    /// Cosine similarity between the query and the window, higher is closer.
+    /// How well the chunk matches by the measure of the search that found it,
+    /// higher is better: cosine similarity for vectors, negated BM25 for keywords.
     pub score: f32,
 }
 
@@ -123,6 +124,36 @@ impl Store {
                 end_line: end_line as usize,
                 text: row.get(4)?,
                 score: (1.0 - distance) as f32,
+            })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// The `limit` chunks that best match an FTS5 `expression` by BM25, best first.
+    pub fn keyword_matches(&self, expression: &str, limit: usize) -> Result<Vec<Hit>> {
+        // Path terms weigh twice as much as text terms (D1). bm25() is lower for
+        // better matches.
+        let mut statement = self.connection.prepare(
+            "SELECT files.path, chunks.id, chunks.start_line, chunks.end_line, chunks.text,
+                    bm25(chunk_terms, 2.0, 1.0) AS bm25_value
+             FROM chunk_terms
+             JOIN chunks ON chunks.id = chunk_terms.rowid
+             JOIN files ON files.id = chunks.file_id
+             WHERE chunk_terms MATCH ?1
+             ORDER BY bm25_value, chunks.id
+             LIMIT ?2",
+        )?;
+        let rows = statement.query_map(params![expression, limit as i64], |row| {
+            let start_line: i64 = row.get(2)?;
+            let end_line: i64 = row.get(3)?;
+            let bm25_value: f64 = row.get(5)?;
+            Ok(Hit {
+                path: row.get(0)?,
+                chunk_id: row.get(1)?,
+                start_line: start_line as usize,
+                end_line: end_line as usize,
+                text: row.get(4)?,
+                score: -bm25_value as f32,
             })
         })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
@@ -495,6 +526,31 @@ mod tests {
             .prepare("SELECT rowid FROM chunk_terms WHERE chunk_terms MATCH ?1 ORDER BY rowid")?;
         let rows = statement.query_map([expression], |row| row.get(0))?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    #[test]
+    fn keyword_matches_rank_path_and_text_hits_best_first() -> Result<()> {
+        let folder = tempfile::tempdir()?;
+        let mut store = Store::open(&folder.path().join("index.db"))?;
+        for (path, text) in [
+            ("src/pasta.rs", "fn boil() {}"),
+            ("src/hybrid.rs", "fn rrfFuse() {}"),
+            ("src/other.rs", "fn cook() {}"),
+        ] {
+            let mut chunk = chunk_with_windows(1, 1);
+            chunk.text = text.into();
+            store.write_file(&record(path), &[chunk], &[unit_vector(0)])?;
+        }
+        let hits = store.keyword_matches("\"fuse\" OR \"pasta\"", 10)?;
+        let paths: Vec<&str> = hits.iter().map(|hit| hit.path.as_str()).collect();
+        assert_eq!(paths.len(), 2);
+        assert!(paths.contains(&"src/pasta.rs") && paths.contains(&"src/hybrid.rs"));
+        assert!(hits[0].score >= hits[1].score);
+        assert_eq!(
+            store.keyword_matches("\"fuse\"", 10)?[0].text,
+            "fn rrfFuse() {}"
+        );
+        Ok(())
     }
 
     #[test]
