@@ -191,7 +191,7 @@
   {
     "query": "LaserTrails animated pointer trail collaborative drawing",
     "expected": [
-      "packages/excalidraw/laser-trails.ts"
+      "packages/excalidraw/laserTrails.ts"
     ],
     "difficulty": "unknown"
   },
