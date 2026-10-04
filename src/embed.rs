@@ -69,6 +69,28 @@ pub fn load_tokenizer(path: &Path) -> Result<Tokenizer> {
     Ok(tokenizer)
 }
 
+/// Tokens a window may hold besides the model's two special tokens.
+const WINDOW_TOKENS: usize = MAX_TOKENS - 2;
+
+/// Cut `text` into windows the model embeds whole: at most `WINDOW_TOKENS`
+/// tokens each, cut at token boundaries. The windows are views of `text`, so
+/// together they are exactly `text`.
+pub fn windows<'a>(text: &'a str, tokenizer: &Tokenizer) -> Result<Vec<&'a str>> {
+    let encoding = tokenizer.encode(text, false).map_err(anyhow::Error::msg)?;
+    // Byte offsets of each token in `text`.
+    let offsets = encoding.get_offsets();
+
+    let mut windows = Vec::new();
+    let mut start = 0;
+    for token_index in (WINDOW_TOKENS..offsets.len()).step_by(WINDOW_TOKENS) {
+        let (cut, _) = offsets[token_index];
+        windows.push(&text[start..cut]);
+        start = cut;
+    }
+    windows.push(&text[start..]);
+    Ok(windows)
+}
+
 /// Turns texts into vectors with the pinned model.
 pub struct Embedder {
     tokenizer: Tokenizer,
@@ -190,6 +212,35 @@ fn mean_pool_and_normalize(hidden: &[f32], mask: &[i64]) -> Result<Vec<f32>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn tokenizer() -> Result<Tokenizer> {
+        load_tokenizer(&Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/tokenizer.json"))
+    }
+
+    fn count_tokens(text: &str, tokenizer: &Tokenizer) -> Result<usize> {
+        let encoding = tokenizer.encode(text, false).map_err(anyhow::Error::msg)?;
+        Ok(encoding.len())
+    }
+
+    #[test]
+    fn short_text_is_one_window() -> Result<()> {
+        let text = "fn main() {}\n";
+        assert_eq!(windows(text, &tokenizer()?)?, [text]);
+        Ok(())
+    }
+
+    #[test]
+    fn long_text_is_cut_into_windows_within_the_token_limit() -> Result<()> {
+        let tokenizer = tokenizer()?;
+        let text = "alpha beta gamma delta ".repeat(300) + "\n";
+        let windows = windows(&text, &tokenizer)?;
+        assert!(windows.len() > 1);
+        assert_eq!(windows.concat(), text);
+        for window in windows {
+            assert!(count_tokens(window, &tokenizer)? <= WINDOW_TOKENS);
+        }
+        Ok(())
+    }
 
     #[test]
     fn pooling_averages_visible_tokens_and_normalizes() -> Result<()> {

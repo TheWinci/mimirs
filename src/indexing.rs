@@ -34,11 +34,13 @@ struct PreparedFile {
     size: u64,
     modified: i64,
     chunks: Vec<Chunk>,
+    /// How many windows each chunk was cut into, in chunk order.
+    window_counts: Vec<usize>,
 }
 
 impl PreparedFile {
     fn window_count(&self) -> usize {
-        self.chunks.iter().map(|chunk| chunk.windows.len()).sum()
+        self.window_counts.iter().sum()
     }
 }
 
@@ -143,6 +145,7 @@ fn prepare_files(
 ) {
     for (file_number, file) in files.iter().enumerate() {
         let path = stored_path(file);
+        let mut window_texts: Vec<String> = Vec::new();
         let event = if is_unchanged(known_files.get(&path), file) {
             Event::Unchanged
         } else {
@@ -154,34 +157,28 @@ fn prepare_files(
                     path: file.path.clone(),
                     error: error.to_string(),
                 },
-                Ok(Some(text)) => match chunk(&text, tokenizer) {
-                    Ok(chunks) => Event::Prepared {
-                        file: file_number,
-                        prepared: PreparedFile {
-                            path,
-                            size: file.size,
-                            modified: file.modified,
-                            chunks,
-                        },
-                    },
-                    Err(error) => Event::Failed(error),
-                },
+                Ok(Some(text)) => {
+                    let chunks = chunk(&text);
+                    match cut_windows(&chunks, tokenizer) {
+                        Ok((window_counts, texts)) => {
+                            window_texts = texts;
+                            Event::Prepared {
+                                file: file_number,
+                                prepared: PreparedFile {
+                                    path,
+                                    size: file.size,
+                                    modified: file.modified,
+                                    chunks,
+                                    window_counts,
+                                },
+                            }
+                        }
+                        Err(error) => Event::Failed(error),
+                    }
+                }
             }
         };
 
-        let window_texts: Vec<String> = match &event {
-            Event::Prepared { prepared, .. } => prepared
-                .chunks
-                .iter()
-                .flat_map(|chunk| {
-                    chunk
-                        .windows
-                        .iter()
-                        .map(|window| chunk.window_text(window).to_string())
-                })
-                .collect(),
-            _ => Vec::new(),
-        };
         let failed = matches!(event, Event::Failed(_));
         // The writer must know a file before any of its vectors arrive.
         if events.send(event).is_err() || failed {
@@ -198,6 +195,19 @@ fn prepare_files(
             }
         }
     }
+}
+
+/// Cut each chunk into windows, returning how many windows each chunk has and
+/// every window's text in order.
+fn cut_windows(chunks: &[Chunk], tokenizer: &Tokenizer) -> Result<(Vec<usize>, Vec<String>)> {
+    let mut window_counts = Vec::new();
+    let mut texts = Vec::new();
+    for chunk in chunks {
+        let windows = embed::windows(&chunk.text, tokenizer)?;
+        window_counts.push(windows.len());
+        texts.extend(windows.into_iter().map(str::to_string));
+    }
+    Ok((window_counts, texts))
 }
 
 /// Embed queued windows with one model instance until the queue is closed and empty.
@@ -309,16 +319,20 @@ fn write_files(
         let Some(done) = pending.remove(&file) else {
             continue;
         };
-        let vectors: Vec<Vec<f32>> = done.vectors.into_iter().flatten().collect();
+        let mut vectors = done.vectors.into_iter().flatten();
+        let mut vectors_per_chunk: Vec<Vec<Vec<f32>>> = Vec::new();
+        for &count in &done.prepared.window_counts {
+            vectors_per_chunk.push(vectors.by_ref().take(count).collect());
+        }
         let record = FileRecord {
             path: &done.prepared.path,
             size: done.prepared.size,
             modified: done.prepared.modified,
         };
-        store.write_file(&record, &done.prepared.chunks, &vectors)?;
+        store.write_file(&record, &done.prepared.chunks, &vectors_per_chunk)?;
         summary.files += 1;
         summary.chunks += done.prepared.chunks.len();
-        summary.windows += vectors.len();
+        summary.windows += done.prepared.window_count();
         finished += 1;
         if show_progress {
             let line = progress_line(finished, total, &done.prepared.path, terminal_width);

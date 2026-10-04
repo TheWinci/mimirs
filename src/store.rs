@@ -3,7 +3,7 @@ use std::path::Path;
 use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use rusqlite::auto_extension::{RawAutoExtension, register_auto_extension};
 use rusqlite::{Connection, OpenFlags, OptionalExtension, Transaction, params};
 
@@ -13,7 +13,7 @@ use crate::keywords;
 
 /// Bump whenever the tables, the model, the tokenizer, or the chunking rules
 /// change, so `index` rebuilds instead of mixing old and new data.
-const SCHEMA_VERSION: i64 = 2;
+const SCHEMA_VERSION: i64 = 3;
 
 const LAST_RUN_KEY: &str = "last_index_finished";
 
@@ -160,17 +160,16 @@ impl Store {
     }
 
     /// Replace one file's chunks, windows, and vectors in a single transaction.
-    /// `vectors` holds one vector per window, in chunk and window order.
+    /// `vectors_per_chunk` holds each chunk's window vectors, in chunk order.
     pub fn write_file(
         &mut self,
         file: &FileRecord,
         chunks: &[Chunk],
-        vectors: &[Vec<f32>],
+        vectors_per_chunk: &[Vec<Vec<f32>>],
     ) -> Result<()> {
-        let window_count: usize = chunks.iter().map(|chunk| chunk.windows.len()).sum();
         anyhow::ensure!(
-            window_count == vectors.len(),
-            "Expected one vector per window"
+            chunks.len() == vectors_per_chunk.len(),
+            "Expected the vectors of every chunk"
         );
 
         let transaction = self.connection.transaction()?;
@@ -182,8 +181,7 @@ impl Store {
         let file_id = transaction.last_insert_rowid();
 
         let path_terms = keywords::terms(file.path).join(" ");
-        let mut vectors = vectors.iter();
-        for chunk in chunks {
+        for (chunk, vectors) in chunks.iter().zip(vectors_per_chunk) {
             transaction.execute(
                 "INSERT INTO chunks (file_id, start_line, end_line, text) VALUES (?1, ?2, ?3, ?4)",
                 params![
@@ -198,10 +196,9 @@ impl Store {
                 "INSERT INTO chunk_terms (rowid, path, text) VALUES (?1, ?2, ?3)",
                 params![chunk_id, path_terms, keywords::terms(&chunk.text).join(" ")],
             )?;
-            for _window in &chunk.windows {
+            for vector in vectors {
                 transaction.execute("INSERT INTO windows (chunk_id) VALUES (?1)", [chunk_id])?;
                 let window_id = transaction.last_insert_rowid();
-                let vector = vectors.next().context("Expected one vector per window")?;
                 transaction.execute(
                     "INSERT INTO window_vectors (window_id, embedding) VALUES (?1, ?2)",
                     params![window_id, vector_bytes(vector)],
@@ -359,20 +356,13 @@ fn register_sqlite_vec() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::chunk::Window;
+    use anyhow::Context;
 
-    fn chunk_with_windows(start_line: usize, window_count: usize) -> Chunk {
-        let text = "x".repeat(window_count);
+    fn line_chunk(start_line: usize) -> Chunk {
         Chunk {
             start_line,
             end_line: start_line,
-            windows: (0..window_count)
-                .map(|index| Window {
-                    start: index,
-                    end: index + 1,
-                })
-                .collect(),
-            text,
+            text: "x".into(),
         }
     }
 
@@ -402,13 +392,13 @@ mod tests {
     fn writing_a_file_again_replaces_its_records() -> Result<()> {
         let folder = tempfile::tempdir()?;
         let mut store = Store::open(&folder.path().join("index.db"))?;
-        let chunks = [chunk_with_windows(1, 2), chunk_with_windows(2, 1)];
-        let vectors = [unit_vector(0), unit_vector(1), unit_vector(2)];
+        let chunks = [line_chunk(1), line_chunk(2)];
+        let vectors = [vec![unit_vector(0), unit_vector(1)], vec![unit_vector(2)]];
         store.write_file(&record("src/a.rs"), &chunks, &vectors)?;
-        store.write_file(&record("src/b.rs"), &chunks[1..], &vectors[..1])?;
+        store.write_file(&record("src/b.rs"), &chunks[1..], &vectors[1..])?;
         assert_eq!(count(&store, "windows")?, 4);
 
-        store.write_file(&record("src/a.rs"), &chunks[1..], &vectors[..1])?;
+        store.write_file(&record("src/a.rs"), &chunks[1..], &vectors[1..])?;
         assert_eq!(count(&store, "files")?, 2);
         assert_eq!(count(&store, "chunks")?, 2);
         assert_eq!(count(&store, "windows")?, 2);
@@ -439,8 +429,8 @@ mod tests {
         let mut store = Store::open(&path)?;
         store.write_file(
             &record("src/a.rs"),
-            &[chunk_with_windows(1, 1)],
-            &[unit_vector(0)],
+            &[line_chunk(1)],
+            &[vec![unit_vector(0)]],
         )?;
         store
             .connection
@@ -462,13 +452,13 @@ mod tests {
         let mut store = Store::open(&folder.path().join("index.db"))?;
         store.write_file(
             &record("src/a.rs"),
-            &[chunk_with_windows(1, 1)],
-            &[unit_vector(0)],
+            &[line_chunk(1)],
+            &[vec![unit_vector(0)]],
         )?;
         store.write_file(
             &record("src/b.rs"),
-            &[chunk_with_windows(7, 1)],
-            &[unit_vector(1)],
+            &[line_chunk(7)],
+            &[vec![unit_vector(1)]],
         )?;
         let hits = store.nearest(&unit_vector(1), 10)?;
         assert_eq!(hits.len(), 2);
@@ -502,11 +492,7 @@ mod tests {
         let folder = tempfile::tempdir()?;
         let mut store = Store::open(&folder.path().join("index.db"))?;
         for path in ["a.rs", "b.rs", "c.rs"] {
-            store.write_file(
-                &record(path),
-                &[chunk_with_windows(1, 1)],
-                &[unit_vector(0)],
-            )?;
+            store.write_file(&record(path), &[line_chunk(1)], &[vec![unit_vector(0)]])?;
         }
         let keep: HashSet<String> = ["b.rs".to_string()].into();
         assert_eq!(store.remove_files_except(&keep)?, 2);
@@ -537,9 +523,9 @@ mod tests {
             ("src/hybrid.rs", "fn rrfFuse() {}"),
             ("src/other.rs", "fn cook() {}"),
         ] {
-            let mut chunk = chunk_with_windows(1, 1);
+            let mut chunk = line_chunk(1);
             chunk.text = text.into();
-            store.write_file(&record(path), &[chunk], &[unit_vector(0)])?;
+            store.write_file(&record(path), &[chunk], &[vec![unit_vector(0)]])?;
         }
         let hits = store.keyword_matches("\"fuse\" OR \"pasta\"", 10)?;
         let paths: Vec<&str> = hits.iter().map(|hit| hit.path.as_str()).collect();
@@ -557,15 +543,15 @@ mod tests {
     fn keyword_rows_follow_their_chunks() -> Result<()> {
         let folder = tempfile::tempdir()?;
         let mut store = Store::open(&folder.path().join("index.db"))?;
-        let mut chunk = chunk_with_windows(1, 1);
+        let mut chunk = line_chunk(1);
         chunk.text = "fn rrfFuse() {}".into();
-        store.write_file(&record("src/hybrid.rs"), &[chunk], &[unit_vector(0)])?;
+        store.write_file(&record("src/hybrid.rs"), &[chunk], &[vec![unit_vector(0)]])?;
         assert_eq!(keyword_matches(&store, "fuse")?.len(), 1);
         assert_eq!(keyword_matches(&store, "path: hybrid")?.len(), 1);
 
-        let mut chunk = chunk_with_windows(1, 1);
+        let mut chunk = line_chunk(1);
         chunk.text = "fn cookPasta() {}".into();
-        store.write_file(&record("src/hybrid.rs"), &[chunk], &[unit_vector(0)])?;
+        store.write_file(&record("src/hybrid.rs"), &[chunk], &[vec![unit_vector(0)]])?;
         assert!(keyword_matches(&store, "fuse")?.is_empty());
         assert_eq!(keyword_matches(&store, "pasta")?.len(), 1);
 
