@@ -3,6 +3,7 @@ use std::path::Path;
 
 use anyhow::Result;
 
+mod python;
 mod symbols;
 mod typescript;
 
@@ -43,6 +44,7 @@ pub fn chunk_file(path: &str, text: &str) -> Result<Vec<Chunk>> {
         "ts" | "mts" | "cts" => Some(&typescript::TYPESCRIPT),
         "tsx" => Some(&typescript::TSX),
         "js" | "jsx" | "mjs" | "cjs" => Some(&typescript::JAVASCRIPT),
+        "py" | "pyi" => Some(&python::PYTHON),
         _ => None,
     };
     if let Some(rules) = rules
@@ -208,6 +210,10 @@ mod tests {
         assert_eq!(chunk_file("src/run.ts", text)?[0].kind, "function");
         assert_eq!(chunk_file("src/run.tsx", text)?[0].kind, "function");
         assert_eq!(chunk_file("src/run.mjs", text)?[0].kind, "function");
+        assert_eq!(
+            chunk_file("src/run.py", "def run():\n    pass\n")?[0].kind,
+            "function"
+        );
         assert_eq!(chunk_file("notes/run.txt", text)?[0].kind, "lines");
         Ok(())
     }
