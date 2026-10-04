@@ -97,15 +97,25 @@ fn collect_symbols(
     }
 }
 
-/// Where a symbol starts once the comments right above it are included: each
-/// comment must end on the line just before the next one starts.
+/// Where a symbol starts once the comments and Rust attributes (`#[test]`)
+/// right above it are included: each must end on the line just before the next
+/// one starts.
 fn attached_comments_start(node: Node) -> usize {
     let mut start = node.start_byte();
     let mut next_row = node.start_position().row;
     let mut previous = node.prev_named_sibling();
     while let Some(comment) = previous {
-        let touches = comment.end_position().row + 1 >= next_row;
-        if !comment.kind().contains("comment") || !touches {
+        // Some grammars end a line comment after its newline, at column 0 of
+        // the next line; the comment itself ends on the line before.
+        let end = comment.end_position();
+        let last_row = if end.column == 0 {
+            end.row.saturating_sub(1)
+        } else {
+            end.row
+        };
+        let touches = last_row + 1 >= next_row;
+        let attaches = comment.kind().contains("comment") || comment.kind() == "attribute_item";
+        if !attaches || !touches {
             break;
         }
         start = comment.start_byte();

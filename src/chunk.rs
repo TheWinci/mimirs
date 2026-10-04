@@ -5,6 +5,7 @@ use anyhow::Result;
 
 mod go;
 mod python;
+mod rust;
 mod symbols;
 mod typescript;
 
@@ -47,6 +48,7 @@ pub fn chunk_file(path: &str, text: &str) -> Result<Vec<Chunk>> {
         "js" | "jsx" | "mjs" | "cjs" => Some(&typescript::JAVASCRIPT),
         "py" | "pyi" => Some(&python::PYTHON),
         "go" => Some(&go::GO),
+        "rs" => Some(&rust::RUST),
         _ => None,
     };
     if let Some(rules) = rules
