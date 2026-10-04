@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use crate::chunk::{last_line, line_at, text_without};
+use crate::chunk::{full_name, last_line, line_at, text_without};
 use crate::store::StoredFile;
 
 /// Consecutive lines of one file, made of one chunk or touching chunks.
@@ -10,12 +10,15 @@ pub struct Excerpt {
     pub text: String,
 }
 
-/// A file as `context` shows it: a summary line for the map and its excerpts in
+/// A file as `context` shows it: what its map line says and its excerpts in
 /// line order.
 pub struct ShownFile {
     pub path: String,
-    /// Line number and text of the first non-blank line of the best chunk.
+    /// The first line of the best chunk.
     pub summary_line: usize,
+    /// Full names of the matching chunks, best first.
+    pub names: Vec<String>,
+    /// The first non-blank line of the best chunk, shown when it has no name.
     pub summary: String,
     pub excerpts: Vec<Excerpt>,
 }
@@ -30,9 +33,25 @@ pub fn show_file(path: &str, file: &StoredFile, matched_ids: &[i64]) -> ShownFil
         Some(&best) => first_non_blank_line(&file.text, file.chunks[best].bytes.clone()),
         None => (1, String::new()),
     };
+    // Names count only when the best chunk has one; otherwise its first line
+    // says more than the names of weaker matches.
+    let best_has_name = matched
+        .first()
+        .is_some_and(|&best| file.chunks[best].name.is_some());
+    let mut names: Vec<String> = Vec::new();
+    if best_has_name {
+        for &index in &matched {
+            if let Some(name) = full_name(&file.chunks, index)
+                && !names.contains(&name)
+            {
+                names.push(name);
+            }
+        }
+    }
     ShownFile {
         path: path.to_string(),
         summary_line,
+        names,
         summary,
         excerpts: excerpts(file, &matched),
     }
@@ -174,6 +193,13 @@ mod tests {
             (shown.summary_line, shown.summary.as_str()),
             (2, "push() { a(); }")
         );
+    }
+
+    #[test]
+    fn the_map_names_matching_symbols_best_first() {
+        let shown = show_file("queue.ts", &queue_file(), &[12, 10, 11]);
+        assert_eq!(shown.names, ["Queue.size", "Queue", "Queue.push"]);
+        assert_eq!(shown.summary_line, 3);
     }
 
     #[test]

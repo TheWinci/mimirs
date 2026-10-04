@@ -13,14 +13,7 @@ pub fn render(index_age_seconds: Option<u64>, files: &[ShownFile], budget: usize
 
     output.push_str("\nRelevant files\n");
     for (position, file) in files.iter().enumerate() {
-        let line = format!(
-            "{:>3}. {}:{}  {}",
-            position + 1,
-            file.path,
-            file.summary_line,
-            file.summary
-        );
-        output.push_str(cut_to_bytes(&line, MAP_LINE_BYTES));
+        output.push_str(&map_line(position + 1, file));
         output.push('\n');
     }
 
@@ -59,6 +52,27 @@ pub fn render(index_age_seconds: Option<u64>, files: &[ShownFile], budget: usize
         }
     }
     output
+}
+
+/// `  3. path:line  ` followed by the names of the file's matching symbols, as
+/// many whole names as fit, or by the best chunk's first line when it has no
+/// name.
+fn map_line(number: usize, file: &ShownFile) -> String {
+    let mut line = format!("{number:>3}. {}:{}  ", file.path, file.summary_line);
+    if file.names.is_empty() {
+        line.push_str(&file.summary);
+        return cut_to_bytes(&line, MAP_LINE_BYTES).to_string();
+    }
+    for (index, name) in file.names.iter().enumerate() {
+        let separator = if index == 0 { "" } else { ", " };
+        let fits = line.len() + separator.len() + name.len() <= MAP_LINE_BYTES;
+        if !fits && index > 0 {
+            break;
+        }
+        line.push_str(separator);
+        line.push_str(name);
+    }
+    cut_to_bytes(&line, MAP_LINE_BYTES).to_string()
 }
 
 fn describe_age(seconds: u64) -> String {
@@ -106,6 +120,7 @@ mod tests {
         ShownFile {
             path: path.into(),
             summary_line: excerpts[0].0,
+            names: Vec::new(),
             summary: "fn example()".into(),
             excerpts: excerpts
                 .into_iter()
@@ -137,6 +152,17 @@ mod tests {
         let map_position = output.find("Relevant files").unwrap();
         let excerpt_position = output.find("Excerpts").unwrap();
         assert!(map_position < excerpt_position);
+    }
+
+    #[test]
+    fn a_map_line_lists_as_many_whole_names_as_fit() {
+        let mut shown = file("src/queue.ts", vec![(3, 9, lines(7))]);
+        shown.names = vec!["Queue.drain".into(), "Queue".into(), "x".repeat(100)];
+        let output = render(None, &[shown], 16_000);
+        assert!(
+            output.contains("  1. src/queue.ts:3  Queue.drain, Queue\n"),
+            "{output}"
+        );
     }
 
     #[test]
