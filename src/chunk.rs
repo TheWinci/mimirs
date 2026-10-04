@@ -3,6 +3,7 @@ use std::path::Path;
 
 use anyhow::Result;
 
+mod go;
 mod python;
 mod symbols;
 mod typescript;
@@ -45,6 +46,7 @@ pub fn chunk_file(path: &str, text: &str) -> Result<Vec<Chunk>> {
         "tsx" => Some(&typescript::TSX),
         "js" | "jsx" | "mjs" | "cjs" => Some(&typescript::JAVASCRIPT),
         "py" | "pyi" => Some(&python::PYTHON),
+        "go" => Some(&go::GO),
         _ => None,
     };
     if let Some(rules) = rules
