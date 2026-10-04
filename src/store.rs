@@ -7,13 +7,13 @@ use anyhow::Result;
 use rusqlite::auto_extension::{RawAutoExtension, register_auto_extension};
 use rusqlite::{Connection, OpenFlags, OptionalExtension, Transaction, params};
 
-use crate::chunk::Chunk;
+use crate::chunk::{self, Chunk};
 use crate::embed::DIMENSION;
 use crate::keywords;
 
 /// Bump whenever the tables, the model, the tokenizer, or the chunking rules
 /// change, so `index` rebuilds instead of mixing old and new data.
-const SCHEMA_VERSION: i64 = 3;
+const SCHEMA_VERSION: i64 = 4;
 
 const LAST_RUN_KEY: &str = "last_index_finished";
 
@@ -30,12 +30,17 @@ pub struct FileRecord<'a> {
 pub struct Hit {
     pub path: String,
     pub chunk_id: i64,
-    pub start_line: usize,
-    pub end_line: usize,
-    pub text: String,
     /// How well the chunk matches by the measure of the search that found it,
     /// higher is better: cosine similarity for vectors, negated BM25 for keywords.
     pub score: f32,
+}
+
+/// A file's text and chunks as stored, for building excerpts.
+pub struct StoredFile {
+    pub text: String,
+    /// The database ID of each chunk in `chunks`, in the same order.
+    pub chunk_ids: Vec<i64>,
+    pub chunks: Vec<Chunk>,
 }
 
 /// The project's index in `.mimirs/index.db`.
@@ -104,8 +109,7 @@ impl Store {
     /// appears once per matching window.
     pub fn nearest(&self, query: &[f32], limit: usize) -> Result<Vec<Hit>> {
         let mut statement = self.connection.prepare(
-            "SELECT files.path, chunks.id, chunks.start_line, chunks.end_line, chunks.text,
-                    window_vectors.distance
+            "SELECT files.path, chunks.id, window_vectors.distance
              FROM window_vectors
              JOIN windows ON windows.id = window_vectors.window_id
              JOIN chunks ON chunks.id = windows.chunk_id
@@ -114,15 +118,10 @@ impl Store {
              ORDER BY window_vectors.distance",
         )?;
         let rows = statement.query_map(params![vector_bytes(query), limit as i64], |row| {
-            let start_line: i64 = row.get(2)?;
-            let end_line: i64 = row.get(3)?;
-            let distance: f64 = row.get(5)?;
+            let distance: f64 = row.get(2)?;
             Ok(Hit {
                 path: row.get(0)?,
                 chunk_id: row.get(1)?,
-                start_line: start_line as usize,
-                end_line: end_line as usize,
-                text: row.get(4)?,
                 score: (1.0 - distance) as f32,
             })
         })?;
@@ -131,11 +130,10 @@ impl Store {
 
     /// The `limit` chunks that best match an FTS5 `expression` by BM25, best first.
     pub fn keyword_matches(&self, expression: &str, limit: usize) -> Result<Vec<Hit>> {
-        // Path terms weigh twice as much as text terms (D1). bm25() is lower for
-        // better matches.
+        // Weights per column: path 2, name 3, text 1. bm25() is lower for better
+        // matches.
         let mut statement = self.connection.prepare(
-            "SELECT files.path, chunks.id, chunks.start_line, chunks.end_line, chunks.text,
-                    bm25(chunk_terms, 2.0, 1.0) AS bm25_value
+            "SELECT files.path, chunks.id, bm25(chunk_terms, 2.0, 3.0, 1.0) AS bm25_value
              FROM chunk_terms
              JOIN chunks ON chunks.id = chunk_terms.rowid
              JOIN files ON files.id = chunks.file_id
@@ -144,26 +142,23 @@ impl Store {
              LIMIT ?2",
         )?;
         let rows = statement.query_map(params![expression, limit as i64], |row| {
-            let start_line: i64 = row.get(2)?;
-            let end_line: i64 = row.get(3)?;
-            let bm25_value: f64 = row.get(5)?;
+            let bm25_value: f64 = row.get(2)?;
             Ok(Hit {
                 path: row.get(0)?,
                 chunk_id: row.get(1)?,
-                start_line: start_line as usize,
-                end_line: end_line as usize,
-                text: row.get(4)?,
                 score: -bm25_value as f32,
             })
         })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
-    /// Replace one file's chunks, windows, and vectors in a single transaction.
-    /// `vectors_per_chunk` holds each chunk's window vectors, in chunk order.
+    /// Replace one file's text, chunks, windows, and vectors in a single
+    /// transaction. `vectors_per_chunk` holds each chunk's window vectors, in
+    /// chunk order.
     pub fn write_file(
         &mut self,
         file: &FileRecord,
+        text: &str,
         chunks: &[Chunk],
         vectors_per_chunk: &[Vec<Vec<f32>>],
     ) -> Result<()> {
@@ -175,26 +170,52 @@ impl Store {
         let transaction = self.connection.transaction()?;
         delete_file(&transaction, file.path)?;
         transaction.execute(
-            "INSERT INTO files (path, size, modified) VALUES (?1, ?2, ?3)",
-            params![file.path, file.size as i64, file.modified],
+            "INSERT INTO files (path, size, modified, text) VALUES (?1, ?2, ?3, ?4)",
+            params![file.path, file.size as i64, file.modified, text],
         )?;
         let file_id = transaction.last_insert_rowid();
 
         let path_terms = keywords::terms(file.path).join(" ");
-        for (chunk, vectors) in chunks.iter().zip(vectors_per_chunk) {
+        // The database ID of each chunk written so far, by its index in `chunks`.
+        let mut chunk_ids: Vec<i64> = Vec::new();
+        for (index, (chunk, vectors)) in chunks.iter().zip(vectors_per_chunk).enumerate() {
+            let parent_id = match chunk.parent {
+                Some(parent) => Some(
+                    *chunk_ids
+                        .get(parent)
+                        .ok_or_else(|| anyhow::anyhow!("A chunk came before its parent"))?,
+                ),
+                None => None,
+            };
+            let body_start = chunk.body.as_ref().map(|body| body.start as i64);
+            let body_end = chunk.body.as_ref().map(|body| body.end as i64);
             transaction.execute(
-                "INSERT INTO chunks (file_id, start_line, end_line, text) VALUES (?1, ?2, ?3, ?4)",
+                "INSERT INTO chunks (file_id, parent_id, kind, name, start_byte, end_byte,
+                                     start_line, end_line, body_start, body_end)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
                 params![
                     file_id,
+                    parent_id,
+                    chunk.kind,
+                    chunk.name,
+                    chunk.bytes.start as i64,
+                    chunk.bytes.end as i64,
                     chunk.start_line as i64,
                     chunk.end_line as i64,
-                    chunk.text
+                    body_start,
+                    body_end
                 ],
             )?;
             let chunk_id = transaction.last_insert_rowid();
+            chunk_ids.push(chunk_id);
+
+            let name_terms = chunk::full_name(chunks, index)
+                .map(|name| keywords::terms(&name).join(" "))
+                .unwrap_or_default();
+            let text_terms = keywords::terms(&chunk::own_text(text, chunks, index)).join(" ");
             transaction.execute(
-                "INSERT INTO chunk_terms (rowid, path, text) VALUES (?1, ?2, ?3)",
-                params![chunk_id, path_terms, keywords::terms(&chunk.text).join(" ")],
+                "INSERT INTO chunk_terms (rowid, path, name, text) VALUES (?1, ?2, ?3, ?4)",
+                params![chunk_id, path_terms, name_terms, text_terms],
             )?;
             for vector in vectors {
                 transaction.execute("INSERT INTO windows (chunk_id) VALUES (?1)", [chunk_id])?;
@@ -207,6 +228,66 @@ impl Store {
         }
         transaction.commit()?;
         Ok(())
+    }
+
+    /// A file's text and all of its chunks, parents before children.
+    pub fn stored_file(&self, path: &str) -> Result<StoredFile> {
+        let text: String =
+            self.connection
+                .query_row("SELECT text FROM files WHERE path = ?1", [path], |row| {
+                    row.get(0)
+                })?;
+        let mut statement = self.connection.prepare(
+            "SELECT chunks.id, chunks.parent_id, chunks.kind, chunks.name,
+                    chunks.start_byte, chunks.end_byte, chunks.start_line, chunks.end_line,
+                    chunks.body_start, chunks.body_end
+             FROM chunks JOIN files ON files.id = chunks.file_id
+             WHERE files.path = ?1
+             ORDER BY chunks.id",
+        )?;
+        let rows = statement.query_map([path], |row| {
+            let parent_id: Option<i64> = row.get(1)?;
+            let start_byte: i64 = row.get(4)?;
+            let end_byte: i64 = row.get(5)?;
+            let start_line: i64 = row.get(6)?;
+            let end_line: i64 = row.get(7)?;
+            let body_start: Option<i64> = row.get(8)?;
+            let body_end: Option<i64> = row.get(9)?;
+            let body = match (body_start, body_end) {
+                (Some(start), Some(end)) => Some(start as usize..end as usize),
+                _ => None,
+            };
+            let row_id: i64 = row.get(0)?;
+            Ok((
+                row_id,
+                parent_id,
+                Chunk {
+                    kind: row.get(2)?,
+                    name: row.get(3)?,
+                    parent: None,
+                    bytes: start_byte as usize..end_byte as usize,
+                    start_line: start_line as usize,
+                    end_line: end_line as usize,
+                    body,
+                },
+            ))
+        })?;
+
+        let mut chunk_ids = Vec::new();
+        let mut chunks = Vec::new();
+        // Chunks are written parents first, so IDs order parents before children.
+        for row in rows {
+            let (chunk_id, parent_id, mut chunk) = row?;
+            chunk.parent =
+                parent_id.and_then(|parent_id| chunk_ids.iter().position(|id| *id == parent_id));
+            chunk_ids.push(chunk_id);
+            chunks.push(chunk);
+        }
+        Ok(StoredFile {
+            text,
+            chunk_ids,
+            chunks,
+        })
     }
 
     /// Size and modification time of every indexed file, by path.
@@ -276,16 +357,26 @@ fn create_schema(connection: &Connection) -> Result<()> {
              id INTEGER PRIMARY KEY,
              path TEXT NOT NULL UNIQUE,
              size INTEGER NOT NULL,
-             modified INTEGER NOT NULL
+             modified INTEGER NOT NULL,
+             text TEXT NOT NULL
          );
+         -- A chunk is one span of its file; its own text is the span minus its
+         -- children's bodies, so no chunk text is stored.
          CREATE TABLE chunks (
              id INTEGER PRIMARY KEY,
              file_id INTEGER NOT NULL REFERENCES files (id) ON DELETE CASCADE,
+             parent_id INTEGER REFERENCES chunks (id) ON DELETE CASCADE,
+             kind TEXT NOT NULL,
+             name TEXT,
+             start_byte INTEGER NOT NULL,
+             end_byte INTEGER NOT NULL,
              start_line INTEGER NOT NULL,
              end_line INTEGER NOT NULL,
-             text TEXT NOT NULL
+             body_start INTEGER,
+             body_end INTEGER
          );
          CREATE INDEX chunks_by_file ON chunks (file_id);
+         CREATE INDEX chunks_by_parent ON chunks (parent_id);
          CREATE TABLE windows (
              id INTEGER PRIMARY KEY,
              chunk_id INTEGER NOT NULL REFERENCES chunks (id) ON DELETE CASCADE
@@ -297,7 +388,7 @@ fn create_schema(connection: &Connection) -> Result<()> {
          );
          -- Contentless: holds only the search index; the text lives in chunks.
          CREATE VIRTUAL TABLE chunk_terms USING fts5 (
-             path, text, content = '', contentless_delete = 1
+             path, name, text, content = '', contentless_delete = 1
          );
          CREATE TABLE meta (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
          PRAGMA user_version = {SCHEMA_VERSION};"
@@ -356,15 +447,8 @@ fn register_sqlite_vec() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::chunk::line_chunks;
     use anyhow::Context;
-
-    fn line_chunk(start_line: usize) -> Chunk {
-        Chunk {
-            start_line,
-            end_line: start_line,
-            text: "x".into(),
-        }
-    }
 
     fn unit_vector(axis: usize) -> Vec<f32> {
         let mut vector = vec![0.0; DIMENSION];
@@ -388,17 +472,25 @@ mod tests {
         }
     }
 
+    /// Write `text` as line chunks, giving every chunk `windows` vectors along `axis`.
+    fn write(store: &mut Store, path: &str, text: &str, windows: usize, axis: usize) -> Result<()> {
+        let chunks = line_chunks(text);
+        let vectors: Vec<Vec<Vec<f32>>> = chunks
+            .iter()
+            .map(|_| vec![unit_vector(axis); windows])
+            .collect();
+        store.write_file(&record(path), text, &chunks, &vectors)
+    }
+
     #[test]
     fn writing_a_file_again_replaces_its_records() -> Result<()> {
         let folder = tempfile::tempdir()?;
         let mut store = Store::open(&folder.path().join("index.db"))?;
-        let chunks = [line_chunk(1), line_chunk(2)];
-        let vectors = [vec![unit_vector(0), unit_vector(1)], vec![unit_vector(2)]];
-        store.write_file(&record("src/a.rs"), &chunks, &vectors)?;
-        store.write_file(&record("src/b.rs"), &chunks[1..], &vectors[1..])?;
-        assert_eq!(count(&store, "windows")?, 4);
+        write(&mut store, "src/a.rs", "fn a() {}\n", 2, 0)?;
+        write(&mut store, "src/b.rs", "fn b() {}\n", 1, 0)?;
+        assert_eq!(count(&store, "windows")?, 3);
 
-        store.write_file(&record("src/a.rs"), &chunks[1..], &vectors[1..])?;
+        write(&mut store, "src/a.rs", "fn a() {}\n", 1, 0)?;
         assert_eq!(count(&store, "files")?, 2);
         assert_eq!(count(&store, "chunks")?, 2);
         assert_eq!(count(&store, "windows")?, 2);
@@ -427,11 +519,7 @@ mod tests {
         let folder = tempfile::tempdir()?;
         let path = folder.path().join("index.db");
         let mut store = Store::open(&path)?;
-        store.write_file(
-            &record("src/a.rs"),
-            &[line_chunk(1)],
-            &[vec![unit_vector(0)]],
-        )?;
+        write(&mut store, "src/a.rs", "fn a() {}\n", 1, 0)?;
         store
             .connection
             .pragma_update(None, "user_version", SCHEMA_VERSION + 1)?;
@@ -450,19 +538,11 @@ mod tests {
     fn nearest_returns_the_closest_chunks_first() -> Result<()> {
         let folder = tempfile::tempdir()?;
         let mut store = Store::open(&folder.path().join("index.db"))?;
-        store.write_file(
-            &record("src/a.rs"),
-            &[line_chunk(1)],
-            &[vec![unit_vector(0)]],
-        )?;
-        store.write_file(
-            &record("src/b.rs"),
-            &[line_chunk(7)],
-            &[vec![unit_vector(1)]],
-        )?;
+        write(&mut store, "src/a.rs", "fn a() {}\n", 1, 0)?;
+        write(&mut store, "src/b.rs", "fn b() {}\n", 1, 1)?;
         let hits = store.nearest(&unit_vector(1), 10)?;
         assert_eq!(hits.len(), 2);
-        assert_eq!((hits[0].path.as_str(), hits[0].start_line), ("src/b.rs", 7));
+        assert_eq!(hits[0].path, "src/b.rs");
         assert!((hits[0].score - 1.0).abs() < 1e-6);
         assert_eq!(store.file_count()?, 2);
         Ok(())
@@ -492,7 +572,7 @@ mod tests {
         let folder = tempfile::tempdir()?;
         let mut store = Store::open(&folder.path().join("index.db"))?;
         for path in ["a.rs", "b.rs", "c.rs"] {
-            store.write_file(&record(path), &[line_chunk(1)], &[vec![unit_vector(0)]])?;
+            write(&mut store, path, "fn f() {}\n", 1, 0)?;
         }
         let keep: HashSet<String> = ["b.rs".to_string()].into();
         assert_eq!(store.remove_files_except(&keep)?, 2);
@@ -506,7 +586,7 @@ mod tests {
         Ok(())
     }
 
-    fn keyword_matches(store: &Store, expression: &str) -> Result<Vec<i64>> {
+    fn keyword_rows(store: &Store, expression: &str) -> Result<Vec<i64>> {
         let mut statement = store
             .connection
             .prepare("SELECT rowid FROM chunk_terms WHERE chunk_terms MATCH ?1 ORDER BY rowid")?;
@@ -518,24 +598,14 @@ mod tests {
     fn keyword_matches_rank_path_and_text_hits_best_first() -> Result<()> {
         let folder = tempfile::tempdir()?;
         let mut store = Store::open(&folder.path().join("index.db"))?;
-        for (path, text) in [
-            ("src/pasta.rs", "fn boil() {}"),
-            ("src/hybrid.rs", "fn rrfFuse() {}"),
-            ("src/other.rs", "fn cook() {}"),
-        ] {
-            let mut chunk = line_chunk(1);
-            chunk.text = text.into();
-            store.write_file(&record(path), &[chunk], &[vec![unit_vector(0)]])?;
-        }
+        write(&mut store, "src/pasta.rs", "fn boil() {}\n", 1, 0)?;
+        write(&mut store, "src/hybrid.rs", "fn rrfFuse() {}\n", 1, 0)?;
+        write(&mut store, "src/other.rs", "fn cook() {}\n", 1, 0)?;
         let hits = store.keyword_matches("\"fuse\" OR \"pasta\"", 10)?;
         let paths: Vec<&str> = hits.iter().map(|hit| hit.path.as_str()).collect();
         assert_eq!(paths.len(), 2);
         assert!(paths.contains(&"src/pasta.rs") && paths.contains(&"src/hybrid.rs"));
         assert!(hits[0].score >= hits[1].score);
-        assert_eq!(
-            store.keyword_matches("\"fuse\"", 10)?[0].text,
-            "fn rrfFuse() {}"
-        );
         Ok(())
     }
 
@@ -543,20 +613,61 @@ mod tests {
     fn keyword_rows_follow_their_chunks() -> Result<()> {
         let folder = tempfile::tempdir()?;
         let mut store = Store::open(&folder.path().join("index.db"))?;
-        let mut chunk = line_chunk(1);
-        chunk.text = "fn rrfFuse() {}".into();
-        store.write_file(&record("src/hybrid.rs"), &[chunk], &[vec![unit_vector(0)]])?;
-        assert_eq!(keyword_matches(&store, "fuse")?.len(), 1);
-        assert_eq!(keyword_matches(&store, "path: hybrid")?.len(), 1);
+        write(&mut store, "src/hybrid.rs", "fn rrfFuse() {}\n", 1, 0)?;
+        assert_eq!(keyword_rows(&store, "fuse")?.len(), 1);
+        assert_eq!(keyword_rows(&store, "path: hybrid")?.len(), 1);
 
-        let mut chunk = line_chunk(1);
-        chunk.text = "fn cookPasta() {}".into();
-        store.write_file(&record("src/hybrid.rs"), &[chunk], &[vec![unit_vector(0)]])?;
-        assert!(keyword_matches(&store, "fuse")?.is_empty());
-        assert_eq!(keyword_matches(&store, "pasta")?.len(), 1);
+        write(&mut store, "src/hybrid.rs", "fn cookPasta() {}\n", 1, 0)?;
+        assert!(keyword_rows(&store, "fuse")?.is_empty());
+        assert_eq!(keyword_rows(&store, "pasta")?.len(), 1);
 
         store.remove_files_except(&HashSet::new())?;
-        assert!(keyword_matches(&store, "pasta")?.is_empty());
+        assert!(keyword_rows(&store, "pasta")?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn a_stored_file_returns_its_text_and_chunk_tree() -> Result<()> {
+        let folder = tempfile::tempdir()?;
+        let mut store = Store::open(&folder.path().join("index.db"))?;
+        let text = "class Queue { push() { a(); } }";
+        let chunks = [
+            Chunk {
+                kind: "class".into(),
+                name: Some("Queue".into()),
+                parent: None,
+                bytes: 0..text.len(),
+                start_line: 1,
+                end_line: 1,
+                body: Some(12..text.len()),
+            },
+            Chunk {
+                kind: "method".into(),
+                name: Some("push".into()),
+                parent: Some(0),
+                bytes: 14..29,
+                start_line: 1,
+                end_line: 1,
+                body: Some(21..29),
+            },
+        ];
+        let vectors = [vec![unit_vector(0)], vec![unit_vector(1)]];
+        store.write_file(&record("queue.ts"), text, &chunks, &vectors)?;
+
+        let stored = store.stored_file("queue.ts")?;
+        assert_eq!(stored.text, text);
+        assert_eq!(stored.chunks.len(), 2);
+        assert_eq!(stored.chunks[1].parent, Some(0));
+        assert_eq!(stored.chunks[1].body, Some(21..29));
+        // The method's full name and the class's outline are searchable.
+        assert_eq!(
+            keyword_rows(&store, "name: queue AND name: push")?,
+            [stored.chunk_ids[1]]
+        );
+        assert_eq!(
+            keyword_rows(&store, "text: push AND text: class")?,
+            [stored.chunk_ids[0]]
+        );
         Ok(())
     }
 }

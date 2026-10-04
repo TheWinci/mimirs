@@ -5,6 +5,7 @@ use anyhow::Context;
 use clap::Args;
 
 use crate::embed::{self, Embedder};
+use crate::excerpt::{ShownFile, show_file};
 use crate::keywords;
 use crate::rank::rank;
 use crate::render::render;
@@ -57,7 +58,12 @@ fn answer(root: &Path, query: &str, budget: usize, max_files: usize) -> anyhow::
         Some(expression) => store.keyword_matches(&expression, KEYWORD_CHUNKS)?,
         None => Vec::new(),
     };
-    let files = rank(vector_hits, keyword_hits, max_files);
+    let ranked = rank(vector_hits, keyword_hits, max_files);
+    let mut files: Vec<ShownFile> = Vec::new();
+    for file in &ranked {
+        let stored = store.stored_file(&file.path)?;
+        files.push(show_file(&file.path, &stored, &file.chunk_ids));
+    }
 
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as i64;
     let index_age = store

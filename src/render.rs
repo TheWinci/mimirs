@@ -1,11 +1,11 @@
-use crate::rank::RankedFile;
+use crate::excerpt::ShownFile;
 
 /// Longest line in the file map, in bytes; longer summaries are cut.
 const MAP_LINE_BYTES: usize = 120;
 
 /// Print the file map, then excerpts in rank order, within `budget` bytes.
 /// One file's excerpts use at most a quarter of the budget.
-pub fn render(index_age_seconds: Option<u64>, files: &[RankedFile], budget: usize) -> String {
+pub fn render(index_age_seconds: Option<u64>, files: &[ShownFile], budget: usize) -> String {
     let mut output = match index_age_seconds {
         Some(seconds) => format!("Index updated {}\n", describe_age(seconds)),
         None => "Index update time unknown\n".to_string(),
@@ -100,12 +100,11 @@ fn cut_at_line(text: &str, max_bytes: usize) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rank::Excerpt;
+    use crate::excerpt::Excerpt;
 
-    fn file(path: &str, excerpts: Vec<(usize, usize, String)>) -> RankedFile {
-        RankedFile {
+    fn file(path: &str, excerpts: Vec<(usize, usize, String)>) -> ShownFile {
+        ShownFile {
             path: path.into(),
-            score: 0.5,
             summary_line: excerpts[0].0,
             summary: "fn example()".into(),
             excerpts: excerpts
@@ -156,7 +155,7 @@ mod tests {
 
     #[test]
     fn stays_within_the_budget() {
-        let files: Vec<RankedFile> = (0..10)
+        let files: Vec<ShownFile> = (0..10)
             .map(|number| file(&format!("f{number}.rs"), vec![(1, 200, lines(200))]))
             .collect();
         let output = render(Some(0), &files, 3_000);

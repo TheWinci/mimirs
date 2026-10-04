@@ -8,22 +8,13 @@ const VECTOR_WEIGHT: f32 = 0.5;
 /// Reciprocal-rank constant: rank 0 counts 1, rank 60 counts half.
 const RANK_CONSTANT: f32 = 60.0;
 
-/// Consecutive lines of one file, made of one chunk or neighbouring chunks.
-pub struct Excerpt {
-    pub start_line: usize,
-    pub end_line: usize,
-    pub text: String,
-}
-
-/// A file in the answer, with its matching code in line order.
+/// A file in the answer and the chunks that matched in it.
 pub struct RankedFile {
     pub path: String,
     /// The fused score of the file's best chunk.
     pub score: f32,
-    /// Line number and text of the first non-blank line of the best chunk.
-    pub summary_line: usize,
-    pub summary: String,
-    pub excerpts: Vec<Excerpt>,
+    /// The file's matching chunks, best first.
+    pub chunk_ids: Vec<i64>,
 }
 
 /// Fuse the nearest windows and the keyword matches by rank, rank files by
@@ -97,105 +88,75 @@ fn fuse(vector_chunks: Vec<Hit>, keyword_chunks: Vec<Hit>) -> Vec<Hit> {
 
 /// Build a file's entry from its hits; `None` when it has no hits.
 fn ranked_file(path: String, mut hits: Vec<Hit>) -> Option<RankedFile> {
-    let best = hits
-        .iter()
-        .max_by(|left, right| left.score.total_cmp(&right.score))?;
-    let score = best.score;
-    let (summary_line, summary) = first_non_blank_line(best);
-
-    hits.sort_by_key(|hit| hit.start_line);
-    let mut excerpts: Vec<Excerpt> = Vec::new();
-    for hit in hits {
-        match excerpts.last_mut() {
-            Some(previous) if previous.end_line + 1 == hit.start_line => {
-                previous.end_line = hit.end_line;
-                previous.text.push_str(&hit.text);
-            }
-            _ => excerpts.push(Excerpt {
-                start_line: hit.start_line,
-                end_line: hit.end_line,
-                text: hit.text,
-            }),
-        }
-    }
-
+    hits.sort_by(|left, right| {
+        right
+            .score
+            .total_cmp(&left.score)
+            .then_with(|| left.chunk_id.cmp(&right.chunk_id))
+    });
+    let score = hits.first()?.score;
     Some(RankedFile {
         path,
         score,
-        summary_line,
-        summary,
-        excerpts,
+        chunk_ids: hits.into_iter().map(|hit| hit.chunk_id).collect(),
     })
-}
-
-fn first_non_blank_line(hit: &Hit) -> (usize, String) {
-    for (offset, line) in hit.text.lines().enumerate() {
-        if !line.trim().is_empty() {
-            return (hit.start_line + offset, line.trim().to_string());
-        }
-    }
-    (hit.start_line, String::new())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn hit(path: &str, chunk_id: i64, lines: (usize, usize), score: f32) -> Hit {
+    fn hit(path: &str, chunk_id: i64, score: f32) -> Hit {
         Hit {
             path: path.into(),
             chunk_id,
-            start_line: lines.0,
-            end_line: lines.1,
-            text: format!("\n  chunk {chunk_id}\n"),
             score,
         }
+    }
+
+    fn paths(files: &[RankedFile]) -> Vec<&str> {
+        files.iter().map(|file| file.path.as_str()).collect()
     }
 
     #[test]
     fn files_rank_by_their_best_chunk() {
         let files = rank(
             vec![
-                hit("a.rs", 1, (1, 5), 0.5),
-                hit("a.rs", 2, (20, 30), 0.6),
-                hit("b.rs", 3, (1, 5), 0.9),
-                hit("c.rs", 4, (1, 5), 0.1),
+                hit("a.rs", 1, 0.5),
+                hit("a.rs", 2, 0.6),
+                hit("b.rs", 3, 0.9),
+                hit("c.rs", 4, 0.1),
             ],
             Vec::new(),
             2,
         );
-        let paths: Vec<&str> = files.iter().map(|file| file.path.as_str()).collect();
-        assert_eq!(paths, ["b.rs", "a.rs"]);
-        assert_eq!(
-            (files[1].summary_line, files[1].summary.as_str()),
-            (21, "chunk 2")
-        );
+        assert_eq!(paths(&files), ["b.rs", "a.rs"]);
+        assert_eq!(files[1].chunk_ids, [2, 1]);
     }
 
     #[test]
     fn a_chunk_scores_as_its_best_window() {
         let files = rank(
             vec![
-                hit("a.rs", 1, (1, 5), 0.2),
-                hit("b.rs", 2, (1, 5), 0.5),
-                hit("a.rs", 1, (1, 5), 0.7),
+                hit("a.rs", 1, 0.2),
+                hit("b.rs", 2, 0.5),
+                hit("a.rs", 1, 0.7),
             ],
             Vec::new(),
             20,
         );
         assert_eq!(files[0].path, "a.rs");
-        assert_eq!(files[0].excerpts.len(), 1);
+        assert_eq!(files[0].chunk_ids, [1]);
     }
 
     #[test]
     fn a_chunk_found_by_both_lists_beats_one_found_by_one() {
         let files = rank(
-            vec![hit("a.rs", 1, (1, 5), 0.9), hit("b.rs", 2, (1, 5), 0.8)],
-            vec![hit("b.rs", 2, (1, 5), 3.0), hit("c.rs", 3, (1, 5), 2.0)],
+            vec![hit("a.rs", 1, 0.9), hit("b.rs", 2, 0.8)],
+            vec![hit("b.rs", 2, 3.0), hit("c.rs", 3, 2.0)],
             20,
         );
-        let paths: Vec<&str> = files.iter().map(|file| file.path.as_str()).collect();
-        assert_eq!(paths, ["b.rs", "a.rs", "c.rs"]);
+        assert_eq!(paths(&files), ["b.rs", "a.rs", "c.rs"]);
     }
 
     #[test]
@@ -204,13 +165,13 @@ mod tests {
         // second, level with the second keyword match.
         let files = rank(
             vec![
-                hit("a.rs", 1, (1, 5), 0.81),
-                hit("a.rs", 1, (1, 5), 0.80),
-                hit("a.rs", 1, (1, 5), 0.79),
-                hit("a.rs", 1, (1, 5), 0.78),
-                hit("b.rs", 2, (1, 5), 0.77),
+                hit("a.rs", 1, 0.81),
+                hit("a.rs", 1, 0.80),
+                hit("a.rs", 1, 0.79),
+                hit("a.rs", 1, 0.78),
+                hit("b.rs", 2, 0.77),
             ],
-            vec![hit("c.rs", 3, (1, 5), 5.0), hit("d.rs", 4, (1, 5), 4.0)],
+            vec![hit("c.rs", 3, 5.0), hit("d.rs", 4, 4.0)],
             20,
         );
         let score = |path: &str| {
@@ -220,24 +181,5 @@ mod tests {
                 .map(|file| file.score)
         };
         assert_eq!(score("b.rs"), score("d.rs"));
-    }
-
-    #[test]
-    fn neighbouring_chunks_merge_into_one_excerpt_in_line_order() {
-        let files = rank(
-            vec![
-                hit("a.rs", 3, (11, 20), 0.9),
-                hit("a.rs", 1, (1, 10), 0.5),
-                hit("a.rs", 7, (40, 50), 0.4),
-            ],
-            Vec::new(),
-            20,
-        );
-        let ranges: Vec<(usize, usize)> = files[0]
-            .excerpts
-            .iter()
-            .map(|excerpt| (excerpt.start_line, excerpt.end_line))
-            .collect();
-        assert_eq!(ranges, [(1, 20), (40, 50)]);
     }
 }

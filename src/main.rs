@@ -6,6 +6,7 @@ mod commands;
 mod config;
 mod discover;
 mod embed;
+mod excerpt;
 mod files;
 mod indexing;
 mod keywords;

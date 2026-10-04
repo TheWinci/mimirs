@@ -8,7 +8,7 @@ use std::thread;
 use anyhow::{Context, Result};
 use tokenizers::Tokenizer;
 
-use crate::chunk::{Chunk, chunk};
+use crate::chunk::{self, Chunk};
 use crate::config::Config;
 use crate::discover::{DiscoveredFile, Discovery, discover};
 use crate::embed::{self, Embedder, ModelInstance};
@@ -33,6 +33,7 @@ struct PreparedFile {
     path: String,
     size: u64,
     modified: i64,
+    text: String,
     chunks: Vec<Chunk>,
     /// How many windows each chunk was cut into, in chunk order.
     window_counts: Vec<usize>,
@@ -158,8 +159,8 @@ fn prepare_files(
                     error: error.to_string(),
                 },
                 Ok(Some(text)) => {
-                    let chunks = chunk(&text);
-                    match cut_windows(&chunks, tokenizer) {
+                    let chunks = chunk::line_chunks(&text);
+                    match cut_windows(&text, &chunks, tokenizer) {
                         Ok((window_counts, texts)) => {
                             window_texts = texts;
                             Event::Prepared {
@@ -168,6 +169,7 @@ fn prepare_files(
                                     path,
                                     size: file.size,
                                     modified: file.modified,
+                                    text,
                                     chunks,
                                     window_counts,
                                 },
@@ -197,13 +199,18 @@ fn prepare_files(
     }
 }
 
-/// Cut each chunk into windows, returning how many windows each chunk has and
-/// every window's text in order.
-fn cut_windows(chunks: &[Chunk], tokenizer: &Tokenizer) -> Result<(Vec<usize>, Vec<String>)> {
+/// Cut each chunk's own text into windows, returning how many windows each chunk
+/// has and every window's text in order.
+fn cut_windows(
+    text: &str,
+    chunks: &[Chunk],
+    tokenizer: &Tokenizer,
+) -> Result<(Vec<usize>, Vec<String>)> {
     let mut window_counts = Vec::new();
     let mut texts = Vec::new();
-    for chunk in chunks {
-        let windows = embed::windows(&chunk.text, tokenizer)?;
+    for index in 0..chunks.len() {
+        let own_text = chunk::own_text(text, chunks, index);
+        let windows = embed::windows(&own_text, tokenizer)?;
         window_counts.push(windows.len());
         texts.extend(windows.into_iter().map(str::to_string));
     }
@@ -329,7 +336,12 @@ fn write_files(
             size: done.prepared.size,
             modified: done.prepared.modified,
         };
-        store.write_file(&record, &done.prepared.chunks, &vectors_per_chunk)?;
+        store.write_file(
+            &record,
+            &done.prepared.text,
+            &done.prepared.chunks,
+            &vectors_per_chunk,
+        )?;
         summary.files += 1;
         summary.chunks += done.prepared.chunks.len();
         summary.windows += done.prepared.window_count();
