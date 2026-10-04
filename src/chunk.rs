@@ -4,6 +4,7 @@ use std::path::Path;
 use anyhow::Result;
 
 mod go;
+mod markdown;
 mod python;
 mod rust;
 mod symbols;
@@ -49,6 +50,7 @@ pub fn chunk_file(path: &str, text: &str) -> Result<Vec<Chunk>> {
         "py" | "pyi" => Some(&python::PYTHON),
         "go" => Some(&go::GO),
         "rs" => Some(&rust::RUST),
+        "md" | "mdx" | "markdown" => Some(&markdown::MARKDOWN),
         _ => None,
     };
     if let Some(rules) = rules
@@ -136,13 +138,19 @@ pub fn text_without(text: &str, span: Range<usize>, left_out: &[Range<usize>]) -
     for range in sorted {
         result.push_str(&text[position..range.start]);
         result.push_str(ELISION);
+        // Keep the line break that ended the left-out text, so the next line
+        // of the outline starts on its own line.
+        if text[range.clone()].ends_with('\n') {
+            result.push('\n');
+        }
         position = range.end;
     }
     result.push_str(&text[position..span.end]);
     result
 }
 
-/// The chunk's name joined with its parents' names, outermost first.
+/// The chunk's name joined with its parents' names, outermost first: with `.`
+/// for code (`Queue.drain`) and ` > ` for Markdown sections (`Guide > Setup`).
 pub fn full_name(chunks: &[Chunk], index: usize) -> Option<String> {
     let mut names = Vec::new();
     let mut current = Some(index);
@@ -156,7 +164,12 @@ pub fn full_name(chunks: &[Chunk], index: usize) -> Option<String> {
         return None;
     }
     names.reverse();
-    Some(names.join("."))
+    let separator = if chunks[index].kind == "section" {
+        " > "
+    } else {
+        "."
+    };
+    Some(names.join(separator))
 }
 
 #[cfg(test)]
