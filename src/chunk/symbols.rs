@@ -14,8 +14,8 @@ pub struct Rules {
     pub grammar: fn() -> Language,
     /// Recognizes a node that is a symbol.
     pub symbol: for<'tree> fn(Node<'tree>, &str) -> Option<Symbol<'tree>>,
-    /// Node kinds that are imports; consecutive imports form one chunk.
-    pub imports: &'static [&'static str],
+    /// Recognizes an import; consecutive imports form one chunk.
+    pub is_import: fn(Node, &str) -> bool,
 }
 
 /// What a language says about a node that is a symbol. The symbol's span is the
@@ -73,6 +73,9 @@ fn collect_symbols(
 ) {
     let mut cursor = container.walk();
     for node in container.named_children(&mut cursor) {
+        if (rules.is_import)(node, text) {
+            continue;
+        }
         let Some(symbol) = (rules.symbol)(node, text) else {
             continue;
         };
@@ -118,7 +121,7 @@ fn add_top_level_rest(root: Node, text: &str, rules: &Rules, chunks: &mut Vec<Ch
     let mut imports: Vec<Range<usize>> = Vec::new();
     let mut cursor = root.walk();
     for node in root.named_children(&mut cursor) {
-        if !rules.imports.contains(&node.kind()) {
+        if !(rules.is_import)(node, text) {
             continue;
         }
         let start = attached_comments_start(node);

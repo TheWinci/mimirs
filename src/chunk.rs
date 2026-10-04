@@ -42,6 +42,7 @@ pub fn chunk_file(path: &str, text: &str) -> Result<Vec<Chunk>> {
     let rules = match extension {
         "ts" | "mts" | "cts" => Some(&typescript::TYPESCRIPT),
         "tsx" => Some(&typescript::TSX),
+        "js" | "jsx" | "mjs" | "cjs" => Some(&typescript::JAVASCRIPT),
         _ => None,
     };
     if let Some(rules) = rules
@@ -206,6 +207,7 @@ mod tests {
         let text = "function run() {}\n";
         assert_eq!(chunk_file("src/run.ts", text)?[0].kind, "function");
         assert_eq!(chunk_file("src/run.tsx", text)?[0].kind, "function");
+        assert_eq!(chunk_file("src/run.mjs", text)?[0].kind, "function");
         assert_eq!(chunk_file("notes/run.txt", text)?[0].kind, "lines");
         Ok(())
     }

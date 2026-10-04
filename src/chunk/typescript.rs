@@ -4,16 +4,25 @@ use tree_sitter::{Language, Node};
 
 use super::symbols::{Rules, Symbol};
 
+// JavaScript shares these rules: its grammar uses the same node kinds, except
+// that a class field is a `field_definition` named by its `property` field.
+
 pub const TYPESCRIPT: Rules = Rules {
     grammar: typescript_grammar,
     symbol,
-    imports: &["import_statement"],
+    is_import,
 };
 
 pub const TSX: Rules = Rules {
     grammar: tsx_grammar,
     symbol,
-    imports: &["import_statement"],
+    is_import,
+};
+
+pub const JAVASCRIPT: Rules = Rules {
+    grammar: javascript_grammar,
+    symbol,
+    is_import,
 };
 
 fn typescript_grammar() -> Language {
@@ -22,6 +31,22 @@ fn typescript_grammar() -> Language {
 
 fn tsx_grammar() -> Language {
     tree_sitter_typescript::LANGUAGE_TSX.into()
+}
+
+fn javascript_grammar() -> Language {
+    tree_sitter_javascript::LANGUAGE.into()
+}
+
+/// `import …`, and CommonJS `const path = require("path")`.
+fn is_import(node: Node, text: &str) -> bool {
+    match node.kind() {
+        "import_statement" => true,
+        "lexical_declaration" | "variable_declaration" => {
+            let declaration = &text[node.byte_range()];
+            declaration.contains("require(") && !declaration.contains('\n')
+        }
+        _ => false,
+    }
 }
 
 /// Node kinds that are always symbols, with the kind they get. Their name is
@@ -56,7 +81,8 @@ fn symbol<'tree>(node: Node<'tree>, text: &str) -> Option<Symbol<'tree>> {
         // keeps the keyword with the symbol.
         "export_statement" | "ambient_declaration" => wrapped_symbol(node, text),
         "lexical_declaration" | "variable_declaration" => variable(node, text),
-        "public_field_definition" => function_field(node, text),
+        "public_field_definition" => function_field(node, "name", text),
+        "field_definition" => function_field(node, "property", text),
         kind => {
             let &(_, symbol_kind) = DECLARATIONS
                 .iter()
@@ -145,11 +171,11 @@ fn variable<'tree>(node: Node<'tree>, text: &str) -> Option<Symbol<'tree>> {
 
 /// A class field that holds a function is a method:
 /// `handleClick = (event) => {…}`.
-fn function_field<'tree>(node: Node<'tree>, text: &str) -> Option<Symbol<'tree>> {
+fn function_field<'tree>(node: Node<'tree>, name_field: &str, text: &str) -> Option<Symbol<'tree>> {
     let body = function_body(node.child_by_field_name("value"))?;
     Some(Symbol {
         kind: "method",
-        name: field_text(node, "name", text),
+        name: field_text(node, name_field, text),
         body: Some(body),
         members: None,
     })
@@ -181,6 +207,8 @@ mod tests {
 
     const QUEUE: &str = include_str!("samples/queue.ts");
     const CANVAS: &str = include_str!("samples/canvas.tsx");
+    const SERVER: &str = include_str!("samples/server.js");
+    const MENU: &str = include_str!("samples/menu.jsx");
 
     fn chunks(text: &str, rules: &Rules) -> Vec<Chunk> {
         let chunks = symbol_chunks(text, rules)
@@ -288,5 +316,26 @@ lines - 23-23
             outline(&chunks(text, &TYPESCRIPT)),
             "function before 1-1\nlines - 3-8\n"
         );
+    }
+
+    #[test]
+    fn javascript_uses_the_same_rules() {
+        let expected = "\
+constant PORT 6-7
+class Router 9-20
+method Router.handleRequest 12-15
+method Router.add 17-19
+function serveFile 22-24
+imports - 3-4
+lines - 1-1
+lines - 26-30
+";
+        assert_eq!(outline(&chunks(SERVER, &JAVASCRIPT)), expected);
+    }
+
+    #[test]
+    fn jsx_components_are_functions() {
+        let expected = "function Menu 3-6\nfunction MenuItem 8-8\nimports - 1-1\n";
+        assert_eq!(outline(&chunks(MENU, &JAVASCRIPT)), expected);
     }
 }
