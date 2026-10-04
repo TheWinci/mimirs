@@ -13,7 +13,7 @@ use crate::keywords;
 
 /// Bump whenever the tables, the model, the tokenizer, or the chunking rules
 /// change, so `index` rebuilds instead of mixing old and new data.
-const SCHEMA_VERSION: i64 = 4;
+const SCHEMA_VERSION: i64 = 5;
 
 const LAST_RUN_KEY: &str = "last_index_finished";
 
