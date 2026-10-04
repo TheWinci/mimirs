@@ -158,26 +158,16 @@ fn prepare_files(
                     path: file.path.clone(),
                     error: error.to_string(),
                 },
-                Ok(Some(text)) => {
-                    let chunks = chunk::line_chunks(&text);
-                    match cut_windows(&text, &chunks, tokenizer) {
-                        Ok((window_counts, texts)) => {
-                            window_texts = texts;
-                            Event::Prepared {
-                                file: file_number,
-                                prepared: PreparedFile {
-                                    path,
-                                    size: file.size,
-                                    modified: file.modified,
-                                    text,
-                                    chunks,
-                                    window_counts,
-                                },
-                            }
+                Ok(Some(text)) => match prepare(path, text, file, tokenizer) {
+                    Ok((prepared, texts)) => {
+                        window_texts = texts;
+                        Event::Prepared {
+                            file: file_number,
+                            prepared,
                         }
-                        Err(error) => Event::Failed(error),
                     }
-                }
+                    Err(error) => Event::Failed(error),
+                },
             }
         };
 
@@ -197,6 +187,27 @@ fn prepare_files(
             }
         }
     }
+}
+
+/// Chunk a file's text and cut its chunks into windows, returning the prepared
+/// file and every window's text in order.
+fn prepare(
+    path: String,
+    text: String,
+    file: &DiscoveredFile,
+    tokenizer: &Tokenizer,
+) -> Result<(PreparedFile, Vec<String>)> {
+    let chunks = chunk::chunk_file(&path, &text)?;
+    let (window_counts, window_texts) = cut_windows(&text, &chunks, tokenizer)?;
+    let prepared = PreparedFile {
+        path,
+        size: file.size,
+        modified: file.modified,
+        text,
+        chunks,
+        window_counts,
+    };
+    Ok((prepared, window_texts))
 }
 
 /// Cut each chunk's own text into windows, returning how many windows each chunk

@@ -1,4 +1,10 @@
 use std::ops::Range;
+use std::path::Path;
+
+use anyhow::Result;
+
+mod symbols;
+mod typescript;
 
 /// Most bytes a line chunk grows to; a longer line stays one chunk. Code uses
 /// about 4 bytes per token, so this is close to the model's 256-token limit.
@@ -26,51 +32,54 @@ pub struct Chunk {
     pub body: Option<Range<usize>>,
 }
 
+/// Chunk a file by its symbols when its language has a grammar, and by lines
+/// otherwise or when parsing gives no tree.
+pub fn chunk_file(path: &str, text: &str) -> Result<Vec<Chunk>> {
+    let extension = Path::new(path)
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .unwrap_or("");
+    let rules = match extension {
+        "ts" | "mts" | "cts" => Some(&typescript::TYPESCRIPT),
+        "tsx" => Some(&typescript::TSX),
+        _ => None,
+    };
+    if let Some(rules) = rules
+        && let Some(chunks) = symbols::symbol_chunks(text, rules)?
+    {
+        return Ok(chunks);
+    }
+    Ok(line_chunks(text))
+}
+
 /// Split `text` into chunks of whole lines, each within `CHUNK_BYTES` unless a
 /// single line exceeds it. Lines never overlap between chunks, and chunks of
 /// only whitespace are left out.
 pub fn line_chunks(text: &str) -> Vec<Chunk> {
-    let mut chunks = Vec::new();
-    let mut chunk_start = 0;
-    let mut chunk_end = 0;
-    let mut start_line = 1;
+    line_chunks_in(text, 0..text.len())
+}
 
-    for (index, line) in text.split_inclusive('\n').enumerate() {
-        let line_number = index + 1;
+/// Like `line_chunks`, for the part of `text` in `region`. The region may start
+/// or end in the middle of a line.
+fn line_chunks_in(text: &str, region: Range<usize>) -> Vec<Chunk> {
+    let mut chunks = Vec::new();
+    let mut chunk_start = region.start;
+    let mut chunk_end = region.start;
+    for line in text[region].split_inclusive('\n') {
         let chunk_is_full =
             chunk_end > chunk_start && chunk_end - chunk_start + line.len() > CHUNK_BYTES;
         if chunk_is_full {
-            push_line_chunk(
-                &mut chunks,
-                text,
-                chunk_start..chunk_end,
-                start_line,
-                line_number - 1,
-            );
+            push_line_chunk(&mut chunks, text, chunk_start..chunk_end);
             chunk_start = chunk_end;
-            start_line = line_number;
         }
         chunk_end += line.len();
     }
-    let last_line = text.split_inclusive('\n').count();
-    push_line_chunk(
-        &mut chunks,
-        text,
-        chunk_start..chunk_end,
-        start_line,
-        last_line,
-    );
+    push_line_chunk(&mut chunks, text, chunk_start..chunk_end);
     chunks
 }
 
 // Whitespace has nothing worth embedding; its bytes stay outside every chunk.
-fn push_line_chunk(
-    chunks: &mut Vec<Chunk>,
-    text: &str,
-    bytes: Range<usize>,
-    start_line: usize,
-    end_line: usize,
-) {
+fn push_line_chunk(chunks: &mut Vec<Chunk>, text: &str, bytes: Range<usize>) {
     if text[bytes.clone()].trim().is_empty() {
         return;
     }
@@ -78,11 +87,26 @@ fn push_line_chunk(
         kind: "lines".into(),
         name: None,
         parent: None,
+        start_line: line_at(text, bytes.start),
+        end_line: last_line(text, bytes.clone()),
         bytes,
-        start_line,
-        end_line,
         body: None,
     });
+}
+
+/// The line, counting from 1, that holds the byte at `offset`.
+pub fn line_at(text: &str, offset: usize) -> usize {
+    // Counted on bytes, so an offset inside a multi-byte character still works.
+    let newlines = text.as_bytes()[..offset]
+        .iter()
+        .filter(|&&byte| byte == b'\n')
+        .count();
+    newlines + 1
+}
+
+/// The line that holds the last byte of `bytes`.
+pub fn last_line(text: &str, bytes: Range<usize>) -> usize {
+    line_at(text, bytes.end.saturating_sub(1).max(bytes.start))
 }
 
 /// The chunk's own text: its span with each child's body replaced by `ELISION`.
@@ -175,6 +199,22 @@ mod tests {
         assert_eq!(chunks.len(), 1);
         assert_eq!((chunks[0].start_line, chunks[0].end_line), (1, 1));
         assert_eq!(chunk_text(&line, &chunks[0]), line);
+    }
+
+    #[test]
+    fn files_with_a_grammar_are_chunked_by_symbols() -> Result<()> {
+        let text = "function run() {}\n";
+        assert_eq!(chunk_file("src/run.ts", text)?[0].kind, "function");
+        assert_eq!(chunk_file("src/run.tsx", text)?[0].kind, "function");
+        assert_eq!(chunk_file("notes/run.txt", text)?[0].kind, "lines");
+        Ok(())
+    }
+
+    #[test]
+    fn a_chunk_may_end_with_a_multi_byte_character() {
+        let text = "// ──\nlet a = 1;\n// ──";
+        assert_eq!(last_line(text, 0..text.len()), 3);
+        assert_eq!(line_chunks(text)[0].end_line, 3);
     }
 
     #[test]

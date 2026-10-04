@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use crate::chunk::text_without;
+use crate::chunk::{last_line, line_at, text_without};
 use crate::store::StoredFile;
 
 /// Consecutive lines of one file, made of one chunk or touching chunks.
@@ -74,7 +74,7 @@ fn excerpts(file: &StoredFile, matched: &[usize]) -> Vec<Excerpt> {
                 .collect();
             Excerpt {
                 start_line: line_at(text, span.start),
-                end_line: line_at(text, span.end.saturating_sub(1).max(span.start)),
+                end_line: last_line(text, span.clone()),
                 text: text_without(text, span, &inside),
             }
         })
@@ -114,11 +114,6 @@ fn from_line_start(text: &str, span: Range<usize>) -> Range<usize> {
     } else {
         span
     }
-}
-
-/// The line, counting from 1, that holds the byte at `offset`.
-fn line_at(text: &str, offset: usize) -> usize {
-    text[..offset].matches('\n').count() + 1
 }
 
 fn first_non_blank_line(text: &str, span: Range<usize>) -> (usize, String) {

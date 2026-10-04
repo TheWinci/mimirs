@@ -24,6 +24,8 @@ sqlite-vec = "=0.1.9"
 ort = { version = "=2.0.0-rc.10", default-features = false, features = ["std", "download-binaries"] }
 terminal_size = "0.4.4"
 tokenizers = { version = "0.22.2", default-features = false, features = ["onig"] }
+tree-sitter = "0.27.0"
+tree-sitter-typescript = "=0.23.2"
 
 [dev-dependencies]
 tempfile = "3.27.0"
