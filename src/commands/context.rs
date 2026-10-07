@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -7,6 +8,7 @@ use clap::Args;
 use crate::embed::{self, Embedder};
 use crate::excerpt::{ShownFile, show_file};
 use crate::keywords;
+use crate::names;
 use crate::probes::Probes;
 use crate::rank::{PROBE_VECTOR_WEIGHT, Signals, rank};
 use crate::references;
@@ -77,6 +79,14 @@ fn answer(root: &Path, query: &str, budget: usize, max_files: usize) -> anyhow::
     let mut signals = Signals::default();
     if probes.vector_weight() {
         signals.vector_weight = PROBE_VECTOR_WEIGHT;
+    }
+    let found_chunks: HashSet<i64> = vector_hits
+        .iter()
+        .chain(&keyword_hits)
+        .map(|hit| hit.chunk_id)
+        .collect();
+    if probes.unique_symbol() {
+        names::unique_symbols(query, &found_chunks, &store, &mut signals.chunk_multipliers)?;
     }
     let mut ranking = rank(vector_hits, keyword_hits, &signals);
     if probes.doc_references() {

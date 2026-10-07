@@ -26,12 +26,16 @@ pub struct RankedFile {
 pub struct Signals {
     /// Share of the fused score that comes from the vector list.
     pub vector_weight: f32,
+    /// Factors for fused chunk scores, by chunk ID, applied before chunks
+    /// are grouped into files; chunks not listed keep their score.
+    pub chunk_multipliers: HashMap<i64, f32>,
 }
 
 impl Default for Signals {
     fn default() -> Self {
         Self {
             vector_weight: VECTOR_WEIGHT,
+            chunk_multipliers: HashMap::new(),
         }
     }
 }
@@ -49,11 +53,16 @@ pub struct Ranking {
 pub fn rank(vector_hits: Vec<Hit>, keyword_hits: Vec<Hit>, signals: &Signals) -> Ranking {
     // Score completion adds hits out of order, so both lists are put in score
     // order here.
-    let chunks = fuse(
+    let mut chunks = fuse(
         best_hit_per_chunk(vector_hits),
         best_hit_per_chunk(keyword_hits),
         signals.vector_weight,
     );
+    for hit in &mut chunks {
+        if let Some(multiplier) = signals.chunk_multipliers.get(&hit.chunk_id) {
+            hit.score *= multiplier;
+        }
+    }
 
     let mut hits_by_file: HashMap<String, Vec<Hit>> = HashMap::new();
     for hit in chunks {
@@ -211,10 +220,25 @@ mod tests {
             keyword(),
             &Signals {
                 vector_weight: PROBE_VECTOR_WEIGHT,
+                ..Signals::default()
             },
         );
         assert_eq!(tilted.files[0].path, "a.rs");
         assert!(tilted.files[0].score > tilted.files[1].score);
+    }
+
+    #[test]
+    fn chunk_multipliers_scale_fused_scores() {
+        let signals = Signals {
+            chunk_multipliers: HashMap::from([(2, 1.3)]),
+            ..Signals::default()
+        };
+        let ranking = rank(
+            vec![hit("a.rs", 1, 0.9), hit("b.rs", 2, 0.8)],
+            Vec::new(),
+            &signals,
+        );
+        assert_eq!(paths(&ranking.files), ["b.rs", "a.rs"]);
     }
 
     #[test]

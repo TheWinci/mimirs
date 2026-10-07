@@ -7,12 +7,13 @@ use anyhow::{Result, bail};
 use crate::keywords;
 
 /// Every probe name `MIMIRS_PROBES` accepts.
-const KNOWN_PROBES: [&str; 5] = [
+const KNOWN_PROBES: [&str; 6] = [
     "path-file",
     "path-plain",
     "path-terms",
     "doc-references",
     "vector-weight",
+    "unique-symbol",
 ];
 
 /// The probes turned on for this run.
@@ -73,6 +74,12 @@ impl Probes {
     /// S5: the vector list weighs 0.6 instead of 0.5.
     pub fn vector_weight(&self) -> bool {
         self.has("vector-weight")
+    }
+
+    /// S6: a found chunk that alone defines a code identifier in the query
+    /// scores ×1.3.
+    pub fn unique_symbol(&self) -> bool {
+        self.has("unique-symbol")
     }
 
     pub fn path_prefix(&self) -> Option<PathPrefix> {

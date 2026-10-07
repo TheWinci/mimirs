@@ -43,6 +43,11 @@ pub struct StoredFile {
     pub chunks: Vec<Chunk>,
 }
 
+/// A chunk's full name with its parents' (`Queue.drain`).
+pub struct ChunkName {
+    pub full: String,
+}
+
 /// The project's index in `.mimirs/index.db`.
 pub struct Store {
     connection: Connection,
@@ -201,6 +206,40 @@ impl Store {
         )?;
         let rows = statement.query_map([name], |row| Ok((row.get(0)?, row.get(1)?)))?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// The full name of each named chunk in `chunk_ids`; unnamed
+    /// chunks are left out. Full names follow `chunk::full_name`.
+    pub fn chunk_names(&self, chunk_ids: &[i64]) -> Result<HashMap<i64, ChunkName>> {
+        let mut statement = self
+            .connection
+            .prepare("SELECT name, parent_id, kind FROM chunks WHERE id = ?1")?;
+        let mut names = HashMap::new();
+        for &chunk_id in chunk_ids {
+            let mut parts: Vec<String> = Vec::new();
+            let mut is_section = false;
+            let mut current = Some(chunk_id);
+            while let Some(id) = current {
+                let (name, parent, kind): (Option<String>, Option<i64>, String) =
+                    statement.query_row([id], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?;
+                if id == chunk_id {
+                    if name.is_none() {
+                        break;
+                    }
+                    is_section = kind == "section";
+                }
+                parts.extend(name);
+                current = parent;
+            }
+            if parts.is_empty() {
+                continue;
+            }
+            parts.reverse();
+            let separator = if is_section { " > " } else { "." };
+            let full = parts.join(separator);
+            names.insert(chunk_id, ChunkName { full });
+        }
+        Ok(names)
     }
 
     /// The ID of the first chunk in `path`, or `None` when it has no chunks.
@@ -726,6 +765,25 @@ mod tests {
         assert_eq!(scored.len(), 1);
         assert_eq!(scored[0].chunk_id, matched[0].chunk_id);
         assert_eq!(scored[0].score, matched[0].score);
+        Ok(())
+    }
+
+    #[test]
+    fn chunk_names_join_parent_names() -> Result<()> {
+        let folder = tempfile::tempdir()?;
+        let mut store = Store::open(&folder.path().join("index.db"))?;
+        let text = "class Queue {\n  drain() {}\n}\n";
+        let chunks = crate::chunk::chunk_file("src/queue.ts", text)?;
+        let vectors: Vec<Vec<Vec<f32>>> = chunks.iter().map(|_| vec![unit_vector(0)]).collect();
+        store.write_file(&record("src/queue.ts"), text, &chunks, &vectors)?;
+        let ids = store.stored_file("src/queue.ts")?.chunk_ids;
+        let names = store.chunk_names(&ids)?;
+        let full_names: Vec<&str> = ids
+            .iter()
+            .filter_map(|id| names.get(id))
+            .map(|name| name.full.as_str())
+            .collect();
+        assert_eq!(full_names, ["Queue", "Queue.drain"]);
         Ok(())
     }
 
