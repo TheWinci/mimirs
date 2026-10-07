@@ -58,18 +58,23 @@ fn answer(root: &Path, query: &str, budget: usize, max_files: usize) -> anyhow::
         Some(expression) => store.keyword_matches(&expression, KEYWORD_CHUNKS)?,
         None => Vec::new(),
     };
-    let ranked = rank(vector_hits, keyword_hits, max_files);
+    let ranking = rank(vector_hits, keyword_hits, max_files);
     let mut files: Vec<ShownFile> = Vec::new();
-    for file in &ranked {
+    for file in &ranking.files {
         let stored = store.stored_file(&file.path)?;
         files.push(show_file(&file.path, &stored, &file.chunk_ids));
+    }
+    let mut docs: Vec<ShownFile> = Vec::new();
+    for doc in &ranking.docs {
+        let stored = store.stored_file(&doc.path)?;
+        docs.push(show_file(&doc.path, &stored, &doc.chunk_ids));
     }
 
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as i64;
     let index_age = store
         .last_finished_run()?
         .map(|finished| now.saturating_sub(finished).max(0) as u64);
-    Ok(render(index_age, &files, budget))
+    Ok(render(index_age, &files, &docs, budget))
 }
 
 #[cfg(test)]

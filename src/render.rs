@@ -3,9 +3,15 @@ use crate::excerpt::ShownFile;
 /// Longest line in the file map, in bytes; longer summaries are cut.
 const MAP_LINE_BYTES: usize = 120;
 
-/// Print the file map, then excerpts in rank order, within `budget` bytes.
-/// One file's excerpts use at most a quarter of the budget.
-pub fn render(index_age_seconds: Option<u64>, files: &[ShownFile], budget: usize) -> String {
+/// Print the file map and the doc map, then excerpts within `budget` bytes:
+/// source files in rank order, then docs. One file's excerpts use at most a
+/// quarter of the budget.
+pub fn render(
+    index_age_seconds: Option<u64>,
+    files: &[ShownFile],
+    docs: &[ShownFile],
+    budget: usize,
+) -> String {
     let mut output = match index_age_seconds {
         Some(seconds) => format!("Index updated {}\n", describe_age(seconds)),
         None => "Index update time unknown\n".to_string(),
@@ -16,10 +22,17 @@ pub fn render(index_age_seconds: Option<u64>, files: &[ShownFile], budget: usize
         output.push_str(&map_line(position + 1, file));
         output.push('\n');
     }
+    if !docs.is_empty() {
+        output.push_str("\nRelevant docs\n");
+        for (position, doc) in docs.iter().enumerate() {
+            output.push_str(&map_line(position + 1, doc));
+            output.push('\n');
+        }
+    }
 
     output.push_str("\nExcerpts\n");
     let per_file_cap = budget / 4;
-    for file in files {
+    for file in files.iter().chain(docs) {
         let remaining = budget.saturating_sub(output.len());
         let mut allowance = per_file_cap.min(remaining);
         for excerpt in &file.excerpts {
@@ -145,7 +158,7 @@ mod tests {
             file("src/a.rs", vec![(1, 3, lines(3))]),
             file("src/b.rs", vec![(10, 11, lines(2))]),
         ];
-        let output = render(Some(120), &files, 16_000);
+        let output = render(Some(120), &files, &[], 16_000);
         assert!(output.starts_with("Index updated 2 minutes ago\n"));
         assert!(output.contains("  1. src/a.rs:1  fn example()\n  2. src/b.rs:10  fn example()\n"));
         assert!(output.contains("\nsrc/a.rs:1-3\nline 1\nline 2\nline 3\n"));
@@ -155,10 +168,33 @@ mod tests {
     }
 
     #[test]
+    fn docs_follow_source_in_the_map_and_in_the_excerpts() {
+        let files = [file("src/a.rs", vec![(1, 2, lines(2))])];
+        let docs = [file("docs/guide.md", vec![(4, 5, lines(2))])];
+        let output = render(None, &files, &docs, 16_000);
+        assert!(
+            output.contains(
+                "Relevant files\n  1. src/a.rs:1  fn example()\n\nRelevant docs\n  1. docs/guide.md:4  fn example()\n"
+            ),
+            "{output}"
+        );
+        let source_excerpt = output.find("\nsrc/a.rs:1-2\n").unwrap();
+        let doc_excerpt = output.find("\ndocs/guide.md:4-5\n").unwrap();
+        assert!(source_excerpt < doc_excerpt);
+    }
+
+    #[test]
+    fn no_docs_print_no_doc_map() {
+        let files = [file("src/a.rs", vec![(1, 2, lines(2))])];
+        let output = render(None, &files, &[], 16_000);
+        assert!(!output.contains("Relevant docs"));
+    }
+
+    #[test]
     fn a_map_line_lists_as_many_whole_names_as_fit() {
         let mut shown = file("src/queue.ts", vec![(3, 9, lines(7))]);
         shown.names = vec!["Queue.drain".into(), "Queue".into(), "x".repeat(100)];
-        let output = render(None, &[shown], 16_000);
+        let output = render(None, &[shown], &[], 16_000);
         assert!(
             output.contains("  1. src/queue.ts:3  Queue.drain, Queue\n"),
             "{output}"
@@ -171,7 +207,7 @@ mod tests {
             file("big.rs", vec![(1, 500, lines(500))]),
             file("small.rs", vec![(1, 2, lines(2))]),
         ];
-        let output = render(None, &files, 4_000);
+        let output = render(None, &files, &[], 4_000);
         let big_start = output.find("\nbig.rs:1-500\n").unwrap();
         let small_start = output.find("\nsmall.rs:1-2\n").unwrap();
         assert!(small_start - big_start <= 1_000);
@@ -184,7 +220,7 @@ mod tests {
         let files: Vec<ShownFile> = (0..10)
             .map(|number| file(&format!("f{number}.rs"), vec![(1, 200, lines(200))]))
             .collect();
-        let output = render(Some(0), &files, 3_000);
+        let output = render(Some(0), &files, &[], 3_000);
         assert!(output.len() <= 3_000);
     }
 

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::Path;
 
 use crate::store::Hit;
 
@@ -7,6 +8,11 @@ use crate::store::Hit;
 const VECTOR_WEIGHT: f32 = 0.5;
 /// Reciprocal-rank constant: rank 0 counts 1, rank 60 counts half.
 const RANK_CONSTANT: f32 = 60.0;
+/// Most docs in the answer. Docs have their own list, so they never take a
+/// source file's place.
+const MAX_DOCS: usize = 5;
+/// Extensions of documentation files (TS v2's list); `.txt` covers Django's docs.
+const DOC_EXTENSIONS: [&str; 6] = ["md", "mdx", "markdown", "rst", "txt", "adoc"];
 
 /// A file in the answer and the chunks that matched in it.
 pub struct RankedFile {
@@ -17,9 +23,17 @@ pub struct RankedFile {
     pub chunk_ids: Vec<i64>,
 }
 
+/// The answer's two lists, each best first.
+pub struct Ranking {
+    /// Source files: everything that is not a doc.
+    pub files: Vec<RankedFile>,
+    pub docs: Vec<RankedFile>,
+}
+
 /// Fuse the nearest windows and the keyword matches by rank, rank files by
-/// their best fused chunk, and keep the `max_files` best.
-pub fn rank(vector_hits: Vec<Hit>, keyword_hits: Vec<Hit>, max_files: usize) -> Vec<RankedFile> {
+/// their best fused chunk, and keep the `max_files` best source files and the
+/// `MAX_DOCS` best docs.
+pub fn rank(vector_hits: Vec<Hit>, keyword_hits: Vec<Hit>, max_files: usize) -> Ranking {
     let chunks = fuse(best_window_per_chunk(vector_hits), keyword_hits);
 
     let mut hits_by_file: HashMap<String, Vec<Hit>> = HashMap::new();
@@ -37,8 +51,18 @@ pub fn rank(vector_hits: Vec<Hit>, keyword_hits: Vec<Hit>, max_files: usize) -> 
             .total_cmp(&left.score)
             .then_with(|| left.path.cmp(&right.path))
     });
+    let (mut docs, mut files): (Vec<RankedFile>, Vec<RankedFile>) =
+        files.into_iter().partition(|file| is_doc(&file.path));
     files.truncate(max_files);
-    files
+    docs.truncate(MAX_DOCS);
+    Ranking { files, docs }
+}
+
+fn is_doc(path: &str) -> bool {
+    Path::new(path)
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| DOC_EXTENSIONS.contains(&extension.to_lowercase().as_str()))
 }
 
 /// One hit per chunk, scored as its best window, best first.
@@ -114,13 +138,21 @@ mod tests {
         }
     }
 
+    fn rank_files(
+        vector_hits: Vec<Hit>,
+        keyword_hits: Vec<Hit>,
+        max_files: usize,
+    ) -> Vec<RankedFile> {
+        rank(vector_hits, keyword_hits, max_files).files
+    }
+
     fn paths(files: &[RankedFile]) -> Vec<&str> {
         files.iter().map(|file| file.path.as_str()).collect()
     }
 
     #[test]
     fn files_rank_by_their_best_chunk() {
-        let files = rank(
+        let files = rank_files(
             vec![
                 hit("a.rs", 1, 0.5),
                 hit("a.rs", 2, 0.6),
@@ -135,8 +167,24 @@ mod tests {
     }
 
     #[test]
+    fn docs_get_their_own_list_and_take_no_source_place() {
+        let ranking = rank(
+            vec![
+                hit("wiki/guide.md", 1, 0.9),
+                hit("docs/ref.TXT", 2, 0.8),
+                hit("src/a.rs", 3, 0.7),
+                hit("src/b.rs", 4, 0.6),
+            ],
+            Vec::new(),
+            2,
+        );
+        assert_eq!(paths(&ranking.files), ["src/a.rs", "src/b.rs"]);
+        assert_eq!(paths(&ranking.docs), ["wiki/guide.md", "docs/ref.TXT"]);
+    }
+
+    #[test]
     fn a_chunk_scores_as_its_best_window() {
-        let files = rank(
+        let files = rank_files(
             vec![
                 hit("a.rs", 1, 0.2),
                 hit("b.rs", 2, 0.5),
@@ -151,7 +199,7 @@ mod tests {
 
     #[test]
     fn a_chunk_found_by_both_lists_beats_one_found_by_one() {
-        let files = rank(
+        let files = rank_files(
             vec![hit("a.rs", 1, 0.9), hit("b.rs", 2, 0.8)],
             vec![hit("b.rs", 2, 3.0), hit("c.rs", 3, 2.0)],
             20,
@@ -163,7 +211,7 @@ mod tests {
     fn extra_windows_leave_no_gaps_between_vector_ranks() {
         // Chunk 1 fills the first four window positions; chunk 2 still ranks
         // second, level with the second keyword match.
-        let files = rank(
+        let files = rank_files(
             vec![
                 hit("a.rs", 1, 0.81),
                 hit("a.rs", 1, 0.80),

@@ -141,7 +141,9 @@ def map_files(folder, query):
         text=True,
         check=True,
     ).stdout
-    map_section = output.split("Relevant files\n", 1)[1].split("\nExcerpts", 1)[0]
+    # Ranks count source files only; docs have their own list after the map.
+    after_heading = output.split("Relevant files\n", 1)[1]
+    map_section = after_heading.split("\nRelevant docs", 1)[0].split("\nExcerpts", 1)[0]
     files = []
     for line in map_section.splitlines():
         match = MAP_LINE.match(line)
