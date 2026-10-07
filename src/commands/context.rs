@@ -8,7 +8,7 @@ use crate::embed::{self, Embedder};
 use crate::excerpt::{ShownFile, show_file};
 use crate::keywords;
 use crate::probes::Probes;
-use crate::rank::rank;
+use crate::rank::{PROBE_VECTOR_WEIGHT, Signals, rank};
 use crate::references;
 use crate::render::render;
 use crate::store::{Hit, Store};
@@ -74,7 +74,11 @@ fn answer(root: &Path, query: &str, budget: usize, max_files: usize) -> anyhow::
     }
     vector_hits.extend(store.vector_scores(&query_vector, &keyword_only)?);
 
-    let mut ranking = rank(vector_hits, keyword_hits);
+    let mut signals = Signals::default();
+    if probes.vector_weight() {
+        signals.vector_weight = PROBE_VECTOR_WEIGHT;
+    }
+    let mut ranking = rank(vector_hits, keyword_hits, &signals);
     if probes.doc_references() {
         references::expand(&mut ranking, &store)?;
     }

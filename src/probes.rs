@@ -7,7 +7,13 @@ use anyhow::{Result, bail};
 use crate::keywords;
 
 /// Every probe name `MIMIRS_PROBES` accepts.
-const KNOWN_PROBES: [&str; 4] = ["path-file", "path-plain", "path-terms", "doc-references"];
+const KNOWN_PROBES: [&str; 5] = [
+    "path-file",
+    "path-plain",
+    "path-terms",
+    "doc-references",
+    "vector-weight",
+];
 
 /// The probes turned on for this run.
 pub struct Probes {
@@ -62,6 +68,11 @@ impl Probes {
     /// S4: files named by found docs join the source list.
     pub fn doc_references(&self) -> bool {
         self.has("doc-references")
+    }
+
+    /// S5: the vector list weighs 0.6 instead of 0.5.
+    pub fn vector_weight(&self) -> bool {
+        self.has("vector-weight")
     }
 
     pub fn path_prefix(&self) -> Option<PathPrefix> {

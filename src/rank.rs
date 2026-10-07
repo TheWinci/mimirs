@@ -6,6 +6,8 @@ use crate::store::Hit;
 /// Share of the fused score that comes from the vector list; the keyword list
 /// gives the rest.
 const VECTOR_WEIGHT: f32 = 0.5;
+/// The vector weight the S5 probe tries (TS v2's choice after score completion).
+pub const PROBE_VECTOR_WEIGHT: f32 = 0.6;
 /// Reciprocal-rank constant: rank 0 counts 1, rank 60 counts half.
 const RANK_CONSTANT: f32 = 60.0;
 /// Extensions of documentation files (TS v2's list); `.txt` covers Django's docs.
@@ -20,6 +22,20 @@ pub struct RankedFile {
     pub chunk_ids: Vec<i64>,
 }
 
+/// How chunk scores turn into file ranks; the ranking plan's probes change it.
+pub struct Signals {
+    /// Share of the fused score that comes from the vector list.
+    pub vector_weight: f32,
+}
+
+impl Default for Signals {
+    fn default() -> Self {
+        Self {
+            vector_weight: VECTOR_WEIGHT,
+        }
+    }
+}
+
 /// The answer's two lists, each best first.
 pub struct Ranking {
     /// Source files: everything that is not a doc.
@@ -30,12 +46,13 @@ pub struct Ranking {
 /// Fuse the nearest windows and the keyword matches by rank, and rank files by
 /// their best fused chunk. Docs get their own list, so they never take a
 /// source file's place.
-pub fn rank(vector_hits: Vec<Hit>, keyword_hits: Vec<Hit>) -> Ranking {
+pub fn rank(vector_hits: Vec<Hit>, keyword_hits: Vec<Hit>, signals: &Signals) -> Ranking {
     // Score completion adds hits out of order, so both lists are put in score
     // order here.
     let chunks = fuse(
         best_hit_per_chunk(vector_hits),
         best_hit_per_chunk(keyword_hits),
+        signals.vector_weight,
     );
 
     let mut hits_by_file: HashMap<String, Vec<Hit>> = HashMap::new();
@@ -95,11 +112,11 @@ fn best_hit_per_chunk(hits: Vec<Hit>) -> Vec<Hit> {
 /// Reciprocal-rank fusion of two chunk lists, each best first (D2). A chunk's
 /// rank is its position in a list; a list without the chunk adds nothing.
 /// Returns one hit per chunk whose score is the fused score.
-fn fuse(vector_chunks: Vec<Hit>, keyword_chunks: Vec<Hit>) -> Vec<Hit> {
+fn fuse(vector_chunks: Vec<Hit>, keyword_chunks: Vec<Hit>, vector_weight: f32) -> Vec<Hit> {
     let mut fused: HashMap<i64, Hit> = HashMap::new();
     let lists = [
-        (vector_chunks, VECTOR_WEIGHT),
-        (keyword_chunks, 1.0 - VECTOR_WEIGHT),
+        (vector_chunks, vector_weight),
+        (keyword_chunks, 1.0 - vector_weight),
     ];
     for (chunks, weight) in lists {
         for (position, mut hit) in chunks.into_iter().enumerate() {
@@ -145,7 +162,7 @@ mod tests {
     }
 
     fn rank_files(vector_hits: Vec<Hit>, keyword_hits: Vec<Hit>) -> Vec<RankedFile> {
-        rank(vector_hits, keyword_hits).files
+        rank(vector_hits, keyword_hits, &Signals::default()).files
     }
 
     fn paths(files: &[RankedFile]) -> Vec<&str> {
@@ -177,9 +194,27 @@ mod tests {
                 hit("src/b.rs", 4, 0.6),
             ],
             Vec::new(),
+            &Signals::default(),
         );
         assert_eq!(paths(&ranking.files), ["src/a.rs", "src/b.rs"]);
         assert_eq!(paths(&ranking.docs), ["wiki/guide.md", "docs/ref.TXT"]);
+    }
+
+    #[test]
+    fn a_higher_vector_weight_favors_the_vector_list() {
+        let vector = || vec![hit("a.rs", 1, 0.9), hit("b.rs", 2, 0.8)];
+        let keyword = || vec![hit("b.rs", 2, 3.0), hit("a.rs", 1, 2.0)];
+        let even = rank(vector(), keyword(), &Signals::default());
+        assert_eq!(even.files[0].score, even.files[1].score);
+        let tilted = rank(
+            vector(),
+            keyword(),
+            &Signals {
+                vector_weight: PROBE_VECTOR_WEIGHT,
+            },
+        );
+        assert_eq!(tilted.files[0].path, "a.rs");
+        assert!(tilted.files[0].score > tilted.files[1].score);
     }
 
     #[test]
