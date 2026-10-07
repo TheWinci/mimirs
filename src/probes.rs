@@ -7,7 +7,7 @@ use anyhow::{Result, bail};
 use crate::keywords;
 
 /// Every probe name `MIMIRS_PROBES` accepts.
-const KNOWN_PROBES: [&str; 9] = [
+const KNOWN_PROBES: [&str; 10] = [
     "path-file",
     "path-plain",
     "path-terms",
@@ -17,6 +17,7 @@ const KNOWN_PROBES: [&str; 9] = [
     "exact-name-own",
     "exact-name-full",
     "exact-name-long",
+    "second-chunk",
 ];
 
 /// The probes turned on for this run.
@@ -106,6 +107,11 @@ impl Probes {
         } else {
             None
         }
+    }
+
+    /// S8: a file adds a quarter of its second-best chunk's score.
+    pub fn second_chunk(&self) -> bool {
+        self.has("second-chunk")
     }
 
     pub fn path_prefix(&self) -> Option<PathPrefix> {

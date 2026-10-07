@@ -8,6 +8,9 @@ use crate::store::Hit;
 const VECTOR_WEIGHT: f32 = 0.5;
 /// The vector weight the S5 probe tries (TS v2's choice after score completion).
 pub const PROBE_VECTOR_WEIGHT: f32 = 0.6;
+/// The share of a file's second-best chunk the S8 probe adds (TS v2's value
+/// with score completion).
+pub const PROBE_SECOND_CHUNK_WEIGHT: f32 = 0.25;
 /// Reciprocal-rank constant: rank 0 counts 1, rank 60 counts half.
 const RANK_CONSTANT: f32 = 60.0;
 /// Extensions of documentation files (TS v2's list); `.txt` covers Django's docs.
@@ -29,6 +32,9 @@ pub struct Signals {
     /// Factors for fused chunk scores, by chunk ID, applied before chunks
     /// are grouped into files; chunks not listed keep their score.
     pub chunk_multipliers: HashMap<i64, f32>,
+    /// Share of a file's second-best chunk score added to its best; 0 adds
+    /// nothing.
+    pub second_chunk_weight: f32,
 }
 
 impl Default for Signals {
@@ -36,6 +42,7 @@ impl Default for Signals {
         Self {
             vector_weight: VECTOR_WEIGHT,
             chunk_multipliers: HashMap::new(),
+            second_chunk_weight: 0.0,
         }
     }
 }
@@ -71,7 +78,7 @@ pub fn rank(vector_hits: Vec<Hit>, keyword_hits: Vec<Hit>, signals: &Signals) ->
 
     let mut files: Vec<RankedFile> = hits_by_file
         .into_iter()
-        .filter_map(|(path, hits)| ranked_file(path, hits))
+        .filter_map(|(path, hits)| ranked_file(path, hits, signals.second_chunk_weight))
         .collect();
     sort_files(&mut files);
     let (docs, files): (Vec<RankedFile>, Vec<RankedFile>) =
@@ -142,15 +149,17 @@ fn fuse(vector_chunks: Vec<Hit>, keyword_chunks: Vec<Hit>, vector_weight: f32) -
     fused.into_values().collect()
 }
 
-/// Build a file's entry from its hits; `None` when it has no hits.
-fn ranked_file(path: String, mut hits: Vec<Hit>) -> Option<RankedFile> {
+/// Build a file's entry from its hits; `None` when it has no hits. Its score is
+/// its best chunk's plus `second_chunk_weight` of its second-best chunk's.
+fn ranked_file(path: String, mut hits: Vec<Hit>, second_chunk_weight: f32) -> Option<RankedFile> {
     hits.sort_by(|left, right| {
         right
             .score
             .total_cmp(&left.score)
             .then_with(|| left.chunk_id.cmp(&right.chunk_id))
     });
-    let score = hits.first()?.score;
+    let second_score = hits.get(1).map_or(0.0, |hit| hit.score);
+    let score = hits.first()?.score + second_chunk_weight * second_score;
     Some(RankedFile {
         path,
         score,
@@ -239,6 +248,25 @@ mod tests {
             &signals,
         );
         assert_eq!(paths(&ranking.files), ["b.rs", "a.rs"]);
+    }
+
+    #[test]
+    fn a_second_chunk_bonus_lifts_files_with_more_evidence() {
+        let hits = || {
+            vec![
+                hit("one.rs", 1, 0.9),
+                hit("many.rs", 2, 0.8),
+                hit("many.rs", 3, 0.7),
+            ]
+        };
+        let plain = rank_files(hits(), Vec::new());
+        assert_eq!(paths(&plain), ["one.rs", "many.rs"]);
+        let signals = Signals {
+            second_chunk_weight: PROBE_SECOND_CHUNK_WEIGHT,
+            ..Signals::default()
+        };
+        let with_bonus = rank(hits(), Vec::new(), &signals).files;
+        assert_eq!(paths(&with_bonus), ["many.rs", "one.rs"]);
     }
 
     #[test]

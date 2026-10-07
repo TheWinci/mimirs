@@ -10,7 +10,7 @@ use crate::excerpt::{ShownFile, show_file};
 use crate::keywords;
 use crate::names;
 use crate::probes::Probes;
-use crate::rank::{PROBE_VECTOR_WEIGHT, Signals, rank};
+use crate::rank::{PROBE_SECOND_CHUNK_WEIGHT, PROBE_VECTOR_WEIGHT, Signals, rank};
 use crate::references;
 use crate::render::render;
 use crate::store::{Hit, Store};
@@ -79,6 +79,9 @@ fn answer(root: &Path, query: &str, budget: usize, max_files: usize) -> anyhow::
     let mut signals = Signals::default();
     if probes.vector_weight() {
         signals.vector_weight = PROBE_VECTOR_WEIGHT;
+    }
+    if probes.second_chunk() {
+        signals.second_chunk_weight = PROBE_SECOND_CHUNK_WEIGHT;
     }
     let found_chunks: HashSet<i64> = vector_hits
         .iter()
