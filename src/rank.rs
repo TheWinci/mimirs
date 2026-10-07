@@ -11,6 +11,10 @@ pub const PROBE_VECTOR_WEIGHT: f32 = 0.6;
 /// The share of a file's second-best chunk the S8 probe adds (TS v2's value
 /// with score completion).
 pub const PROBE_SECOND_CHUNK_WEIGHT: f32 = 0.25;
+/// The factor the S9 probe gives chunks in test files (TS v2's value).
+pub const PROBE_TEST_MULTIPLIER: f32 = 0.85;
+/// Folders that hold tests.
+const TEST_FOLDERS: [&str; 4] = ["test", "tests", "__tests__", "spec"];
 /// Reciprocal-rank constant: rank 0 counts 1, rank 60 counts half.
 const RANK_CONSTANT: f32 = 60.0;
 /// Extensions of documentation files (TS v2's list); `.txt` covers Django's docs.
@@ -35,6 +39,8 @@ pub struct Signals {
     /// Share of a file's second-best chunk score added to its best; 0 adds
     /// nothing.
     pub second_chunk_weight: f32,
+    /// Factor for chunks in test files; 1 leaves them as they are.
+    pub test_multiplier: f32,
 }
 
 impl Default for Signals {
@@ -43,6 +49,7 @@ impl Default for Signals {
             vector_weight: VECTOR_WEIGHT,
             chunk_multipliers: HashMap::new(),
             second_chunk_weight: 0.0,
+            test_multiplier: 1.0,
         }
     }
 }
@@ -69,6 +76,9 @@ pub fn rank(vector_hits: Vec<Hit>, keyword_hits: Vec<Hit>, signals: &Signals) ->
         if let Some(multiplier) = signals.chunk_multipliers.get(&hit.chunk_id) {
             hit.score *= multiplier;
         }
+        if is_test(&hit.path) {
+            hit.score *= signals.test_multiplier;
+        }
     }
 
     let mut hits_by_file: HashMap<String, Vec<Hit>> = HashMap::new();
@@ -94,6 +104,19 @@ pub fn sort_files(files: &mut [RankedFile]) {
             .total_cmp(&left.score)
             .then_with(|| left.path.cmp(&right.path))
     });
+}
+
+/// TS v2's test patterns (a test folder, `.test.` or `.spec.` in the name, a
+/// `test_` prefix), plus Go's `_test.go`, which v2 missed.
+fn is_test(path: &str) -> bool {
+    let lower = path.to_lowercase();
+    let mut parts: Vec<&str> = lower.split('/').collect();
+    let file_name = parts.pop().unwrap_or_default();
+    parts.iter().any(|folder| TEST_FOLDERS.contains(folder))
+        || file_name.contains(".test.")
+        || file_name.contains(".spec.")
+        || file_name.starts_with("test_")
+        || file_name.ends_with("_test.go")
 }
 
 pub fn is_doc(path: &str) -> bool {
@@ -267,6 +290,29 @@ mod tests {
         };
         let with_bonus = rank(hits(), Vec::new(), &signals).files;
         assert_eq!(paths(&with_bonus), ["many.rs", "one.rs"]);
+    }
+
+    #[test]
+    fn test_files_are_recognized_by_folder_and_name() {
+        for path in [
+            "tests/a.py",
+            "src/__tests__/b.ts",
+            "pkg/spec/c.rb",
+            "src/queue.test.ts",
+            "src/queue.spec.tsx",
+            "django/test_utils.py",
+            "pkg/cache/cache_test.go",
+        ] {
+            assert!(is_test(path), "{path}");
+        }
+        for path in [
+            "src/testing.rs",
+            "src/latest.ts",
+            "docs/tests.md",
+            "contest/a.py",
+        ] {
+            assert!(!is_test(path), "{path}");
+        }
     }
 
     #[test]
