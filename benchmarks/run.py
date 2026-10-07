@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Measure `mimirs context` on v1's query sets.
 
-Usage: python3 benchmarks/run.py [--index] [corpus ...]
+Usage: python3 benchmarks/run.py [--index | --fresh-index NAME | --use-index NAME] [corpus ...]
+
+MIMIRS_PROBES is passed through to `mimirs`, and the result file is named
+after the index and probes so runs do not overwrite each other.
 
 Each corpus is a local clone in ~/repos/benchmarks/mimirs/<corpus>, set up once
 by hand with its .mimirs/config.toml. Its queries are in
@@ -11,7 +14,9 @@ benchmarks/queries/<corpus>@<commit>.json, and the clone must be at that commit.
 import argparse
 import datetime
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -35,25 +40,48 @@ MAP_LINE = re.compile(r"^\s*\d+\. (.+?):\d+  ")
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--index", action="store_true", help="run `mimirs index` first")
+    indexing = parser.add_mutually_exclusive_group()
+    indexing.add_argument("--index", action="store_true", help="run `mimirs index` first")
+    indexing.add_argument(
+        "--fresh-index",
+        metavar="NAME",
+        help="delete the index, build it from scratch, and save a copy as .mimirs/index-NAME.db",
+    )
+    indexing.add_argument(
+        "--use-index",
+        metavar="NAME",
+        help="copy .mimirs/index-NAME.db back before the queries",
+    )
     parser.add_argument("corpora", nargs="*", help="corpus names; all when omitted")
     arguments = parser.parse_args()
+    will_index = arguments.index or arguments.fresh_index is not None
 
     query_sets = find_query_sets(arguments.corpora)
     for corpus, commit, _ in query_sets:
-        check_corpus(corpus, commit, arguments.index)
+        check_corpus(corpus, commit, will_index)
+        if arguments.use_index and not saved_index(corpus, arguments.use_index).exists():
+            sys.exit(f"{saved_index(corpus, arguments.use_index)} does not exist")
     subprocess.run(["cargo", "build", "--release", "--quiet"], cwd=REPO, check=True)
 
     results = {
         "date": datetime.datetime.now().isoformat(timespec="seconds"),
         "mimirs_commit": mimirs_commit(),
+        "index": arguments.fresh_index or arguments.use_index,
+        "probes": os.environ.get("MIMIRS_PROBES", ""),
         "corpora": {},
     }
     for corpus, commit, path in query_sets:
         folder = CORPORA / corpus
         result = {"commit": commit}
-        if arguments.index:
+        if arguments.fresh_index:
+            delete_index(folder)
+        if will_index:
             result["index_seconds"] = index(corpus, folder)
+        if arguments.fresh_index:
+            shutil.copyfile(folder / ".mimirs" / "index.db", saved_index(corpus, arguments.fresh_index))
+        if arguments.use_index:
+            delete_index(folder)
+            shutil.copyfile(saved_index(corpus, arguments.use_index), folder / ".mimirs" / "index.db")
         queries = json.loads(path.read_text())
         started = time.monotonic()
         result["queries"] = rank_queries(corpus, folder, queries)
@@ -64,9 +92,29 @@ def main():
     print_report(results)
     RESULTS.mkdir(parents=True, exist_ok=True)
     date = datetime.date.today().isoformat()
-    output = RESULTS / f"{date}-{results['mimirs_commit']}.json"
+    output = RESULTS / f"{date}-{run_name(results)}.json"
     output.write_text(json.dumps(results, indent=2) + "\n")
     print(f"\nSaved {output}")
+
+
+def run_name(results):
+    """The commit, then the index and probes when set: `abc123-path-terms-exact-name-own`."""
+    parts = [results["mimirs_commit"]]
+    if results["index"]:
+        parts.append(results["index"])
+    if results["probes"]:
+        parts.append(results["probes"].replace(",", "+"))
+    return "-".join(parts)
+
+
+def saved_index(corpus, name):
+    return CORPORA / corpus / ".mimirs" / f"index-{name}.db"
+
+
+def delete_index(folder):
+    """Remove the index and its write-ahead files, so the next build starts empty."""
+    for suffix in ["", "-wal", "-shm"]:
+        (folder / ".mimirs" / f"index.db{suffix}").unlink(missing_ok=True)
 
 
 def find_query_sets(names):

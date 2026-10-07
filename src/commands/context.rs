@@ -141,7 +141,7 @@ mod tests {
             root.join("docs/garden.md"),
             "# Garden\n\nWater the tomatoes every morning.\n",
         )?;
-        crate::indexing::index_project(root)?;
+        crate::indexing::index_project(root, None)?;
 
         let output = answer(root, "renew an expiring login token", 16_000, 20)?;
         let map = output

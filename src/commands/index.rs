@@ -1,13 +1,15 @@
 use clap::Args;
 
 use crate::indexing::index_project;
+use crate::probes::Probes;
 
 #[derive(Args)]
 pub struct Options {}
 
 pub fn run(_options: Options) -> anyhow::Result<()> {
     let root = std::env::current_dir()?;
-    let summary = index_project(&root)?;
+    let probes = Probes::from_env()?;
+    let summary = index_project(&root, probes.path_prefix())?;
     println!(
         "{} files indexed: {} chunks, {} windows",
         summary.files, summary.chunks, summary.windows

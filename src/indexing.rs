@@ -13,6 +13,7 @@ use crate::config::Config;
 use crate::discover::{DiscoveredFile, Discovery, discover};
 use crate::embed::{self, Embedder, ModelInstance};
 use crate::files::read::read_text;
+use crate::probes::PathPrefix;
 use crate::store::{FileRecord, Store};
 
 /// What one `index` run did.
@@ -77,7 +78,9 @@ enum Event {
 /// One thread reads and chunks files and queues their windows; each model
 /// instance takes the next window as soon as it is free; this thread writes a
 /// file once all of its vectors have arrived.
-pub fn index_project(root: &Path) -> Result<Summary> {
+/// With `path_prefix`, every window starts with its file's path in that
+/// format (ranking plan S3).
+pub fn index_project(root: &Path, path_prefix: Option<PathPrefix>) -> Result<Summary> {
     let config = Config::load(&root.join(".mimirs/config.toml"))?;
     let model_files = embed::cached_files(&embed::cache_dir()?)
         .context("The embedding model is not downloaded; run `mimirs init` first")?;
@@ -112,6 +115,7 @@ pub fn index_project(root: &Path) -> Result<Summary> {
                 files,
                 known_files,
                 tokenizer,
+                path_prefix,
                 job_sender,
                 preparer_events,
             )
@@ -141,6 +145,7 @@ fn prepare_files(
     files: &[DiscoveredFile],
     known_files: &HashMap<String, (u64, i64)>,
     tokenizer: &Tokenizer,
+    path_prefix: Option<PathPrefix>,
     jobs: Sender<WindowJob>,
     events: Sender<Event>,
 ) {
@@ -158,7 +163,7 @@ fn prepare_files(
                     path: file.path.clone(),
                     error: error.to_string(),
                 },
-                Ok(Some(text)) => match prepare(path, text, file, tokenizer) {
+                Ok(Some(text)) => match prepare(path, text, file, tokenizer, path_prefix) {
                     Ok((prepared, texts)) => {
                         window_texts = texts;
                         Event::Prepared {
@@ -196,9 +201,14 @@ fn prepare(
     text: String,
     file: &DiscoveredFile,
     tokenizer: &Tokenizer,
+    path_prefix: Option<PathPrefix>,
 ) -> Result<(PreparedFile, Vec<String>)> {
     let chunks = chunk::chunk_file(&path, &text)?;
-    let (window_counts, window_texts) = cut_windows(&text, &chunks, tokenizer)?;
+    let prefix = match path_prefix {
+        Some(format) => format.line(&path),
+        None => String::new(),
+    };
+    let (window_counts, window_texts) = cut_windows(&text, &chunks, &prefix, tokenizer)?;
     let prepared = PreparedFile {
         path,
         size: file.size,
@@ -210,20 +220,21 @@ fn prepare(
     Ok((prepared, window_texts))
 }
 
-/// Cut each chunk's own text into windows, returning how many windows each chunk
-/// has and every window's text in order.
+/// Cut each chunk's own text into windows that start with `prefix`, returning
+/// how many windows each chunk has and every window's text in order.
 fn cut_windows(
     text: &str,
     chunks: &[Chunk],
+    prefix: &str,
     tokenizer: &Tokenizer,
 ) -> Result<(Vec<usize>, Vec<String>)> {
     let mut window_counts = Vec::new();
     let mut texts = Vec::new();
     for index in 0..chunks.len() {
         let own_text = chunk::own_text(text, chunks, index);
-        let windows = embed::windows(&own_text, tokenizer)?;
+        let windows = embed::windows(&own_text, prefix, tokenizer)?;
         window_counts.push(windows.len());
-        texts.extend(windows.into_iter().map(str::to_string));
+        texts.extend(windows);
     }
     Ok((window_counts, texts))
 }
@@ -432,7 +443,7 @@ mod tests {
         fs::write(root.join("src/token.rs"), "fn refresh_token() {}\n")?;
         fs::write(root.join("README.md"), "# Example\n\nA small project.\n")?;
 
-        index_project(root)?;
+        index_project(root, None)?;
 
         let database = Connection::open(root.join(".mimirs/index.db"))?;
         let count = |table: &str| -> anyhow::Result<i64> {
@@ -509,20 +520,20 @@ mod tests {
         fs::write(root.join("src/a.rs"), "fn a() {}\n")?;
         fs::write(root.join("src/b.rs"), "fn b() {}\n")?;
         fs::write(root.join("src/c.rs"), "fn c() {}\n")?;
-        assert_eq!(index_project(root)?.files, 3);
+        assert_eq!(index_project(root, None)?.files, 3);
 
-        let second = index_project(root)?;
+        let second = index_project(root, None)?;
         assert_eq!((second.files, second.unchanged, second.removed), (0, 3, 0));
 
         fs::write(root.join("src/a.rs"), "fn a() { println!(\"edited\"); }\n")?;
         fs::remove_file(root.join("src/b.rs"))?;
-        let third = index_project(root)?;
+        let third = index_project(root, None)?;
         assert_eq!((third.files, third.unchanged, third.removed), (1, 1, 1));
 
         let mut config = Config::default();
         config.exclude.push("src/c.rs".into());
         fs::write(root.join(".mimirs/config.toml"), config.to_toml()?)?;
-        let fourth = index_project(root)?;
+        let fourth = index_project(root, None)?;
         assert_eq!((fourth.files, fourth.unchanged, fourth.removed), (0, 1, 1));
         Ok(())
     }

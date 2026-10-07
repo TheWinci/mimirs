@@ -72,22 +72,34 @@ pub fn load_tokenizer(path: &Path) -> Result<Tokenizer> {
 /// Tokens a window may hold besides the model's two special tokens.
 const WINDOW_TOKENS: usize = MAX_TOKENS - 2;
 
-/// Cut `text` into windows the model embeds whole: at most `WINDOW_TOKENS`
-/// tokens each, cut at token boundaries. The windows are views of `text`, so
-/// together they are exactly `text`.
-pub fn windows<'a>(text: &'a str, tokenizer: &Tokenizer) -> Result<Vec<&'a str>> {
+/// Cut `text` into windows the model embeds whole, each starting with
+/// `prefix`: at most `WINDOW_TOKENS` tokens each, prefix included, cut at
+/// token boundaries. Without the prefixes, the windows together are exactly
+/// `text`.
+pub fn windows(text: &str, prefix: &str, tokenizer: &Tokenizer) -> Result<Vec<String>> {
     let encoding = tokenizer.encode(text, false).map_err(anyhow::Error::msg)?;
     // Byte offsets of each token in `text`.
     let offsets = encoding.get_offsets();
+    let prefix_tokens = tokenizer
+        .encode(prefix, false)
+        .map_err(anyhow::Error::msg)?
+        .len();
+    // A path so long that it would fill most of every window is left out, so
+    // the windows keep room for the code.
+    let (prefix, text_tokens) = if prefix_tokens <= WINDOW_TOKENS / 2 {
+        (prefix, WINDOW_TOKENS - prefix_tokens)
+    } else {
+        ("", WINDOW_TOKENS)
+    };
 
     let mut windows = Vec::new();
     let mut start = 0;
-    for token_index in (WINDOW_TOKENS..offsets.len()).step_by(WINDOW_TOKENS) {
+    for token_index in (text_tokens..offsets.len()).step_by(text_tokens) {
         let (cut, _) = offsets[token_index];
-        windows.push(&text[start..cut]);
+        windows.push(format!("{prefix}{}", &text[start..cut]));
         start = cut;
     }
-    windows.push(&text[start..]);
+    windows.push(format!("{prefix}{}", &text[start..]));
     Ok(windows)
 }
 
@@ -225,7 +237,7 @@ mod tests {
     #[test]
     fn short_text_is_one_window() -> Result<()> {
         let text = "fn main() {}\n";
-        assert_eq!(windows(text, &tokenizer()?)?, [text]);
+        assert_eq!(windows(text, "", &tokenizer()?)?, [text]);
         Ok(())
     }
 
@@ -233,12 +245,37 @@ mod tests {
     fn long_text_is_cut_into_windows_within_the_token_limit() -> Result<()> {
         let tokenizer = tokenizer()?;
         let text = "alpha beta gamma delta ".repeat(300) + "\n";
-        let windows = windows(&text, &tokenizer)?;
+        let windows = windows(&text, "", &tokenizer)?;
         assert!(windows.len() > 1);
         assert_eq!(windows.concat(), text);
-        for window in windows {
+        for window in &windows {
             assert!(count_tokens(window, &tokenizer)? <= WINDOW_TOKENS);
         }
+        Ok(())
+    }
+
+    #[test]
+    fn every_window_starts_with_the_prefix_within_the_token_limit() -> Result<()> {
+        let tokenizer = tokenizer()?;
+        let text = "alpha beta gamma delta ".repeat(300) + "\n";
+        let prefix = "File: src/search/hybrid.ts\n";
+        let windows = windows(&text, prefix, &tokenizer)?;
+        assert!(windows.len() > 1);
+        let mut rest = String::new();
+        for window in &windows {
+            assert!(window.starts_with(prefix));
+            assert!(count_tokens(window, &tokenizer)? <= WINDOW_TOKENS);
+            rest.push_str(&window[prefix.len()..]);
+        }
+        assert_eq!(rest, text);
+        Ok(())
+    }
+
+    #[test]
+    fn a_prefix_over_half_the_window_is_left_out() -> Result<()> {
+        let prefix = format!("{}\n", "segment/".repeat(200));
+        let windows = windows("fn main() {}\n", &prefix, &tokenizer()?)?;
+        assert_eq!(windows, ["fn main() {}\n"]);
         Ok(())
     }
 
