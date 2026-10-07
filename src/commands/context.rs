@@ -7,7 +7,9 @@ use clap::Args;
 use crate::embed::{self, Embedder};
 use crate::excerpt::{ShownFile, show_file};
 use crate::keywords;
+use crate::probes::Probes;
 use crate::rank::rank;
+use crate::references;
 use crate::render::render;
 use crate::store::{Hit, Store};
 
@@ -15,6 +17,8 @@ use crate::store::{Hit, Store};
 const NEAREST_WINDOWS: usize = 200;
 /// Keyword matches fused with the nearest windows.
 const KEYWORD_CHUNKS: usize = 200;
+/// Most docs in the doc map, after the source files.
+const MAX_DOCS: usize = 5;
 
 #[derive(Args)]
 pub struct Options {
@@ -42,6 +46,7 @@ pub fn run(options: Options) -> anyhow::Result<()> {
 /// Search the project's index for `query` and render the file map and excerpts.
 /// Reads only what is committed; it never indexes or waits for an index run.
 fn answer(root: &Path, query: &str, budget: usize, max_files: usize) -> anyhow::Result<String> {
+    let probes = Probes::from_env()?;
     let store = Store::open_existing(&root.join(".mimirs/index.db"))?;
     anyhow::ensure!(
         store.file_count()? > 0,
@@ -69,7 +74,12 @@ fn answer(root: &Path, query: &str, budget: usize, max_files: usize) -> anyhow::
     }
     vector_hits.extend(store.vector_scores(&query_vector, &keyword_only)?);
 
-    let ranking = rank(vector_hits, keyword_hits, max_files);
+    let mut ranking = rank(vector_hits, keyword_hits);
+    if probes.doc_references() {
+        references::expand(&mut ranking, &store)?;
+    }
+    ranking.files.truncate(max_files);
+    ranking.docs.truncate(MAX_DOCS);
     let mut files: Vec<ShownFile> = Vec::new();
     for file in &ranking.files {
         let stored = store.stored_file(&file.path)?;

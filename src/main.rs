@@ -12,6 +12,7 @@ mod indexing;
 mod keywords;
 mod probes;
 mod rank;
+mod references;
 mod render;
 mod store;
 

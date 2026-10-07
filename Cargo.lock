@@ -1178,6 +1178,7 @@ dependencies = [
  "hf-hub",
  "ignore",
  "ort",
+ "regex",
  "rusqlite",
  "serde",
  "sqlite-vec",

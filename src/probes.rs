@@ -7,7 +7,7 @@ use anyhow::{Result, bail};
 use crate::keywords;
 
 /// Every probe name `MIMIRS_PROBES` accepts.
-const KNOWN_PROBES: [&str; 3] = ["path-file", "path-plain", "path-terms"];
+const KNOWN_PROBES: [&str; 4] = ["path-file", "path-plain", "path-terms", "doc-references"];
 
 /// The probes turned on for this run.
 pub struct Probes {
@@ -57,6 +57,11 @@ impl Probes {
 
     fn has(&self, name: &str) -> bool {
         self.names.iter().any(|known| known == name)
+    }
+
+    /// S4: files named by found docs join the source list.
+    pub fn doc_references(&self) -> bool {
+        self.has("doc-references")
     }
 
     pub fn path_prefix(&self) -> Option<PathPrefix> {

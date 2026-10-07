@@ -8,9 +8,6 @@ use crate::store::Hit;
 const VECTOR_WEIGHT: f32 = 0.5;
 /// Reciprocal-rank constant: rank 0 counts 1, rank 60 counts half.
 const RANK_CONSTANT: f32 = 60.0;
-/// Most docs in the answer. Docs have their own list, so they never take a
-/// source file's place.
-const MAX_DOCS: usize = 5;
 /// Extensions of documentation files (TS v2's list); `.txt` covers Django's docs.
 const DOC_EXTENSIONS: [&str; 6] = ["md", "mdx", "markdown", "rst", "txt", "adoc"];
 
@@ -30,10 +27,10 @@ pub struct Ranking {
     pub docs: Vec<RankedFile>,
 }
 
-/// Fuse the nearest windows and the keyword matches by rank, rank files by
-/// their best fused chunk, and keep the `max_files` best source files and the
-/// `MAX_DOCS` best docs.
-pub fn rank(vector_hits: Vec<Hit>, keyword_hits: Vec<Hit>, max_files: usize) -> Ranking {
+/// Fuse the nearest windows and the keyword matches by rank, and rank files by
+/// their best fused chunk. Docs get their own list, so they never take a
+/// source file's place.
+pub fn rank(vector_hits: Vec<Hit>, keyword_hits: Vec<Hit>) -> Ranking {
     // Score completion adds hits out of order, so both lists are put in score
     // order here.
     let chunks = fuse(
@@ -50,20 +47,23 @@ pub fn rank(vector_hits: Vec<Hit>, keyword_hits: Vec<Hit>, max_files: usize) -> 
         .into_iter()
         .filter_map(|(path, hits)| ranked_file(path, hits))
         .collect();
+    sort_files(&mut files);
+    let (docs, files): (Vec<RankedFile>, Vec<RankedFile>) =
+        files.into_iter().partition(|file| is_doc(&file.path));
+    Ranking { files, docs }
+}
+
+/// Best score first; equal scores by path, so the order is stable.
+pub fn sort_files(files: &mut [RankedFile]) {
     files.sort_by(|left, right| {
         right
             .score
             .total_cmp(&left.score)
             .then_with(|| left.path.cmp(&right.path))
     });
-    let (mut docs, mut files): (Vec<RankedFile>, Vec<RankedFile>) =
-        files.into_iter().partition(|file| is_doc(&file.path));
-    files.truncate(max_files);
-    docs.truncate(MAX_DOCS);
-    Ranking { files, docs }
 }
 
-fn is_doc(path: &str) -> bool {
+pub fn is_doc(path: &str) -> bool {
     Path::new(path)
         .extension()
         .and_then(|extension| extension.to_str())
@@ -144,12 +144,8 @@ mod tests {
         }
     }
 
-    fn rank_files(
-        vector_hits: Vec<Hit>,
-        keyword_hits: Vec<Hit>,
-        max_files: usize,
-    ) -> Vec<RankedFile> {
-        rank(vector_hits, keyword_hits, max_files).files
+    fn rank_files(vector_hits: Vec<Hit>, keyword_hits: Vec<Hit>) -> Vec<RankedFile> {
+        rank(vector_hits, keyword_hits).files
     }
 
     fn paths(files: &[RankedFile]) -> Vec<&str> {
@@ -166,9 +162,8 @@ mod tests {
                 hit("c.rs", 4, 0.1),
             ],
             Vec::new(),
-            2,
         );
-        assert_eq!(paths(&files), ["b.rs", "a.rs"]);
+        assert_eq!(paths(&files), ["b.rs", "a.rs", "c.rs"]);
         assert_eq!(files[1].chunk_ids, [2, 1]);
     }
 
@@ -182,7 +177,6 @@ mod tests {
                 hit("src/b.rs", 4, 0.6),
             ],
             Vec::new(),
-            2,
         );
         assert_eq!(paths(&ranking.files), ["src/a.rs", "src/b.rs"]);
         assert_eq!(paths(&ranking.docs), ["wiki/guide.md", "docs/ref.TXT"]);
@@ -197,7 +191,6 @@ mod tests {
                 hit("a.rs", 1, 0.7),
             ],
             Vec::new(),
-            20,
         );
         assert_eq!(files[0].path, "a.rs");
         assert_eq!(files[0].chunk_ids, [1]);
@@ -205,11 +198,7 @@ mod tests {
 
     #[test]
     fn keyword_hits_rank_by_score_whatever_their_order() {
-        let files = rank_files(
-            Vec::new(),
-            vec![hit("a.rs", 1, 1.0), hit("b.rs", 2, 3.0)],
-            20,
-        );
+        let files = rank_files(Vec::new(), vec![hit("a.rs", 1, 1.0), hit("b.rs", 2, 3.0)]);
         assert_eq!(paths(&files), ["b.rs", "a.rs"]);
     }
 
@@ -218,7 +207,6 @@ mod tests {
         let files = rank_files(
             vec![hit("a.rs", 1, 0.9), hit("b.rs", 2, 0.8)],
             vec![hit("b.rs", 2, 3.0), hit("c.rs", 3, 2.0)],
-            20,
         );
         assert_eq!(paths(&files), ["b.rs", "a.rs", "c.rs"]);
     }
@@ -236,7 +224,6 @@ mod tests {
                 hit("b.rs", 2, 0.77),
             ],
             vec![hit("c.rs", 3, 5.0), hit("d.rs", 4, 4.0)],
-            20,
         );
         let score = |path: &str| {
             files

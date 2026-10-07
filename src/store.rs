@@ -184,6 +184,41 @@ impl Store {
         Ok(hits)
     }
 
+    /// Every indexed file's path.
+    pub fn paths(&self) -> Result<Vec<String>> {
+        let mut statement = self.connection.prepare("SELECT path FROM files")?;
+        let rows = statement.query_map([], |row| row.get(0))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// The path and ID of every chunk whose own name is `name`, ignoring case.
+    pub fn chunks_named(&self, name: &str) -> Result<Vec<(String, i64)>> {
+        let mut statement = self.connection.prepare(
+            "SELECT files.path, chunks.id
+             FROM chunks JOIN files ON files.id = chunks.file_id
+             WHERE chunks.name = ?1 COLLATE NOCASE
+             ORDER BY files.path, chunks.start_byte, chunks.id",
+        )?;
+        let rows = statement.query_map([name], |row| Ok((row.get(0)?, row.get(1)?)))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// The ID of the first chunk in `path`, or `None` when it has no chunks.
+    pub fn first_chunk(&self, path: &str) -> Result<Option<i64>> {
+        let mut statement = self.connection.prepare(
+            "SELECT chunks.id
+             FROM chunks JOIN files ON files.id = chunks.file_id
+             WHERE files.path = ?1
+             ORDER BY chunks.start_byte, chunks.id
+             LIMIT 1",
+        )?;
+        let mut rows = statement.query([path])?;
+        match rows.next()? {
+            Some(row) => Ok(Some(row.get(0)?)),
+            None => Ok(None),
+        }
+    }
+
     /// The `limit` chunks that best match an FTS5 `expression` by BM25, best first.
     pub fn keyword_matches(&self, expression: &str, limit: usize) -> Result<Vec<Hit>> {
         // Weights per column: path 2, name 3, text 1. bm25() is lower for better
