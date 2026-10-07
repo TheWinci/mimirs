@@ -88,6 +88,11 @@ fn answer(root: &Path, query: &str, budget: usize, max_files: usize) -> anyhow::
     if probes.unique_symbol() {
         names::unique_symbols(query, &found_chunks, &store, &mut signals.chunk_multipliers)?;
     }
+    if let Some(variant) = probes.exact_name() {
+        let found_ids: Vec<i64> = found_chunks.iter().copied().collect();
+        let chunk_names = store.chunk_names(&found_ids)?;
+        names::exact_names(query, &chunk_names, variant, &mut signals.chunk_multipliers);
+    }
     let mut ranking = rank(vector_hits, keyword_hits, &signals);
     if probes.doc_references() {
         references::expand(&mut ranking, &store)?;

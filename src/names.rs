@@ -6,11 +6,19 @@ use std::collections::{HashMap, HashSet};
 use anyhow::Result;
 use regex::Regex;
 
-use crate::store::Store;
+use crate::keywords;
+use crate::probes::ExactName;
+use crate::store::{ChunkName, Store};
 
 /// Score multiplier for a chunk that alone defines a code identifier the query
 /// spells (S6, TS v2's value).
 const UNIQUE_SYMBOL_MULTIPLIER: f32 = 1.3;
+
+/// Score multiplier for a chunk whose name the query contains (S7, TS v2's
+/// value).
+const EXACT_NAME_MULTIPLIER: f32 = 1.2;
+/// In the `exact-name-long` variant, a one-term name needs this many letters.
+const SHORTEST_ONE_TERM_NAME: usize = 4;
 
 /// Words that look like identifiers in a question but rarely name the code
 /// asked about (TS v2's list).
@@ -58,6 +66,34 @@ pub fn unique_symbols(
     Ok(())
 }
 
+/// Multiply the score of each named chunk whose name's terms all appear among
+/// the query's terms (S7). `variant` picks which name counts.
+pub fn exact_names(
+    query: &str,
+    names: &HashMap<i64, ChunkName>,
+    variant: ExactName,
+    multipliers: &mut HashMap<i64, f32>,
+) {
+    let query_terms = keywords::terms(query);
+    for (chunk_id, name) in names {
+        let name_text = match variant {
+            ExactName::Own | ExactName::Long => &name.own,
+            ExactName::Full => &name.full,
+        };
+        let name_terms = keywords::terms(name_text);
+        if name_terms.is_empty() {
+            continue;
+        }
+        let too_short = variant == ExactName::Long
+            && name_terms.len() == 1
+            && name_terms[0].chars().count() < SHORTEST_ONE_TERM_NAME;
+        let named_by_query = name_terms.iter().all(|term| query_terms.contains(term));
+        if named_by_query && !too_short {
+            *multipliers.entry(*chunk_id).or_insert(1.0) *= EXACT_NAME_MULTIPLIER;
+        }
+    }
+}
+
 /// Query words spelled like code: 3 or more characters with a capital letter,
 /// `_`, or one `.`, not a stop word, and not all capitals (`STATIC_URL` names
 /// a use site more often than a definition). Each once, in query order.
@@ -86,6 +122,35 @@ fn definition_identifiers(query: &str) -> Result<Vec<String>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn name(own: &str, full: &str) -> ChunkName {
+        ChunkName {
+            own: own.into(),
+            full: full.into(),
+        }
+    }
+
+    fn raised(query: &str, variant: ExactName) -> Vec<i64> {
+        let names = HashMap::from([
+            (1, name("drain", "Queue.drain")),
+            (2, name("get", "Cache.get")),
+            (3, name("getDependsOn", "Graph.getDependsOn")),
+        ]);
+        let mut multipliers = HashMap::new();
+        exact_names(query, &names, variant, &mut multipliers);
+        let mut ids: Vec<i64> = multipliers.into_keys().collect();
+        ids.sort_unstable();
+        ids
+    }
+
+    #[test]
+    fn each_variant_matches_its_name() {
+        let query = "get the tasks to drain and what it depends on";
+        assert_eq!(raised(query, ExactName::Own), [1, 2, 3]);
+        assert_eq!(raised(query, ExactName::Long), [1, 3]);
+        assert!(raised(query, ExactName::Full).is_empty());
+        assert_eq!(raised("drain the queue", ExactName::Full), [1]);
+    }
 
     #[test]
     fn identifiers_need_a_code_spelling() -> Result<()> {

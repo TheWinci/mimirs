@@ -7,13 +7,16 @@ use anyhow::{Result, bail};
 use crate::keywords;
 
 /// Every probe name `MIMIRS_PROBES` accepts.
-const KNOWN_PROBES: [&str; 6] = [
+const KNOWN_PROBES: [&str; 9] = [
     "path-file",
     "path-plain",
     "path-terms",
     "doc-references",
     "vector-weight",
     "unique-symbol",
+    "exact-name-own",
+    "exact-name-full",
+    "exact-name-long",
 ];
 
 /// The probes turned on for this run.
@@ -30,6 +33,17 @@ pub enum PathPrefix {
     Plain,
     /// `src search hybrid ts`: the keyword index's terms.
     Terms,
+}
+
+/// Which name the exact-name probe (S7) compares with the query.
+#[derive(Clone, Copy, PartialEq)]
+pub enum ExactName {
+    /// The chunk's own name: `drain`.
+    Own,
+    /// Its full name with parents: `Queue.drain`.
+    Full,
+    /// Its own name, but a one-term name needs 4 or more letters.
+    Long,
 }
 
 impl Probes {
@@ -52,12 +66,11 @@ impl Probes {
             }
             names.push(name.to_string());
         }
-        let path_formats = names
-            .iter()
-            .filter(|name| name.starts_with("path-"))
-            .count();
-        if path_formats > 1 {
-            bail!("MIMIRS_PROBES turns on more than one path format");
+        for family in ["path-", "exact-name-"] {
+            let variants = names.iter().filter(|name| name.starts_with(family)).count();
+            if variants > 1 {
+                bail!("MIMIRS_PROBES turns on more than one `{family}` variant");
+            }
         }
         Ok(Self { names })
     }
@@ -80,6 +93,19 @@ impl Probes {
     /// scores ×1.3.
     pub fn unique_symbol(&self) -> bool {
         self.has("unique-symbol")
+    }
+
+    /// S7: a chunk whose name the query contains scores ×1.2.
+    pub fn exact_name(&self) -> Option<ExactName> {
+        if self.has("exact-name-own") {
+            Some(ExactName::Own)
+        } else if self.has("exact-name-full") {
+            Some(ExactName::Full)
+        } else if self.has("exact-name-long") {
+            Some(ExactName::Long)
+        } else {
+            None
+        }
     }
 
     pub fn path_prefix(&self) -> Option<PathPrefix> {
@@ -122,6 +148,7 @@ mod tests {
     fn unknown_names_and_two_path_formats_are_errors() {
         assert!(Probes::parse("path-terms,typo").is_err());
         assert!(Probes::parse("path-file,path-plain").is_err());
+        assert!(Probes::parse("exact-name-own,exact-name-long").is_err());
     }
 
     #[test]
