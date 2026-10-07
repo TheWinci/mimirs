@@ -128,6 +128,62 @@ impl Store {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
+    /// The vector score of each chunk in `chunk_ids`, as `nearest` scores it:
+    /// the cosine similarity of its best window to `query`. Chunks without
+    /// windows are left out.
+    pub fn vector_scores(&self, query: &[f32], chunk_ids: &[i64]) -> Result<Vec<Hit>> {
+        let mut statement = self.connection.prepare(
+            "SELECT files.path, chunks.id,
+                    MIN(vec_distance_cosine(window_vectors.embedding, ?1))
+             FROM windows
+             JOIN window_vectors ON window_vectors.window_id = windows.id
+             JOIN chunks ON chunks.id = windows.chunk_id
+             JOIN files ON files.id = chunks.file_id
+             WHERE windows.chunk_id = ?2
+             GROUP BY chunks.id",
+        )?;
+        let query_bytes = vector_bytes(query);
+        let mut hits = Vec::new();
+        for chunk_id in chunk_ids {
+            let mut rows = statement.query(params![query_bytes, chunk_id])?;
+            if let Some(row) = rows.next()? {
+                let distance: f64 = row.get(2)?;
+                hits.push(Hit {
+                    path: row.get(0)?,
+                    chunk_id: row.get(1)?,
+                    score: (1.0 - distance) as f32,
+                });
+            }
+        }
+        Ok(hits)
+    }
+
+    /// The BM25 score of each chunk in `chunk_ids` for an FTS5 `expression`, as
+    /// `keyword_matches` scores it. Chunks the expression does not match are
+    /// left out.
+    pub fn keyword_scores(&self, expression: &str, chunk_ids: &[i64]) -> Result<Vec<Hit>> {
+        let mut statement = self.connection.prepare(
+            "SELECT files.path, chunks.id, bm25(chunk_terms, 2.0, 3.0, 1.0)
+             FROM chunk_terms
+             JOIN chunks ON chunks.id = chunk_terms.rowid
+             JOIN files ON files.id = chunks.file_id
+             WHERE chunk_terms MATCH ?1 AND chunk_terms.rowid = ?2",
+        )?;
+        let mut hits = Vec::new();
+        for chunk_id in chunk_ids {
+            let mut rows = statement.query(params![expression, chunk_id])?;
+            if let Some(row) = rows.next()? {
+                let bm25_value: f64 = row.get(2)?;
+                hits.push(Hit {
+                    path: row.get(0)?,
+                    chunk_id: row.get(1)?,
+                    score: -bm25_value as f32,
+                });
+            }
+        }
+        Ok(hits)
+    }
+
     /// The `limit` chunks that best match an FTS5 `expression` by BM25, best first.
     pub fn keyword_matches(&self, expression: &str, limit: usize) -> Result<Vec<Hit>> {
         // Weights per column: path 2, name 3, text 1. bm25() is lower for better
@@ -592,6 +648,50 @@ mod tests {
             .prepare("SELECT rowid FROM chunk_terms WHERE chunk_terms MATCH ?1 ORDER BY rowid")?;
         let rows = statement.query_map([expression], |row| row.get(0))?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    #[test]
+    fn vector_scores_score_each_chunk_by_its_best_window() -> Result<()> {
+        let folder = tempfile::tempdir()?;
+        let mut store = Store::open(&folder.path().join("index.db"))?;
+        write(&mut store, "src/a.rs", "fn a() {}\n", 2, 0)?;
+        write(&mut store, "src/b.rs", "fn b() {}\n", 1, 1)?;
+        let chunk_of = |path: &str| -> Result<i64> {
+            Ok(store.connection.query_row(
+                "SELECT chunks.id FROM chunks JOIN files ON files.id = chunks.file_id
+                 WHERE files.path = ?1",
+                [path],
+                |row| row.get(0),
+            )?)
+        };
+        let a = chunk_of("src/a.rs")?;
+        let b = chunk_of("src/b.rs")?;
+        let hits = store.vector_scores(&unit_vector(0), &[a, b, 999])?;
+        assert_eq!(hits.len(), 2);
+        assert_eq!((hits[0].chunk_id, hits[1].chunk_id), (a, b));
+        assert!((hits[0].score - 1.0).abs() < 1e-6);
+        assert!(hits[1].score.abs() < 1e-6);
+        Ok(())
+    }
+
+    #[test]
+    fn keyword_scores_match_keyword_matches_and_skip_misses() -> Result<()> {
+        let folder = tempfile::tempdir()?;
+        let mut store = Store::open(&folder.path().join("index.db"))?;
+        write(&mut store, "src/pasta.rs", "fn boil() {}\n", 1, 0)?;
+        write(&mut store, "src/other.rs", "fn cook() {}\n", 1, 0)?;
+        let expression = "\"pasta\"";
+        let matched = store.keyword_matches(expression, 10)?;
+        let all_chunks: Vec<i64> = store
+            .connection
+            .prepare("SELECT id FROM chunks ORDER BY id")?
+            .query_map([], |row| row.get(0))?
+            .collect::<rusqlite::Result<_>>()?;
+        let scored = store.keyword_scores(expression, &all_chunks)?;
+        assert_eq!(scored.len(), 1);
+        assert_eq!(scored[0].chunk_id, matched[0].chunk_id);
+        assert_eq!(scored[0].score, matched[0].score);
+        Ok(())
     }
 
     #[test]

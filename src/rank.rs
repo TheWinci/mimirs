@@ -34,7 +34,12 @@ pub struct Ranking {
 /// their best fused chunk, and keep the `max_files` best source files and the
 /// `MAX_DOCS` best docs.
 pub fn rank(vector_hits: Vec<Hit>, keyword_hits: Vec<Hit>, max_files: usize) -> Ranking {
-    let chunks = fuse(best_window_per_chunk(vector_hits), keyword_hits);
+    // Score completion adds hits out of order, so both lists are put in score
+    // order here.
+    let chunks = fuse(
+        best_hit_per_chunk(vector_hits),
+        best_hit_per_chunk(keyword_hits),
+    );
 
     let mut hits_by_file: HashMap<String, Vec<Hit>> = HashMap::new();
     for hit in chunks {
@@ -65,8 +70,9 @@ fn is_doc(path: &str) -> bool {
         .is_some_and(|extension| DOC_EXTENSIONS.contains(&extension.to_lowercase().as_str()))
 }
 
-/// One hit per chunk, scored as its best window, best first.
-fn best_window_per_chunk(hits: Vec<Hit>) -> Vec<Hit> {
+/// One hit per chunk, scored as its best hit (for vectors, its best window),
+/// best first.
+fn best_hit_per_chunk(hits: Vec<Hit>) -> Vec<Hit> {
     let mut best_hits: HashMap<i64, Hit> = HashMap::new();
     for hit in hits {
         let is_better = best_hits
@@ -195,6 +201,16 @@ mod tests {
         );
         assert_eq!(files[0].path, "a.rs");
         assert_eq!(files[0].chunk_ids, [1]);
+    }
+
+    #[test]
+    fn keyword_hits_rank_by_score_whatever_their_order() {
+        let files = rank_files(
+            Vec::new(),
+            vec![hit("a.rs", 1, 1.0), hit("b.rs", 2, 3.0)],
+            20,
+        );
+        assert_eq!(paths(&files), ["b.rs", "a.rs"]);
     }
 
     #[test]

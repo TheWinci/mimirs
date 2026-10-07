@@ -9,7 +9,7 @@ use crate::excerpt::{ShownFile, show_file};
 use crate::keywords;
 use crate::rank::rank;
 use crate::render::render;
-use crate::store::Store;
+use crate::store::{Hit, Store};
 
 /// Windows compared with the query; enough to fill the default map of 20 files.
 const NEAREST_WINDOWS: usize = 200;
@@ -53,11 +53,22 @@ fn answer(root: &Path, query: &str, budget: usize, max_files: usize) -> anyhow::
     let mut embedder = Embedder::load(&model_files, 1)?;
 
     let query_vector = embedder.embed(query)?;
-    let vector_hits = store.nearest(&query_vector, NEAREST_WINDOWS)?;
-    let keyword_hits = match keywords::match_expression(query) {
-        Some(expression) => store.keyword_matches(&expression, KEYWORD_CHUNKS)?,
+    let mut vector_hits = store.nearest(&query_vector, NEAREST_WINDOWS)?;
+    let expression = keywords::match_expression(query);
+    let mut keyword_hits = match &expression {
+        Some(expression) => store.keyword_matches(expression, KEYWORD_CHUNKS)?,
         None => Vec::new(),
     };
+
+    // Score completion: a chunk found by one list gets its score in the other
+    // too, so fusion compares every candidate on both measures.
+    let vector_only = chunks_missing_from(&vector_hits, &keyword_hits);
+    let keyword_only = chunks_missing_from(&keyword_hits, &vector_hits);
+    if let Some(expression) = &expression {
+        keyword_hits.extend(store.keyword_scores(expression, &vector_only)?);
+    }
+    vector_hits.extend(store.vector_scores(&query_vector, &keyword_only)?);
+
     let ranking = rank(vector_hits, keyword_hits, max_files);
     let mut files: Vec<ShownFile> = Vec::new();
     for file in &ranking.files {
@@ -75,6 +86,20 @@ fn answer(root: &Path, query: &str, budget: usize, max_files: usize) -> anyhow::
         .last_finished_run()?
         .map(|finished| now.saturating_sub(finished).max(0) as u64);
     Ok(render(index_age, &files, &docs, budget))
+}
+
+/// The distinct chunks in `hits` that `other` does not have, in `hits` order.
+fn chunks_missing_from(hits: &[Hit], other: &[Hit]) -> Vec<i64> {
+    let mut missing: Vec<i64> = Vec::new();
+    for hit in hits {
+        let in_other = other
+            .iter()
+            .any(|other_hit| other_hit.chunk_id == hit.chunk_id);
+        if !in_other && !missing.contains(&hit.chunk_id) {
+            missing.push(hit.chunk_id);
+        }
+    }
+    missing
 }
 
 #[cfg(test)]
