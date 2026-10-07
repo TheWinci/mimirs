@@ -330,10 +330,16 @@ def write_report(index, output_path, formats):
 
 
 def find_format_result(name):
-    """The newest run without probes on saved index `name`, at any commit."""
-    matches = sorted(run.RESULTS.glob(f"*-{name}.json"), key=lambda path: path.stat().st_mtime)
-    plain = [path for path in matches if json.loads(path.read_text()).get("probes") == "" and json.loads(path.read_text()).get("index") == name]
-    return plain[-1] if plain else None
+    """The newest run on saved index `name` without ranking probes, at any
+    commit. A format's own run has its path probe turned on, which only
+    changes indexing."""
+    newest = None
+    for path in sorted(run.RESULTS.glob("*.json"), key=lambda path: path.stat().st_mtime):
+        result = json.loads(path.read_text())
+        probes = [probe for probe in result.get("probes", "").split(",") if probe]
+        if result.get("index") == name and all(probe.startswith("path-") for probe in probes):
+            newest = path
+    return newest
 
 
 if __name__ == "__main__":
