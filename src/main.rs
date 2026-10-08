@@ -13,7 +13,6 @@ mod keywords;
 mod names;
 mod probes;
 mod rank;
-mod references;
 mod render;
 mod store;
 

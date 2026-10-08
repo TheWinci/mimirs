@@ -43,9 +43,8 @@ pub struct StoredFile {
     pub chunks: Vec<Chunk>,
 }
 
-/// A chunk's own name (`drain`) and full name with its parents' (`Queue.drain`).
+/// A chunk's full name with its parents' (`Queue.drain`).
 pub struct ChunkName {
-    pub own: String,
     pub full: String,
 }
 
@@ -190,13 +189,6 @@ impl Store {
         Ok(hits)
     }
 
-    /// Every indexed file's path.
-    pub fn paths(&self) -> Result<Vec<String>> {
-        let mut statement = self.connection.prepare("SELECT path FROM files")?;
-        let rows = statement.query_map([], |row| row.get(0))?;
-        Ok(rows.collect::<rusqlite::Result<_>>()?)
-    }
-
     /// The path and ID of every chunk whose own name is `name`, ignoring case.
     pub fn chunks_named(&self, name: &str) -> Result<Vec<(String, i64)>> {
         let mut statement = self.connection.prepare(
@@ -209,7 +201,7 @@ impl Store {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
-    /// The own and full name of each named chunk in `chunk_ids`; unnamed
+    /// The full name of each named chunk in `chunk_ids`; unnamed
     /// chunks are left out. Full names follow `chunk::full_name`.
     pub fn chunk_names(&self, chunk_ids: &[i64]) -> Result<HashMap<i64, ChunkName>> {
         let mut statement = self
@@ -232,31 +224,15 @@ impl Store {
                 parts.extend(name);
                 current = parent;
             }
-            let Some(own) = parts.first().cloned() else {
+            if parts.is_empty() {
                 continue;
-            };
+            }
             parts.reverse();
             let separator = if is_section { " > " } else { "." };
             let full = parts.join(separator);
-            names.insert(chunk_id, ChunkName { own, full });
+            names.insert(chunk_id, ChunkName { full });
         }
         Ok(names)
-    }
-
-    /// The ID of the first chunk in `path`, or `None` when it has no chunks.
-    pub fn first_chunk(&self, path: &str) -> Result<Option<i64>> {
-        let mut statement = self.connection.prepare(
-            "SELECT chunks.id
-             FROM chunks JOIN files ON files.id = chunks.file_id
-             WHERE files.path = ?1
-             ORDER BY chunks.start_byte, chunks.id
-             LIMIT 1",
-        )?;
-        let mut rows = statement.query([path])?;
-        match rows.next()? {
-            Some(row) => Ok(Some(row.get(0)?)),
-            None => Ok(None),
-        }
     }
 
     /// The `limit` chunks that best match an FTS5 `expression` by BM25, best first.
@@ -785,10 +761,6 @@ mod tests {
             .map(|name| name.full.as_str())
             .collect();
         assert_eq!(full_names, ["Queue", "Queue.drain"]);
-        let drain = ids
-            .iter()
-            .find_map(|id| names.get(id).filter(|name| name.full == "Queue.drain"));
-        assert_eq!(drain.map(|name| name.own.as_str()), Some("drain"));
         Ok(())
     }
 

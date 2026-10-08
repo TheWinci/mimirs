@@ -1,27 +1,13 @@
 //! Temporary switches for the ranking plan's experiments. `MIMIRS_PROBES`
-//! lists the probes to turn on, separated by commas. The plan's last slice
+//! lists the probes to turn on, separated by commas. Ranking plan S13
 //! removes this module.
 
 use anyhow::{Result, bail};
 
 use crate::keywords;
-use crate::rank::{PROBE_SECOND_CHUNK_WEIGHT, PROBE_SMALL_SECOND_CHUNK_WEIGHT};
 
 /// Every probe name `MIMIRS_PROBES` accepts.
-const KNOWN_PROBES: [&str; 12] = [
-    "path-file",
-    "path-plain",
-    "path-terms",
-    "doc-references",
-    "vector-weight",
-    "unique-symbol",
-    "exact-name-own",
-    "exact-name-full",
-    "exact-name-long",
-    "second-chunk",
-    "second-chunk-10",
-    "tests-lower",
-];
+const KNOWN_PROBES: [&str; 4] = ["path-file", "path-plain", "path-terms", "exact-name-full"];
 
 /// The probes turned on for this run.
 pub struct Probes {
@@ -37,17 +23,6 @@ pub enum PathPrefix {
     Plain,
     /// `src search hybrid ts`: the keyword index's terms.
     Terms,
-}
-
-/// Which name the exact-name probe (S7) compares with the query.
-#[derive(Clone, Copy, PartialEq)]
-pub enum ExactName {
-    /// The chunk's own name: `drain`.
-    Own,
-    /// Its full name with parents: `Queue.drain`.
-    Full,
-    /// Its own name, but a one-term name needs 4 or more letters.
-    Long,
 }
 
 impl Probes {
@@ -70,11 +45,12 @@ impl Probes {
             }
             names.push(name.to_string());
         }
-        for family in ["path-", "exact-name-", "second-chunk"] {
-            let variants = names.iter().filter(|name| name.starts_with(family)).count();
-            if variants > 1 {
-                bail!("MIMIRS_PROBES turns on more than one `{family}` variant");
-            }
+        let path_formats = names
+            .iter()
+            .filter(|name| name.starts_with("path-"))
+            .count();
+        if path_formats > 1 {
+            bail!("MIMIRS_PROBES turns on more than one path format");
         }
         Ok(Self { names })
     }
@@ -83,50 +59,9 @@ impl Probes {
         self.names.iter().any(|known| known == name)
     }
 
-    /// S4: files named by found docs join the source list.
-    pub fn doc_references(&self) -> bool {
-        self.has("doc-references")
-    }
-
-    /// S5: the vector list weighs 0.6 instead of 0.5.
-    pub fn vector_weight(&self) -> bool {
-        self.has("vector-weight")
-    }
-
-    /// S6: a found chunk that alone defines a code identifier in the query
-    /// scores ×1.3.
-    pub fn unique_symbol(&self) -> bool {
-        self.has("unique-symbol")
-    }
-
-    /// S7: a chunk whose name the query contains scores ×1.2.
-    pub fn exact_name(&self) -> Option<ExactName> {
-        if self.has("exact-name-own") {
-            Some(ExactName::Own)
-        } else if self.has("exact-name-full") {
-            Some(ExactName::Full)
-        } else if self.has("exact-name-long") {
-            Some(ExactName::Long)
-        } else {
-            None
-        }
-    }
-
-    /// S8: a file adds a share of its second-best chunk's score: a quarter,
-    /// or a tenth with `second-chunk-10`.
-    pub fn second_chunk(&self) -> Option<f32> {
-        if self.has("second-chunk") {
-            Some(PROBE_SECOND_CHUNK_WEIGHT)
-        } else if self.has("second-chunk-10") {
-            Some(PROBE_SMALL_SECOND_CHUNK_WEIGHT)
-        } else {
-            None
-        }
-    }
-
-    /// S9: chunks in test files score ×0.85.
-    pub fn tests_lower(&self) -> bool {
-        self.has("tests-lower")
+    /// S7: a chunk whose full name the query contains scores ×1.2.
+    pub fn exact_name(&self) -> bool {
+        self.has("exact-name-full")
     }
 
     pub fn path_prefix(&self) -> Option<PathPrefix> {
@@ -169,7 +104,7 @@ mod tests {
     fn unknown_names_and_two_path_formats_are_errors() {
         assert!(Probes::parse("path-terms,typo").is_err());
         assert!(Probes::parse("path-file,path-plain").is_err());
-        assert!(Probes::parse("exact-name-own,exact-name-long").is_err());
+        assert!(Probes::parse("tests-lower").is_err());
     }
 
     #[test]

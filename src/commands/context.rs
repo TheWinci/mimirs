@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -10,8 +10,7 @@ use crate::excerpt::{ShownFile, show_file};
 use crate::keywords;
 use crate::names;
 use crate::probes::Probes;
-use crate::rank::{PROBE_TEST_MULTIPLIER, PROBE_VECTOR_WEIGHT, Signals, rank};
-use crate::references;
+use crate::rank::rank;
 use crate::render::render;
 use crate::store::{Hit, Store};
 
@@ -76,33 +75,19 @@ fn answer(root: &Path, query: &str, budget: usize, max_files: usize) -> anyhow::
     }
     vector_hits.extend(store.vector_scores(&query_vector, &keyword_only)?);
 
-    let mut signals = Signals::default();
-    if probes.vector_weight() {
-        signals.vector_weight = PROBE_VECTOR_WEIGHT;
-    }
-    if let Some(weight) = probes.second_chunk() {
-        signals.second_chunk_weight = weight;
-    }
-    if probes.tests_lower() {
-        signals.test_multiplier = PROBE_TEST_MULTIPLIER;
-    }
     let found_chunks: HashSet<i64> = vector_hits
         .iter()
         .chain(&keyword_hits)
         .map(|hit| hit.chunk_id)
         .collect();
-    if probes.unique_symbol() {
-        names::unique_symbols(query, &found_chunks, &store, &mut signals.chunk_multipliers)?;
-    }
-    if let Some(variant) = probes.exact_name() {
+    let mut chunk_multipliers: HashMap<i64, f32> = HashMap::new();
+    names::unique_symbols(query, &found_chunks, &store, &mut chunk_multipliers)?;
+    if probes.exact_name() {
         let found_ids: Vec<i64> = found_chunks.iter().copied().collect();
         let chunk_names = store.chunk_names(&found_ids)?;
-        names::exact_names(query, &chunk_names, variant, &mut signals.chunk_multipliers);
+        names::exact_names(query, &chunk_names, &mut chunk_multipliers);
     }
-    let mut ranking = rank(vector_hits, keyword_hits, &signals);
-    if probes.doc_references() {
-        references::expand(&mut ranking, &store)?;
-    }
+    let mut ranking = rank(vector_hits, keyword_hits, &chunk_multipliers);
     ranking.files.truncate(max_files);
     ranking.docs.truncate(MAX_DOCS);
     let mut files: Vec<ShownFile> = Vec::new();
