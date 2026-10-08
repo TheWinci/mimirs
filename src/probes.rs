@@ -5,9 +5,10 @@
 use anyhow::{Result, bail};
 
 use crate::keywords;
+use crate::rank::{PROBE_SECOND_CHUNK_WEIGHT, PROBE_SMALL_SECOND_CHUNK_WEIGHT};
 
 /// Every probe name `MIMIRS_PROBES` accepts.
-const KNOWN_PROBES: [&str; 11] = [
+const KNOWN_PROBES: [&str; 12] = [
     "path-file",
     "path-plain",
     "path-terms",
@@ -18,6 +19,7 @@ const KNOWN_PROBES: [&str; 11] = [
     "exact-name-full",
     "exact-name-long",
     "second-chunk",
+    "second-chunk-10",
     "tests-lower",
 ];
 
@@ -68,7 +70,7 @@ impl Probes {
             }
             names.push(name.to_string());
         }
-        for family in ["path-", "exact-name-"] {
+        for family in ["path-", "exact-name-", "second-chunk"] {
             let variants = names.iter().filter(|name| name.starts_with(family)).count();
             if variants > 1 {
                 bail!("MIMIRS_PROBES turns on more than one `{family}` variant");
@@ -110,9 +112,16 @@ impl Probes {
         }
     }
 
-    /// S8: a file adds a quarter of its second-best chunk's score.
-    pub fn second_chunk(&self) -> bool {
-        self.has("second-chunk")
+    /// S8: a file adds a share of its second-best chunk's score: a quarter,
+    /// or a tenth with `second-chunk-10`.
+    pub fn second_chunk(&self) -> Option<f32> {
+        if self.has("second-chunk") {
+            Some(PROBE_SECOND_CHUNK_WEIGHT)
+        } else if self.has("second-chunk-10") {
+            Some(PROBE_SMALL_SECOND_CHUNK_WEIGHT)
+        } else {
+            None
+        }
     }
 
     /// S9: chunks in test files score ×0.85.

@@ -10,9 +10,7 @@ use crate::excerpt::{ShownFile, show_file};
 use crate::keywords;
 use crate::names;
 use crate::probes::Probes;
-use crate::rank::{
-    PROBE_SECOND_CHUNK_WEIGHT, PROBE_TEST_MULTIPLIER, PROBE_VECTOR_WEIGHT, Signals, rank,
-};
+use crate::rank::{PROBE_TEST_MULTIPLIER, PROBE_VECTOR_WEIGHT, Signals, rank};
 use crate::references;
 use crate::render::render;
 use crate::store::{Hit, Store};
@@ -82,8 +80,8 @@ fn answer(root: &Path, query: &str, budget: usize, max_files: usize) -> anyhow::
     if probes.vector_weight() {
         signals.vector_weight = PROBE_VECTOR_WEIGHT;
     }
-    if probes.second_chunk() {
-        signals.second_chunk_weight = PROBE_SECOND_CHUNK_WEIGHT;
+    if let Some(weight) = probes.second_chunk() {
+        signals.second_chunk_weight = weight;
     }
     if probes.tests_lower() {
         signals.test_multiplier = PROBE_TEST_MULTIPLIER;

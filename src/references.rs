@@ -179,7 +179,7 @@ fn clean(value: &str) -> Option<String> {
 }
 
 /// Every source file under its module names: `a/b/c` and `a.b.c` for
-/// `a/b/c.py`, plus `a/b` and `a.b` for `a/b/index.ts`.
+/// `a/b/c.py`, plus `a/b` and `a.b` for `a/b/index.ts` and `a/b/__init__.py`.
 fn module_paths<'a>(source_paths: &HashSet<&'a str>) -> HashMap<String, Vec<&'a str>> {
     let mut sorted: Vec<&str> = source_paths.iter().copied().collect();
     sorted.sort_unstable();
@@ -187,7 +187,10 @@ fn module_paths<'a>(source_paths: &HashSet<&'a str>) -> HashMap<String, Vec<&'a 
     for path in sorted {
         let stem = without_extension(path);
         let mut keys = vec![stem.to_string(), stem.replace('/', ".")];
-        if let Some(parent) = stem.strip_suffix("/index") {
+        let package = stem
+            .strip_suffix("/index")
+            .or_else(|| stem.strip_suffix("/__init__"));
+        if let Some(parent) = package {
             keys.push(parent.to_string());
             keys.push(parent.replace('/', "."));
         }
@@ -228,7 +231,13 @@ fn resolve(
                     .iter()
                     .find(|(definition_path, _)| definition_path == path)
                     .map(|(_, chunk_id)| *chunk_id);
-                return Ok(Some((path.to_string(), chunk)));
+                // A Python package often re-exports a name defined in one of
+                // its modules; look for that module before settling on
+                // `__init__.py`.
+                let is_package = path.ends_with("/__init__.py");
+                if chunk.is_some() || !is_package {
+                    return Ok(Some((path.to_string(), chunk)));
+                }
             }
             let source_definitions: Vec<&(String, i64)> = definitions
                 .iter()
@@ -245,9 +254,9 @@ fn resolve(
                 return Ok(None);
             }
             let dotted_stem = without_extension(path).replace('/', ".");
-            Ok(module
-                .ends_with(&dotted_stem)
-                .then(|| (path.clone(), Some(*chunk_id))))
+            let names_the_file = module.ends_with(&dotted_stem);
+            let inside_the_package = dotted_stem.starts_with(&format!("{module}."));
+            Ok((names_the_file || inside_the_package).then(|| (path.clone(), Some(*chunk_id))))
         }
     }
 }
@@ -341,8 +350,17 @@ mod tests {
 
     #[test]
     fn module_names_cover_dotted_and_index_forms() {
-        let source: HashSet<&str> = ["django/db/state.py", "src/ui/index.ts"].into();
+        let source: HashSet<&str> = [
+            "django/db/state.py",
+            "src/ui/index.ts",
+            "django/db/operations/__init__.py",
+        ]
+        .into();
         let modules = module_paths(&source);
+        assert_eq!(
+            modules["django.db.operations"],
+            ["django/db/operations/__init__.py"]
+        );
         assert_eq!(modules["django.db.state"], ["django/db/state.py"]);
         assert_eq!(modules["django/db/state"], ["django/db/state.py"]);
         assert_eq!(modules["src.ui"], ["src/ui/index.ts"]);

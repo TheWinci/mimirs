@@ -11,6 +11,8 @@ pub const PROBE_VECTOR_WEIGHT: f32 = 0.6;
 /// The share of a file's second-best chunk the S8 probe adds (TS v2's value
 /// with score completion).
 pub const PROBE_SECOND_CHUNK_WEIGHT: f32 = 0.25;
+/// The smaller share a follow-up run tries (TS v2's best without completion).
+pub const PROBE_SMALL_SECOND_CHUNK_WEIGHT: f32 = 0.10;
 /// The factor the S9 probe gives chunks in test files (TS v2's value).
 pub const PROBE_TEST_MULTIPLIER: f32 = 0.85;
 /// Folders that hold tests.
