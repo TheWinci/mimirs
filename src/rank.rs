@@ -10,6 +10,9 @@ const VECTOR_WEIGHT: f32 = 0.5;
 /// split into several matching symbols is not beaten by one strong chunk
 /// (TS v2's value with score completion).
 const SECOND_CHUNK_WEIGHT: f32 = 0.25;
+/// Weight of the whole-file BM25 list, next to 0.5 for each chunk list
+/// (ranking plan D7).
+const FILE_MATCH_WEIGHT: f32 = 0.5;
 /// Factor for chunks in test files, so source files rank first (TS v2's value).
 const TEST_MULTIPLIER: f32 = 0.85;
 /// Folders that hold tests.
@@ -37,13 +40,15 @@ pub struct Ranking {
 
 /// Fuse the nearest windows and the keyword matches by rank, and rank files by
 /// their best fused chunk plus a quarter of their second-best; chunks in test
-/// files count less. Docs get their own list, so they never take a source
-/// file's place.
+/// files count less. A found file also gains by its rank in `file_matches`,
+/// the whole-file keyword matches, best first. Docs get their own list, so
+/// they never take a source file's place.
 /// `chunk_multipliers` scales fused chunk scores by chunk ID before chunks are
 /// grouped into files; chunks not listed keep their score.
 pub fn rank(
     vector_hits: Vec<Hit>,
     keyword_hits: Vec<Hit>,
+    file_matches: &[String],
     chunk_multipliers: &HashMap<i64, f32>,
 ) -> Ranking {
     // Score completion adds hits out of order, so both lists are put in score
@@ -70,6 +75,13 @@ pub fn rank(
         .into_iter()
         .filter_map(|(path, hits)| ranked_file(path, hits))
         .collect();
+    // Only files the chunk lists found gain: a file found by its whole text
+    // alone has no chunk to show.
+    for (position, path) in file_matches.iter().enumerate() {
+        if let Some(file) = files.iter_mut().find(|file| &file.path == path) {
+            file.score += FILE_MATCH_WEIGHT * RANK_CONSTANT / (RANK_CONSTANT + position as f32);
+        }
+    }
     sort_files(&mut files);
     let (docs, files): (Vec<RankedFile>, Vec<RankedFile>) =
         files.into_iter().partition(|file| is_doc(&file.path));
@@ -183,7 +195,7 @@ mod tests {
     }
 
     fn rank_files(vector_hits: Vec<Hit>, keyword_hits: Vec<Hit>) -> Vec<RankedFile> {
-        rank(vector_hits, keyword_hits, &HashMap::new()).files
+        rank(vector_hits, keyword_hits, &[], &HashMap::new()).files
     }
 
     fn paths(files: &[RankedFile]) -> Vec<&str> {
@@ -213,6 +225,7 @@ mod tests {
                 hit("src/b.rs", 4, 0.6),
             ],
             Vec::new(),
+            &[],
             &HashMap::new(),
         );
         assert_eq!(paths(&ranking.files), ["src/a.rs", "src/b.rs"]);
@@ -224,6 +237,7 @@ mod tests {
         let ranking = rank(
             vec![hit("a.rs", 1, 0.9), hit("b.rs", 2, 0.8)],
             Vec::new(),
+            &[],
             &HashMap::from([(2, 1.3)]),
         );
         assert_eq!(paths(&ranking.files), ["b.rs", "a.rs"]);
@@ -273,6 +287,17 @@ mod tests {
         ] {
             assert!(!is_test(path), "{path}");
         }
+    }
+
+    #[test]
+    fn whole_file_matches_lift_found_files_only() {
+        let ranking = rank(
+            vec![hit("a.rs", 1, 0.9), hit("b.rs", 2, 0.8)],
+            Vec::new(),
+            &["b.rs".to_string(), "c.rs".to_string()],
+            &HashMap::new(),
+        );
+        assert_eq!(paths(&ranking.files), ["b.rs", "a.rs"]);
     }
 
     #[test]

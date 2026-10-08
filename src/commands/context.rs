@@ -9,7 +9,6 @@ use crate::embed::{self, Embedder};
 use crate::excerpt::{ShownFile, show_file};
 use crate::keywords;
 use crate::names;
-use crate::probes::Probes;
 use crate::rank::rank;
 use crate::render::render;
 use crate::store::{Hit, Store};
@@ -18,6 +17,8 @@ use crate::store::{Hit, Store};
 const NEAREST_WINDOWS: usize = 200;
 /// Keyword matches fused with the nearest windows.
 const KEYWORD_CHUNKS: usize = 200;
+/// Whole-file keyword matches that can lift a found file.
+const FILE_MATCHES: usize = 200;
 /// Most docs in the doc map, after the source files.
 const MAX_DOCS: usize = 5;
 
@@ -47,7 +48,6 @@ pub fn run(options: Options) -> anyhow::Result<()> {
 /// Search the project's index for `query` and render the file map and excerpts.
 /// Reads only what is committed; it never indexes or waits for an index run.
 fn answer(root: &Path, query: &str, budget: usize, max_files: usize) -> anyhow::Result<String> {
-    let probes = Probes::from_env()?;
     let store = Store::open_existing(&root.join(".mimirs/index.db"))?;
     anyhow::ensure!(
         store.file_count()? > 0,
@@ -82,12 +82,14 @@ fn answer(root: &Path, query: &str, budget: usize, max_files: usize) -> anyhow::
         .collect();
     let mut chunk_multipliers: HashMap<i64, f32> = HashMap::new();
     names::unique_symbols(query, &found_chunks, &store, &mut chunk_multipliers)?;
-    if probes.exact_name() {
-        let found_ids: Vec<i64> = found_chunks.iter().copied().collect();
-        let chunk_names = store.chunk_names(&found_ids)?;
-        names::exact_names(query, &chunk_names, &mut chunk_multipliers);
-    }
-    let mut ranking = rank(vector_hits, keyword_hits, &chunk_multipliers);
+    let found_ids: Vec<i64> = found_chunks.iter().copied().collect();
+    let chunk_names = store.chunk_names(&found_ids)?;
+    names::exact_names(query, &chunk_names, &mut chunk_multipliers);
+    let file_matches = match &expression {
+        Some(expression) => store.file_matches(expression, FILE_MATCHES)?,
+        None => Vec::new(),
+    };
+    let mut ranking = rank(vector_hits, keyword_hits, &file_matches, &chunk_multipliers);
     ranking.files.truncate(max_files);
     ranking.docs.truncate(MAX_DOCS);
     let mut files: Vec<ShownFile> = Vec::new();
@@ -161,7 +163,7 @@ mod tests {
             root.join("docs/garden.md"),
             "# Garden\n\nWater the tomatoes every morning.\n",
         )?;
-        crate::indexing::index_project(root, None)?;
+        crate::indexing::index_project(root)?;
 
         let output = answer(root, "renew an expiring login token", 16_000, 20)?;
         let map = output

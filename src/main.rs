@@ -11,7 +11,6 @@ mod files;
 mod indexing;
 mod keywords;
 mod names;
-mod probes;
 mod rank;
 mod render;
 mod store;

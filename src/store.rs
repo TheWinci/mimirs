@@ -13,7 +13,7 @@ use crate::keywords;
 
 /// Bump whenever the tables, the model, the tokenizer, or the chunking rules
 /// change, so `index` rebuilds instead of mixing old and new data.
-const SCHEMA_VERSION: i64 = 5;
+const SCHEMA_VERSION: i64 = 6;
 
 const LAST_RUN_KEY: &str = "last_index_finished";
 
@@ -235,6 +235,21 @@ impl Store {
         Ok(names)
     }
 
+    /// The paths of the `limit` files whose whole text best matches an FTS5
+    /// `expression` by BM25, best first. Weights per column: path 2, text 1.
+    pub fn file_matches(&self, expression: &str, limit: usize) -> Result<Vec<String>> {
+        let mut statement = self.connection.prepare(
+            "SELECT files.path
+             FROM file_terms
+             JOIN files ON files.id = file_terms.rowid
+             WHERE file_terms MATCH ?1
+             ORDER BY bm25(file_terms, 2.0, 1.0), files.id
+             LIMIT ?2",
+        )?;
+        let rows = statement.query_map(params![expression, limit as i64], |row| row.get(0))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
     /// The `limit` chunks that best match an FTS5 `expression` by BM25, best first.
     pub fn keyword_matches(&self, expression: &str, limit: usize) -> Result<Vec<Hit>> {
         // Weights per column: path 2, name 3, text 1. bm25() is lower for better
@@ -283,6 +298,10 @@ impl Store {
         let file_id = transaction.last_insert_rowid();
 
         let path_terms = keywords::terms(file.path).join(" ");
+        transaction.execute(
+            "INSERT INTO file_terms (rowid, path, text) VALUES (?1, ?2, ?3)",
+            params![file_id, path_terms, keywords::terms(text).join(" ")],
+        )?;
         // The database ID of each chunk written so far, by its index in `chunks`.
         let mut chunk_ids: Vec<i64> = Vec::new();
         for (index, (chunk, vectors)) in chunks.iter().zip(vectors_per_chunk).enumerate() {
@@ -454,6 +473,10 @@ fn delete_file(transaction: &Transaction, path: &str) -> Result<()> {
              WHERE files.path = ?1)",
         [path],
     )?;
+    transaction.execute(
+        "DELETE FROM file_terms WHERE rowid IN (SELECT id FROM files WHERE path = ?1)",
+        [path],
+    )?;
     transaction.execute("DELETE FROM files WHERE path = ?1", [path])?;
     Ok(())
 }
@@ -496,6 +519,10 @@ fn create_schema(connection: &Connection) -> Result<()> {
          -- Contentless: holds only the search index; the text lives in chunks.
          CREATE VIRTUAL TABLE chunk_terms USING fts5 (
              path, name, text, content = '', contentless_delete = 1
+         );
+         -- One row per file: its path and whole text, for whole-file BM25.
+         CREATE VIRTUAL TABLE file_terms USING fts5 (
+             path, text, content = '', contentless_delete = 1
          );
          CREATE TABLE meta (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
          PRAGMA user_version = {SCHEMA_VERSION};"
@@ -761,6 +788,29 @@ mod tests {
             .map(|name| name.full.as_str())
             .collect();
         assert_eq!(full_names, ["Queue", "Queue.drain"]);
+        Ok(())
+    }
+
+    #[test]
+    fn file_matches_follow_whole_files_and_forget_removed_ones() -> Result<()> {
+        let folder = tempfile::tempdir()?;
+        let mut store = Store::open(&folder.path().join("index.db"))?;
+        write(
+            &mut store,
+            "src/queue.rs",
+            "fn push() {}\nfn drain() {}\n",
+            1,
+            0,
+        )?;
+        write(&mut store, "src/drain.rs", "fn other() {}\n", 1, 0)?;
+        write(&mut store, "src/cook.rs", "fn boil() {}\n", 1, 0)?;
+        assert_eq!(
+            store.file_matches("\"drain\"", 10)?,
+            ["src/drain.rs", "src/queue.rs"]
+        );
+        store.remove_files_except(&HashSet::from(["src/cook.rs".to_string()]))?;
+        assert!(store.file_matches("\"drain\"", 10)?.is_empty());
+        assert_eq!(count(&store, "file_terms")?, 1);
         Ok(())
     }
 

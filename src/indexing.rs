@@ -13,8 +13,14 @@ use crate::config::Config;
 use crate::discover::{DiscoveredFile, Discovery, discover};
 use crate::embed::{self, Embedder, ModelInstance};
 use crate::files::read::read_text;
-use crate::probes::PathPrefix;
+use crate::keywords;
 use crate::store::{FileRecord, Store};
+
+/// Share of the file's path vector added to each of its window vectors, so
+/// search finds code by the subsystem its path names (ranking plan D7).
+const PATH_WEIGHT: f32 = 0.5;
+/// Share of the chunk's path-and-name vector added to each of its windows.
+const SYMBOL_WEIGHT: f32 = 0.25;
 
 /// What one `index` run did.
 #[derive(Default)]
@@ -29,7 +35,9 @@ pub struct Summary {
     pub unreadable: usize,
 }
 
-/// A file read and chunked, waiting for its vectors.
+/// A file read and chunked, waiting for its vectors. Its embedding jobs are
+/// its windows in chunk order, then its path terms, then one label per chunk
+/// (see `labels`).
 struct PreparedFile {
     path: String,
     size: u64,
@@ -44,9 +52,14 @@ impl PreparedFile {
     fn window_count(&self) -> usize {
         self.window_counts.iter().sum()
     }
+
+    fn job_count(&self) -> usize {
+        self.window_count() + 1 + self.chunks.len()
+    }
 }
 
-/// One window for a model to embed, tagged with its file and position.
+/// One text for a model to embed, a window or a label, tagged with its file
+/// and its position among the file's jobs.
 struct WindowJob {
     file: usize,
     window: usize,
@@ -78,9 +91,7 @@ enum Event {
 /// One thread reads and chunks files and queues their windows; each model
 /// instance takes the next window as soon as it is free; this thread writes a
 /// file once all of its vectors have arrived.
-/// With `path_prefix`, every window starts with its file's path in that
-/// format (ranking plan S3).
-pub fn index_project(root: &Path, path_prefix: Option<PathPrefix>) -> Result<Summary> {
+pub fn index_project(root: &Path) -> Result<Summary> {
     let config = Config::load(&root.join(".mimirs/config.toml"))?;
     let model_files = embed::cached_files(&embed::cache_dir()?)
         .context("The embedding model is not downloaded; run `mimirs init` first")?;
@@ -115,7 +126,6 @@ pub fn index_project(root: &Path, path_prefix: Option<PathPrefix>) -> Result<Sum
                 files,
                 known_files,
                 tokenizer,
-                path_prefix,
                 job_sender,
                 preparer_events,
             )
@@ -145,13 +155,12 @@ fn prepare_files(
     files: &[DiscoveredFile],
     known_files: &HashMap<String, (u64, i64)>,
     tokenizer: &Tokenizer,
-    path_prefix: Option<PathPrefix>,
     jobs: Sender<WindowJob>,
     events: Sender<Event>,
 ) {
     for (file_number, file) in files.iter().enumerate() {
         let path = stored_path(file);
-        let mut window_texts: Vec<String> = Vec::new();
+        let mut job_texts: Vec<String> = Vec::new();
         let event = if is_unchanged(known_files.get(&path), file) {
             Event::Unchanged
         } else {
@@ -163,9 +172,9 @@ fn prepare_files(
                     path: file.path.clone(),
                     error: error.to_string(),
                 },
-                Ok(Some(text)) => match prepare(path, text, file, tokenizer, path_prefix) {
+                Ok(Some(text)) => match prepare(path, text, file, tokenizer) {
                     Ok((prepared, texts)) => {
-                        window_texts = texts;
+                        job_texts = texts;
                         Event::Prepared {
                             file: file_number,
                             prepared,
@@ -181,7 +190,7 @@ fn prepare_files(
         if events.send(event).is_err() || failed {
             return;
         }
-        for (window, text) in window_texts.into_iter().enumerate() {
+        for (window, text) in job_texts.into_iter().enumerate() {
             let job = WindowJob {
                 file: file_number,
                 window,
@@ -195,20 +204,16 @@ fn prepare_files(
 }
 
 /// Chunk a file's text and cut its chunks into windows, returning the prepared
-/// file and every window's text in order.
+/// file and the texts of its embedding jobs in order.
 fn prepare(
     path: String,
     text: String,
     file: &DiscoveredFile,
     tokenizer: &Tokenizer,
-    path_prefix: Option<PathPrefix>,
 ) -> Result<(PreparedFile, Vec<String>)> {
     let chunks = chunk::chunk_file(&path, &text)?;
-    let prefix = match path_prefix {
-        Some(format) => format.line(&path),
-        None => String::new(),
-    };
-    let (window_counts, window_texts) = cut_windows(&text, &chunks, &prefix, tokenizer)?;
+    let (window_counts, mut job_texts) = cut_windows(&text, &chunks, tokenizer)?;
+    job_texts.extend(labels(&path, &chunks));
     let prepared = PreparedFile {
         path,
         size: file.size,
@@ -217,24 +222,58 @@ fn prepare(
         chunks,
         window_counts,
     };
-    Ok((prepared, window_texts))
+    Ok((prepared, job_texts))
 }
 
-/// Cut each chunk's own text into windows that start with `prefix`, returning
-/// how many windows each chunk has and every window's text in order.
+/// The texts blended into a file's window vectors: first its path terms
+/// (`src search hybrid ts`), then for each chunk its path and full name
+/// (`src/queue.ts > Queue.drain`), or the path alone when it has no name.
+fn labels(path: &str, chunks: &[Chunk]) -> Vec<String> {
+    let mut labels = vec![keywords::terms(path).join(" ")];
+    for index in 0..chunks.len() {
+        let label = match chunk::full_name(chunks, index) {
+            Some(name) => format!("{path} > {name}"),
+            None => path.to_string(),
+        };
+        labels.push(label);
+    }
+    labels
+}
+
+/// normalize(window + PATH_WEIGHT · path + SYMBOL_WEIGHT · symbol): the
+/// window's own meaning, pulled toward what its path and name say.
+fn blend(window: &[f32], path: &[f32], symbol: &[f32]) -> Vec<f32> {
+    let mut blended: Vec<f32> = window
+        .iter()
+        .zip(path)
+        .zip(symbol)
+        .map(|((window, path), symbol)| window + PATH_WEIGHT * path + SYMBOL_WEIGHT * symbol)
+        .collect();
+    let length = blended
+        .iter()
+        .map(|value| value * value)
+        .sum::<f32>()
+        .sqrt();
+    for value in &mut blended {
+        *value /= length;
+    }
+    blended
+}
+
+/// Cut each chunk's own text into windows, returning how many windows each
+/// chunk has and every window's text in order.
 fn cut_windows(
     text: &str,
     chunks: &[Chunk],
-    prefix: &str,
     tokenizer: &Tokenizer,
 ) -> Result<(Vec<usize>, Vec<String>)> {
     let mut window_counts = Vec::new();
     let mut texts = Vec::new();
     for index in 0..chunks.len() {
         let own_text = chunk::own_text(text, chunks, index);
-        let windows = embed::windows(&own_text, prefix, tokenizer)?;
+        let windows = embed::windows(&own_text, tokenizer)?;
         window_counts.push(windows.len());
-        texts.extend(windows);
+        texts.extend(windows.into_iter().map(str::to_string));
     }
     Ok((window_counts, texts))
 }
@@ -292,13 +331,13 @@ fn write_files(
     for event in events {
         let completed = match event {
             Event::Prepared { file, prepared } => {
-                let window_count = prepared.window_count();
+                let job_count = prepared.job_count();
                 pending.insert(
                     file,
                     PendingFile {
                         prepared,
-                        vectors: vec![None; window_count],
-                        missing: window_count,
+                        vectors: vec![None; job_count],
+                        missing: job_count,
                     },
                 );
                 Some(file)
@@ -349,9 +388,21 @@ fn write_files(
             continue;
         };
         let mut vectors = done.vectors.into_iter().flatten();
+        let window_vectors: Vec<Vec<f32>> = vectors
+            .by_ref()
+            .take(done.prepared.window_count())
+            .collect();
+        let path_vector = vectors.next().context("A file's path vector is missing")?;
+        let symbol_vectors: Vec<Vec<f32>> = vectors.collect();
+        let mut window_vectors = window_vectors.into_iter();
         let mut vectors_per_chunk: Vec<Vec<Vec<f32>>> = Vec::new();
-        for &count in &done.prepared.window_counts {
-            vectors_per_chunk.push(vectors.by_ref().take(count).collect());
+        for (count, symbol_vector) in done.prepared.window_counts.iter().zip(&symbol_vectors) {
+            let blended = window_vectors
+                .by_ref()
+                .take(*count)
+                .map(|window| blend(&window, &path_vector, symbol_vector))
+                .collect();
+            vectors_per_chunk.push(blended);
         }
         let record = FileRecord {
             path: &done.prepared.path,
@@ -443,7 +494,7 @@ mod tests {
         fs::write(root.join("src/token.rs"), "fn refresh_token() {}\n")?;
         fs::write(root.join("README.md"), "# Example\n\nA small project.\n")?;
 
-        index_project(root, None)?;
+        index_project(root)?;
 
         let database = Connection::open(root.join(".mimirs/index.db"))?;
         let count = |table: &str| -> anyhow::Result<i64> {
@@ -457,6 +508,36 @@ mod tests {
         assert_eq!(count("chunks")?, 2);
         assert_eq!(count("window_vectors")?, count("windows")?);
         Ok(())
+    }
+
+    #[test]
+    fn labels_are_the_path_terms_then_each_chunk_s_path_and_name() -> Result<()> {
+        let text = "class Queue {\n  drain() {}\n}\nconsole.log(1);\n";
+        let chunks = chunk::chunk_file("src/queue.ts", text)?;
+        let labels = labels("src/queue.ts", &chunks);
+        assert_eq!(labels[0], "src queue ts");
+        assert_eq!(labels.len(), chunks.len() + 1);
+        assert!(labels.contains(&"src/queue.ts > Queue.drain".to_string()));
+        assert!(labels.contains(&"src/queue.ts".to_string()));
+        Ok(())
+    }
+
+    #[test]
+    fn a_blend_is_unit_length_and_leans_toward_the_path() {
+        let axis = |index: usize| {
+            let mut vector = vec![0.0; 3];
+            vector[index] = 1.0;
+            vector
+        };
+        let blended = blend(&axis(0), &axis(1), &axis(2));
+        let length: f32 = blended
+            .iter()
+            .map(|value| value * value)
+            .sum::<f32>()
+            .sqrt();
+        assert!((length - 1.0).abs() < 1e-6);
+        assert!(blended[0] > blended[1] && blended[1] > blended[2]);
+        assert!((blended[1] / blended[0] - PATH_WEIGHT).abs() < 1e-6);
     }
 
     #[test]
@@ -520,20 +601,20 @@ mod tests {
         fs::write(root.join("src/a.rs"), "fn a() {}\n")?;
         fs::write(root.join("src/b.rs"), "fn b() {}\n")?;
         fs::write(root.join("src/c.rs"), "fn c() {}\n")?;
-        assert_eq!(index_project(root, None)?.files, 3);
+        assert_eq!(index_project(root)?.files, 3);
 
-        let second = index_project(root, None)?;
+        let second = index_project(root)?;
         assert_eq!((second.files, second.unchanged, second.removed), (0, 3, 0));
 
         fs::write(root.join("src/a.rs"), "fn a() { println!(\"edited\"); }\n")?;
         fs::remove_file(root.join("src/b.rs"))?;
-        let third = index_project(root, None)?;
+        let third = index_project(root)?;
         assert_eq!((third.files, third.unchanged, third.removed), (1, 1, 1));
 
         let mut config = Config::default();
         config.exclude.push("src/c.rs".into());
         fs::write(root.join(".mimirs/config.toml"), config.to_toml()?)?;
-        let fourth = index_project(root, None)?;
+        let fourth = index_project(root)?;
         assert_eq!((fourth.files, fourth.unchanged, fourth.removed), (0, 1, 1));
         Ok(())
     }
