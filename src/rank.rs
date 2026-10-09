@@ -10,9 +10,10 @@ const VECTOR_WEIGHT: f32 = 0.5;
 /// split into several matching symbols is not beaten by one strong chunk
 /// (TS v2's value with score completion).
 const SECOND_CHUNK_WEIGHT: f32 = 0.25;
-/// Weight of the whole-file BM25 list, next to 0.5 for each chunk list
-/// (ranking plan D7).
-const FILE_MATCH_WEIGHT: f32 = 0.5;
+/// Weight of the whole-file BM25 list, next to 0.5 for each chunk list.
+/// 0.25 rather than 0.5: more correct files in the top 5 and fewer queries
+/// with none in the top 10, for a slightly lower first-place rate.
+const FILE_MATCH_WEIGHT: f32 = 0.25;
 /// Factor for chunks in test files, so source files rank first (TS v2's value).
 const TEST_MULTIPLIER: f32 = 0.85;
 /// Folders that hold tests.
