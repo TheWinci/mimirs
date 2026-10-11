@@ -429,6 +429,16 @@ impl Store {
     }
 
     /// Delete every file whose path is not in `keep`, returning how many were removed.
+    /// Remove the given files and their chunks and vectors in one transaction.
+    pub fn remove_files(&mut self, paths: &[String]) -> Result<()> {
+        let transaction = self.connection.transaction()?;
+        for path in paths {
+            delete_file(&transaction, path)?;
+        }
+        transaction.commit()?;
+        Ok(())
+    }
+
     pub fn remove_files_except(&mut self, keep: &HashSet<String>) -> Result<usize> {
         let stored_paths: Vec<String> = self.file_states()?.into_keys().collect();
         let transaction = self.connection.transaction()?;

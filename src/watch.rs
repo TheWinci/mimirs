@@ -12,8 +12,8 @@ use crate::discover::{excluded_dir_set, glob_set};
 /// What the writer hears from the file watcher.
 #[derive(Debug, PartialEq)]
 pub enum Change {
-    /// A project path that may be indexed changed.
-    Files,
+    /// A project path that may be indexed changed. Relative to the root.
+    Path(PathBuf),
     /// The watcher lost events, so any file may have changed.
     Lost,
     /// `.mimirs/config.toml` changed; applying it needs a restart.
@@ -34,7 +34,7 @@ pub fn watch(root: &Path, config: &Config, changes: Sender<Change>) -> Result<Re
     let mut watcher = notify::recommended_watcher(move |result: notify::Result<Event>| {
         match result {
             Ok(event) => {
-                if let Some(change) = filter.classify(&event) {
+                for change in filter.classify(&event) {
                     // The writer only stops when the process ends.
                     let _ = changes.send(change);
                 }
@@ -77,26 +77,23 @@ struct Filter {
 }
 
 impl Filter {
-    fn classify(&self, event: &Event) -> Option<Change> {
+    /// The changes one event means. A rename names both of its paths.
+    fn classify(&self, event: &Event) -> Vec<Change> {
         // Lost-event signals often carry no path.
         if event.need_rescan() {
-            return Some(Change::Lost);
+            return vec![Change::Lost];
         }
         // Our own walks and reads open files; only a finished write is a change.
         if let EventKind::Access(kind) = event.kind
             && kind != AccessKind::Close(AccessMode::Write)
         {
-            return None;
+            return Vec::new();
         }
-        let mut change = None;
-        for path in &event.paths {
-            match self.path_change(path) {
-                Some(Change::Files) => return Some(Change::Files),
-                Some(other) => change = Some(other),
-                None => {}
-            }
-        }
-        change
+        event
+            .paths
+            .iter()
+            .filter_map(|path| self.path_change(path))
+            .collect()
     }
 
     fn path_change(&self, path: &Path) -> Option<Change> {
@@ -112,14 +109,14 @@ impl Filter {
         if self.exclude.is_match(relative_path) || self.excluded_dirs.is_match(relative_path) {
             return None;
         }
-        Some(Change::Files)
+        Some(Change::Path(relative_path.to_path_buf()))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use notify::event::{CreateKind, Flag, ModifyKind};
+    use notify::event::{CreateKind, Flag, ModifyKind, RenameMode};
 
     fn filter() -> Result<Filter> {
         let exclude = vec![".git/**".to_string(), "**/node_modules/**".to_string()];
@@ -140,17 +137,26 @@ mod tests {
         let edit = EventKind::Modify(ModifyKind::Any);
         assert_eq!(
             filter.classify(&event(edit, "/project/src/main.rs")),
-            Some(Change::Files)
+            [Change::Path("src/main.rs".into())]
         );
         let created = EventKind::Create(CreateKind::Folder);
         assert_eq!(
             filter.classify(&event(created, "/project/lib")),
-            Some(Change::Files)
+            [Change::Path("lib".into())]
         );
         let written = EventKind::Access(AccessKind::Close(AccessMode::Write));
         assert_eq!(
             filter.classify(&event(written, "/project/src/main.rs")),
-            Some(Change::Files)
+            [Change::Path("src/main.rs".into())]
+        );
+        let renamed = event(
+            EventKind::Modify(ModifyKind::Name(RenameMode::Both)),
+            "/project/old.rs",
+        )
+        .add_path(PathBuf::from("/project/new.rs"));
+        assert_eq!(
+            filter.classify(&renamed),
+            [Change::Path("old.rs".into()), Change::Path("new.rs".into())]
         );
         Ok(())
     }
@@ -159,9 +165,10 @@ mod tests {
     fn drops_reads_excludes_and_the_index() -> Result<()> {
         let filter = filter()?;
         let opened = EventKind::Access(AccessKind::Open(AccessMode::Any));
-        assert_eq!(
-            filter.classify(&event(opened, "/project/src/main.rs")),
-            None
+        assert!(
+            filter
+                .classify(&event(opened, "/project/src/main.rs"))
+                .is_empty()
         );
         let edit = EventKind::Modify(ModifyKind::Any);
         for path in [
@@ -171,7 +178,7 @@ mod tests {
             "/project/.mimirs/index.db-wal",
             "/elsewhere/main.rs",
         ] {
-            assert_eq!(filter.classify(&event(edit, path)), None, "{path}");
+            assert!(filter.classify(&event(edit, path)).is_empty(), "{path}");
         }
         Ok(())
     }
@@ -182,10 +189,10 @@ mod tests {
         let edit = EventKind::Modify(ModifyKind::Any);
         assert_eq!(
             filter.classify(&event(edit, "/project/.mimirs/config.toml")),
-            Some(Change::Config)
+            [Change::Config]
         );
         let lost = Event::new(EventKind::Other).set_flag(Flag::Rescan);
-        assert_eq!(filter.classify(&lost), Some(Change::Lost));
+        assert_eq!(filter.classify(&lost), [Change::Lost]);
         Ok(())
     }
 }

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::thread;
@@ -83,15 +84,24 @@ fn write_index(root: &Path) -> anyhow::Result<()> {
     report(&summary);
 
     let mut next_timed_catch_up = Instant::now() + TIMED_CATCH_UP;
-    let mut quiet_until: Option<Instant> = None;
+    // Each changed path waits for its own quiet period.
+    let mut pending_paths: HashMap<PathBuf, Instant> = HashMap::new();
+    let mut catch_up_after: Option<Instant> = None;
     let mut config_notice_at: Option<Instant> = None;
     loop {
-        let deadline = match quiet_until {
-            Some(quiet_until) => quiet_until.min(next_timed_catch_up),
-            None => next_timed_catch_up,
+        // A pending catch-up covers every path, so paths do not wake the loop then.
+        let deadline = match catch_up_after {
+            Some(catch_up_after) => catch_up_after.min(next_timed_catch_up),
+            None => pending_paths
+                .values()
+                .copied()
+                .fold(next_timed_catch_up, Instant::min),
         };
         match changes.recv_timeout(deadline.saturating_duration_since(Instant::now())) {
-            Ok(Change::Files | Change::Lost) => quiet_until = Some(Instant::now() + QUIET),
+            Ok(Change::Path(path)) => {
+                pending_paths.insert(path, Instant::now() + QUIET);
+            }
+            Ok(Change::Lost) => catch_up_after = Some(Instant::now() + QUIET),
             Ok(Change::Config) => {
                 // One save fires several events; say it once.
                 if config_notice_at.is_none_or(|at| at.elapsed() > Duration::from_secs(1)) {
@@ -101,22 +111,45 @@ fn write_index(root: &Path) -> anyhow::Result<()> {
             }
             Err(RecvTimeoutError::Timeout) => {
                 let now = Instant::now();
-                if now >= next_timed_catch_up {
+                let timed = now >= next_timed_catch_up;
+                if timed {
                     // A fixed schedule, so a file that never stops changing
                     // cannot hold off every catch-up.
                     next_timed_catch_up += TIMED_CATCH_UP;
-                } else if quiet_until.is_none_or(|quiet_until| now < quiet_until) {
-                    continue;
                 }
-                quiet_until = None;
+                let catch_up_due = timed || catch_up_after.is_some_and(|at| now >= at);
+                if !catch_up_due {
+                    if catch_up_after.is_some() {
+                        continue;
+                    }
+                    let due_paths: Vec<PathBuf> = pending_paths
+                        .extract_if(|_, quiet_until| *quiet_until <= now)
+                        .map(|(path, _)| path)
+                        .collect();
+                    if due_paths.is_empty() {
+                        continue;
+                    }
+                    if let Some(summary) = indexer.update_paths(&due_paths)? {
+                        report_changes(&summary);
+                        continue;
+                    }
+                }
+                // The full walk covers every path still waiting.
+                pending_paths.clear();
+                catch_up_after = None;
                 let summary = indexer.catch_up()?;
-                // The timed catch-up usually finds nothing; stay quiet then.
-                if summary.files > 0 || summary.removed > 0 {
-                    report(&summary);
-                }
+                report_changes(&summary);
             }
             Err(RecvTimeoutError::Disconnected) => anyhow::bail!("the file watcher stopped"),
         }
+    }
+}
+
+/// Report a catch-up or update only when it changed the index; the timed
+/// catch-up usually finds nothing.
+fn report_changes(summary: &Summary) {
+    if summary.files > 0 || summary.removed > 0 {
+        report(summary);
     }
 }
 

@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
-use std::io::{IsTerminal, Write};
+use std::fs;
+use std::io::{self, IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
@@ -10,7 +11,7 @@ use tokenizers::Tokenizer;
 
 use crate::chunk::{self, Chunk};
 use crate::config::Config;
-use crate::discover::{DiscoveredFile, Discovery, discover};
+use crate::discover::{DiscoveredFile, Discovery, PathMatcher, discover};
 use crate::embed::{self, Embedder, ModelInstance};
 use crate::files::read::read_text;
 use crate::keywords;
@@ -98,6 +99,19 @@ pub struct Indexer {
     config: Config,
     tokenizer: Tokenizer,
     embedder: Embedder,
+    matcher: PathMatcher,
+}
+
+/// What the files named by watcher events need.
+enum PathUpdate {
+    /// Index these files if they changed, and remove these stored paths.
+    Files {
+        changed: Vec<DiscoveredFile>,
+        gone: Vec<String>,
+    },
+    /// A folder or an ignore file changed; only a full walk can tell what that
+    /// means.
+    CatchUp,
 }
 
 impl Indexer {
@@ -107,11 +121,13 @@ impl Indexer {
             .context("The embedding model is not downloaded; run `mimirs init` first")?;
         let tokenizer = embed::load_tokenizer(&model_files.tokenizer)?;
         let embedder = Embedder::load(&model_files, config.threads)?;
+        let matcher = PathMatcher::new(root, &config)?;
         Ok(Self {
             root: root.to_path_buf(),
             config,
             tokenizer,
             embedder,
+            matcher,
         })
     }
 
@@ -120,21 +136,12 @@ impl Indexer {
     }
 
     /// Walk the project and index what changed since the last run.
-    ///
-    /// One thread reads and chunks files and queues their windows; each model
-    /// instance takes the next window as soon as it is free; this thread writes
-    /// a file once all of its vectors have arrived.
     pub fn catch_up(&mut self) -> Result<Summary> {
-        let Indexer {
-            root,
-            config,
-            tokenizer,
-            embedder,
-        } = self;
-        let root = root.as_path();
-        let mut store = Store::open(&root.join(".mimirs/index.db"))?;
+        let mut store = Store::open(&self.root.join(".mimirs/index.db"))?;
+        // The walk reads every ignore file afresh; the matcher must agree with it.
+        self.matcher = PathMatcher::new(&self.root, &self.config)?;
 
-        let discovery = discover(root, config)?;
+        let discovery = discover(&self.root, &self.config)?;
         for error in &discovery.errors {
             eprintln!("{error}");
         }
@@ -143,7 +150,52 @@ impl Indexer {
             too_large: discovery.skipped_too_large,
             ..Summary::default()
         };
+        self.index_files(&discovery.files, &known_files, &mut store, &mut summary)?;
 
+        if walk_found_everything(&discovery) {
+            let found_paths: HashSet<String> = discovery
+                .files
+                .iter()
+                .map(|file| stored_path(&file.path))
+                .collect();
+            summary.removed = store.remove_files_except(&found_paths)?;
+        }
+        store.record_finished_run()?;
+        Ok(summary)
+    }
+
+    /// Bring just the given project paths up to date. Returns `None` when they
+    /// need a full catch-up instead.
+    pub fn update_paths(&mut self, relative_paths: &[PathBuf]) -> Result<Option<Summary>> {
+        let mut store = Store::open(&self.root.join(".mimirs/index.db"))?;
+        let known_files = store.file_states()?;
+        let (changed, gone) =
+            match classify_paths(&self.root, relative_paths, &known_files, &mut self.matcher)? {
+                PathUpdate::Files { changed, gone } => (changed, gone),
+                PathUpdate::CatchUp => return Ok(None),
+            };
+
+        let mut summary = Summary::default();
+        self.index_files(&changed, &known_files, &mut store, &mut summary)?;
+        store.remove_files(&gone)?;
+        summary.removed = gone.len();
+        Ok(Some(summary))
+    }
+
+    /// Index each of `files` that differs from its record.
+    ///
+    /// One thread reads and chunks files and queues their windows; each model
+    /// instance takes the next window as soon as it is free; this thread writes
+    /// a file once all of its vectors have arrived.
+    fn index_files(
+        &mut self,
+        files: &[DiscoveredFile],
+        known_files: &HashMap<String, (u64, i64)>,
+        store: &mut Store,
+        summary: &mut Summary,
+    ) -> Result<()> {
+        let root = self.root.as_path();
+        let tokenizer = &self.tokenizer;
         // Unbounded for now, to measure how far reading runs ahead of embedding.
         let (job_sender, job_receiver) = mpsc::channel();
         // The model threads own the receiver, so once they all stop, queueing fails
@@ -151,9 +203,6 @@ impl Indexer {
         let job_receiver = Arc::new(Mutex::new(job_receiver));
         let (event_sender, event_receiver) = mpsc::channel();
         thread::scope(|scope| {
-            let files = &discovery.files;
-            let known_files = &known_files;
-            let tokenizer = &*tokenizer;
             let preparer_events = event_sender.clone();
             scope.spawn(move || {
                 prepare_files(
@@ -165,23 +214,60 @@ impl Indexer {
                     preparer_events,
                 )
             });
-            for instance in embedder.instances() {
+            for instance in self.embedder.instances() {
                 let jobs = Arc::clone(&job_receiver);
                 let events = event_sender.clone();
                 scope.spawn(move || embed_windows(instance, jobs, events));
             }
             drop(job_receiver);
             drop(event_sender);
-            write_files(event_receiver, &mut store, files.len(), &mut summary)
-        })?;
-
-        if walk_found_everything(&discovery) {
-            let found_paths: HashSet<String> = discovery.files.iter().map(stored_path).collect();
-            summary.removed = store.remove_files_except(&found_paths)?;
-        }
-        store.record_finished_run()?;
-        Ok(summary)
+            write_files(event_receiver, store, files.len(), summary)
+        })
     }
+}
+
+/// Decide what each path named by a watcher event needs, from what is on disk
+/// now. Files are checked alone; a folder or an ignore file needs a full walk.
+fn classify_paths(
+    root: &Path,
+    relative_paths: &[PathBuf],
+    known_files: &HashMap<String, (u64, i64)>,
+    matcher: &mut PathMatcher,
+) -> Result<PathUpdate> {
+    let mut changed = Vec::new();
+    let mut gone = Vec::new();
+    for relative_path in relative_paths {
+        let is_ignore_file = relative_path
+            .file_name()
+            .is_some_and(|name| name == ".gitignore" || name == ".ignore");
+        if is_ignore_file {
+            return Ok(PathUpdate::CatchUp);
+        }
+        let path = stored_path(relative_path);
+        match fs::symlink_metadata(root.join(relative_path)) {
+            Ok(metadata) if metadata.is_dir() => return Ok(PathUpdate::CatchUp),
+            Ok(metadata) => match matcher.file(relative_path, &metadata) {
+                Some(file) => changed.push(file),
+                // A stored file the rules now skip, such as one grown past the size limit.
+                None if known_files.contains_key(&path) => gone.push(path),
+                None => {}
+            },
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                let folder_prefix = format!("{path}/");
+                if known_files.contains_key(&path) {
+                    gone.push(path);
+                } else if known_files
+                    .keys()
+                    .any(|known| known.starts_with(&folder_prefix))
+                {
+                    // A removed folder; the walk finds everything that went with it.
+                    return Ok(PathUpdate::CatchUp);
+                }
+            }
+            Err(error) => return Err(error.into()),
+        }
+    }
+    Ok(PathUpdate::Files { changed, gone })
 }
 
 /// Read and chunk each changed file, announce it to the writer, then queue its
@@ -195,7 +281,7 @@ fn prepare_files(
     events: Sender<Event>,
 ) {
     for (file_number, file) in files.iter().enumerate() {
-        let path = stored_path(file);
+        let path = stored_path(&file.path);
         let mut job_texts: Vec<String> = Vec::new();
         let event = if is_unchanged(known_files.get(&path), file) {
             Event::Unchanged
@@ -470,8 +556,8 @@ fn write_files(
 }
 
 /// The path as stored in the index: relative to the root, with `/` separators.
-fn stored_path(file: &DiscoveredFile) -> String {
-    file.path.to_string_lossy().replace('\\', "/")
+fn stored_path(relative_path: &Path) -> String {
+    relative_path.to_string_lossy().replace('\\', "/")
 }
 
 /// A file is unchanged when its size and modification time match its record.
@@ -514,6 +600,72 @@ mod tests {
     use super::*;
     use rusqlite::Connection;
     use std::fs;
+
+    /// Classify `paths` in a project holding `src/kept.rs`, `lib/inner.rs`, and an
+    /// ignored `generated/out.rs`, with `src/kept.rs`, `src/gone.rs`, and
+    /// `old/inner.rs` stored in the index.
+    fn classify(paths: &[&str]) -> Result<PathUpdate> {
+        let project = tempfile::tempdir()?;
+        let root = project.path();
+        for (path, text) in [
+            ("src/kept.rs", "fn kept() {}"),
+            ("lib/inner.rs", "fn inner() {}"),
+            ("generated/out.rs", "fn out() {}"),
+            (".gitignore", "generated/\n"),
+        ] {
+            fs::create_dir_all(root.join(path).parent().unwrap())?;
+            fs::write(root.join(path), text)?;
+        }
+        let known_files: HashMap<String, (u64, i64)> =
+            ["src/kept.rs", "src/gone.rs", "old/inner.rs"]
+                .iter()
+                .map(|path| (path.to_string(), (0, 0)))
+                .collect();
+        let mut matcher = PathMatcher::new(root, &Config::default())?;
+        let paths: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
+        classify_paths(root, &paths, &known_files, &mut matcher)
+    }
+
+    fn files(update: PathUpdate) -> (Vec<String>, Vec<String>) {
+        match update {
+            PathUpdate::Files { changed, gone } => (
+                changed.iter().map(|file| stored_path(&file.path)).collect(),
+                gone,
+            ),
+            PathUpdate::CatchUp => panic!("expected files, got a catch-up"),
+        }
+    }
+
+    #[test]
+    fn classifies_files_alone() -> Result<()> {
+        let (changed, gone) = files(classify(&["src/kept.rs", "src/new.rs", "src/gone.rs"])?);
+        // `src/new.rs` vanished before its turn and was never stored.
+        assert_eq!(changed, ["src/kept.rs"]);
+        assert_eq!(gone, ["src/gone.rs"]);
+
+        // A rename names both sides: the old path is gone, the new one is a file.
+        let (changed, gone) = files(classify(&["src/gone.rs", "lib/inner.rs"])?);
+        assert_eq!(changed, ["lib/inner.rs"]);
+        assert_eq!(gone, ["src/gone.rs"]);
+
+        // Ignored through its parent folder.
+        let (changed, gone) = files(classify(&["generated/out.rs"])?);
+        assert!(changed.is_empty() && gone.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn folders_and_ignore_files_need_a_catch_up() -> Result<()> {
+        for paths in [
+            &["lib"][..],
+            &["old"],
+            &[".gitignore"],
+            &["src/kept.rs", "lib"],
+        ] {
+            assert!(matches!(classify(paths)?, PathUpdate::CatchUp), "{paths:?}");
+        }
+        Ok(())
+    }
 
     #[test]
     #[ignore = "downloads and runs the real model"]
