@@ -1,9 +1,10 @@
 use std::path::{Path, PathBuf};
+use std::sync::mpsc;
 use std::time::UNIX_EPOCH;
 
 use anyhow::Result;
 use globset::{Glob, GlobSet, GlobSetBuilder};
-use ignore::WalkBuilder;
+use ignore::{WalkBuilder, WalkState};
 
 use crate::config::Config;
 
@@ -39,11 +40,35 @@ pub fn discover(root: &Path, config: &Config) -> Result<Discovery> {
 
     // Dot-files such as CI configs are useful context; secrets are excluded by pattern.
     // `.gitignore` must also apply in folders that are not git repositories.
+    let excluded_dirs = excluded_dir_set(&config.exclude)?;
+    let walk_root = root.to_path_buf();
     let walk = WalkBuilder::new(root)
         .hidden(false)
         .require_git(false)
-        .build();
-    for entry in walk {
+        .threads(config.threads)
+        // Skipping excluded directories saves reading them; `.git` is the big one,
+        // because `.hidden(false)` lets the walk in and no ignore file covers it.
+        .filter_entry(move |entry| {
+            let is_dir = entry.file_type().is_some_and(|kind| kind.is_dir());
+            match entry.path().strip_prefix(&walk_root) {
+                Ok(relative_path) if is_dir => !excluded_dirs.is_match(relative_path),
+                _ => true,
+            }
+        })
+        .build_parallel();
+
+    let (entry_sender, entry_receiver) = mpsc::channel();
+    walk.run(|| {
+        let entry_sender = entry_sender.clone();
+        Box::new(move |entry| {
+            // The receiver lives until the walk ends, so sending cannot fail.
+            let _ = entry_sender.send(entry);
+            WalkState::Continue
+        })
+    });
+    drop(entry_sender);
+
+    for entry in entry_receiver {
         let entry = match entry {
             Ok(entry) => entry,
             Err(error) => {
@@ -82,7 +107,22 @@ pub fn discover(root: &Path, config: &Config) -> Result<Discovery> {
             modified,
         });
     }
+    // The parallel walk finds files in a different order on every run.
+    discovery.files.sort_by(|a, b| a.path.cmp(&b.path));
+    discovery.errors.sort();
     Ok(discovery)
+}
+
+/// Directory patterns from the exclude patterns that end in `/**`: `.git/**`
+/// gives `.git`. Such a pattern excludes every file under the directory, so the
+/// walk can skip the directory without changing what it finds.
+fn excluded_dir_set(exclude: &[String]) -> Result<GlobSet> {
+    let dir_patterns: Vec<String> = exclude
+        .iter()
+        .filter_map(|pattern| pattern.strip_suffix("/**"))
+        .map(str::to_string)
+        .collect();
+    glob_set(&dir_patterns)
 }
 
 fn glob_set(patterns: &[String]) -> Result<GlobSet> {
@@ -134,6 +174,36 @@ mod tests {
             discovered_paths(root, &Config::default())?,
             [".github/workflows/ci.yml", "src/main.rs"]
         );
+        Ok(())
+    }
+
+    #[test]
+    fn skips_excluded_directories_and_sorts_files() -> Result<()> {
+        let project = tempfile::tempdir()?;
+        let root = project.path();
+        write(root, "vendor/lib.rs", b"")?;
+        write(root, "src/b.rs", b"")?;
+        write(root, "src/a.rs", b"")?;
+        write(root, "src/vendor/kept.rs", b"")?;
+        let config = Config {
+            include: vec!["**/*.rs".into()],
+            exclude: vec!["vendor/**".into()],
+            ..Config::default()
+        };
+
+        let paths: Vec<PathBuf> = discover(root, &config)?
+            .files
+            .into_iter()
+            .map(|file| file.path)
+            .collect();
+        let expected: Vec<PathBuf> = ["src/a.rs", "src/b.rs", "src/vendor/kept.rs"]
+            .iter()
+            .map(PathBuf::from)
+            .collect();
+        assert_eq!(paths, expected);
+        let excluded_dirs = excluded_dir_set(&config.exclude)?;
+        assert!(excluded_dirs.is_match("vendor"));
+        assert!(!excluded_dirs.is_match("src/vendor"));
         Ok(())
     }
 
