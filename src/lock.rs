@@ -20,6 +20,14 @@ pub fn try_take(root: &Path) -> Result<Option<WriterLock>> {
     }
 }
 
+/// Take the writer lock, waiting as long as another process holds it. The OS
+/// wakes this call the moment the holder exits or dies.
+pub fn take(root: &Path) -> Result<WriterLock> {
+    let file = open_lock_file(root)?;
+    file.lock()?;
+    Ok(WriterLock { _file: file })
+}
+
 fn open_lock_file(root: &Path) -> Result<File> {
     let folder = root.join(".mimirs");
     anyhow::ensure!(
