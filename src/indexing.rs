@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{self, IsTerminal, Write};
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -160,7 +161,7 @@ impl Indexer {
                 .collect();
             summary.removed = store.remove_files_except(&found_paths)?;
         }
-        store.record_finished_run()?;
+        store.record_write(head_commit(&self.root).as_deref())?;
         Ok(summary)
     }
 
@@ -179,6 +180,9 @@ impl Indexer {
         self.index_files(&changed, &known_files, &mut store, &mut summary)?;
         store.remove_files(&gone)?;
         summary.removed = gone.len();
+        if summary.files > 0 || summary.removed > 0 {
+            store.record_write(head_commit(&self.root).as_deref())?;
+        }
         Ok(Some(summary))
     }
 
@@ -224,6 +228,22 @@ impl Indexer {
             write_files(event_receiver, store, files.len(), summary)
         })
     }
+}
+
+/// The commit `root` is at, or `None` when Git is missing, the project is not a
+/// repository, or Git refuses, as it does for folders another user owns.
+fn head_commit(root: &Path) -> Option<String> {
+    let output = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(root)
+        .stderr(Stdio::null())
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let commit_hash = String::from_utf8(output.stdout).ok()?;
+    Some(commit_hash.trim().to_string())
 }
 
 /// Decide what each path named by a watcher event needs, from what is on disk

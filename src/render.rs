@@ -3,17 +3,23 @@ use crate::excerpt::ShownFile;
 /// Longest line in the file map, in bytes; longer summaries are cut.
 const MAP_LINE_BYTES: usize = 120;
 
+/// When the index last changed, for the first line of the output.
+pub struct Freshness {
+    pub age_seconds: u64,
+    pub commit_hash: Option<String>,
+}
+
 /// Print the file map and the doc map, then excerpts within `budget` bytes:
 /// source files in rank order, then docs. One file's excerpts use at most a
 /// quarter of the budget.
 pub fn render(
-    index_age_seconds: Option<u64>,
+    freshness: Option<&Freshness>,
     files: &[ShownFile],
     docs: &[ShownFile],
     budget: usize,
 ) -> String {
-    let mut output = match index_age_seconds {
-        Some(seconds) => format!("Index updated {}\n", describe_age(seconds)),
+    let mut output = match freshness {
+        Some(freshness) => freshness_line(freshness),
         None => "Index update time unknown\n".to_string(),
     };
 
@@ -88,6 +94,18 @@ fn map_line(number: usize, file: &ShownFile) -> String {
     cut_to_bytes(&line, MAP_LINE_BYTES).to_string()
 }
 
+fn freshness_line(freshness: &Freshness) -> String {
+    let age = describe_age(freshness.age_seconds);
+    match &freshness.commit_hash {
+        // Eight characters identify a commit as well as the full hash here.
+        Some(commit_hash) => {
+            let short_hash = commit_hash.get(..8).unwrap_or(commit_hash);
+            format!("Index updated {age} at commit {short_hash}\n")
+        }
+        None => format!("Index updated {age}\n"),
+    }
+}
+
 fn describe_age(seconds: u64) -> String {
     let minutes = seconds / 60;
     let hours = minutes / 60;
@@ -158,8 +176,19 @@ mod tests {
             file("src/a.rs", vec![(1, 3, lines(3))]),
             file("src/b.rs", vec![(10, 11, lines(2))]),
         ];
-        let output = render(Some(120), &files, &[], 16_000);
+        let freshness = Freshness {
+            age_seconds: 120,
+            commit_hash: None,
+        };
+        let output = render(Some(&freshness), &files, &[], 16_000);
         assert!(output.starts_with("Index updated 2 minutes ago\n"));
+
+        let freshness = Freshness {
+            age_seconds: 120,
+            commit_hash: Some("5ebfed40a7f3a4e34c15d165".to_string()),
+        };
+        let output = render(Some(&freshness), &files, &[], 16_000);
+        assert!(output.starts_with("Index updated 2 minutes ago at commit 5ebfed40\n"));
         assert!(output.contains("  1. src/a.rs:1  fn example()\n  2. src/b.rs:10  fn example()\n"));
         assert!(output.contains("\nsrc/a.rs:1-3\nline 1\nline 2\nline 3\n"));
         let map_position = output.find("Relevant files").unwrap();
@@ -220,7 +249,11 @@ mod tests {
         let files: Vec<ShownFile> = (0..10)
             .map(|number| file(&format!("f{number}.rs"), vec![(1, 200, lines(200))]))
             .collect();
-        let output = render(Some(0), &files, &[], 3_000);
+        let freshness = Freshness {
+            age_seconds: 0,
+            commit_hash: None,
+        };
+        let output = render(Some(&freshness), &files, &[], 3_000);
         assert!(output.len() <= 3_000);
     }
 

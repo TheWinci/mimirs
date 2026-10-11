@@ -13,9 +13,7 @@ use crate::keywords;
 
 /// Bump whenever the tables, the model, the tokenizer, or the chunking rules
 /// change, so `index` rebuilds instead of mixing old and new data.
-const SCHEMA_VERSION: i64 = 6;
-
-const LAST_RUN_KEY: &str = "last_index_finished";
+const SCHEMA_VERSION: i64 = 7;
 
 /// A file as recorded in the index.
 pub struct FileRecord<'a> {
@@ -97,17 +95,16 @@ impl Store {
         Ok(count as usize)
     }
 
-    /// Seconds since the Unix epoch when the last `index` run finished.
-    pub fn last_finished_run(&self) -> Result<Option<i64>> {
-        let finished = self
+    /// When the index last changed, in seconds since the Unix epoch, and the
+    /// commit the project was at then, if it is a Git repository.
+    pub fn last_write(&self) -> Result<Option<(i64, Option<String>)>> {
+        let last_write = self
             .connection
-            .query_row(
-                "SELECT value FROM meta WHERE key = ?1",
-                [LAST_RUN_KEY],
-                |row| row.get(0),
-            )
+            .query_row("SELECT time, commit_hash FROM last_write", [], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })
             .optional()?;
-        Ok(finished)
+        Ok(last_write)
     }
 
     /// The chunks of the `limit` windows nearest to `query`, closest first. A chunk
@@ -451,13 +448,14 @@ impl Store {
         Ok(removed)
     }
 
-    /// Record that an `index` run finished now.
-    pub fn record_finished_run(&self) -> Result<()> {
+    /// Record that the index changed now, with the project's current commit.
+    pub fn record_write(&self, commit_hash: Option<&str>) -> Result<()> {
         let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as i64;
         self.connection.execute(
-            "INSERT INTO meta (key, value) VALUES (?1, ?2)
-             ON CONFLICT (key) DO UPDATE SET value = excluded.value",
-            params![LAST_RUN_KEY, now],
+            "INSERT INTO last_write (id, time, commit_hash) VALUES (1, ?1, ?2)
+             ON CONFLICT (id) DO UPDATE
+             SET time = excluded.time, commit_hash = excluded.commit_hash",
+            params![now, commit_hash],
         )?;
         Ok(())
     }
@@ -534,7 +532,12 @@ fn create_schema(connection: &Connection) -> Result<()> {
          CREATE VIRTUAL TABLE file_terms USING fts5 (
              path, text, content = '', contentless_delete = 1
          );
-         CREATE TABLE meta (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
+         -- One row: when the index last changed, and the commit it matches.
+         CREATE TABLE last_write (
+             id INTEGER PRIMARY KEY CHECK (id = 1),
+             time INTEGER NOT NULL,
+             commit_hash TEXT
+         );
          PRAGMA user_version = {SCHEMA_VERSION};"
     ))?;
     Ok(())
@@ -644,17 +647,15 @@ mod tests {
     }
 
     #[test]
-    fn records_when_the_last_run_finished() -> Result<()> {
+    fn records_the_last_write() -> Result<()> {
         let folder = tempfile::tempdir()?;
         let store = Store::open(&folder.path().join("index.db"))?;
-        store.record_finished_run()?;
-        store.record_finished_run()?;
-        let finished: i64 = store.connection.query_row(
-            "SELECT value FROM meta WHERE key = ?1",
-            [LAST_RUN_KEY],
-            |row| row.get(0),
-        )?;
-        assert!(finished > 0);
+        assert!(store.last_write()?.is_none());
+        store.record_write(Some("5ebfed40a7f3"))?;
+        store.record_write(None)?;
+        let (time, commit_hash) = store.last_write()?.expect("a write was recorded");
+        assert!(time > 0);
+        assert_eq!(commit_hash, None);
         Ok(())
     }
 
