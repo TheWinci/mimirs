@@ -51,7 +51,7 @@ fn answer(root: &Path, query: &str, budget: usize, max_files: usize) -> anyhow::
     let store = Store::open_existing(&root.join(".mimirs/index.db"))?;
     anyhow::ensure!(
         store.file_count()? > 0,
-        "The index is empty; run `mimirs index` first"
+        "The index is empty; run `mimirs index`, or wait if a server is indexing"
     );
     let model_files = embed::cached_files(&embed::cache_dir()?)
         .context("The embedding model is not downloaded; run `mimirs init` first")?;
