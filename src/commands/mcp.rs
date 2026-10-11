@@ -1,13 +1,23 @@
 use std::path::{Path, PathBuf};
+use std::sync::mpsc::{self, RecvTimeoutError};
 use std::thread;
+use std::time::{Duration, Instant};
 
 use clap::Args;
 use rmcp::ServiceExt;
 use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
 use tokio::sync::oneshot;
 
-use crate::indexing::index_project;
+use crate::indexing::{Indexer, Summary};
 use crate::lock;
+use crate::watch::{self, Change};
+
+/// How long changes must stop before a catch-up runs, so one save that fires
+/// several events costs one catch-up.
+const QUIET: Duration = Duration::from_millis(200);
+/// How often a full catch-up runs anyway. Some platforms lose events without
+/// saying so, and folders past the watch limit send none.
+const TIMED_CATCH_UP: Duration = Duration::from_secs(60);
 
 #[derive(Args)]
 pub struct Options {
@@ -64,16 +74,57 @@ fn write_index(root: &Path) -> anyhow::Result<()> {
         }
     };
 
-    let summary = index_project(root)?;
+    let mut indexer = Indexer::load(root)?;
+    let (change_sender, changes) = mpsc::channel();
+    // Watching starts before the first catch-up, so a change made during it
+    // still arrives as an event.
+    let _watcher = watch::watch(root, indexer.config(), change_sender)?;
+    let summary = indexer.catch_up()?;
+    report(&summary);
+
+    let mut next_timed_catch_up = Instant::now() + TIMED_CATCH_UP;
+    let mut quiet_until: Option<Instant> = None;
+    let mut config_notice_at: Option<Instant> = None;
+    loop {
+        let deadline = match quiet_until {
+            Some(quiet_until) => quiet_until.min(next_timed_catch_up),
+            None => next_timed_catch_up,
+        };
+        match changes.recv_timeout(deadline.saturating_duration_since(Instant::now())) {
+            Ok(Change::Files | Change::Lost) => quiet_until = Some(Instant::now() + QUIET),
+            Ok(Change::Config) => {
+                // One save fires several events; say it once.
+                if config_notice_at.is_none_or(|at| at.elapsed() > Duration::from_secs(1)) {
+                    eprintln!("mimirs: restart the session to apply config changes");
+                    config_notice_at = Some(Instant::now());
+                }
+            }
+            Err(RecvTimeoutError::Timeout) => {
+                let now = Instant::now();
+                if now >= next_timed_catch_up {
+                    // A fixed schedule, so a file that never stops changing
+                    // cannot hold off every catch-up.
+                    next_timed_catch_up += TIMED_CATCH_UP;
+                } else if quiet_until.is_none_or(|quiet_until| now < quiet_until) {
+                    continue;
+                }
+                quiet_until = None;
+                let summary = indexer.catch_up()?;
+                // The timed catch-up usually finds nothing; stay quiet then.
+                if summary.files > 0 || summary.removed > 0 {
+                    report(&summary);
+                }
+            }
+            Err(RecvTimeoutError::Disconnected) => anyhow::bail!("the file watcher stopped"),
+        }
+    }
+}
+
+fn report(summary: &Summary) {
     eprintln!(
         "mimirs: caught up: {} files indexed, {} unchanged, {} removed",
         summary.files, summary.unchanged, summary.removed
     );
-
-    // Hold the lock until the process exits.
-    loop {
-        thread::park();
-    }
 }
 
 /// An MCP server with no tools; it exists so the client keeps the writer alive.

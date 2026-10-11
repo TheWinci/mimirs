@@ -15,6 +15,7 @@ mod names;
 mod rank;
 mod render;
 mod store;
+mod watch;
 
 /// mimirs CLI
 #[derive(Parser)]

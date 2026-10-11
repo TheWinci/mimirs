@@ -116,7 +116,7 @@ pub fn discover(root: &Path, config: &Config) -> Result<Discovery> {
 /// Directory patterns from the exclude patterns that end in `/**`: `.git/**`
 /// gives `.git`. Such a pattern excludes every file under the directory, so the
 /// walk can skip the directory without changing what it finds.
-fn excluded_dir_set(exclude: &[String]) -> Result<GlobSet> {
+pub fn excluded_dir_set(exclude: &[String]) -> Result<GlobSet> {
     let dir_patterns: Vec<String> = exclude
         .iter()
         .filter_map(|pattern| pattern.strip_suffix("/**"))
@@ -125,7 +125,7 @@ fn excluded_dir_set(exclude: &[String]) -> Result<GlobSet> {
     glob_set(&dir_patterns)
 }
 
-fn glob_set(patterns: &[String]) -> Result<GlobSet> {
+pub fn glob_set(patterns: &[String]) -> Result<GlobSet> {
     let mut builder = GlobSetBuilder::new();
     for pattern in patterns {
         builder.add(Glob::new(pattern)?);

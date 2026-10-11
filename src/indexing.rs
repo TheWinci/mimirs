@@ -87,65 +87,101 @@ enum Event {
 }
 
 /// Bring the index in `root/.mimirs/index.db` up to date with the project's files.
-///
-/// One thread reads and chunks files and queues their windows; each model
-/// instance takes the next window as soon as it is free; this thread writes a
-/// file once all of its vectors have arrived.
 pub fn index_project(root: &Path) -> Result<Summary> {
-    let config = Config::load(&root.join(".mimirs/config.toml"))?;
-    let model_files = embed::cached_files(&embed::cache_dir()?)
-        .context("The embedding model is not downloaded; run `mimirs init` first")?;
-    let tokenizer = embed::load_tokenizer(&model_files.tokenizer)?;
-    let mut embedder = Embedder::load(&model_files, config.threads)?;
-    let mut store = Store::open(&root.join(".mimirs/index.db"))?;
+    Indexer::load(root)?.catch_up()
+}
 
-    let discovery = discover(root, &config)?;
-    for error in &discovery.errors {
-        eprintln!("{error}");
+/// A project's config and loaded model, kept between catch-ups so that only
+/// the first one pays for loading. Config edits apply after a restart.
+pub struct Indexer {
+    root: PathBuf,
+    config: Config,
+    tokenizer: Tokenizer,
+    embedder: Embedder,
+}
+
+impl Indexer {
+    pub fn load(root: &Path) -> Result<Self> {
+        let config = Config::load(&root.join(".mimirs/config.toml"))?;
+        let model_files = embed::cached_files(&embed::cache_dir()?)
+            .context("The embedding model is not downloaded; run `mimirs init` first")?;
+        let tokenizer = embed::load_tokenizer(&model_files.tokenizer)?;
+        let embedder = Embedder::load(&model_files, config.threads)?;
+        Ok(Self {
+            root: root.to_path_buf(),
+            config,
+            tokenizer,
+            embedder,
+        })
     }
-    let known_files = store.file_states()?;
-    let mut summary = Summary {
-        too_large: discovery.skipped_too_large,
-        ..Summary::default()
-    };
 
-    // Unbounded for now, to measure how far reading runs ahead of embedding.
-    let (job_sender, job_receiver) = mpsc::channel();
-    // The model threads own the receiver, so once they all stop, queueing fails
-    // and the preparing thread stops too.
-    let job_receiver = Arc::new(Mutex::new(job_receiver));
-    let (event_sender, event_receiver) = mpsc::channel();
-    thread::scope(|scope| {
-        let files = &discovery.files;
-        let known_files = &known_files;
-        let tokenizer = &tokenizer;
-        let preparer_events = event_sender.clone();
-        scope.spawn(move || {
-            prepare_files(
-                root,
-                files,
-                known_files,
-                tokenizer,
-                job_sender,
-                preparer_events,
-            )
-        });
-        for instance in embedder.instances() {
-            let jobs = Arc::clone(&job_receiver);
-            let events = event_sender.clone();
-            scope.spawn(move || embed_windows(instance, jobs, events));
+    pub fn config(&self) -> &Config {
+        &self.config
+    }
+
+    /// Walk the project and index what changed since the last run.
+    ///
+    /// One thread reads and chunks files and queues their windows; each model
+    /// instance takes the next window as soon as it is free; this thread writes
+    /// a file once all of its vectors have arrived.
+    pub fn catch_up(&mut self) -> Result<Summary> {
+        let Indexer {
+            root,
+            config,
+            tokenizer,
+            embedder,
+        } = self;
+        let root = root.as_path();
+        let mut store = Store::open(&root.join(".mimirs/index.db"))?;
+
+        let discovery = discover(root, config)?;
+        for error in &discovery.errors {
+            eprintln!("{error}");
         }
-        drop(job_receiver);
-        drop(event_sender);
-        write_files(event_receiver, &mut store, files.len(), &mut summary)
-    })?;
+        let known_files = store.file_states()?;
+        let mut summary = Summary {
+            too_large: discovery.skipped_too_large,
+            ..Summary::default()
+        };
 
-    if walk_found_everything(&discovery) {
-        let found_paths: HashSet<String> = discovery.files.iter().map(stored_path).collect();
-        summary.removed = store.remove_files_except(&found_paths)?;
+        // Unbounded for now, to measure how far reading runs ahead of embedding.
+        let (job_sender, job_receiver) = mpsc::channel();
+        // The model threads own the receiver, so once they all stop, queueing fails
+        // and the preparing thread stops too.
+        let job_receiver = Arc::new(Mutex::new(job_receiver));
+        let (event_sender, event_receiver) = mpsc::channel();
+        thread::scope(|scope| {
+            let files = &discovery.files;
+            let known_files = &known_files;
+            let tokenizer = &*tokenizer;
+            let preparer_events = event_sender.clone();
+            scope.spawn(move || {
+                prepare_files(
+                    root,
+                    files,
+                    known_files,
+                    tokenizer,
+                    job_sender,
+                    preparer_events,
+                )
+            });
+            for instance in embedder.instances() {
+                let jobs = Arc::clone(&job_receiver);
+                let events = event_sender.clone();
+                scope.spawn(move || embed_windows(instance, jobs, events));
+            }
+            drop(job_receiver);
+            drop(event_sender);
+            write_files(event_receiver, &mut store, files.len(), &mut summary)
+        })?;
+
+        if walk_found_everything(&discovery) {
+            let found_paths: HashSet<String> = discovery.files.iter().map(stored_path).collect();
+            summary.removed = store.remove_files_except(&found_paths)?;
+        }
+        store.record_finished_run()?;
+        Ok(summary)
     }
-    store.record_finished_run()?;
-    Ok(summary)
 }
 
 /// Read and chunk each changed file, announce it to the writer, then queue its
