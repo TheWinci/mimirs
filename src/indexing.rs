@@ -88,9 +88,10 @@ enum Event {
     Failed(anyhow::Error),
 }
 
-/// Bring the index in `root/.mimirs/index.db` up to date with the project's files.
-pub fn index_project(root: &Path) -> Result<Summary> {
-    Indexer::load(root)?.catch_up(&mut |_, _| {})
+/// Bring the index in `root/.mimirs/index.db` up to date with the project's
+/// files. `progress` hears files finished and the total, as in `catch_up`.
+pub fn index_project(root: &Path, progress: &mut dyn FnMut(usize, usize)) -> Result<Summary> {
+    Indexer::load(root)?.catch_up(progress)
 }
 
 /// A project's config and loaded model, kept between catch-ups so that only
@@ -722,7 +723,7 @@ mod tests {
         fs::write(root.join("src/token.rs"), "fn refresh_token() {}\n")?;
         fs::write(root.join("README.md"), "# Example\n\nA small project.\n")?;
 
-        index_project(root)?;
+        index_project(root, &mut |_, _| {})?;
 
         let database = Connection::open(root.join(".mimirs/index.db"))?;
         let count = |table: &str| -> anyhow::Result<i64> {
@@ -829,20 +830,20 @@ mod tests {
         fs::write(root.join("src/a.rs"), "fn a() {}\n")?;
         fs::write(root.join("src/b.rs"), "fn b() {}\n")?;
         fs::write(root.join("src/c.rs"), "fn c() {}\n")?;
-        assert_eq!(index_project(root)?.files, 3);
+        assert_eq!(index_project(root, &mut |_, _| {})?.files, 3);
 
-        let second = index_project(root)?;
+        let second = index_project(root, &mut |_, _| {})?;
         assert_eq!((second.files, second.unchanged, second.removed), (0, 3, 0));
 
         fs::write(root.join("src/a.rs"), "fn a() { println!(\"edited\"); }\n")?;
         fs::remove_file(root.join("src/b.rs"))?;
-        let third = index_project(root)?;
+        let third = index_project(root, &mut |_, _| {})?;
         assert_eq!((third.files, third.unchanged, third.removed), (1, 1, 1));
 
         let mut config = Config::default();
         config.exclude.push("src/c.rs".into());
         fs::write(root.join(".mimirs/config.toml"), config.to_toml()?)?;
-        let fourth = index_project(root)?;
+        let fourth = index_project(root, &mut |_, _| {})?;
         assert_eq!((fourth.files, fourth.unchanged, fourth.removed), (0, 1, 1));
         Ok(())
     }

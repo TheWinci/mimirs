@@ -104,6 +104,15 @@ impl Status {
         self.lock().write(&text);
     }
 
+    pub fn indexed(&self, summary: &Summary) {
+        let text = format!(
+            "indexed\nfinished: {}\n{}\n",
+            now(),
+            counts(summary.files, summary.unchanged, summary.removed)
+        );
+        self.lock().write(&text);
+    }
+
     /// Record why the writer failed. `message` may span lines; the file keeps
     /// it on one.
     pub fn error(&self, message: &str) {
