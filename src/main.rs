@@ -14,6 +14,7 @@ mod lock;
 mod names;
 mod rank;
 mod render;
+mod status;
 mod store;
 mod watch;
 

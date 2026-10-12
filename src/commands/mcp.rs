@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -11,6 +12,7 @@ use tokio::sync::oneshot;
 
 use crate::indexing::{Indexer, Summary};
 use crate::lock;
+use crate::status::{IndexChange, Status};
 use crate::watch::{self, Change};
 
 /// How long changes must stop before a catch-up runs, so one save that fires
@@ -45,11 +47,13 @@ pub fn run(options: Options) -> anyhow::Result<()> {
 }
 
 async fn serve(root: PathBuf) -> anyhow::Result<()> {
+    let status = Arc::new(Status::new(&root));
+    let writer_status = Arc::clone(&status);
     let (writer_sender, writer_receiver) = oneshot::channel();
     // A plain thread, not a tokio task: it may block on the lock for a whole
     // session, and the process must still exit when stdin closes.
     thread::spawn(move || {
-        let _ = writer_sender.send(write_index(&root));
+        let _ = writer_sender.send(write_index(&root, &writer_status));
     });
 
     let session = async {
@@ -57,16 +61,28 @@ async fn serve(root: PathBuf) -> anyhow::Result<()> {
         service.waiting().await?;
         anyhow::Ok(())
     };
-    // The writer can fail before the client finishes the handshake.
+    // The writer can fail before the client finishes the handshake. Both
+    // states are recorded here, after the writer can no longer replace them.
     tokio::select! {
-        ended = session => ended,
-        written = writer_receiver => written?,
+        ended = session => {
+            status.stopped();
+            ended
+        }
+        written = writer_receiver => {
+            // A panic drops the sender without a result; its message is on stderr.
+            let written = written
+                .unwrap_or_else(|_| Err(anyhow::anyhow!("the index writer panicked")));
+            if let Err(error) = &written {
+                status.error(&format!("{error:#}"));
+            }
+            written
+        }
     }
 }
 
 /// Become the project's writer, then keep its index current. Returns only on
 /// error; the process exiting releases the lock.
-fn write_index(root: &Path) -> anyhow::Result<()> {
+fn write_index(root: &Path, status: &Status) -> anyhow::Result<()> {
     let _writer_lock = match lock::try_take(root)? {
         Some(writer_lock) => writer_lock,
         None => {
@@ -74,14 +90,24 @@ fn write_index(root: &Path) -> anyhow::Result<()> {
             lock::take(root)?
         }
     };
+    status.hold_lock();
+    keep_index_current(root, status)
+}
 
+/// Catch up, then index changes as the watcher reports them. Returns only on
+/// error.
+fn keep_index_current(root: &Path, status: &Status) -> anyhow::Result<()> {
+    status.catching_up();
     let mut indexer = Indexer::load(root)?;
     let (change_sender, changes) = mpsc::channel();
     // Watching starts before the first catch-up, so a change made during it
     // still arrives as an event.
     let _watcher = watch::watch(root, indexer.config(), change_sender)?;
-    let summary = indexer.catch_up()?;
+    let summary = indexer.catch_up(&mut |done, total| status.progress(done, total))?;
     report(&summary);
+    // The first catch-up counts as a change, so the status always has a summary.
+    let mut last_change = IndexChange::now(&summary);
+    status.watching(&last_change);
 
     let mut next_timed_catch_up = Instant::now() + TIMED_CATCH_UP;
     // Each changed path waits for its own quiet period.
@@ -125,15 +151,16 @@ fn write_index(root: &Path) -> anyhow::Result<()> {
                         continue;
                     }
                     if let Some(summary) = indexer.update_paths(&due_paths)? {
-                        report_changes(&summary);
+                        record_changes(&summary, &mut last_change, status);
                         continue;
                     }
                 }
                 // The full walk covers every path still waiting.
                 pending_paths.clear();
                 catch_up_after = None;
-                let summary = indexer.catch_up()?;
-                report_changes(&summary);
+                status.catching_up();
+                let summary = indexer.catch_up(&mut |done, total| status.progress(done, total))?;
+                record_changes(&summary, &mut last_change, status);
                 // Counted from the end of the walk: a walk longer than the
                 // interval would otherwise leave the deadline in the past and
                 // run walks back to back. Only a walk moves it, so a file that
@@ -145,12 +172,14 @@ fn write_index(root: &Path) -> anyhow::Result<()> {
     }
 }
 
-/// Report a catch-up or update only when it changed the index; the timed
-/// catch-up usually finds nothing.
-fn report_changes(summary: &Summary) {
+/// Report and remember a catch-up or update only when it changed the index;
+/// the timed catch-up usually finds nothing. The status still shows the check.
+fn record_changes(summary: &Summary, last_change: &mut IndexChange, status: &Status) {
     if summary.files > 0 || summary.removed > 0 {
         report(summary);
+        *last_change = IndexChange::now(summary);
     }
+    status.watching(last_change);
 }
 
 fn report(summary: &Summary) {

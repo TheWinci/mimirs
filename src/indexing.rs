@@ -90,7 +90,7 @@ enum Event {
 
 /// Bring the index in `root/.mimirs/index.db` up to date with the project's files.
 pub fn index_project(root: &Path) -> Result<Summary> {
-    Indexer::load(root)?.catch_up()
+    Indexer::load(root)?.catch_up(&mut |_, _| {})
 }
 
 /// A project's config and loaded model, kept between catch-ups so that only
@@ -136,8 +136,9 @@ impl Indexer {
         &self.config
     }
 
-    /// Walk the project and index what changed since the last run.
-    pub fn catch_up(&mut self) -> Result<Summary> {
+    /// Walk the project and index what changed since the last run. `progress`
+    /// hears files finished and the total, once the walk knows it.
+    pub fn catch_up(&mut self, progress: &mut dyn FnMut(usize, usize)) -> Result<Summary> {
         let mut store = Store::open(&self.root.join(".mimirs/index.db"))?;
         // The walk reads every ignore file afresh; the matcher must agree with it.
         self.matcher = PathMatcher::new(&self.root, &self.config)?;
@@ -151,7 +152,13 @@ impl Indexer {
             too_large: discovery.skipped_too_large,
             ..Summary::default()
         };
-        self.index_files(&discovery.files, &known_files, &mut store, &mut summary)?;
+        self.index_files(
+            &discovery.files,
+            &known_files,
+            &mut store,
+            &mut summary,
+            progress,
+        )?;
 
         if walk_found_everything(&discovery) {
             let found_paths: HashSet<String> = discovery
@@ -177,7 +184,14 @@ impl Indexer {
             };
 
         let mut summary = Summary::default();
-        self.index_files(&changed, &known_files, &mut store, &mut summary)?;
+        // A few files finish at once; their progress is not worth reporting.
+        self.index_files(
+            &changed,
+            &known_files,
+            &mut store,
+            &mut summary,
+            &mut |_, _| {},
+        )?;
         store.remove_files(&gone)?;
         summary.removed = gone.len();
         if summary.files > 0 || summary.removed > 0 {
@@ -197,6 +211,7 @@ impl Indexer {
         known_files: &HashMap<String, (u64, i64)>,
         store: &mut Store,
         summary: &mut Summary,
+        progress: &mut dyn FnMut(usize, usize),
     ) -> Result<()> {
         let root = self.root.as_path();
         let tokenizer = &self.tokenizer;
@@ -225,7 +240,7 @@ impl Indexer {
             }
             drop(job_receiver);
             drop(event_sender);
-            write_files(event_receiver, store, files.len(), summary)
+            write_files(event_receiver, store, files.len(), summary, progress)
         })
     }
 }
@@ -463,12 +478,14 @@ fn write_files(
     store: &mut Store,
     total: usize,
     summary: &mut Summary,
+    progress: &mut dyn FnMut(usize, usize),
 ) -> Result<()> {
     let show_progress = std::io::stderr().is_terminal();
     let terminal_width = terminal_size::terminal_size_of(std::io::stderr())
         .map_or(80, |(width, _)| usize::from(width.0));
     let mut pending: HashMap<usize, PendingFile> = HashMap::new();
     let mut finished = 0;
+    progress(finished, total);
 
     for event in events {
         let completed = match event {
@@ -520,6 +537,8 @@ fn write_files(
         };
 
         let Some(file) = completed else {
+            // Unchanged, not text, or unreadable: finished without a write.
+            progress(finished, total);
             continue;
         };
         let is_complete = pending.get(&file).is_some_and(|entry| entry.missing == 0);
@@ -561,6 +580,7 @@ fn write_files(
         summary.chunks += done.prepared.chunks.len();
         summary.windows += done.prepared.window_count();
         finished += 1;
+        progress(finished, total);
         if show_progress {
             let line = progress_line(finished, total, &done.prepared.path, terminal_width);
             eprint!("\r\x1b[2K{line}");
