@@ -26,6 +26,40 @@ struct State {
     last_progress: Option<Instant>,
 }
 
+/// Why the index writer stopped, as `.mimirs/status` recorded it.
+pub struct Failure {
+    pub failed: String,
+    pub message: String,
+}
+
+/// The writer's failure, when the status says `error`. Every other state, and
+/// a file that is missing or cannot be read, gives `None`: the file is for
+/// debugging and must not block a query.
+pub fn read_failure(root: &Path) -> Option<Failure> {
+    let text = fs::read_to_string(root.join(".mimirs/status")).ok()?;
+    parse_failure(&text)
+}
+
+fn parse_failure(text: &str) -> Option<Failure> {
+    let mut lines = text.lines();
+    if lines.next()? != "error" {
+        return None;
+    }
+    let mut failed = None;
+    let mut message = None;
+    for line in lines {
+        if let Some(value) = line.strip_prefix("failed: ") {
+            failed = Some(value.to_string());
+        } else if let Some(value) = line.strip_prefix("message: ") {
+            message = Some(value.to_string());
+        }
+    }
+    Some(Failure {
+        failed: failed?,
+        message: message?,
+    })
+}
+
 /// The last catch-up or update that changed the index.
 pub struct IndexChange {
     at: String,
@@ -220,6 +254,22 @@ mod tests {
     fn state_of(project: &tempfile::TempDir) -> Result<String> {
         let text = fs::read_to_string(project.path().join(".mimirs/status"))?;
         Ok(text.lines().next().unwrap_or_default().to_string())
+    }
+
+    #[test]
+    fn only_a_complete_error_is_a_failure() -> Result<()> {
+        let project = project()?;
+        assert!(read_failure(project.path()).is_none());
+
+        let failure = parse_failure("error\nfailed: 2026-10-11T14:05:31Z\nmessage: disk gone\n")
+            .expect("a complete error");
+        assert_eq!(failure.failed, "2026-10-11T14:05:31Z");
+        assert_eq!(failure.message, "disk gone");
+
+        assert!(parse_failure("error\nfailed: 2026-10-11T14:05:31Z\n").is_none());
+        assert!(parse_failure("watching\nchecked: 2026-10-11T14:05:31Z\n").is_none());
+        assert!(parse_failure("").is_none());
+        Ok(())
     }
 
     #[test]

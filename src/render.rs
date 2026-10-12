@@ -1,4 +1,5 @@
 use crate::excerpt::ShownFile;
+use crate::status::Failure;
 
 /// Longest line in the file map, in bytes; longer summaries are cut.
 const MAP_LINE_BYTES: usize = 120;
@@ -11,17 +12,26 @@ pub struct Freshness {
 
 /// Print the file map and the doc map, then excerpts within `budget` bytes:
 /// source files in rank order, then docs. One file's excerpts use at most a
-/// quarter of the budget.
+/// quarter of the budget. A failed index writer comes first, because the
+/// index may have stopped following the files.
 pub fn render(
+    failure: Option<&Failure>,
     freshness: Option<&Freshness>,
     files: &[ShownFile],
     docs: &[ShownFile],
     budget: usize,
 ) -> String {
-    let mut output = match freshness {
-        Some(freshness) => freshness_line(freshness),
-        None => "Index update time unknown\n".to_string(),
+    let mut output = match failure {
+        Some(failure) => format!(
+            "Indexing failed at {}: {}\n",
+            failure.failed, failure.message
+        ),
+        None => String::new(),
     };
+    match freshness {
+        Some(freshness) => output.push_str(&freshness_line(freshness)),
+        None => output.push_str("Index update time unknown\n"),
+    }
 
     output.push_str("\nRelevant files\n");
     for (position, file) in files.iter().enumerate() {
@@ -180,14 +190,14 @@ mod tests {
             age_seconds: 120,
             commit_hash: None,
         };
-        let output = render(Some(&freshness), &files, &[], 16_000);
+        let output = render(None, Some(&freshness), &files, &[], 16_000);
         assert!(output.starts_with("Index updated 2 minutes ago\n"));
 
         let freshness = Freshness {
             age_seconds: 120,
             commit_hash: Some("5ebfed40a7f3a4e34c15d165".to_string()),
         };
-        let output = render(Some(&freshness), &files, &[], 16_000);
+        let output = render(None, Some(&freshness), &files, &[], 16_000);
         assert!(output.starts_with("Index updated 2 minutes ago at commit 5ebfed40\n"));
         assert!(output.contains("  1. src/a.rs:1  fn example()\n  2. src/b.rs:10  fn example()\n"));
         assert!(output.contains("\nsrc/a.rs:1-3\nline 1\nline 2\nline 3\n"));
@@ -197,10 +207,28 @@ mod tests {
     }
 
     #[test]
+    fn a_failed_writer_comes_before_the_index_age() {
+        let files = [file("src/a.rs", vec![(1, 3, lines(3))])];
+        let failure = Failure {
+            failed: "2026-10-11T14:05:31Z".to_string(),
+            message: "the file watcher stopped".to_string(),
+        };
+        let freshness = Freshness {
+            age_seconds: 120,
+            commit_hash: None,
+        };
+        let output = render(Some(&failure), Some(&freshness), &files, &[], 16_000);
+        assert!(output.starts_with(
+            "Indexing failed at 2026-10-11T14:05:31Z: the file watcher stopped\n\
+             Index updated 2 minutes ago\n"
+        ));
+    }
+
+    #[test]
     fn docs_follow_source_in_the_map_and_in_the_excerpts() {
         let files = [file("src/a.rs", vec![(1, 2, lines(2))])];
         let docs = [file("docs/guide.md", vec![(4, 5, lines(2))])];
-        let output = render(None, &files, &docs, 16_000);
+        let output = render(None, None, &files, &docs, 16_000);
         assert!(
             output.contains(
                 "Relevant files\n  1. src/a.rs:1  fn example()\n\nRelevant docs\n  1. docs/guide.md:4  fn example()\n"
@@ -215,7 +243,7 @@ mod tests {
     #[test]
     fn no_docs_print_no_doc_map() {
         let files = [file("src/a.rs", vec![(1, 2, lines(2))])];
-        let output = render(None, &files, &[], 16_000);
+        let output = render(None, None, &files, &[], 16_000);
         assert!(!output.contains("Relevant docs"));
     }
 
@@ -223,7 +251,7 @@ mod tests {
     fn a_map_line_lists_as_many_whole_names_as_fit() {
         let mut shown = file("src/queue.ts", vec![(3, 9, lines(7))]);
         shown.names = vec!["Queue.drain".into(), "Queue".into(), "x".repeat(100)];
-        let output = render(None, &[shown], &[], 16_000);
+        let output = render(None, None, &[shown], &[], 16_000);
         assert!(
             output.contains("  1. src/queue.ts:3  Queue.drain, Queue\n"),
             "{output}"
@@ -236,7 +264,7 @@ mod tests {
             file("big.rs", vec![(1, 500, lines(500))]),
             file("small.rs", vec![(1, 2, lines(2))]),
         ];
-        let output = render(None, &files, &[], 4_000);
+        let output = render(None, None, &files, &[], 4_000);
         let big_start = output.find("\nbig.rs:1-500\n").unwrap();
         let small_start = output.find("\nsmall.rs:1-2\n").unwrap();
         assert!(small_start - big_start <= 1_000);
@@ -253,7 +281,7 @@ mod tests {
             age_seconds: 0,
             commit_hash: None,
         };
-        let output = render(Some(&freshness), &files, &[], 3_000);
+        let output = render(None, Some(&freshness), &files, &[], 3_000);
         assert!(output.len() <= 3_000);
     }
 

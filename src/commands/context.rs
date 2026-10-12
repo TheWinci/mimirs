@@ -11,6 +11,7 @@ use crate::keywords;
 use crate::names;
 use crate::rank::rank;
 use crate::render::{Freshness, render};
+use crate::status;
 use crate::store::{Hit, Store};
 
 /// Windows compared with the query; enough to fill the default map of 20 files.
@@ -108,7 +109,14 @@ fn answer(root: &Path, query: &str, budget: usize, max_files: usize) -> anyhow::
         age_seconds: now.saturating_sub(time).max(0) as u64,
         commit_hash,
     });
-    Ok(render(freshness.as_ref(), &files, &docs, budget))
+    let failure = status::read_failure(root);
+    Ok(render(
+        failure.as_ref(),
+        freshness.as_ref(),
+        &files,
+        &docs,
+        budget,
+    ))
 }
 
 /// The distinct chunks in `hits` that `other` does not have, in `hits` order.
