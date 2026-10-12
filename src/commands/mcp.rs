@@ -112,11 +112,6 @@ fn write_index(root: &Path) -> anyhow::Result<()> {
             Err(RecvTimeoutError::Timeout) => {
                 let now = Instant::now();
                 let timed = now >= next_timed_catch_up;
-                if timed {
-                    // A fixed schedule, so a file that never stops changing
-                    // cannot hold off every catch-up.
-                    next_timed_catch_up += TIMED_CATCH_UP;
-                }
                 let catch_up_due = timed || catch_up_after.is_some_and(|at| now >= at);
                 if !catch_up_due {
                     if catch_up_after.is_some() {
@@ -139,6 +134,11 @@ fn write_index(root: &Path) -> anyhow::Result<()> {
                 catch_up_after = None;
                 let summary = indexer.catch_up()?;
                 report_changes(&summary);
+                // Counted from the end of the walk: a walk longer than the
+                // interval would otherwise leave the deadline in the past and
+                // run walks back to back. Only a walk moves it, so a file that
+                // never stops changing cannot hold off every catch-up.
+                next_timed_catch_up = Instant::now() + TIMED_CATCH_UP;
             }
             Err(RecvTimeoutError::Disconnected) => anyhow::bail!("the file watcher stopped"),
         }
