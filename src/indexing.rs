@@ -815,6 +815,122 @@ mod tests {
         )));
     }
 
+    /// Each file's path, text, and chunk spans: what a store holds, without
+    /// its row IDs.
+    fn stored_files(root: &Path) -> Result<Vec<String>> {
+        let store = Store::open_existing(&root.join(".mimirs/index.db"))?;
+        let mut paths: Vec<String> = store.file_states()?.into_keys().collect();
+        paths.sort();
+        let mut files = Vec::new();
+        for path in &paths {
+            let stored = store.stored_file(path)?;
+            let spans: Vec<String> = stored
+                .chunks
+                .iter()
+                .map(|chunk| {
+                    format!(
+                        "{} {:?} {:?} {:?} {}-{} {:?}",
+                        chunk.kind,
+                        chunk.name,
+                        chunk.parent,
+                        chunk.bytes,
+                        chunk.start_line,
+                        chunk.end_line,
+                        chunk.body
+                    )
+                })
+                .collect();
+            files.push(format!("{path}\n{}\n{}", stored.text, spans.join("\n")));
+        }
+        Ok(files)
+    }
+
+    /// The windows nearest to `query`, by path and score rounded to four
+    /// places, so the vectors can be compared without their row IDs.
+    fn nearest_windows(root: &Path, query: &[f32]) -> Result<Vec<(String, i64)>> {
+        let store = Store::open_existing(&root.join(".mimirs/index.db"))?;
+        let mut nearest: Vec<(String, i64)> = store
+            .nearest(query, 100)?
+            .into_iter()
+            .map(|hit| (hit.path, (hit.score * 10_000.0).round() as i64))
+            .collect();
+        nearest.sort();
+        Ok(nearest)
+    }
+
+    fn project_with(files: &[(&str, &str)]) -> Result<tempfile::TempDir> {
+        let project = tempfile::tempdir()?;
+        let root = project.path();
+        fs::create_dir_all(root.join(".mimirs"))?;
+        fs::write(
+            root.join(".mimirs/config.toml"),
+            Config::default().to_toml()?,
+        )?;
+        for (path, text) in files {
+            let path = root.join(path);
+            if let Some(folder) = path.parent() {
+                fs::create_dir_all(folder)?;
+            }
+            fs::write(path, text)?;
+        }
+        Ok(project)
+    }
+
+    #[test]
+    #[ignore = "downloads and runs the real model"]
+    fn updating_single_files_matches_a_fresh_index() -> Result<()> {
+        embed::download(&embed::cache_dir()?)?;
+        let project = project_with(&[
+            (
+                "src/edited.rs",
+                "/// Parse a number.\nfn parse(text: &str) -> u32 { 0 }\n",
+            ),
+            ("src/deleted.rs", "fn deleted() {}\n"),
+            ("src/old_name.rs", "/// Retry a request.\nfn retry() {}\n"),
+            ("docs/notes.md", "# Notes\n\nKeep this file as it is.\n"),
+        ])?;
+        let root = project.path();
+        let mut indexer = Indexer::load(root)?;
+        indexer.catch_up(&mut |_, _| {})?;
+
+        let edited = "/// Parse a number, or fail on letters.\nfn parse(text: &str) -> Option<u32> { None }\n\nfn helper() {}\n";
+        let added = "/// Send the weekly report by email.\nfn send_report() {}\n";
+        fs::write(root.join("src/edited.rs"), edited)?;
+        fs::write(root.join("src/added.rs"), added)?;
+        fs::remove_file(root.join("src/deleted.rs"))?;
+        fs::rename(root.join("src/old_name.rs"), root.join("src/new_name.rs"))?;
+        let changed_paths: Vec<PathBuf> = [
+            "src/edited.rs",
+            "src/added.rs",
+            "src/deleted.rs",
+            "src/old_name.rs",
+            "src/new_name.rs",
+        ]
+        .iter()
+        .map(PathBuf::from)
+        .collect();
+        let summary = indexer
+            .update_paths(&changed_paths)?
+            .context("single files should not need a catch-up")?;
+        assert_eq!((summary.files, summary.removed), (3, 2));
+
+        let fresh = project_with(&[
+            ("src/edited.rs", edited),
+            ("src/added.rs", added),
+            ("src/new_name.rs", "/// Retry a request.\nfn retry() {}\n"),
+            ("docs/notes.md", "# Notes\n\nKeep this file as it is.\n"),
+        ])?;
+        index_project(fresh.path(), &mut |_, _| {})?;
+
+        assert_eq!(stored_files(root)?, stored_files(fresh.path())?);
+        let query = indexer.embedder.embed("email the weekly report")?;
+        assert_eq!(
+            nearest_windows(root, &query)?,
+            nearest_windows(fresh.path(), &query)?
+        );
+        Ok(())
+    }
+
     #[test]
     #[ignore = "downloads and runs the real model"]
     fn a_second_run_only_does_work_for_changes() -> Result<()> {
