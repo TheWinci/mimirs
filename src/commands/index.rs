@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use clap::Args;
 
 use crate::indexing::index_project;
@@ -13,8 +15,9 @@ pub fn run(_options: Options) -> anyhow::Result<()> {
     let Some(_writer_lock) = lock::try_take(&root)? else {
         anyhow::bail!("another mimirs process is indexing this project");
     };
-    let status = Status::new(&root);
+    let status = Arc::new(Status::new(&root));
     status.hold_lock();
+    Status::record_panics(Arc::clone(&status));
     status.catching_up();
     let summary = match index_project(&root, &mut |done, total| status.progress(done, total)) {
         Ok(summary) => summary,

@@ -48,6 +48,7 @@ pub fn run(options: Options) -> anyhow::Result<()> {
 
 async fn serve(root: PathBuf) -> anyhow::Result<()> {
     let status = Arc::new(Status::new(&root));
+    Status::record_panics(Arc::clone(&status));
     let writer_status = Arc::clone(&status);
     let (writer_sender, writer_receiver) = oneshot::channel();
     // A plain thread, not a tokio task: it may block on the lock for a whole
@@ -69,7 +70,8 @@ async fn serve(root: PathBuf) -> anyhow::Result<()> {
             ended
         }
         written = writer_receiver => {
-            // A panic drops the sender without a result; its message is on stderr.
+            // A panic drops the sender without a result; the panic hook has
+            // already recorded its message.
             let written = written
                 .unwrap_or_else(|_| Err(anyhow::anyhow!("the index writer panicked")));
             if let Err(error) = &written {

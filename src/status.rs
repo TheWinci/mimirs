@@ -1,6 +1,7 @@
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::indexing::Summary;
@@ -164,6 +165,16 @@ impl Status {
         state.ended = true;
     }
 
+    /// Record any panic, on any thread, as `error` with its message and
+    /// location. The default hook still prints it to stderr afterwards.
+    pub fn record_panics(status: Arc<Status>) {
+        let default_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            status.error(&info.to_string());
+            default_hook(info);
+        }));
+    }
+
     /// A panic while holding the lock must not stop the last write.
     fn lock(&self) -> std::sync::MutexGuard<'_, State> {
         self.state.lock().unwrap_or_else(PoisonError::into_inner)
@@ -172,7 +183,9 @@ impl Status {
 
 impl State {
     /// Replace the file through a rename, so a reader never sees half of it. A
-    /// failed write must not stop the writer, so it only prints a line.
+    /// failed write must not stop the writer, so it only prints a line. That
+    /// line uses `writeln!`, not `eprintln!`: a closed stderr would panic, and
+    /// the panic hook would wait forever for the lock this call holds.
     fn write(&self, text: &str) {
         if !self.holds_lock || self.ended {
             return;
@@ -180,7 +193,11 @@ impl State {
         let temporary = self.path.with_extension("tmp");
         let written = fs::write(&temporary, text).and_then(|()| fs::rename(&temporary, &self.path));
         if let Err(error) = written {
-            eprintln!("mimirs: could not write {}: {error}", self.path.display());
+            let _ = writeln!(
+                std::io::stderr(),
+                "mimirs: could not write {}: {error}",
+                self.path.display()
+            );
         }
     }
 }
@@ -294,6 +311,26 @@ mod tests {
         let text = fs::read_to_string(project.path().join(".mimirs/status"))?;
         assert!(text.starts_with("error\nfailed: "));
         assert!(text.ends_with("message: the file watcher stopped\n"));
+        Ok(())
+    }
+
+    #[test]
+    fn a_panic_is_recorded_with_its_message() -> Result<()> {
+        let project = project()?;
+        let status = Arc::new(Status::new(project.path()));
+        status.hold_lock();
+        Status::record_panics(Arc::clone(&status));
+        let panicked = std::thread::spawn(|| panic!("a test panic")).join();
+        // The hook is global; later panics in other tests must not write here.
+        let _ = std::panic::take_hook();
+        assert!(panicked.is_err());
+        let text = fs::read_to_string(project.path().join(".mimirs/status"))?;
+        assert!(text.starts_with("error\n"), "{text}");
+        assert!(
+            text.contains("message: panicked at src/status.rs:"),
+            "{text}"
+        );
+        assert!(text.ends_with(": a test panic\n"), "{text}");
         Ok(())
     }
 
