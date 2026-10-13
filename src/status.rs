@@ -158,8 +158,11 @@ impl Status {
         state.ended = true;
     }
 
-    pub fn stopped(&self) {
-        let text = format!("stopped\nstopped: {}\n", now());
+    /// Record that the process ended on request; `reason` says how, such as
+    /// `stdin closed` or `SIGINT`.
+    pub fn stopped(&self, reason: &str) {
+        let reason = reason.replace('\n', " ");
+        let text = format!("stopped\nstopped: {}\nreason: {reason}\n", now());
         let mut state = self.lock();
         state.write(&text);
         state.ended = true;
@@ -294,7 +297,7 @@ mod tests {
         let project = project()?;
         let status = Status::new(project.path());
         status.catching_up();
-        status.stopped();
+        status.stopped("stdin closed");
         assert!(!project.path().join(".mimirs/status").exists());
         Ok(())
     }
@@ -305,7 +308,7 @@ mod tests {
         let status = Status::new(project.path());
         status.hold_lock();
         status.error("the file watcher\nstopped");
-        status.stopped();
+        status.stopped("stdin closed");
         status.catching_up();
         status.progress(1, 2);
         let text = fs::read_to_string(project.path().join(".mimirs/status"))?;
@@ -339,7 +342,7 @@ mod tests {
         let project = project()?;
         let status = Status::new(project.path());
         status.hold_lock();
-        status.stopped();
+        status.stopped("stdin closed");
         status.progress(1, 2);
         status.watching(&IndexChange::now(&Summary::default()));
         assert_eq!(state_of(&project)?, "stopped");

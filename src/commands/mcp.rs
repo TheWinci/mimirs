@@ -12,6 +12,7 @@ use tokio::sync::oneshot;
 
 use crate::indexing::{Indexer, Summary};
 use crate::lock;
+use crate::signals;
 use crate::status::{IndexChange, Status};
 use crate::watch::{self, Change};
 
@@ -62,12 +63,20 @@ async fn serve(root: PathBuf) -> anyhow::Result<()> {
         service.waiting().await?;
         anyhow::Ok(())
     };
-    // The writer can fail before the client finishes the handshake. Both
-    // states are recorded here, after the writer can no longer replace them.
+    // The writer can fail before the client finishes the handshake. Every
+    // ending is recorded here, after the writer can no longer replace it.
     tokio::select! {
         ended = session => {
-            status.stopped();
+            match &ended {
+                Ok(()) => status.stopped("stdin closed"),
+                Err(error) => status.stopped(&format!("session failed: {error:#}")),
+            }
             ended
+        }
+        signal = signals::wait_for_stop() => {
+            let signal = signal?;
+            status.stopped(signal);
+            Ok(())
         }
         written = writer_receiver => {
             // A panic drops the sender without a result; the panic hook has

@@ -33,7 +33,7 @@ tree-sitter-rust = "0.24.2"
 tree-sitter-md = "0.5.3"
 regex = "1.13.1"
 rmcp = { version = "3.5.1", default-features = false, features = ["server", "transport-io"] }
-tokio = { version = "1.53.2", features = ["macros", "rt", "sync"] }
+tokio = { version = "1.53.2", features = ["macros", "rt", "signal", "sync"] }
 notify = "8.2.0"
 
 [dev-dependencies]
