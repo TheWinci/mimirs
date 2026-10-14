@@ -1,0 +1,86 @@
+[
+  {
+    "query": "where is the Q object for combining filter conditions with AND/OR defined",
+    "expected": [
+      "django/db/models/query_utils.py"
+    ],
+    "kind": "definition"
+  },
+  {
+    "query": "where is the factory that builds fake request objects for testing views without the full test client",
+    "expected": [
+      "django/test/client.py"
+    ],
+    "kind": "definition"
+  },
+  {
+    "query": "register_converter custom path converter",
+    "expected": [
+      "django/urls/converters.py"
+    ],
+    "kind": "definition"
+  },
+  {
+    "query": "where is JsonResponse implemented",
+    "expected": [
+      "django/http/response.py"
+    ],
+    "kind": "definition"
+  },
+  {
+    "query": "generic DetailView class definition single object view",
+    "expected": [
+      "django/views/generic/detail.py"
+    ],
+    "kind": "definition"
+  },
+  {
+    "query": "override_settings decorator source",
+    "expected": [
+      "django/test/utils.py"
+    ],
+    "kind": "definition"
+  },
+  {
+    "query": "what names does django.test export to users, like TestCase and Client",
+    "expected": [
+      "django/test/__init__.py"
+    ],
+    "kind": "reexport"
+  },
+  {
+    "query": "public API of django.http package request response cookie classes list",
+    "expected": [
+      "django/http/__init__.py"
+    ],
+    "kind": "reexport"
+  },
+  {
+    "query": "which class-based generic views are available from django.views.generic",
+    "expected": [
+      "django/views/generic/__init__.py"
+    ],
+    "kind": "reexport"
+  },
+  {
+    "query": "where do path, include, reverse and resolve get exposed for django.urls",
+    "expected": [
+      "django/urls/__init__.py"
+    ],
+    "kind": "reexport"
+  },
+  {
+    "query": "where does django.db.models pull in fields, aggregates, constraints and indexes so users can write models.CharField",
+    "expected": [
+      "django/db/models/__init__.py"
+    ],
+    "kind": "reexport"
+  },
+  {
+    "query": "where are ArrayField, HStoreField and the range fields gathered for import from one place",
+    "expected": [
+      "django/contrib/postgres/fields/__init__.py"
+    ],
+    "kind": "reexport"
+  }
+]

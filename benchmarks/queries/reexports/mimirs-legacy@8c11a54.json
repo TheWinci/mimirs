@@ -1,0 +1,58 @@
+[
+  {
+    "query": "where is runGit implemented",
+    "expected": [
+      "src/git/exec.ts"
+    ],
+    "kind": "definition"
+  },
+  {
+    "query": "function that returns the current HEAD commit sha of a project",
+    "expected": [
+      "src/git/exec.ts"
+    ],
+    "kind": "definition"
+  },
+  {
+    "query": "GitCommitRow interface definition",
+    "expected": [
+      "src/db/types.ts"
+    ],
+    "kind": "definition"
+  },
+  {
+    "query": "Where is the PathFilter type declared?",
+    "expected": [
+      "src/db/types.ts"
+    ],
+    "kind": "definition"
+  },
+  {
+    "query": "which embedding model and vector size does the tool use out of the box",
+    "expected": [
+      "src/embeddings/embed.ts"
+    ],
+    "kind": "definition"
+  },
+  {
+    "query": "which row and search result types does the database module expose to consumers",
+    "expected": [
+      "src/db/index.ts"
+    ],
+    "kind": "reexport"
+  },
+  {
+    "query": "git helpers re-exported from the MCP tools layer so old importers keep working",
+    "expected": [
+      "src/tools/git-tools.ts"
+    ],
+    "kind": "reexport"
+  },
+  {
+    "query": "Where does the chunker pass through the import/export types from the bun-chunk package?",
+    "expected": [
+      "src/indexing/chunker.ts"
+    ],
+    "kind": "reexport"
+  }
+]

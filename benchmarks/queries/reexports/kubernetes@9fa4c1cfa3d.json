@@ -1,0 +1,58 @@
+[
+  {
+    "query": "where is the websocket Conn struct for channel multiplexing actually implemented, not the apimachinery wrapper",
+    "expected": [
+      "staging/src/k8s.io/streaming/pkg/httpstream/wsstream/conn.go"
+    ],
+    "kind": "definition"
+  },
+  {
+    "query": "where does apimachinery keep its old websocket stream API as thin aliases over the new streaming module",
+    "expected": [
+      "staging/src/k8s.io/apimachinery/pkg/util/httpstream/wsstream/wsstream.go"
+    ],
+    "kind": "reexport"
+  },
+  {
+    "query": "where does meta v1beta1 keep its table and partial-metadata types for backward compatibility by pointing at v1",
+    "expected": [
+      "staging/src/k8s.io/apimachinery/pkg/apis/meta/v1beta1/types.go"
+    ],
+    "kind": "reexport"
+  },
+  {
+    "query": "Where is the DRA DeviceID struct defined that the structured allocator aliases?",
+    "expected": [
+      "staging/src/k8s.io/dynamic-resource-allocation/structured/schedulerapi/types.go"
+    ],
+    "kind": "definition"
+  },
+  {
+    "query": "AnnotatedEventRecorder interface definition in client-go events, the actual interface, not the public alias",
+    "expected": [
+      "staging/src/k8s.io/client-go/tools/internal/events/interfaces.go"
+    ],
+    "kind": "definition"
+  },
+  {
+    "query": "which file in nodedeclaredfeatures re-exports PodInfo, Feature, FeatureGate and NodeConfiguration as convenience aliases",
+    "expected": [
+      "staging/src/k8s.io/component-helpers/nodedeclaredfeatures/types.go"
+    ],
+    "kind": "reexport"
+  },
+  {
+    "query": "how does component-base expose a process-wide default metrics registry for code that registers metrics globally",
+    "expected": [
+      "staging/src/k8s.io/component-base/metrics/legacyregistry/registry.go"
+    ],
+    "kind": "reexport"
+  },
+  {
+    "query": "where is FeatureRequirements struct for node declared features defined",
+    "expected": [
+      "staging/src/k8s.io/component-helpers/nodedeclaredfeatures/types/types.go"
+    ],
+    "kind": "definition"
+  }
+]

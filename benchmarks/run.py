@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Measure `mimirs context` on v1's query sets.
 
-Usage: python3 benchmarks/run.py [--index] [corpus ...]
+Usage: python3 benchmarks/run.py [--index] [--set NAME] [corpus ...]
 
 Each corpus is a local clone in ~/repos/benchmarks/mimirs/<corpus>, set up once
 by hand with its .mimirs/config.toml. Its queries are in
 benchmarks/queries/<corpus>@<commit>.json, and the clone must be at that commit.
+Extra query sets live in benchmarks/queries/<set>/ and run with --set <set>.
 """
 
 import argparse
@@ -36,10 +37,12 @@ MAP_LINE = re.compile(r"^\s*\d+\. (.+?):\d+  ")
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--index", action="store_true", help="run `mimirs index` first")
+    parser.add_argument("--set", help="run the queries in benchmarks/queries/<set>/ instead")
     parser.add_argument("corpora", nargs="*", help="corpus names; all when omitted")
     arguments = parser.parse_args()
 
-    query_sets = find_query_sets(arguments.corpora)
+    folder = QUERY_SETS / arguments.set if arguments.set else QUERY_SETS
+    query_sets = find_query_sets(folder, arguments.corpora)
     for corpus, commit, _ in query_sets:
         check_corpus(corpus, commit, arguments.index)
     subprocess.run(["cargo", "build", "--release", "--quiet"], cwd=REPO, check=True)
@@ -47,6 +50,7 @@ def main():
     results = {
         "date": datetime.datetime.now().isoformat(timespec="seconds"),
         "mimirs_commit": mimirs_commit(),
+        "set": arguments.set,
         "corpora": {},
     }
     for corpus, commit, path in query_sets:
@@ -64,22 +68,26 @@ def main():
     print_report(results)
     RESULTS.mkdir(parents=True, exist_ok=True)
     date = datetime.date.today().isoformat()
-    output = RESULTS / f"{date}-{results['mimirs_commit']}.json"
+    name = f"{date}-{results['mimirs_commit']}"
+    # A set gets its own file, so it never overwrites the main results.
+    if arguments.set:
+        name += f"-{arguments.set}"
+    output = RESULTS / f"{name}.json"
     output.write_text(json.dumps(results, indent=2) + "\n")
     print(f"\nSaved {output}")
 
 
-def find_query_sets(names):
-    """(corpus, commit, path) for each query set, limited to `names` when given."""
+def find_query_sets(folder, names):
+    """(corpus, commit, path) for each query set in `folder`, limited to `names` when given."""
     query_sets = []
-    for path in sorted(QUERY_SETS.glob("*@*.json")):
+    for path in sorted(folder.glob("*@*.json")):
         corpus, commit = path.stem.split("@")
         if not names or corpus in names:
             query_sets.append((corpus, commit, path))
     found = {corpus for corpus, _, _ in query_sets}
     unknown = [name for name in names if name not in found]
     if unknown:
-        sys.exit(f"No query set for {', '.join(unknown)} in {QUERY_SETS}")
+        sys.exit(f"No query set for {', '.join(unknown)} in {folder}")
     return query_sets
 
 
@@ -127,7 +135,10 @@ def rank_queries(corpus, folder, queries):
         ranks = {}
         for path in query["expected"]:
             ranks[path] = files.index(path) + 1 if path in files else None
-        ranked.append({"query": query["query"], "ranks": ranks})
+        entry = {"query": query["query"], "ranks": ranks}
+        if "kind" in query:
+            entry["kind"] = query["kind"]
+        ranked.append(entry)
     print()
     return ranked
 

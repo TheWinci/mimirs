@@ -1,0 +1,86 @@
+[
+  {
+    "query": "where is reconcileElements implemented, merging local and remote elements during collaboration",
+    "expected": [
+      "packages/excalidraw/data/reconcile.ts"
+    ],
+    "kind": "definition"
+  },
+  {
+    "query": "priority queue / heap data structure used in excalidraw common utilities",
+    "expected": [
+      "packages/common/src/binary-heap.ts"
+    ],
+    "kind": "definition"
+  },
+  {
+    "query": "how does pointRotateRads rotate a point around a center",
+    "expected": [
+      "packages/math/src/point.ts"
+    ],
+    "kind": "definition"
+  },
+  {
+    "query": "how do the utils find which elements overlap or fall inside a bounding box",
+    "expected": [
+      "packages/utils/src/withinBounds.ts"
+    ],
+    "kind": "definition"
+  },
+  {
+    "query": "PromisePool concurrency limit implementation",
+    "expected": [
+      "packages/common/src/promise-pool.ts"
+    ],
+    "kind": "definition"
+  },
+  {
+    "query": "where is the curve vs line segment intersection function defined",
+    "expected": [
+      "packages/math/src/curve.ts"
+    ],
+    "kind": "definition"
+  },
+  {
+    "query": "what does the @excalidraw/math package expose to consumers",
+    "expected": [
+      "packages/math/src/index.ts"
+    ],
+    "kind": "reexport"
+  },
+  {
+    "query": "common package public exports barrel",
+    "expected": [
+      "packages/common/src/index.ts"
+    ],
+    "kind": "reexport"
+  },
+  {
+    "query": "which modules make up the public API of the element package",
+    "expected": [
+      "packages/element/src/index.ts"
+    ],
+    "kind": "reexport"
+  },
+  {
+    "query": "@excalidraw/utils entry point exports",
+    "expected": [
+      "packages/utils/src/index.ts"
+    ],
+    "kind": "reexport"
+  },
+  {
+    "query": "what components and helpers does the main excalidraw npm package export, like Excalidraw, MainMenu, exportToBlob",
+    "expected": [
+      "packages/excalidraw/index.tsx"
+    ],
+    "kind": "reexport"
+  },
+  {
+    "query": "where are selection helpers and getNormalizedZoom re-exported together for the editor's scene code",
+    "expected": [
+      "packages/excalidraw/scene/index.ts"
+    ],
+    "kind": "reexport"
+  }
+]
