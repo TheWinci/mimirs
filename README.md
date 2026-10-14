@@ -123,6 +123,10 @@ only when you need more than they show.
   `--files <n>` for a longer or shorter file map (default 20).
 - If the first line starts with `Indexing failed`, tell the user: the index
   may be stale until the MCP server restarts.
+
+To see a file's shape before reading it, run `mimirs outline <file>...`. It
+lists each symbol as `path:start-end  kind  name`, so you can read only the
+lines you need.
 ````
 
 ## When something goes wrong

@@ -4,3 +4,4 @@ pub mod index;
 pub mod init;
 pub mod learn;
 pub mod mcp;
+pub mod outline;

@@ -44,6 +44,9 @@ enum Command {
     /// Retrieve context for a distilled query.
     Context(Box<commands::context::Options>),
 
+    /// Show each file's symbols with their line ranges.
+    Outline(Box<commands::outline::Options>),
+
     /// Serve MCP over stdio and keep the index current while the session runs.
     Mcp(Box<commands::mcp::Options>),
 }
@@ -57,6 +60,7 @@ fn main() -> Result<()> {
         Command::Index(options) => commands::index::run(*options)?,
         Command::Learn(options) => commands::learn::run(*options)?,
         Command::Context(options) => commands::context::run(*options)?,
+        Command::Outline(options) => commands::outline::run(*options)?,
         Command::Mcp(options) => commands::mcp::run(*options)?,
     }
 
