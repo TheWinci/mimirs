@@ -124,11 +124,29 @@ fn write_rows(
         row.push_str("  ");
         row.push_str(&signature(text, chunk));
     }
+    let children = children_of(chunks, Some(index));
+    // Orienting rarely needs each test, so a test module shows only a count.
+    if is_test_module(text, chunk) {
+        let noun = if children.len() == 1 { "item" } else { "items" };
+        row.push_str(&format!(" ({} {noun})", children.len()));
+        output.push_str(&row);
+        output.push('\n');
+        return;
+    }
     output.push_str(&row);
     output.push('\n');
-    for child in children_of(chunks, Some(index)) {
+    for child in children {
         write_rows(output, path, text, chunks, child, depth + 1);
     }
+}
+
+/// A Rust module marked `#[cfg(test)]`. The chunk's span starts at its
+/// attributes, so the mark sits before the body.
+fn is_test_module(text: &str, chunk: &Chunk) -> bool {
+    let Some(body) = &chunk.body else {
+        return false;
+    };
+    chunk.kind == "module" && text[chunk.bytes.start..body.start].contains("#[cfg(test)]")
 }
 
 #[cfg(test)]
@@ -155,8 +173,7 @@ cache.rs:27-31  impl  impl fmt::Display for Cache
 cache.rs:33-35  trait  pub trait Store
   cache.rs:34-34  method  fn load(&self) -> Vec<String>;
 cache.rs:37-41  macro  macro_rules! entry { ($key:expr) => { $key.to_string() }; }
-cache.rs:43-51  module  mod tests
-  cache.rs:47-50  function  fn starts_empty()
+cache.rs:43-51  module  mod tests (1 item)
 ";
         assert_eq!(outline("cache.rs", text)?, expected);
         Ok(())
@@ -299,6 +316,29 @@ guide.md:7-31  section  # Guide
         assert_eq!(
             outline,
             "notes.txt (2 lines)\nnotes.txt:1-2  lines\n    first\n    second\n"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_module_without_the_test_mark_shows_its_items() -> anyhow::Result<()> {
+        let text = "mod inner {\n    fn first() {}\n    fn second() {}\n}\n";
+        let expected = "\
+inner.rs (4 lines)
+inner.rs:1-4  module  mod inner
+  inner.rs:2-2  function  fn first()
+  inner.rs:3-3  function  fn second()
+";
+        assert_eq!(outline("inner.rs", text)?, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn a_test_module_counts_its_items() -> anyhow::Result<()> {
+        let text = "#[cfg(test)]\nmod tests {\n    fn first() {}\n    fn second() {}\n}\n";
+        assert_eq!(
+            outline("tests.rs", text)?,
+            "tests.rs (5 lines)\ntests.rs:1-5  module  mod tests (2 items)\n"
         );
         Ok(())
     }
