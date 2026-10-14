@@ -4,6 +4,9 @@ use anyhow::{Context, bail};
 use clap::Args;
 
 use crate::chunk::{Chunk, chunk_file, signature};
+
+/// Most lines an import or leftover block prints before it is cut.
+const BLOCK_LINES: usize = 20;
 use crate::files::read::read_text;
 
 #[derive(Args)]
@@ -34,15 +37,63 @@ fn outline_file(path: &str) -> anyhow::Result<String> {
 }
 
 /// A header line, then one row per chunk in line order, with children
-/// indented under their parent.
+/// indented under their parent. Neighbouring import and leftover chunks print
+/// as one block with their own lines.
 fn outline(path: &str, text: &str) -> anyhow::Result<String> {
     let chunks = chunk_file(path, text)?;
     let mut output = format!("{path} ({} lines)\n", text.lines().count());
     let top_level = children_of(&chunks, None);
-    for index in top_level {
-        write_rows(&mut output, path, text, &chunks, index, 0);
+    let mut position = 0;
+    while position < top_level.len() {
+        let index = top_level[position];
+        if !is_block(&chunks[index]) {
+            write_rows(&mut output, path, text, &chunks, index, 0);
+            position += 1;
+            continue;
+        }
+        // The chunker splits leftover text at 1,000 bytes for the embedding
+        // model; a reader sees the neighbours as one block.
+        let mut last = index;
+        while position + 1 < top_level.len() && is_block(&chunks[top_level[position + 1]]) {
+            position += 1;
+            last = top_level[position];
+        }
+        write_block(&mut output, path, text, &chunks[index], &chunks[last]);
+        position += 1;
     }
     Ok(output)
+}
+
+/// Import and leftover chunks hold code that is not a symbol.
+fn is_block(chunk: &Chunk) -> bool {
+    chunk.kind == "imports" || chunk.kind == "lines"
+}
+
+/// One row for the chunks from `first` to `last`, then their non-blank lines,
+/// cut after `BLOCK_LINES`.
+fn write_block(output: &mut String, path: &str, text: &str, first: &Chunk, last: &Chunk) {
+    let kind = if first.kind == last.kind {
+        first.kind.as_str()
+    } else {
+        "lines"
+    };
+    output.push_str(&format!(
+        "{path}:{}-{}  {kind}\n",
+        first.start_line, last.end_line
+    ));
+    let block = &text[first.bytes.start..last.bytes.end];
+    let lines: Vec<&str> = block
+        .lines()
+        .map(|line| line.trim_end_matches('\r'))
+        .filter(|line| !line.trim().is_empty())
+        .collect();
+    for line in lines.iter().take(BLOCK_LINES) {
+        output.push_str(&format!("    {line}\n"));
+    }
+    if lines.len() > BLOCK_LINES {
+        let more = lines.len() - BLOCK_LINES;
+        output.push_str(&format!("    … {more} more lines\n"));
+    }
 }
 
 /// The chunks directly under `parent`, by start line and then end line.
@@ -89,8 +140,11 @@ mod tests {
         let text = include_str!("../chunk/samples/cache.rs");
         let expected = "\
 cache.rs (51 lines)
-cache.rs:1-1  lines
-cache.rs:3-6  imports
+cache.rs:1-6  lines
+    //! Sample module for chunking tests, written for this repository.
+    use std::collections::HashMap;
+    use std::fmt;
+    mod storage;
 cache.rs:8-9  constant  pub const MAX_ENTRIES: usize = 1_000;
 cache.rs:11-14  struct  pub struct Cache
 cache.rs:16-25  impl  impl Cache
@@ -113,8 +167,11 @@ cache.rs:43-51  module  mod tests
         let text = include_str!("../chunk/samples/models.py");
         let expected = "\
 models.py (48 lines)
-models.py:1-1  lines
-models.py:3-6  imports
+models.py:1-6  lines
+    \"\"\"Sample module for chunking tests, written for this repository.\"\"\"
+    import functools
+    from datetime import timedelta
+    from .fields import CharField, IntegerField
 models.py:8-8  constant  DEFAULT_TIMEOUT = 30
 models.py:9-9  constant  EMPTY_VALUES = (None, \"\", [], (), {})
 models.py:12-17  class  class ModelBase(type)
@@ -126,6 +183,8 @@ models.py:20-40  class  class Article(metaclass=ModelBase)
   models.py:35-40  method  def expires_in(self, days=1)
 models.py:43-44  function  def get_article(pk)
 models.py:47-48  lines
+    if __name__ == \"__main__\":
+        print(get_article(1))
 ";
         assert_eq!(outline("models.py", text)?, expected);
         Ok(())
@@ -136,8 +195,10 @@ models.py:47-48  lines
         let text = include_str!("../chunk/samples/queue.ts");
         let expected = "\
 queue.ts (67 lines)
-queue.ts:1-1  lines
-queue.ts:3-4  imports
+queue.ts:1-4  lines
+    // Sample file for chunking tests, written for this repository.
+    import { run } from \"./run\";
+    import type { Task } from \"./task\";
 queue.ts:6-7  constant  export const DEFAULT_LIMIT = 100;
 queue.ts:9-12  interface  export interface QueueOptions
 queue.ts:14-14  type  export type Priority = \"low\" | \"high\";
@@ -156,6 +217,8 @@ queue.ts:55-59  namespace  declare global
   queue.ts:56-58  interface  interface Window
 queue.ts:61-63  function  export default function ()
 queue.ts:65-67  lines
+    export { run };
+    createQueue(1).drain();
 ";
         assert_eq!(outline("queue.ts", text)?, expected);
         Ok(())
@@ -166,8 +229,13 @@ queue.ts:65-67  lines
         let text = include_str!("../chunk/samples/cache.go");
         let expected = "\
 cache.go (50 lines)
-cache.go:1-2  lines
-cache.go:4-7  imports
+cache.go:1-7  lines
+    // Package cache keeps recently used values.
+    package cache
+    import (
+    	\"sync\"
+    	\"time\"
+    )
 cache.go:9-10  constant  const DefaultTTL = 5 * time.Minute
 cache.go:12-15  constant  const (MaxEntries = 1000 MinEntries = 10)
 cache.go:17-20  variable  var (hits int misses int)
@@ -190,12 +258,48 @@ cache.go:50-50  method  func (c Cache) Len() int
         let expected = "\
 guide.md (31 lines)
 guide.md:1-5  lines
+    ---
+    title: Sample guide
+    ---
+    Text before the first heading, written for chunking tests.
 guide.md:7-31  section  # Guide
   guide.md:11-19  section  ## Setup
   guide.md:20-31  section  ## Usage
     guide.md:24-31  section  ### Limits
 ";
         assert_eq!(outline("guide.md", text)?, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn a_long_block_merges_its_chunks_and_is_cut() -> anyhow::Result<()> {
+        // 50 export lines are over 1,000 bytes, so the chunker splits them.
+        let mut text = String::new();
+        for number in 1..=50 {
+            text.push_str(&format!(
+                "export * from \"./modules/module-number-{number:02}\";\n"
+            ));
+        }
+        let outline = outline("barrel.ts", &text)?;
+        let rows: Vec<&str> = outline.lines().collect();
+        assert_eq!(rows[1], "barrel.ts:1-50  lines");
+        assert_eq!(rows[2], "    export * from \"./modules/module-number-01\";");
+        assert_eq!(
+            rows[21],
+            "    export * from \"./modules/module-number-20\";"
+        );
+        assert_eq!(rows[22], "    … 30 more lines");
+        assert_eq!(rows.len(), 23);
+        Ok(())
+    }
+
+    #[test]
+    fn carriage_returns_do_not_print() -> anyhow::Result<()> {
+        let outline = outline("notes.txt", "first\r\nsecond\r\n")?;
+        assert_eq!(
+            outline,
+            "notes.txt (2 lines)\nnotes.txt:1-2  lines\n    first\n    second\n"
+        );
         Ok(())
     }
 
