@@ -7,8 +7,11 @@ mod go;
 mod markdown;
 mod python;
 mod rust;
+mod signature;
 mod symbols;
 mod typescript;
+
+pub use signature::signature;
 
 /// Most bytes a line chunk grows to; a longer line stays one chunk. Code uses
 /// about 4 bytes per token, so this is close to the model's 256-token limit.

@@ -125,7 +125,7 @@ only when you need more than they show.
   may be stale until the MCP server restarts.
 
 To see a file's shape before reading it, run `mimirs outline <file>...`. It
-lists each symbol as `path:start-end  kind  name`, so you can read only the
+lists each symbol as `path:start-end  kind  signature`, so you can read only the
 lines you need.
 ````
 

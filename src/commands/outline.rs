@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::{Context, bail};
 use clap::Args;
 
-use crate::chunk::{Chunk, chunk_file};
+use crate::chunk::{Chunk, chunk_file, signature};
 use crate::files::read::read_text;
 
 #[derive(Args)]
@@ -40,7 +40,7 @@ fn outline(path: &str, text: &str) -> anyhow::Result<String> {
     let mut output = format!("{path} ({} lines)\n", text.lines().count());
     let top_level = children_of(&chunks, None);
     for index in top_level {
-        write_rows(&mut output, path, &chunks, index, 0);
+        write_rows(&mut output, path, text, &chunks, index, 0);
     }
     Ok(output)
 }
@@ -54,21 +54,29 @@ fn children_of(chunks: &[Chunk], parent: Option<usize>) -> Vec<usize> {
     children
 }
 
-fn write_rows(output: &mut String, path: &str, chunks: &[Chunk], index: usize, depth: usize) {
+fn write_rows(
+    output: &mut String,
+    path: &str,
+    text: &str,
+    chunks: &[Chunk],
+    index: usize,
+    depth: usize,
+) {
     let chunk = &chunks[index];
     let indent = "  ".repeat(depth);
     let mut row = format!(
         "{indent}{path}:{}-{}  {}",
         chunk.start_line, chunk.end_line, chunk.kind
     );
-    if let Some(name) = &chunk.name {
+    // Import and leftover chunks have no name and no declaration.
+    if chunk.name.is_some() {
         row.push_str("  ");
-        row.push_str(name);
+        row.push_str(&signature(text, chunk));
     }
     output.push_str(&row);
     output.push('\n');
     for child in children_of(chunks, Some(index)) {
-        write_rows(output, path, chunks, child, depth + 1);
+        write_rows(output, path, text, chunks, child, depth + 1);
     }
 }
 
@@ -83,18 +91,18 @@ mod tests {
 cache.rs (51 lines)
 cache.rs:1-1  lines
 cache.rs:3-6  imports
-cache.rs:8-9  constant  MAX_ENTRIES
-cache.rs:11-14  struct  Cache
-cache.rs:16-25  impl  Cache
-  cache.rs:17-19  method  new
-  cache.rs:21-24  method  get
-cache.rs:27-31  impl  Cache
-  cache.rs:28-30  method  fmt
-cache.rs:33-35  trait  Store
-  cache.rs:34-34  method  load
-cache.rs:37-41  macro  entry
-cache.rs:43-51  module  tests
-  cache.rs:47-50  function  starts_empty
+cache.rs:8-9  constant  pub const MAX_ENTRIES: usize = 1_000;
+cache.rs:11-14  struct  pub struct Cache
+cache.rs:16-25  impl  impl Cache
+  cache.rs:17-19  method  pub fn new() -> Self
+  cache.rs:21-24  method  pub fn get(&self, key: &str) -> Option<&String>
+cache.rs:27-31  impl  impl fmt::Display for Cache
+  cache.rs:28-30  method  fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result
+cache.rs:33-35  trait  pub trait Store
+  cache.rs:34-34  method  fn load(&self) -> Vec<String>;
+cache.rs:37-41  macro  macro_rules! entry { ($key:expr) => { $key.to_string() }; }
+cache.rs:43-51  module  mod tests
+  cache.rs:47-50  function  fn starts_empty()
 ";
         assert_eq!(outline("cache.rs", text)?, expected);
         Ok(())
@@ -107,16 +115,16 @@ cache.rs:43-51  module  tests
 models.py (48 lines)
 models.py:1-1  lines
 models.py:3-6  imports
-models.py:8-8  constant  DEFAULT_TIMEOUT
-models.py:9-9  constant  EMPTY_VALUES
-models.py:12-17  class  ModelBase
-  models.py:15-17  method  __new__
-models.py:20-40  class  Article
-  models.py:24-25  class  Meta
-  models.py:27-29  method  __str__
-  models.py:31-33  method  is_popular
-  models.py:35-40  method  expires_in
-models.py:43-44  function  get_article
+models.py:8-8  constant  DEFAULT_TIMEOUT = 30
+models.py:9-9  constant  EMPTY_VALUES = (None, \"\", [], (), {})
+models.py:12-17  class  class ModelBase(type)
+  models.py:15-17  method  def __new__(cls, name, bases, attrs, **kwargs)
+models.py:20-40  class  class Article(metaclass=ModelBase)
+  models.py:24-25  class  class Meta
+  models.py:27-29  method  def __str__(self)
+  models.py:31-33  method  def is_popular(self)
+  models.py:35-40  method  def expires_in(self, days=1)
+models.py:43-44  function  def get_article(pk)
 models.py:47-48  lines
 ";
         assert_eq!(outline("models.py", text)?, expected);
@@ -130,23 +138,23 @@ models.py:47-48  lines
 queue.ts (67 lines)
 queue.ts:1-1  lines
 queue.ts:3-4  imports
-queue.ts:6-7  constant  DEFAULT_LIMIT
-queue.ts:9-12  interface  QueueOptions
-queue.ts:14-14  type  Priority
-queue.ts:16-19  enum  State
-queue.ts:21-38  class  Queue
-  queue.ts:27-27  method  constructor
-  queue.ts:29-29  method  push
-  queue.ts:30-30  method  size
-  queue.ts:30-32  method  drain
-  queue.ts:34-37  method  handleDone
-queue.ts:40-45  function  createQueue
-queue.ts:47-49  function  schedule
-queue.ts:51-53  namespace  Scheduler
-  queue.ts:52-52  function  start
-queue.ts:55-59  namespace  global
-  queue.ts:56-58  interface  Window
-queue.ts:61-63  function  default
+queue.ts:6-7  constant  export const DEFAULT_LIMIT = 100;
+queue.ts:9-12  interface  export interface QueueOptions
+queue.ts:14-14  type  export type Priority = \"low\" | \"high\";
+queue.ts:16-19  enum  export enum State
+queue.ts:21-38  class  export class Queue
+  queue.ts:27-27  method  constructor(private options: QueueOptions)
+  queue.ts:29-29  method  push(task: Task)
+  queue.ts:30-30  method  size()
+  queue.ts:30-32  method  drain()
+  queue.ts:34-37  method  private handleDone = (task: Task) =>
+queue.ts:40-45  function  export function createQueue(limit: number, onDrain?: () => void): Queue
+queue.ts:47-49  function  export const schedule = async (queue: Queue, task: Task) =>
+queue.ts:51-53  namespace  export namespace Scheduler
+  queue.ts:52-52  function  export function start()
+queue.ts:55-59  namespace  declare global
+  queue.ts:56-58  interface  interface Window
+queue.ts:61-63  function  export default function ()
 queue.ts:65-67  lines
 ";
         assert_eq!(outline("queue.ts", text)?, expected);
@@ -160,17 +168,17 @@ queue.ts:65-67  lines
 cache.go (50 lines)
 cache.go:1-2  lines
 cache.go:4-7  imports
-cache.go:9-10  constant  DefaultTTL
-cache.go:12-15  constant  MaxEntries
-cache.go:17-20  variable  hits
+cache.go:9-10  constant  const DefaultTTL = 5 * time.Minute
+cache.go:12-15  constant  const (MaxEntries = 1000 MinEntries = 10)
+cache.go:17-20  variable  var (hits int misses int)
 cache.go:22-25  types
-  cache.go:23-23  type  Key
-  cache.go:24-24  type  Value
-cache.go:27-31  struct  Cache
-cache.go:33-35  interface  Store
-cache.go:37-40  function  NewCache
-cache.go:42-48  method  Cache.Get
-cache.go:50-50  method  Cache.Len
+  cache.go:23-23  type  Key string
+  cache.go:24-24  type  Value []byte
+cache.go:27-31  struct  type Cache struct
+cache.go:33-35  interface  type Store interface
+cache.go:37-40  function  func NewCache() *Cache
+cache.go:42-48  method  func (c *Cache) Get(key Key) (Value, bool)
+cache.go:50-50  method  func (c Cache) Len() int
 ";
         assert_eq!(outline("cache.go", text)?, expected);
         Ok(())
@@ -182,10 +190,10 @@ cache.go:50-50  method  Cache.Len
         let expected = "\
 guide.md (31 lines)
 guide.md:1-5  lines
-guide.md:7-31  section  Guide
-  guide.md:11-19  section  Setup
-  guide.md:20-31  section  Usage
-    guide.md:24-31  section  Limits
+guide.md:7-31  section  # Guide
+  guide.md:11-19  section  ## Setup
+  guide.md:20-31  section  ## Usage
+    guide.md:24-31  section  ### Limits
 ";
         assert_eq!(outline("guide.md", text)?, expected);
         Ok(())
