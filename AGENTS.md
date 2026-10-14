@@ -1,25 +1,8 @@
-## Scope discipline
+## General rules
 
-- Implement only the requested slice and changes strictly necessary for it.
-- Questions about code request explanations, not edits.
-- Suggestions such as “maybe we should” are discussion, not authorization.
-- Do not add speculative features, abstractions, recovery policies, or future-proofing.
-- Preserve agreed module responsibilities unless explicitly asked to change them.
-- Before editing, state the intended scope in one sentence. Do not expand it silently.
-- Before finishing, review the diff and remove changes unrelated to the request.
-- When explaining a decision, explain the existing behavior without proposing extra features unless asked.
-
-## Readability and simplicity
-
-- Prefer straightforward code over clever or densely packed expressions.
-- Use one-liners only when they are easier to understand than multiple steps.
-- Give variables and functions names that describe their purpose; avoid
-  abbreviations such as `tx` and `rx` when a meaningful name is available.
-- Name intermediate values when doing so makes an expression easier to follow.
-- Keep each function focused on one responsibility.
-- Prefer concrete code over abstractions until a current requirement justifies them.
-- Accept small amounts of duplication when extracting a helper would obscure intent.
-- Comment on reasons and non-obvious constraints, not what the code already says.
+Scope and readability rules live in the `simple` skill:
+`~/repos/skills/skills/simple/SKILL.md`. It is imported globally from
+`~/.claude/CLAUDE.md`.
 
 ## Responsibilities
 
