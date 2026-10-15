@@ -59,6 +59,9 @@ Do not add a `Co-Authored-By` trailer or any other attribution trailer. The auth
 1. Set `version` in `Cargo.toml`, for example `2.0.0-alpha.4`.
 2. Run `cargo build` to update `Cargo.lock`.
 3. Run `cargo fmt`, `cargo clippy --all-targets`, and `cargo test`.
-4. Commit both files as `chore(release): prepare <version>`. Summarize the changes since the last release in the body.
-5. Tag the commit: `git tag -a v<version> -m "v<version>"`.
-6. Push the branch and the tag.
+4. Commit both files as `chore(release) <version>`. Summarize the changes since the last release in the body.
+5. Run `cargo package --list` and check that only `src/` and the crate files are packaged. Add anything else to `exclude` in `Cargo.toml`.
+6. Run `cargo publish --dry-run`.
+7. Tag the commit: `git tag -a v<version> -m "v<version>"`.
+8. Push the branch and the tag.
+9. Run `cargo publish`. A published version cannot be deleted, only yanked with `cargo yank --version <version>`.
