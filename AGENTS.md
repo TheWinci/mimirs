@@ -53,3 +53,12 @@ Run `cargo fmt` before every commit.
 Use Conventional Commits. Write a terse subject and a short reason. One commit for each slice.
 
 Do not add a `Co-Authored-By` trailer or any other attribution trailer. The author of the commit is the user.
+
+## Releases
+
+1. Set `version` in `Cargo.toml`, for example `2.0.0-alpha.4`.
+2. Run `cargo build` to update `Cargo.lock`.
+3. Run `cargo fmt`, `cargo clippy --all-targets`, and `cargo test`.
+4. Commit both files as `chore(release): prepare <version>`. Summarize the changes since the last release in the body.
+5. Tag the commit: `git tag -a v<version> -m "v<version>"`.
+6. Push the branch and the tag.
